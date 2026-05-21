@@ -57,7 +57,7 @@ export async function generateCarouselCampaign(params: {
     log('Slide copies generated')
 
     const designPrompts = await runStep('Design prompt generation', () =>
-      generateDesignPrompts(params.brandProfile, params.campaignInput, copies)
+      generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure)
     )
     log('Design prompts generated')
 
