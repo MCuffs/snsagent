@@ -14,9 +14,9 @@ interface GenerateCampaignResponse {
   error?: string
 }
 
-const contentTypes = ['뉴스형 카드뉴스', '트렌드형 카드뉴스', '정보형 카드뉴스', '미디어형 카드뉴스']
-const categories = ['AI 뉴스', '정치 이슈', '트렌드', '비즈니스', '라이프스타일', '데이터/통계', '커뮤니티 반응']
-const tones = ['진지하고 몰입감 있게', '빠르고 트렌디하게', '차분하고 신뢰감 있게', '프리미엄 매거진처럼', '저장하고 싶게']
+const contentTypes = ['신상품 홍보', '베스트셀러 추천', '고객 리얼 리뷰', '브랜드 스토리', '세일/이벤트 안내', '꿀팁/큐레이션']
+const categories = ['패션/의류', '뷰티/화장품', '리빙/인테리어', '푸드/식품', '디지털/가전', '라이프스타일', '반려동물', '기타']
+const tones = ['감성적이고 따뜻하게', '시크하고 고급스럽게', '톡톡 튀고 트렌디하게', '정보가 쏙쏙 들어오게', '신뢰감 있고 전문적이게']
 const loadingSteps = [
   '카드뉴스 스타일과 레이아웃을 선택하고 있습니다.',
   '이미지 모델용 비주얼 방향을 생성하고 있습니다.',
@@ -35,7 +35,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [brandId, setBrandId] = useState(brands[0]?.id || '')
-  const [contentType, setContentType] = useState(contentTypes[2])
+  const [contentType, setContentType] = useState(contentTypes[0])
   const [category, setCategory] = useState(categories[0])
   const [topic, setTopic] = useState('')
   const [title, setTitle] = useState('')
@@ -129,8 +129,8 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <Field label="주제" value={topic} onChange={setTopic} placeholder="예: 젠슨 황의 AI 발언이 던진 의미" required />
-          <Field label="제목" value={title} onChange={setTitle} placeholder="예: 젠슨 황, 왜 고통을 말했나" required />
+          <Field label="주제" value={topic} onChange={setTopic} placeholder="예: 신상품 리넨 원피스 출시" required />
+          <Field label="제목" value={title} onChange={setTitle} placeholder="예: 올여름 필수템, 핏 예쁜 리넨 원피스" required />
         </div>
 
         <div className="mt-6">
@@ -149,8 +149,8 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <Field label="비주얼 힌트" value={visualHint} onChange={setVisualHint} placeholder="예: 어두운 무대 조명, 인물은 우측" />
-          <Field label="출처/브랜드 표시" value={source} onChange={setSource} placeholder="예: InstaAgent Research" />
+          <Field label="비주얼 힌트" value={visualHint} onChange={setVisualHint} placeholder="예: 밝은 자연광이 비치는 화이트 톤 스튜디오, 리넨 패브릭 질감" />
+          <Field label="출처/브랜드 표시" value={source} onChange={setSource} placeholder="예: 스토어 브랜드명 또는 웹사이트 주소" />
         </div>
 
         <div className="mt-6">

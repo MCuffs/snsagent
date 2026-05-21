@@ -198,14 +198,14 @@ function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayo
       slideNumber: 1,
       role: 'hook',
       headline: input.title,
-      body: `${input.topic}에 대해 지금 알아야 할 핵심만 정리했습니다.`,
+      body: `${input.topic}의 특별한 소식과 핵심 가치를 전해드립니다.`,
       layoutType: firstSlideLayout(input, baseLayoutType),
     },
     {
       slideNumber: 2,
       role: 'context',
-      headline: '왜 지금 중요한가',
-      body: points[0] || `${input.topic}은 지금 ${input.category}에서 주목받는 이슈입니다.`,
+      headline: '오늘의 핵심 큐레이션',
+      body: points[0] || `${input.topic}은(는) 많은 분들이 찾으시는 ${input.category}의 인기 추천 아이템입니다.`,
       layoutType: contextLayout(baseLayoutType),
     },
   ]
@@ -216,7 +216,7 @@ function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayo
     slides.push({
       slideNumber: index,
       role: hasStat ? 'stat' : index % 2 === 0 ? 'detail' : 'key-point',
-      headline: hasStat ? '숫자로 보면' : `${index - 2}번째 포인트`,
+      headline: hasStat ? '숫자로 확인하는 가치' : `추천 포인트 ${index - 2}`,
       body: point,
       layoutType: hasStat ? 'stat-highlight' : supportingLayout(baseLayoutType, index),
     })
@@ -225,8 +225,8 @@ function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayo
   slides.push({
     slideNumber: slideCount,
     role: 'save-cta',
-    headline: '핵심만 저장하세요',
-    body: `${input.topic}을 다시 볼 수 있도록 저장해두면 좋습니다.`,
+    headline: '스토어에서 확인하세요',
+    body: `프로필 링크를 통해 ${input.topic}의 자세한 혜택을 만나보세요.`,
     layoutType: baseLayoutType === 'minimal-clean' ? 'quote-focus' : 'minimal-clean',
   })
 
@@ -245,7 +245,7 @@ function splitKeyPoints(content: string) {
 }
 
 function firstSlideLayout(input: MediaCarouselInput, baseLayoutType: LayoutType): LayoutType {
-  if (/뉴스|이슈|논란|속보/.test(`${input.category} ${input.contentType}`)) return 'dark-editorial'
+  if (/세일|할인|이벤트|특가|혜택/.test(`${input.category} ${input.contentType}`)) return 'breaking-news'
   if (/통계|실적|데이터|%|\d/.test(`${input.title} ${input.keyContent}`)) return 'stat-highlight'
   return baseLayoutType === 'minimal-clean' ? 'cinematic-headline' : baseLayoutType
 }
@@ -264,7 +264,7 @@ function supportingLayout(baseLayoutType: LayoutType, index: number): LayoutType
 }
 
 function buildCaption(input: MediaCarouselInput) {
-  return `${input.title}\n\n${input.keyContent.slice(0, 180)}${input.keyContent.length > 180 ? '...' : ''}\n\n저장해두고 다시 확인해보세요.`
+  return `${input.title}\n\n${input.keyContent.slice(0, 180)}${input.keyContent.length > 180 ? '...' : ''}\n\n자세한 혜택은 프로필 링크 스토어에서 확인해보세요.`
 }
 
 function buildHashtags(input: MediaCarouselInput) {
@@ -273,7 +273,7 @@ function buildHashtags(input: MediaCarouselInput) {
     .map(item => item.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .slice(0, 6)
-  return Array.from(new Set(['카드뉴스', '인스타그램콘텐츠', ...normalized])).map(tag => `#${tag}`)
+  return Array.from(new Set(['카드뉴스', '스토어추천', '쇼핑몰트렌드', ...normalized])).map(tag => `#${tag}`)
 }
 
 function normalizeSlideCount(slideCount: number) {
