@@ -22,8 +22,7 @@ export interface RenderMediaCardInput {
 
 export async function renderMediaCard(input: RenderMediaCardInput) {
   const textBox = getTextBox(input.layout)
-  const category = escapeXml(input.category)
-  const source = escapeXml(input.source || 'InstaAgent')
+  const source = escapeXml(normalizeInstagramHandle(input.source || 'instaagent'))
   const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
   const fontFam = fontFamily(input.layout.typographyStyle)
   const textColor = input.layout.overlayStyle === 'none' ? '#ffffff' : input.overlay.textColor
@@ -34,12 +33,8 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const headlineToBodyGap = input.layout.spacingRules?.headlineToBodyGap || 36
 
   let currentY = textBox.y
-  let categoryMarkup = ''
-  if (input.category) {
-    const badge = renderCategoryBadge(category, textBox.x, currentY, input.typography.emphasisColor, textBox.align)
-    categoryMarkup = badge.markup
-    currentY += badge.height + badgeToHeadlineGap
-  }
+  const sourceMarkup = renderTopHandle(source, textBox.x, currentY, textColor, textBox.align)
+  currentY += 30 + badgeToHeadlineGap
 
   const headlineStartBaseline = currentY + input.typography.headlineFontSize * 0.95
   const headlineMarkup = renderHeadline(input.typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam)
@@ -62,12 +57,12 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   <rect width="1080" height="1350" fill="#101114"/>
   <image href="${escapeXml(backgroundImageDataUri || input.backgroundImageUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"/>
   ${input.overlay.svgMarkup || renderFallbackOverlay()}
-  ${categoryMarkup}
+  ${sourceMarkup}
   <g filter="url(#text-shadow)">
     ${headlineMarkup}
     ${bodyMarkup}
   </g>
-  ${renderSourceBadge(source, input.layout.safeArea.left, 1268, textColor, input.typography.emphasisColor)}
+  ${renderSourceBadge(source, input.layout.safeArea.left, 1268, textColor)}
   ${input.totalPages && input.pageNumber ? renderPaginationDots(input.pageNumber, input.totalPages, 540, 1284) : ''}
 </svg>`
 
@@ -101,22 +96,11 @@ function getTextBox(layout: LayoutDefinition) {
   return { x: left, y: 710, align: 'left' as const }
 }
 
-function renderCategoryBadge(category: string, x: number, y: number, emphasisColor: string, align: 'left' | 'center') {
-  const badgeWidth = Math.max(104, estimateTextWidth(category, 20, 0.62) + 36)
-  const badgeHeight = 40
-  const badgeX = align === 'center' ? x - badgeWidth / 2 : x
-  const textX = badgeX + badgeWidth / 2
-  const textY = y + 27
-
-  return {
-    height: badgeHeight,
-    markup: `
-      <g class="category-badge">
-        <rect x="${badgeX}" y="${y}" width="${badgeWidth}" height="${badgeHeight}" rx="8" fill="${emphasisColor}"/>
-        <text x="${textX}" y="${textY}" text-anchor="middle" font-family="${fontFamily('bold-heavy')}" font-size="18" font-weight="900" fill="#ffffff" letter-spacing="1">${category}</text>
-      </g>
-    `,
-  }
+function renderTopHandle(source: string, x: number, y: number, fill: string, align: 'left' | 'center') {
+  const anchor = align === 'center' ? 'middle' : 'start'
+  return `
+    <text x="${x}" y="${y + 24}" text-anchor="${anchor}" font-family="${fontFamily('clean-sans')}" font-size="22" font-weight="500" fill="${fill}" fill-opacity="0.88" letter-spacing="0">${source}</text>
+  `
 }
 
 function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center', fontFam: string) {
@@ -126,7 +110,7 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
   return plan.headlineLines.map((line) => {
     const tspans = renderTokenTspans(line.tokens, plan.emphasisColor)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="950" fill="${fill}" letter-spacing="-2.2">${tspans || fallback}</text>`
+    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="500" fill="${fill}" letter-spacing="0">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
     return markup
   }).join('')
@@ -145,7 +129,7 @@ function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, al
   let currentY = y
 
   return plan.bodyLines.map((line) => {
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="800" fill="${fill}" letter-spacing="-0.5">${escapeXml(line)}</text>`
+    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="400" fill="${fill}" letter-spacing="0">${escapeXml(line)}</text>`
     currentY += plan.bodyFontSize * bodyLineGap
     return markup
   }).join('')
@@ -162,13 +146,12 @@ function renderPaginationDots(pageNumber: number, totalPages: number, centerX: n
   return `<g class="pagination-dots">${dots}</g>`
 }
 
-function renderSourceBadge(source: string, x: number, y: number, textColor: string, emphasisColor: string) {
+function renderSourceBadge(source: string, x: number, y: number, textColor: string) {
   if (!source) return ''
   const fontColor = textColor === '#ffffff' ? '#ffffff' : '#111111'
   return `
     <g class="brand-badge">
-      <circle cx="${x + 8}" cy="${y - 8}" r="6" fill="${emphasisColor}"/>
-      <text x="${x + 24}" y="${y}" font-family="${fontFamily('bold-heavy')}" font-size="22" font-weight="900" fill="${fontColor}" fill-opacity="0.9" letter-spacing="0.6">${escapeXml(source)}</text>
+      <text x="${x}" y="${y}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="500" fill="${fontColor}" fill-opacity="0.72" letter-spacing="0">${escapeXml(source)}</text>
     </g>
   `
 }
@@ -193,11 +176,15 @@ function fontFamily(style: string) {
   return 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif'
 }
 
-function estimateTextWidth(value: string, fontSize: number, ratio: number) {
-  return Array.from(value).reduce((sum, char) => {
-    const code = char.charCodeAt(0)
-    return sum + fontSize * (code >= 0xac00 && code <= 0xd7a3 ? 0.95 : ratio)
-  }, 0)
+function normalizeInstagramHandle(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return '@instaagent'
+  const withoutUrl = trimmed
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
+    .replace(/^instagram\.com\//i, '')
+    .split(/[/?#]/)[0]
+  const handle = withoutUrl.replace(/^@+/, '').replace(/\s+/g, '').toLowerCase()
+  return `@${handle || 'instaagent'}`
 }
 
 function escapeXml(value: string) {

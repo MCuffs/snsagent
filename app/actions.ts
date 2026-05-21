@@ -273,6 +273,9 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
     if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
     if (existingSlide.campaign.userId !== user.id) return forbidden()
 
+    const brand = await dbService.getBrand(existingSlide.campaign.brandId)
+    const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
+    const source = account?.username || brand?.name || 'instaagent'
     const layout = LAYOUT_DEFINITIONS[inferLayoutType(existingSlide.designPrompt)]
     const typography = planTypography({
       headline,
@@ -295,7 +298,7 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
       headline,
       body,
       backgroundImageUrl: background.imageUrl,
-      source: existingSlide.campaign.title,
+      source,
       pageNumber: existingSlide.slideNumber,
       totalPages: existingSlide.campaign.slideCount,
     })
@@ -439,6 +442,8 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
 
   const brand = await dbService.getBrand(campaign.brandId)
   if (!brand) return failed('브랜드 정보를 찾을 수 없습니다.')
+  const account = await dbService.getInstagramAccount(user.id, campaign.brandId)
+  const source = account?.username || brand.name
 
   const styleKeywords: Record<string, string> = {
     minimalist: 'Korean media documentary photo, subdued realistic scene, dark editorial contrast, no generated text',
@@ -475,7 +480,7 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
           headline: slide.headline,
           body: slide.body,
           backgroundImageUrl: imgResult.imageUrl,
-          source: brand.name,
+          source,
           pageNumber: slide.slideNumber,
           totalPages: campaign.slideCount,
         })

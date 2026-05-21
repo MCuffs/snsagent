@@ -117,19 +117,19 @@ function getBodyLineChars(layout: LayoutDefinition) {
 
 function getHeadlineFontSize(layout: LayoutDefinition, lineCount: number) {
   const base = layout.typographyStyle === 'stat-numeric'
-    ? 104
+    ? 86
     : layout.typographyStyle === 'quote-large'
-      ? 82
+      ? 72
       : layout.typographyStyle === 'clean-sans'
-        ? 70
-        : 78
+        ? 62
+        : 68
 
   // 라인이 많아질수록 폰트 스케일을 서서히 줄여서 오버플로우 방지
-  return Math.max(54, base - Math.max(0, lineCount - 2) * 8)
+  return Math.max(48, base - Math.max(0, lineCount - 2) * 7)
 }
 
 function getBodyFontSize(layout: LayoutDefinition) {
-  return layout.typographyStyle === 'clean-sans' ? 34 : 31
+  return layout.typographyStyle === 'clean-sans' ? 29 : 27
 }
 
 function getEmphasisColor(palette: string[]) {

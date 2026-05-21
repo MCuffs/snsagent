@@ -56,6 +56,8 @@ export async function POST(request: Request) {
     }
 
     if (body.campaignType === 'media') {
+      const account = await dbService.getInstagramAccount(user.id, brand.id)
+      const source = body.source || account?.username || brand.name
       const result = await generateMediaCarousel({
         userId: user.id,
         brandId: brand.id,
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
         tone: body.tone || '감성적이고 따뜻하게',
         contentType: body.contentType || '신상품 홍보',
         slideCount: normalizeSlideCount(body.slideCount),
-        source: body.source || brand.name,
+        source,
         visualHint: body.visualHint,
       })
 
