@@ -5,7 +5,8 @@ import { dbService, User } from '../lib/db-service'
 import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
-import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode, getAppBaseUrl } from '../lib/env'
+import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey } from '../lib/env'
+import { OpenAI } from 'openai'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { renderSlide } from '../src/lib/carousel/renderer'
@@ -642,5 +643,236 @@ export async function updatePostScheduledTimeAction(postId: string, dateStr: str
     return { success: true as const, post }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '예약 시간 수정에 실패했습니다.'))
+  }
+}
+
+function cleanHtmlText(html: string): string {
+  // Remove script, style, svg, header, footer, nav tags and their contents
+  let text = html.replace(/<(script|style|svg|noscript|header|footer|nav)[^>]*>([\s\S]*?)<\/\1>/gi, '')
+  // Remove all HTML tags
+  text = text.replace(/<[^>]+>/g, ' ')
+  // Decode common HTML entities
+  text = text.replace(/&nbsp;/g, ' ')
+             .replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&amp;/g, '&')
+             .replace(/&quot;/g, '"')
+             .replace(/&#39;/g, "'")
+  // Normalize whitespace
+  text = text.replace(/\s+/g, ' ').trim()
+  // Limit character size to optimize token usage
+  return text.substring(0, 5000)
+}
+
+export async function analyzeBrandWebsiteAction(url: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  if (!url || !url.startsWith('http')) {
+    return failed('올바른 URL 형식(http:// 또는 https://)을 입력해 주세요.')
+  }
+
+  try {
+    console.log(`Scraping URL: ${url}`)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    })
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`웹사이트를 불러오지 못했습니다. (HTTP ${response.status})`)
+    }
+
+    const html = await response.text()
+    const cleanedText = cleanHtmlText(html)
+
+    if (cleanedText.length < 50) {
+      throw new Error('웹사이트에서 텍스트 정보를 충분히 추출할 수 없습니다. 빈 페이지이거나 차단되었을 수 있습니다.')
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY
+    const useRealAI = isConfiguredOpenAIKey(apiKey)
+
+    if (useRealAI) {
+      const openai = new OpenAI({ apiKey })
+      const prompt = `
+You are an expert brand consultant and digital marketer.
+Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
+Also, write a professional brand analysis report in Markdown format.
+
+[Scraped Website Content]
+${cleanedText}
+
+[Requirements]
+1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style for Instagram.
+2. The primary brand color must be a high-quality hex color code (e.g. '#B94718', '#2D3748', etc.) that represents the brand's aesthetic.
+3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry.
+4. The tone of voice must match one of these pre-defined options or a custom short variant:
+   - "친근하고 명확한 톤" (Friendly and clear)
+   - "전문적이고 신뢰감 있는 톤" (Professional and trustworthy)
+   - "젊고 경쾌한 톤" (Young and cheerful)
+   - "고급스럽고 차분한 톤" (Premium and calm)
+5. The industry must fit one of: '온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'.
+6. Write a brand identity report in Markdown (under "markdownReport"). Keep it professional, informative, and written in Korean (한국어). The report should outline the Brand Identity, Key Strengths, and SNS content strategy suggestions.
+
+You MUST respond ONLY with a valid JSON object matching the following structure:
+{
+  "name": "Brand Name (Korean/English)",
+  "industry": "One of the 6 industries listed above",
+  "targetAudience": "Target customers description (e.g. 2030 여성 직장인)",
+  "toneOfVoice": "One of the 4 tones listed above",
+  "mainColor": "#HEXCODE",
+  "forbiddenWords": "word1, word2, word3",
+  "ctaStyle": "A short call-to-action recommendation (e.g. 프로필 링크에서 만나보기)",
+  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서\\n\\n## 1. 브랜드 정체성\\n...\\n\\n## 2. SNS 콘텐츠 전략\\n..."
+}
+`
+
+      const aiResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a brand analysis AI agent. Return JSON only.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' }
+      })
+
+      const rawJson = aiResponse.choices[0].message.content
+      if (rawJson) {
+        const parsed = JSON.parse(rawJson)
+        return {
+          success: true as const,
+          brandProfile: {
+            name: parsed.name || '알 수 없음',
+            industry: parsed.industry || '온라인 스토어',
+            targetAudience: parsed.targetAudience || '대중 고객',
+            toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
+            mainColor: parsed.mainColor || '#b94718',
+            forbiddenWords: parsed.forbiddenWords || '',
+            ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
+          },
+          markdownReport: parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.'
+        }
+      } else {
+        throw new Error('AI 분석 실패: 응답이 비어있습니다.')
+      }
+
+    } else {
+      console.log('Using Mock Brand Website Analyzer (OpenAI key not configured)')
+      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulation delay
+
+      const lowerUrl = url.toLowerCase()
+      let mockProfile = {
+        name: '모카 숍 (Mock)',
+        industry: '온라인 스토어',
+        targetAudience: '2030 트렌디한 쇼핑족',
+        toneOfVoice: '젊고 경쾌한 톤',
+        mainColor: '#E28743',
+        forbiddenWords: '최저가, 100% 보장, 광고',
+        ctaStyle: '스토어에서 자세히 보기'
+      }
+      let typeLabel = '온라인 셀렉트숍'
+      let strengths = '트렌디한 아이템 큐레이션 및 빠른 고객 응대'
+      let colorDesc = '따뜻하고 활력 있는 오렌지 브라운 계열 (#E28743)'
+
+      if (lowerUrl.includes('cafe') || lowerUrl.includes('coffee') || lowerUrl.includes('roast')) {
+        mockProfile = {
+          name: '카페 모카 (Mock)',
+          industry: '카페 / F&B',
+          targetAudience: '아늑한 휴식을 찾는 카공족 및 커피 애호가',
+          toneOfVoice: '고급스럽고 차분한 톤',
+          mainColor: '#6F4E37',
+          forbiddenWords: '존맛, 최고존엄, 절대 실패없는',
+          ctaStyle: '프로필 링크에서 예약하기'
+        }
+        typeLabel = '스페셜티 커피 전문 F&B'
+        strengths = '매일 볶는 신선한 원두와 아늑한 인테리어 분위기'
+        colorDesc = '커피 향을 담은 깊고 부드러운 브라운 계열 (#6F4E37)'
+      } else if (lowerUrl.includes('fit') || lowerUrl.includes('gym') || lowerUrl.includes('health') || lowerUrl.includes('pilates')) {
+        mockProfile = {
+          name: '에너지 피트니스 (Mock)',
+          industry: '피트니스',
+          targetAudience: '체력 증진과 바디프로필을 목표로 하는 직장인',
+          toneOfVoice: '친근하고 명확한 톤',
+          mainColor: '#1A365D',
+          forbiddenWords: '단기간 폭풍감량, 부작용 제로, 기적',
+          ctaStyle: '무료 상담 신청하기'
+        }
+        typeLabel = '체계적 PT 전문 헬스센터'
+        strengths = '개인 맞춤 피드백과 과학적 운동 데이터 제공'
+        colorDesc = '신뢰감과 에너지를 부여하는 네이비 블루 계열 (#1A365D)'
+      } else if (lowerUrl.includes('beauty') || lowerUrl.includes('skin') || lowerUrl.includes('salon') || lowerUrl.includes('care')) {
+        mockProfile = {
+          name: '라벨 뷰티 (Mock)',
+          industry: '뷰티 / 케어',
+          targetAudience: '자연스러운 스킨케어와 이너뷰티를 지향하는 고객',
+          toneOfVoice: '고급스럽고 차분한 톤',
+          mainColor: '#D9A5B3',
+          forbiddenWords: '기적의 피부, 즉각 효과, 무조건 성공',
+          ctaStyle: 'DM으로 문의하기'
+        }
+        typeLabel = '토탈 에스테틱 뷰티 살롱'
+        strengths = '피부 저자극 프리미엄 천연 아로마 케어 및 1:1 예약제 관리'
+        colorDesc = '우아하고 세련된 더스티 핑크 계열 (#D9A5B3)'
+      } else if (lowerUrl.includes('tech') || lowerUrl.includes('saas') || lowerUrl.includes('software') || lowerUrl.includes('app')) {
+        mockProfile = {
+          name: '센스 에이전트 (Mock)',
+          industry: 'IT / SaaS',
+          targetAudience: '업무 자동화와 스마트 워크를 지향하는 1인 기업 및 소상공인',
+          toneOfVoice: '전문적이고 신뢰감 있는 톤',
+          mainColor: '#4A5568',
+          forbiddenWords: '세계 1등, 절대 깨지지 않는, 무한 기능',
+          ctaStyle: '프로필 링크에서 무료로 시작하기'
+        }
+        typeLabel = 'AI 기반 업무 자동화 SaaS 솔루션'
+        strengths = '반복 업무 90% 이상 절감 및 사용자 친화적 대시보드'
+        colorDesc = '스마트하고 정돈된 슬레이트 그레이 계열 (#4A5568)'
+      }
+
+      const markdownReport = `# 🏷️ 브랜드 분석 및 구도 기획서 (시뮬레이터)
+
+본 보고서는 사용자가 입력한 사이트 URL(\`${url}\`)을 AI 기반으로 분석하여 추출한 브랜드 정체성 및 SNS 콘텐츠 가이드라인입니다. *(현재 로컬 시뮬레이션 모드로 분석되었습니다)*
+
+## 1. 브랜드 기본 프로필
+* **브랜드명**: \`${mockProfile.name}\`
+* **업종**: \`${mockProfile.industry}\` (${typeLabel})
+* **메인 컬러**: ${colorDesc}
+
+## 2. 브랜드 정체성 & 강점
+* **핵심 타겟**: ${mockProfile.targetAudience}
+* **브랜드 경쟁력**: ${strengths}
+* **권장 톤앤매너**: ${mockProfile.toneOfVoice} (일관된 인스타그램 브랜딩에 도움을 줍니다)
+
+## 3. SNS 인스타그램 추천 전략
+* **콘텐츠 포커스**:
+  1. 정보성 콘텐츠 위주로 전문성과 신뢰도를 확보합니다.
+  2. 고객 피드백과 비포/애프터(혹은 후기)를 가공해 캐러셀 카드뉴스로 발행합니다.
+* **사용 지양 용어 (금칙어)**: \`${mockProfile.forbiddenWords}\` (인스타그램 가이드라인 준수 및 브랜드 신뢰 유지를 위해 사용을 삼가세요)
+* **피드 전환율 상승을 위한 CTA**: \`${mockProfile.ctaStyle}\`
+`
+
+      return {
+        success: true as const,
+        brandProfile: mockProfile,
+        markdownReport
+      }
+    }
+  } catch (err: unknown) {
+    console.error('Brand Website Analysis failed:', err)
+    return failed(err instanceof Error ? err.message : '웹사이트를 분석하는 중 알 수 없는 오류가 발생했습니다.')
   }
 }
