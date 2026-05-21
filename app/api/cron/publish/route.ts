@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dbService } from '../../../../lib/db-service'
 import { schedulePost, tokenEncryptor } from '../../../../lib/instagram/client'
-import { isInstagramMockMode } from '../../../../lib/env'
+import { isInstagramMockMode, getAppBaseUrl } from '../../../../lib/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,9 +64,16 @@ async function handleCron(request: NextRequest) {
             throw new Error('Campaign data not found.')
           }
 
+          const baseUrl = getAppBaseUrl(request)
           const imageUrls = campaign.slides
             .sort((a, b) => a.slideNumber - b.slideNumber)
-            .map(s => s.imageUrl)
+            .map(s => {
+              if (!s.imageUrl) return null
+              if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) {
+                return s.imageUrl
+              }
+              return `${baseUrl}${s.imageUrl}`
+            })
             .filter((url): url is string => !!url)
 
           if (imageUrls.length === 0) {

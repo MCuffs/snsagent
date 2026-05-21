@@ -5,7 +5,7 @@ import { dbService, User } from '../lib/db-service'
 import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
-import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode } from '../lib/env'
+import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode, getAppBaseUrl } from '../lib/env'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { renderSlide } from '../src/lib/carousel/renderer'
@@ -370,10 +370,17 @@ export async function approveAndScheduleCampaignAction(
     const accountId = account?.instagramAccountId || getInstagramAccountId()
     const decryptedToken = account ? tokenEncryptor.decrypt(account.accessTokenEncrypted) : ''
 
+    const baseUrl = getAppBaseUrl()
     // Gather all slide images
     const imageUrls = campaign.slides
       .sort((a, b) => a.slideNumber - b.slideNumber)
-      .map(s => s.imageUrl)
+      .map(s => {
+        if (!s.imageUrl) return null
+        if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) {
+          return s.imageUrl
+        }
+        return `${baseUrl}${s.imageUrl}`
+      })
       .filter((url): url is string => !!url)
 
     if (imageUrls.length === 0) {
@@ -546,10 +553,17 @@ export async function triggerSchedulerAction() {
             throw new Error('캠페인을 찾을 수 없습니다.')
           }
 
+          const baseUrl = getAppBaseUrl()
           // Gather all slide images
           const imageUrls = campaign.slides
             .sort((a, b) => a.slideNumber - b.slideNumber)
-            .map(s => s.imageUrl)
+            .map(s => {
+              if (!s.imageUrl) return null
+              if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) {
+                return s.imageUrl
+              }
+              return `${baseUrl}${s.imageUrl}`
+            })
             .filter((url): url is string => !!url)
 
           if (imageUrls.length === 0) {
