@@ -42,9 +42,9 @@ const quickFlow = [
 ]
 
 const showcaseImages = [
-  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1', className: 'showcase-card-one' },
-  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2', className: 'showcase-card-two' },
-  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3', className: 'showcase-card-three' },
+  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1', className: 'showcase-slide-one' },
+  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2', className: 'showcase-slide-two' },
+  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3', className: 'showcase-slide-three' },
 ]
 
 export default function LandingPage() {
@@ -52,9 +52,9 @@ export default function LandingPage() {
     <main className="min-h-screen overflow-hidden bg-white text-[#101827]">
       <section className="premium-blue-bg relative flex min-h-screen flex-col">
         <div className="ambient-lines" />
-        <div className="showcase-stack" aria-hidden="true">
+        <div className="showcase-carousel" aria-hidden="true">
           {showcaseImages.map((image) => (
-            <div key={image.alt} className={`showcase-card ${image.className}`}>
+            <div key={image.alt} className={`showcase-slide ${image.className}`}>
               <Image
                 src={image.src}
                 alt={image.alt}
