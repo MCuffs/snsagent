@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, Check, ClipboardList, Images, PenLine, Sparkles } from 'lucide-react'
 
 export const metadata = {
@@ -40,11 +41,31 @@ const quickFlow = [
   '결과 저장',
 ]
 
+const showcaseImages = [
+  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1', className: 'showcase-card-one' },
+  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2', className: 'showcase-card-two' },
+  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3', className: 'showcase-card-three' },
+]
+
 export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-white text-[#101827]">
       <section className="premium-blue-bg relative flex min-h-screen flex-col">
         <div className="ambient-lines" />
+        <div className="showcase-stack" aria-hidden="true">
+          {showcaseImages.map((image) => (
+            <div key={image.alt} className={`showcase-card ${image.className}`}>
+              <Image
+                src={image.src}
+                alt={image.alt}
+                fill
+                priority
+                sizes="220px"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
         <header className="relative z-20 border-b border-[#dbe8f7]/70 bg-white/68 backdrop-blur-xl">
           <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-6 lg:px-10">
             <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-[-0.035em]">
