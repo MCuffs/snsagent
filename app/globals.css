@@ -176,26 +176,32 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    min-height: 3.5rem;
-    border-radius: 999px;
-    border: 1px solid #d9e8f7;
-    background: rgba(255, 255, 255, 0.92);
-    color: #17324d;
-    font-size: 0.875rem;
-    font-weight: 850;
-    box-shadow: 0 16px 42px rgba(32, 92, 145, 0.1);
+    gap: 0.875rem;
+    min-height: 3.625rem;
+    border-radius: 0.75rem;
+    border: 1px solid #dadce0;
+    background: #fff;
+    color: #3c4043;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 28px rgba(32, 92, 145, 0.08);
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   }
 
   .btn-google:hover {
-    border-color: #b9d9f5;
-    background: #fff;
-    box-shadow: 0 18px 48px rgba(32, 92, 145, 0.14);
+    border-color: #c6c8cc;
+    background: #f8fafd;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12), 0 12px 34px rgba(32, 92, 145, 0.12);
   }
 
   .btn-google:active {
     transform: translateY(1px);
+  }
+
+  .google-mark {
+    height: 1.25rem;
+    width: 1.25rem;
+    flex: 0 0 auto;
   }
 
   .field {
