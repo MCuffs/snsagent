@@ -13,6 +13,11 @@ export function runMediaCardQualityCheck(params: {
   headline: string
   body: string
   backgroundImageUrl: string
+  harnessDiagnostics?: {
+    score: number
+    issues: string[]
+    rules: string[]
+  }
 }) {
   const issues: string[] = []
   const suggestions: string[] = []
@@ -20,6 +25,13 @@ export function runMediaCardQualityCheck(params: {
   if (!params.backgroundImageUrl) {
     issues.push('배경 이미지 URL이 없습니다.')
     suggestions.push('이미지 provider fallback을 확인하세요.')
+  }
+
+  if (params.harnessDiagnostics) {
+    if (params.harnessDiagnostics.score < 90) {
+      issues.push(`카드뉴스 하네스 점수가 낮습니다 (${params.harnessDiagnostics.score}점).`)
+    }
+    suggestions.push(...params.harnessDiagnostics.issues)
   }
 
   // 1. 가독성 경고 병합
@@ -60,7 +72,7 @@ export function runMediaCardQualityCheck(params: {
   const headlineLineGap = params.layout.spacingRules?.headlineLineGap || 1.10
   const bodyLineGap = params.layout.spacingRules?.bodyLineGap || 1.42
 
-  const categoryHeight = 44 // 카테고리 뱃지 높이 고정
+  const categoryHeight = 28
   const headlineHeight = params.typography.headlineLines.length * params.typography.headlineFontSize * headlineLineGap
   const bodyHeight = params.typography.bodyLines.length * params.typography.bodyFontSize * bodyLineGap
   

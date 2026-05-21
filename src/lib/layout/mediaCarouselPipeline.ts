@@ -3,7 +3,7 @@ import type { ImageProvider } from '../ai/imageProvider'
 import { getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
-import { generateOverlay } from './overlayEngine'
+import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
@@ -78,8 +78,16 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
   for (const slide of slidePlans) {
     const layout = LAYOUT_DEFINITIONS[slide.layoutType]
-    const visualDirection = generateVisualDirection({
+    const typographyPlan = planTypography({
+      headline: slide.headline,
+      body: slide.body,
+      category: input.category,
       layout,
+      brandMainColor: input.brandMainColor,
+    })
+    const harness = applyMediaCardHarness({ layout, typography: typographyPlan })
+    const visualDirection = generateVisualDirection({
+      layout: harness.layout,
       category: input.category,
       topic: input.topic,
       tone: input.tone,
@@ -88,40 +96,33 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       brandToneOfVoice: input.brandToneOfVoice,
       brandIndustry: input.brandIndustry,
     })
-    const background = await imageProvider.generateImage(visualDirection.prompt, {
+    const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt), {
       size: '1024x1024',
       productImageUrls: [],
     })
-    const typography = planTypography({
-      headline: slide.headline,
-      body: slide.body,
-      category: input.category,
-      layout,
-      brandMainColor: input.brandMainColor,
-    })
-    const overlay = generateOverlay(layout.overlayStyle)
     analyzeReferencePattern({
-      layoutType: slide.layoutType,
+      layoutType: harness.layout.layoutType,
       headlineLength: slide.headline.length,
       bodyLength: slide.body.length,
       hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
     })
 
     const qualityCheck = runMediaCardQualityCheck({
-      layout,
-      typography,
+      layout: harness.layout,
+      typography: harness.typography,
       headline: slide.headline,
       body: slide.body,
       backgroundImageUrl: background.imageUrl,
+      harnessDiagnostics: harness.diagnostics,
     })
     qualityIssues.push(...qualityCheck.issues.map(issue => `${slide.slideNumber}장: ${issue}`))
     qualitySuggestions.push(...qualityCheck.suggestions.map(suggestion => `${slide.slideNumber}장: ${suggestion}`))
 
     const finalImageUrl = await renderMediaCard({
       id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
-      layout,
-      typography,
-      overlay,
+      layout: harness.layout,
+      typography: harness.typography,
+      overlay: harness.overlay,
       category: input.category,
       headline: slide.headline,
       body: slide.body,

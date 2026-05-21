@@ -2,7 +2,8 @@ import type { ImageProvider } from '../ai/imageProvider'
 import { getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutDefinition, type LayoutType } from './layoutTypes'
-import { generateOverlay } from './overlayEngine'
+import type { OverlayPlan } from './overlayEngine'
+import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
 import { planTypography } from './typographyEngine'
 import { runMediaCardQualityCheck } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
@@ -29,7 +30,7 @@ export interface GenerateMediaCardResult {
   visualDirection: ReturnType<typeof generateVisualDirection>
   backgroundImageUrl: string
   typography: ReturnType<typeof planTypography>
-  overlay: ReturnType<typeof generateOverlay>
+  overlay: OverlayPlan
   referencePattern: ReturnType<typeof analyzeReferencePattern>
   finalImageUrl: string
   qualityCheck: ReturnType<typeof runMediaCardQualityCheck>
@@ -43,28 +44,28 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
     contentType: input.contentType,
   })
   const layout = LAYOUT_DEFINITIONS[layoutType]
-  const visualDirection = generateVisualDirection({
+
+  const imageProvider = input.imageProvider || getPipelineImageProvider()
+  const typographyPlan = planTypography({
+    headline: input.title,
+    body: input.keyContent,
+    category: input.category,
     layout,
+  })
+  const harness = applyMediaCardHarness({ layout, typography: typographyPlan })
+  const visualDirection = generateVisualDirection({
+    layout: harness.layout,
     category: input.category,
     topic: input.topic,
     tone: input.tone,
     visualHint: input.visualHint,
   })
 
-  const imageProvider = input.imageProvider || getPipelineImageProvider()
-  const background = await imageProvider.generateImage(visualDirection.prompt, {
+  const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt), {
     size: '1024x1024',
     productImageUrls: [],
   })
 
-  const typography = planTypography({
-    headline: input.title,
-    body: input.keyContent,
-    category: input.category,
-    layout,
-  })
-
-  const overlay = generateOverlay(layout.overlayStyle)
   const referencePattern = analyzeReferencePattern({
     layoutType,
     headlineLength: input.title.length,
@@ -73,18 +74,19 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
   })
 
   const qualityCheck = runMediaCardQualityCheck({
-    layout,
-    typography,
+    layout: harness.layout,
+    typography: harness.typography,
     headline: input.title,
     body: input.keyContent,
     backgroundImageUrl: background.imageUrl,
+    harnessDiagnostics: harness.diagnostics,
   })
 
   const finalImageUrl = await renderMediaCard({
     id: `media-card-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    layout,
-    typography,
-    overlay,
+    layout: harness.layout,
+    typography: harness.typography,
+    overlay: harness.overlay,
     category: input.category,
     headline: input.title,
     body: input.keyContent,
@@ -96,11 +98,11 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
 
   return {
     layoutType,
-    layout,
+    layout: harness.layout,
     visualDirection,
     backgroundImageUrl: background.imageUrl,
-    typography,
-    overlay,
+    typography: harness.typography,
+    overlay: harness.overlay,
     referencePattern,
     finalImageUrl,
     qualityCheck,

@@ -10,9 +10,9 @@ import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageProvider } from '../src/lib/ai/providers'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
-import { generateOverlay } from '../src/lib/layout/overlayEngine'
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
+import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -283,17 +283,17 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
       category: existingSlide.campaign.keyBenefits || '카드뉴스',
       layout,
     })
-    const overlay = generateOverlay(layout.overlayStyle)
-    const background = await getPipelineImageProvider().generateImage(existingSlide.designPrompt, {
+    const harness = applyMediaCardHarness({ layout, typography })
+    const background = await getPipelineImageProvider().generateImage(buildHarnessedVisualPrompt(existingSlide.designPrompt), {
       size: '1024x1024',
       productImageUrls: [],
     })
 
     const imageUrl = await renderMediaCard({
       id: `media-card-rerender-${Date.now()}-${existingSlide.slideNumber}`,
-      layout,
-      typography,
-      overlay,
+      layout: harness.layout,
+      typography: harness.typography,
+      overlay: harness.overlay,
       category: existingSlide.campaign.keyBenefits || '카드뉴스',
       headline,
       body,
@@ -467,15 +467,15 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
           layout,
           brandMainColor: brand.mainColor,
         })
-        const overlay = generateOverlay(layout.overlayStyle)
+        const harness = applyMediaCardHarness({ layout, typography })
         const finalPrompt = `${keyword}, ${slide.designPrompt}`
-        const imgResult = await provider.generateImage(finalPrompt)
+        const imgResult = await provider.generateImage(buildHarnessedVisualPrompt(finalPrompt))
         
         const finalImageUrl = await renderMediaCard({
           id: `media-card-style-${Date.now()}-${slide.slideNumber}`,
-          layout,
-          typography,
-          overlay,
+          layout: harness.layout,
+          typography: harness.typography,
+          overlay: harness.overlay,
           category: campaign.keyBenefits || '카드뉴스',
           headline: slide.headline,
           body: slide.body,
