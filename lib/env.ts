@@ -23,6 +23,25 @@ export function getInstagramAccessToken() {
   return readEnv('INSTAGRAM_ACCESS_TOKEN') || 'mock_access_token'
 }
 
+export function getMetaAppId() {
+  return readEnv('META_APP_ID')
+}
+
+export function getMetaAppSecret() {
+  return readEnv('META_APP_SECRET')
+}
+
+export function getMetaApiVersion() {
+  return readEnv('META_API_VERSION') || 'v19.0'
+}
+
+export function getAppBaseUrl(request?: Request) {
+  const configured = readEnv('NEXT_PUBLIC_APP_URL') || readEnv('APP_URL')
+  if (configured) return configured.replace(/\/$/, '')
+  if (request) return new URL(request.url).origin
+  return 'http://localhost:3000'
+}
+
 export function getTokenEncryptionSecret() {
   const secret = readEnv('INSTAGRAM_TOKEN_ENCRYPTION_KEY') || readEnv('AUTH_SECRET')
 

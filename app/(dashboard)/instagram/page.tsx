@@ -2,13 +2,17 @@ import { redirect } from 'next/navigation'
 import { getSessionUser, quickConnectInstagramAction, saveInstagramAccountAction } from '../../actions'
 import { dbService } from '../../../lib/db-service'
 import { tokenEncryptor } from '../../../lib/instagram/client'
-import { isInstagramMockMode } from '../../../lib/env'
-import { Link2, Link2Off, ShieldAlert, CheckCircle2, Zap, KeyRound } from 'lucide-react'
+import { getMetaAppId, isInstagramMockMode } from '../../../lib/env'
+import { Link2, Link2Off, ShieldAlert, CheckCircle2, Zap, KeyRound, ExternalLink } from 'lucide-react'
 import InstagramIcon from '../../components/InstagramIcon'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InstagramSettingsPage() {
+export default async function InstagramSettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ connected?: string; error?: string }>
+}) {
   const user = await getSessionUser()
   if (!user) return null
 
@@ -46,6 +50,8 @@ export default async function InstagramSettingsPage() {
   }
 
   const mockMode = isInstagramMockMode()
+  const oauthConfigured = Boolean(getMetaAppId())
+  const params = searchParams ? await searchParams : {}
   const maskedAccountId = account?.instagramAccountId
     ? `${account.instagramAccountId.slice(0, 6)}••••${account.instagramAccountId.slice(-4)}`
     : null
@@ -62,6 +68,18 @@ export default async function InstagramSettingsPage() {
           데모 환경에서는 빠른 연동으로 바로 시작하고, 실제 운영 전환 시 Meta Graph API 정보를 직접 입력하면 됩니다.
         </p>
       </div>
+
+      {params.connected === 'meta' && (
+        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold">
+          실제 Meta OAuth 연동이 완료되었습니다. 이제 승인된 카드뉴스를 예약 발행 흐름에 연결할 수 있습니다.
+        </div>
+      )}
+
+      {params.error && (
+        <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-xs font-bold">
+          {getMetaErrorMessage(params.error)}
+        </div>
+      )}
 
       {/* Quick Connect */}
       {mockMode && (
@@ -99,6 +117,33 @@ export default async function InstagramSettingsPage() {
           <p>Access Token은 서버에서 AES 방식으로 암호화해 저장합니다.</p>
           <p>운영 계정은 `instagram_content_publish` 등 필요한 최소 권한만 부여하세요.</p>
         </div>
+      </div>
+
+      {/* Real OAuth Connect */}
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col md:flex-row gap-5 md:items-center md:justify-between">
+        <div className="flex gap-4 items-start">
+          <div className="w-11 h-11 rounded-lg bg-slate-900 text-white flex items-center justify-center flex-shrink-0">
+            <ExternalLink className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-black text-slate-900">실제 Instagram으로 빠르게 연결</h2>
+            <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+              Meta 로그인과 권한 승인 후 연결 가능한 Instagram Business 계정을 자동으로 찾아 저장합니다. 토큰과 Page 정보는 서버에서 암호화됩니다.
+            </p>
+          </div>
+        </div>
+        <a
+          href={oauthConfigured ? `/api/auth/meta/start?brandId=${brand.id}` : '#'}
+          aria-disabled={!oauthConfigured}
+          className={`w-full md:w-auto px-5 py-3 rounded-lg text-xs font-extrabold active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2 ${
+            oauthConfigured
+              ? 'bg-slate-900 hover:bg-slate-800 text-white'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          <ExternalLink className="w-4 h-4" />
+          <span>{oauthConfigured ? 'Instagram으로 실제 연결' : 'Meta 앱 설정 필요'}</span>
+        </a>
       </div>
 
       {/* Status Panel */}
@@ -213,4 +258,17 @@ function safeDecryptToken(encryptedToken: string) {
     console.warn('Failed to decrypt Instagram token for form display', error)
     return ''
   }
+}
+
+function getMetaErrorMessage(error: string) {
+  const messages: Record<string, string> = {
+    meta_config_missing: 'META_APP_ID와 META_APP_SECRET 설정이 필요합니다.',
+    meta_callback_invalid: 'Meta OAuth 응답이 올바르지 않습니다.',
+    meta_state_invalid: 'OAuth 보안 검증에 실패했습니다. 다시 시도해 주세요.',
+    brand_forbidden: '브랜드 접근 권한이 없습니다.',
+    no_instagram_business_account: '연결 가능한 Instagram Business 계정을 찾지 못했습니다. Facebook Page에 Instagram Business/Creator 계정을 연결해 주세요.',
+    meta_oauth_failed: 'Meta OAuth 연동 중 오류가 발생했습니다.',
+  }
+
+  return messages[error] || 'Instagram 연동 중 오류가 발생했습니다.'
 }

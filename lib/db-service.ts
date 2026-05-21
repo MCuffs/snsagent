@@ -34,6 +34,12 @@ export interface InstagramAccount {
   brandId: string
   instagramAccountId: string
   accessTokenEncrypted: string
+  facebookPageId?: string | null
+  pageAccessTokenEncrypted?: string | null
+  tokenExpiresAt?: Date | null
+  username?: string | null
+  profilePictureUrl?: string | null
+  connectionMethod?: string
   status: string // CONNECTED, DISCONNECTED
   createdAt: Date
   updatedAt: Date
@@ -119,7 +125,7 @@ function initMockDb(): MockDatabase {
       return {
         users: (parsed.users || []).map((u) => ({ ...u, createdAt: new Date(u.createdAt), updatedAt: new Date(u.updatedAt) })),
         brands: (parsed.brands || []).map((b) => ({ ...b, createdAt: new Date(b.createdAt), updatedAt: new Date(b.updatedAt) })),
-        instagramAccounts: (parsed.instagramAccounts || []).map((ia) => ({ ...ia, createdAt: new Date(ia.createdAt), updatedAt: new Date(ia.updatedAt) })),
+        instagramAccounts: (parsed.instagramAccounts || []).map((ia) => ({ ...ia, tokenExpiresAt: ia.tokenExpiresAt ? new Date(ia.tokenExpiresAt) : null, createdAt: new Date(ia.createdAt), updatedAt: new Date(ia.updatedAt) })),
         campaigns: (parsed.campaigns || []).map((c) => ({ ...c, createdAt: new Date(c.createdAt), updatedAt: new Date(c.updatedAt) })),
         slides: (parsed.slides || []).map((s) => ({ ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) })),
         posts: (parsed.posts || []).map((p) => ({ ...p, scheduledAt: new Date(p.scheduledAt), createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })),
@@ -352,6 +358,7 @@ export const dbService = {
           update: {
             instagramAccountId,
             accessTokenEncrypted,
+            connectionMethod: 'manual',
             status: 'CONNECTED',
           },
           create: {
@@ -359,6 +366,7 @@ export const dbService = {
             brandId,
             instagramAccountId,
             accessTokenEncrypted,
+            connectionMethod: 'manual',
             status: 'CONNECTED',
           },
         })
@@ -372,6 +380,7 @@ export const dbService = {
     if (acc) {
       acc.instagramAccountId = instagramAccountId
       acc.accessTokenEncrypted = accessTokenEncrypted
+      acc.connectionMethod = 'manual'
       acc.status = 'CONNECTED'
       acc.updatedAt = new Date()
     } else {
@@ -381,6 +390,91 @@ export const dbService = {
         brandId,
         instagramAccountId,
         accessTokenEncrypted,
+        connectionMethod: 'manual',
+        status: 'CONNECTED',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      db.instagramAccounts.push(acc)
+    }
+    writeMockDb(db)
+    return acc
+  },
+
+  async saveInstagramOAuthAccount(
+    userId: string,
+    brandId: string,
+    data: {
+      instagramAccountId: string
+      accessTokenEncrypted: string
+      facebookPageId: string
+      pageAccessTokenEncrypted: string
+      tokenExpiresAt: Date | null
+      username?: string | null
+      profilePictureUrl?: string | null
+      connectionMethod: 'oauth'
+    }
+  ): Promise<InstagramAccount> {
+    if (!isMock()) {
+      try {
+        return await prisma.instagramAccount.upsert({
+          where: { brandId },
+          update: {
+            instagramAccountId: data.instagramAccountId,
+            accessTokenEncrypted: data.accessTokenEncrypted,
+            facebookPageId: data.facebookPageId,
+            pageAccessTokenEncrypted: data.pageAccessTokenEncrypted,
+            tokenExpiresAt: data.tokenExpiresAt,
+            username: data.username,
+            profilePictureUrl: data.profilePictureUrl,
+            connectionMethod: data.connectionMethod,
+            status: 'CONNECTED',
+          },
+          create: {
+            userId,
+            brandId,
+            instagramAccountId: data.instagramAccountId,
+            accessTokenEncrypted: data.accessTokenEncrypted,
+            facebookPageId: data.facebookPageId,
+            pageAccessTokenEncrypted: data.pageAccessTokenEncrypted,
+            tokenExpiresAt: data.tokenExpiresAt,
+            username: data.username,
+            profilePictureUrl: data.profilePictureUrl,
+            connectionMethod: data.connectionMethod,
+            status: 'CONNECTED',
+          },
+        })
+      } catch (err) {
+        console.warn('Prisma saveInstagramOAuthAccount failed, falling back to mock database', err)
+      }
+    }
+
+    const db = initMockDb()
+    let acc = db.instagramAccounts.find(ia => ia.brandId === brandId)
+    if (acc) {
+      acc.instagramAccountId = data.instagramAccountId
+      acc.accessTokenEncrypted = data.accessTokenEncrypted
+      acc.facebookPageId = data.facebookPageId
+      acc.pageAccessTokenEncrypted = data.pageAccessTokenEncrypted
+      acc.tokenExpiresAt = data.tokenExpiresAt
+      acc.username = data.username
+      acc.profilePictureUrl = data.profilePictureUrl
+      acc.connectionMethod = data.connectionMethod
+      acc.status = 'CONNECTED'
+      acc.updatedAt = new Date()
+    } else {
+      acc = {
+        id: `ia-${Date.now()}`,
+        userId,
+        brandId,
+        instagramAccountId: data.instagramAccountId,
+        accessTokenEncrypted: data.accessTokenEncrypted,
+        facebookPageId: data.facebookPageId,
+        pageAccessTokenEncrypted: data.pageAccessTokenEncrypted,
+        tokenExpiresAt: data.tokenExpiresAt,
+        username: data.username,
+        profilePictureUrl: data.profilePictureUrl,
+        connectionMethod: data.connectionMethod,
         status: 'CONNECTED',
         createdAt: new Date(),
         updatedAt: new Date(),

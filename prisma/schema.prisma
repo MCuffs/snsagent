@@ -46,6 +46,12 @@ model InstagramAccount {
   brand                 Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   instagramAccountId    String
   accessTokenEncrypted  String
+  facebookPageId        String?
+  pageAccessTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  username              String?
+  profilePictureUrl     String?
+  connectionMethod      String   @default("manual") // oauth, manual, mock
   status                String   @default("DISCONNECTED") // CONNECTED, DISCONNECTED
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

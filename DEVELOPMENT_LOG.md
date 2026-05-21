@@ -92,3 +92,23 @@ This file records meaningful development work, fixes, verification commands, and
 ### Verification
 - `npm run lint`
 - `npm run build`
+
+## 2026-05-21 18:27 KST
+
+### Summary
+- Added the first real Meta OAuth connection path for faster production Instagram setup.
+
+### Changes
+- Added `app/api/auth/meta/start/route.ts` to start Meta OAuth with nonce-backed state validation.
+- Added `app/api/auth/meta/callback/route.ts` to exchange authorization codes, upgrade long-lived tokens, discover Instagram Business accounts, and save the first eligible account.
+- Added `app/api/instagram/accounts/route.ts` for account discovery support.
+- Added `lib/meta/oauth.ts`, `lib/meta/pages.ts`, and `lib/meta/types.ts`.
+- Extended `InstagramAccount` schema and DB service with Facebook Page ID, encrypted page token, token expiry, username, profile image, and connection method fields.
+- Updated `/instagram` with an “Instagram으로 실제 연결” path while keeping demo quick-connect and manual fallback.
+- Updated `.env.example` and README with Meta OAuth settings and callback setup.
+- Regenerated Prisma Client after schema changes.
+
+### Verification
+- `npx prisma generate`
+- `npm run lint`
+- `npm run build`
