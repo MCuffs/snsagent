@@ -14,6 +14,9 @@ export interface MediaCarouselInput {
   userId: string
   brandId: string
   brandName: string
+  brandMainColor?: string
+  brandToneOfVoice?: string
+  brandIndustry?: string
   topic: string
   category: string
   title: string
@@ -81,6 +84,9 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       topic: input.topic,
       tone: input.tone,
       visualHint: input.visualHint,
+      brandMainColor: input.brandMainColor,
+      brandToneOfVoice: input.brandToneOfVoice,
+      brandIndustry: input.brandIndustry,
     })
     const background = await imageProvider.generateImage(visualDirection.prompt, {
       size: '1024x1024',
@@ -91,6 +97,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       body: slide.body,
       category: input.category,
       layout,
+      brandMainColor: input.brandMainColor,
     })
     const overlay = generateOverlay(layout.overlayStyle)
     analyzeReferencePattern({

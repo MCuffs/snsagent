@@ -24,8 +24,231 @@
       "updatedAt": "2026-05-21T15:35:04.236Z"
     }
   ],
-  "instagramAccounts": [],
-  "campaigns": [],
-  "slides": [],
-  "posts": []
+  "instagramAccounts": [
+    {
+      "id": "ia-1779378294965",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "instagramAccountId": "17841400000000000",
+      "accessTokenEncrypted": "v1:JHUKlN3eoau74aan:8REvkyfjL47QktuN4OvoYA:GwfwpmwcS_CLGRLth4P6tV3Gahn5Tiiy",
+      "connectionMethod": "manual",
+      "status": "CONNECTED",
+      "createdAt": "2026-05-21T15:44:54.965Z",
+      "updatedAt": "2026-05-21T15:44:54.965Z"
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "c-1779378084513",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "title": "ㅇ",
+      "productName": "ㅇ",
+      "productDescription": "ㅇ",
+      "keyBenefits": "AI 뉴스",
+      "objective": "정보형 카드뉴스 / 진지하고 몰입감 있게",
+      "slideCount": 7,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:24.515Z"
+    },
+    {
+      "id": "c-1779378132760",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "title": "ㅇㄴㅁ",
+      "productName": "ㅇㄴㅁ",
+      "productDescription": "ㅁㄴㅇ",
+      "keyBenefits": "AI 뉴스",
+      "objective": "미디어형 카드뉴스 / 진지하고 몰입감 있게",
+      "slideCount": 7,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.762Z"
+    }
+  ],
+  "slides": [
+    {
+      "id": "s-1779378084513-1",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 1,
+      "headline": "ㅇ",
+      "body": "ㅇ에 대해 지금 알아야 할 핵심만 정리했습니다.",
+      "designPrompt": "cinematic Korean editorial photography, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: serious, immersive, dramatic, preferred color palette: black, white, subject positioning: center-right, reserve clean empty space for typography at bottom-left, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-1.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.003Z"
+    },
+    {
+      "id": "s-1779378084513-2",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 2,
+      "headline": "왜 지금 중요한가",
+      "body": "ㅇ은 지금 AI 뉴스에서 주목받는 이슈입니다.",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-2.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.015Z"
+    },
+    {
+      "id": "s-1779378084513-3",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 3,
+      "headline": "1번째 포인트",
+      "body": "ㅇ",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-3.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.071Z"
+    },
+    {
+      "id": "s-1779378084513-4",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 4,
+      "headline": "2번째 포인트",
+      "body": "ㅇ",
+      "designPrompt": "cinematic portrait composition, strong subject and lighting, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: dramatic, story-led, headline-first, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-4.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.022Z"
+    },
+    {
+      "id": "s-1779378084513-5",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 5,
+      "headline": "3번째 포인트",
+      "body": "ㅇ",
+      "designPrompt": "cinematic portrait composition, strong subject and lighting, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: dramatic, story-led, headline-first, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-5.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.125Z"
+    },
+    {
+      "id": "s-1779378084513-6",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 6,
+      "headline": "4번째 포인트",
+      "body": "ㅇ",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-6.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.144Z"
+    },
+    {
+      "id": "s-1779378084513-7",
+      "campaignId": "c-1779378084513",
+      "slideNumber": 7,
+      "headline": "핵심만 저장하세요",
+      "body": "ㅇ을 다시 볼 수 있도록 저장해두면 좋습니다.",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/cg-regen-1779378107066-slide-7.png",
+      "createdAt": "2026-05-21T15:41:24.513Z",
+      "updatedAt": "2026-05-21T15:41:48.141Z"
+    },
+    {
+      "id": "s-1779378132760-1",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 1,
+      "headline": "ㅇㄴㅁ",
+      "body": "ㅇㄴㅁ에 대해 지금 알아야 할 핵심만 정리했습니다.",
+      "designPrompt": "cinematic Korean editorial photography, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: serious, immersive, dramatic, preferred color palette: black, white, subject positioning: center-right, reserve clean empty space for typography at bottom-left, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132082-1-favqsr.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-2",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 2,
+      "headline": "왜 지금 중요한가",
+      "body": "ㅇㄴㅁ은 지금 AI 뉴스에서 주목받는 이슈입니다.",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132270-2-nfm9is.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-3",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 3,
+      "headline": "1번째 포인트",
+      "body": "ㅁㄴㅇ",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132344-3-68vrp3.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-4",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 4,
+      "headline": "2번째 포인트",
+      "body": "ㅁㄴㅇ",
+      "designPrompt": "cinematic portrait composition, strong subject and lighting, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: dramatic, story-led, headline-first, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132409-4-qge06d.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-5",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 5,
+      "headline": "3번째 포인트",
+      "body": "ㅁㄴㅇ",
+      "designPrompt": "cinematic portrait composition, strong subject and lighting, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: dramatic, story-led, headline-first, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, consider overlay readability: dark-gradient, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132516-5-vi0obc.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-6",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 6,
+      "headline": "4번째 포인트",
+      "body": "ㅁㄴㅇ",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132624-6-na2xuc.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    },
+    {
+      "id": "s-1779378132760-7",
+      "campaignId": "c-1779378132760",
+      "slideNumber": 7,
+      "headline": "핵심만 저장하세요",
+      "body": "ㅇㄴㅁ을 다시 볼 수 있도록 저장해두면 좋습니다.",
+      "designPrompt": "clean studio background with generous whitespace, topic: ㅇㄴㅁ, category: AI 뉴스, tone: 진지하고 몰입감 있게, visual mood: clear, calm, informational, readable, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, consider overlay readability: none, realistic Korean Instagram media aesthetic, high editorial quality, mobile-first vertical composition, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378132691-7-bn8h85.png",
+      "createdAt": "2026-05-21T15:42:12.760Z",
+      "updatedAt": "2026-05-21T15:42:12.760Z"
+    }
+  ],
+  "posts": [
+    {
+      "id": "p-1779378084518",
+      "campaignId": "c-1779378084513",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "caption": "ㅇ\n\nㅇ\n\n저장해두고 다시 확인해보세요.",
+      "hashtags": "#카드뉴스, #인스타그램콘텐츠, #AI, #뉴스, #ㅇ, #정보형",
+      "scheduledAt": "2026-05-23T11:00:00.000Z",
+      "instagramMediaId": null,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:41:24.518Z",
+      "updatedAt": "2026-05-21T15:41:24.520Z"
+    },
+    {
+      "id": "p-1779378132763",
+      "campaignId": "c-1779378132760",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "caption": "ㅇㄴㅁ\n\nㅁㄴㅇ\n\n저장해두고 다시 확인해보세요.",
+      "hashtags": "#카드뉴스, #인스타그램콘텐츠, #AI, #뉴스, #ㅇㄴㅁ, #미디어형",
+      "scheduledAt": "2026-05-23T11:00:00.000Z",
+      "instagramMediaId": null,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:42:12.763Z",
+      "updatedAt": "2026-05-21T15:42:12.766Z"
+    }
+  ]
 }

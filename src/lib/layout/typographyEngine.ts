@@ -31,6 +31,7 @@ export interface TypographyInput {
   category: string
   layout: LayoutDefinition
   emphasisWords?: string[]
+  brandMainColor?: string
 }
 
 const PARTICLES = ['은', '는', '이', '가', '을', '를', '의', '에', '에서', '으로', '와', '과', '도', '만']
@@ -55,7 +56,7 @@ export function planTypography(input: TypographyInput): TypographyPlan {
     lineHeight: input.layout.typographyStyle === 'quote-large' ? 1.16 : 1.08,
     maxLineCount: 3,
     textAlign: input.layout.textPosition.includes('center') ? 'center' : 'left',
-    emphasisColor: getEmphasisColor(input.layout.preferredColorPalette),
+    emphasisColor: input.brandMainColor || getEmphasisColor(input.layout.preferredColorPalette),
   }
 }
 
