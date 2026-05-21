@@ -70,7 +70,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
 
       clearInterval(stepInterval)
 
-      if (res.success && res.campaignId) {
+      if (res.success) {
         router.push(`/campaign/${res.campaignId}`)
       } else {
         setError(res.error || '생성에 실패했습니다.')

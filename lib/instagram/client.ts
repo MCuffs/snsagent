@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 export interface InstagramClientConfig {
   accountId: string
   accessToken: string
@@ -24,20 +26,60 @@ async function readInstagramError(res: Response, fallback: string) {
   return fallback
 }
 
+function getTokenEncryptionKey() {
+  const secret =
+    process.env.INSTAGRAM_TOKEN_ENCRYPTION_KEY ||
+    process.env.AUTH_SECRET ||
+    process.env.DATABASE_URL ||
+    'instaagent-local-development-token-key'
+
+  return crypto.createHash('sha256').update(secret).digest()
+}
+
 /**
- * Encrypts/Decrypts Access Tokens to prevent plaintext leak in the database.
- * For MVP, we use a simple base64-based reversible obfuscation, representing
- * the encryption boundary. In production, this would use Node.js crypto (AES-256-GCM).
+ * Encrypts/decrypts Instagram access tokens before database storage.
+ * New values use AES-256-GCM. Legacy base64-only values are still readable
+ * so existing local demo data does not break during upgrades.
  */
 export const tokenEncryptor = {
   encrypt(token: string): string {
     if (!token) return ''
-    // obfuscate token for security representation
-    return Buffer.from(token).toString('base64')
+
+    const iv = crypto.randomBytes(12)
+    const cipher = crypto.createCipheriv('aes-256-gcm', getTokenEncryptionKey(), iv)
+    const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
+
+    return [
+      'v1',
+      iv.toString('base64url'),
+      tag.toString('base64url'),
+      encrypted.toString('base64url'),
+    ].join(':')
   },
   decrypt(encrypted: string): string {
     if (!encrypted) return ''
-    return Buffer.from(encrypted, 'base64').toString('utf8')
+
+    if (!encrypted.startsWith('v1:')) {
+      return Buffer.from(encrypted, 'base64').toString('utf8')
+    }
+
+    const [, iv, tag, payload] = encrypted.split(':')
+    if (!iv || !tag || !payload) {
+      throw new Error('Invalid encrypted token format')
+    }
+
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      getTokenEncryptionKey(),
+      Buffer.from(iv, 'base64url')
+    )
+    decipher.setAuthTag(Buffer.from(tag, 'base64url'))
+
+    return Buffer.concat([
+      decipher.update(Buffer.from(payload, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8')
   }
 }
 

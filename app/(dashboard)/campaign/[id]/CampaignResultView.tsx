@@ -135,7 +135,7 @@ export default function CampaignResultView({
     setMessage(null)
     try {
       const res = await updateSlideAction(activeSlide.id, editingHeadline, editingBody)
-      if (res.success && res.slide) {
+      if (res.success) {
         // Update local state
         const updatedSlides = slides.map(s => {
           if (s.id === activeSlide.id) {
@@ -165,7 +165,7 @@ export default function CampaignResultView({
     setMessage(null)
     try {
       const res = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
-      if (res.success && res.slides) {
+      if (res.success) {
         setSlides(res.slides)
         // Reset preview back to slide 1
         setActiveSlideIndex(0)

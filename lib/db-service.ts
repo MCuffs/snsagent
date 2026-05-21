@@ -253,6 +253,32 @@ export const dbService = {
     return db.brands.find(b => b.id === brandId) || null
   },
 
+  async getSlide(slideId: string): Promise<(CarouselSlide & { campaign: Campaign }) | null> {
+    if (!isMock()) {
+      try {
+        const slide = await prisma.carouselSlide.findUnique({
+          where: { id: slideId },
+          include: { campaign: true },
+        })
+        return slide
+      } catch (err) {
+        console.warn('Prisma getSlide failed, falling back to mock database', err)
+      }
+    }
+
+    const db = initMockDb()
+    const slide = db.slides.find(s => s.id === slideId)
+    if (!slide) return null
+
+    const campaign = db.campaigns.find(c => c.id === slide.campaignId)
+    if (!campaign) return null
+
+    return {
+      ...slide,
+      campaign,
+    }
+  },
+
   async saveBrand(userId: string, brandId: string | null, data: Omit<Brand, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Brand> {
     if (!isMock()) {
       try {
@@ -537,6 +563,21 @@ export const dbService = {
   },
 
   // Post & Scheduling operations
+  async getPost(postId: string): Promise<Post | null> {
+    if (!isMock()) {
+      try {
+        return await prisma.post.findUnique({
+          where: { id: postId },
+        })
+      } catch (err) {
+        console.warn('Prisma getPost failed, falling back to mock database', err)
+      }
+    }
+
+    const db = initMockDb()
+    return db.posts.find(p => p.id === postId) || null
+  },
+
   async getPosts(userId: string): Promise<(Post & { campaign: Campaign; brand: Brand })[]> {
     if (!isMock()) {
       try {

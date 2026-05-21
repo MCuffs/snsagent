@@ -11,6 +11,18 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
+function forbidden() {
+  return { success: false as const, error: '접근 권한이 없습니다.' }
+}
+
+function unauthenticated() {
+  return { success: false as const, error: '로그인이 필요합니다.' }
+}
+
+function failed(error: string) {
+  return { success: false as const, error }
+}
+
 // Helper to get authenticated user from session cookies
 export async function getSessionUser(): Promise<User | null> {
   const cookieStore = await cookies()
@@ -28,7 +40,7 @@ export async function getSessionUser(): Promise<User | null> {
 // User Mock Login Action
 export async function loginAction(email: string, name?: string) {
   if (!email || !email.includes('@')) {
-    return { success: false, error: '올바른 이메일 주소를 입력해주세요.' }
+    return failed('올바른 이메일 주소를 입력해주세요.')
   }
 
   const user = await dbService.getOrCreateUser(email, name)
@@ -42,26 +54,26 @@ export async function loginAction(email: string, name?: string) {
     sameSite: 'lax',
   })
 
-  return { success: true, user }
+  return { success: true as const, user }
 }
 
 // Logout Action
 export async function logoutAction() {
   const cookieStore = await cookies()
   cookieStore.delete('instaagent_session_email')
-  return { success: true }
+  return { success: true as const }
 }
 
 // Change Plan Action (Mock Pricing Switcher)
 export async function changeUserPlanAction(plan: string) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   await dbService.updateUserPlan(user.id, plan)
   
   // Clear layout cache
   await cookies() // dummy read to bypass Next.js server actions cache
-  return { success: true }
+  return { success: true as const }
 }
 
 // Brand Save/Update Action
@@ -81,34 +93,41 @@ export async function saveBrandAction(brandId: string | null, data: {
   if (!brandId) {
     const limitCheck = await checkBrandCountLimit(user.id)
     if (!limitCheck.allowed) {
-      return { 
-        success: false, 
-        error: `브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.` 
-      }
+      return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
     }
   }
 
   try {
+    if (brandId) {
+      const existingBrand = await dbService.getBrand(brandId)
+      if (!existingBrand) return failed('브랜드를 찾을 수 없습니다.')
+      if (existingBrand.userId !== user.id) return forbidden()
+    }
+
     const brand = await dbService.saveBrand(user.id, brandId, data)
-    return { success: true, brand }
+    return { success: true as const, brand }
   } catch (err: unknown) {
-    return { success: false, error: getErrorMessage(err, '브랜드 저장에 실패했습니다.') }
+    return failed(getErrorMessage(err, '브랜드 저장에 실패했습니다.'))
   }
 }
 
 // Instagram Integration Action
 export async function saveInstagramAccountAction(brandId: string, accountId: string, accessToken: string) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   if (!accountId || !accessToken) {
-    return { success: false, error: '계정 ID와 Access Token을 입력해 주세요.' }
+    return failed('계정 ID와 Access Token을 입력해 주세요.')
   }
+
+  const brand = await dbService.getBrand(brandId)
+  if (!brand) return failed('브랜드를 찾을 수 없습니다.')
+  if (brand.userId !== user.id) return forbidden()
 
   // Validate connection
   const validation = await validateInstagramConnection(accountId, accessToken)
   if (!validation.success) {
-    return { success: false, error: `인스타그램 계정 연동 실패: ${validation.error}` }
+    return failed(`인스타그램 계정 연동 실패: ${validation.error}`)
   }
 
   try {
@@ -122,9 +141,9 @@ export async function saveInstagramAccountAction(brandId: string, accountId: str
       encryptedToken
     )
     
-    return { success: true, account, username: validation.username }
+    return { success: true as const, account, username: validation.username }
   } catch (err: unknown) {
-    return { success: false, error: getErrorMessage(err, '계정 연동 저장 중 오류가 발생했습니다.') }
+    return failed(getErrorMessage(err, '계정 연동 저장 중 오류가 발생했습니다.'))
   }
 }
 
@@ -137,19 +156,17 @@ export async function createCampaignAction(brandId: string, data: {
   slideCount: number
 }) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   // Limit Check
   const limitCheck = await checkCampaignCreationLimit(user.id)
   if (!limitCheck.allowed) {
-    return {
-      success: false,
-      error: `월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`
-    }
+    return failed(`월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
   }
 
   const brand = await dbService.getBrand(brandId)
-  if (!brand) return { success: false, error: '브랜드를 찾을 수 없습니다.' }
+  if (!brand) return failed('브랜드를 찾을 수 없습니다.')
+  if (brand.userId !== user.id) return forbidden()
 
   try {
     // Step 1: AI Content Generation (Text logic)
@@ -223,33 +240,47 @@ export async function createCampaignAction(brandId: string, data: {
     })
 
     return { 
-      success: true, 
+      success: true as const, 
       campaignId: campaign.id,
       postId: post.id 
     }
   } catch (err: unknown) {
     console.error('Campaign creation failed:', err)
-    return { success: false, error: getErrorMessage(err, '카드뉴스 기획 생성에 실패했습니다.') }
+    return failed(getErrorMessage(err, '카드뉴스 기획 생성에 실패했습니다.'))
   }
 }
 
 // Update slide copy content
 export async function updateSlideAction(slideId: string, headline: string, body: string, imageUrl?: string | null) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
   try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
     const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
-    return { success: true, slide }
+    return { success: true as const, slide }
   } catch (err: unknown) {
-    return { success: false, error: getErrorMessage(err, '슬라이드 수정에 실패했습니다.') }
+    return failed(getErrorMessage(err, '슬라이드 수정에 실패했습니다.'))
   }
 }
 
 // Update post caption & hashtags
 export async function updatePostDetailsAction(postId: string, caption: string, hashtags: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
   try {
+    const existingPost = await dbService.getPost(postId)
+    if (!existingPost) return failed('피드를 찾을 수 없습니다.')
+    if (existingPost.userId !== user.id) return forbidden()
+
     const post = await dbService.updatePostDetails(postId, caption, hashtags)
-    return { success: true, post }
+    return { success: true as const, post }
   } catch (err: unknown) {
-    return { success: false, error: getErrorMessage(err, '피드 정보 수정에 실패했습니다.') }
+    return failed(getErrorMessage(err, '피드 정보 수정에 실패했습니다.'))
   }
 }
 
@@ -260,21 +291,25 @@ export async function approveAndScheduleCampaignAction(
   postData: { caption: string; hashtags: string; scheduledAt: string }
 ) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   try {
     // 1. Fetch Instagram Account integration info
     const campaign = await dbService.getCampaign(campaignId)
-    if (!campaign) return { success: false, error: '캠페인을 찾을 수 없습니다.' }
+    if (!campaign) return failed('캠페인을 찾을 수 없습니다.')
+    if (campaign.userId !== user.id) return forbidden()
+
+    const post = await dbService.getPost(postId)
+    if (!post) return failed('피드를 찾을 수 없습니다.')
+    if (post.userId !== user.id || post.campaignId !== campaign.id || post.brandId !== campaign.brandId) {
+      return forbidden()
+    }
 
     const account = await dbService.getInstagramAccount(user.id, campaign.brandId)
     const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true'
 
     if (!isMock && (!account || account.status !== 'CONNECTED')) {
-      return { 
-        success: false, 
-        error: '인스타그램 연동 정보가 없습니다. [Instagram 설정] 메뉴에서 먼저 계정을 연동해 주세요.' 
-      }
+      return failed('인스타그램 연동 정보가 없습니다. [Instagram 설정] 메뉴에서 먼저 계정을 연동해 주세요.')
     }
 
     const accountId = account?.instagramAccountId || process.env.INSTAGRAM_ACCOUNT_ID || 'mock_account_id'
@@ -287,13 +322,13 @@ export async function approveAndScheduleCampaignAction(
       .filter((url): url is string => !!url)
 
     if (imageUrls.length === 0) {
-      return { success: false, error: '카드뉴스에 유효한 이미지가 없습니다.' }
+      return failed('카드뉴스에 유효한 이미지가 없습니다.')
     }
 
     // 2. Parse scheduled time
     const scheduledDate = new Date(postData.scheduledAt)
     if (isNaN(scheduledDate.getTime())) {
-      return { success: false, error: '잘못된 예약 시간 형식입니다.' }
+      return failed('잘못된 예약 시간 형식입니다.')
     }
 
     // 3. Update campaign & post details in DB
@@ -312,7 +347,7 @@ export async function approveAndScheduleCampaignAction(
     if (!result.success) {
       await dbService.updatePostStatus(postId, 'failed')
       await dbService.updateCampaignStatus(campaignId, 'failed')
-      return { success: false, error: `인스타그램 예약 업로드 실패: ${result.error}` }
+      return failed(`인스타그램 예약 업로드 실패: ${result.error}`)
     }
 
     // 5. Update status to scheduled or posted
@@ -322,23 +357,24 @@ export async function approveAndScheduleCampaignAction(
     await dbService.updateCampaignStatus(campaignId, targetStatus)
 
     return { 
-      success: true, 
+      success: true as const, 
       status: targetStatus,
       message: targetStatus === 'posted' ? '인스타그램에 즉시 업로드 완료!' : '예약이 승인되어 스케줄러에 등록되었습니다.'
     }
   } catch (err: unknown) {
     console.error('Approval flow error:', err)
-    return { success: false, error: getErrorMessage(err, '승인 처리 도중 오류가 발생했습니다.') }
+    return failed(getErrorMessage(err, '승인 처리 도중 오류가 발생했습니다.'))
   }
 }
 
 // Regenerate campaign images using a specific style preset
 export async function regenerateCampaignImagesAction(campaignId: string, styleName: string) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   const campaign = await dbService.getCampaign(campaignId)
-  if (!campaign) return { success: false, error: '캠페인을 찾을 수 없습니다.' }
+  if (!campaign) return failed('캠페인을 찾을 수 없습니다.')
+  if (campaign.userId !== user.id) return forbidden()
 
   // Define style prompt prefixes
   const styleKeywords: Record<string, string> = {
@@ -377,17 +413,17 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
       })
     )
 
-    return { success: true, slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber) }
+    return { success: true as const, slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber) }
   } catch (err: unknown) {
     console.error('Failed to regenerate style images:', err)
-    return { success: false, error: getErrorMessage(err, '이미지 스타일 일괄 재생성에 실패했습니다.') }
+    return failed(getErrorMessage(err, '이미지 스타일 일괄 재생성에 실패했습니다.'))
   }
 }
 
 // Manually trigger background scheduler (Simulator)
 export async function triggerSchedulerAction() {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   try {
     // Fetch all posts for the user
@@ -398,7 +434,7 @@ export async function triggerSchedulerAction() {
 
     if (scheduledPosts.length === 0) {
       return { 
-        success: true, 
+        success: true as const, 
         processedCount: 0, 
         message: '현재 발행 대기 중(scheduled)인 포스트가 없습니다. 카드뉴스를 승인하여 예약 상태로 먼저 만들어보세요.' 
       }
@@ -416,13 +452,12 @@ export async function triggerSchedulerAction() {
     }
 
     return { 
-      success: true, 
+      success: true as const, 
       processedCount: scheduledPosts.length, 
       message: `성공: 대기 중이던 ${scheduledPosts.length}개의 카드뉴스 포스트가 인스타그램에 가상 발행 완료(posted) 처리되었습니다.` 
     }
   } catch (err: unknown) {
     console.error('Scheduler manual execution failed:', err)
-    return { success: false, error: getErrorMessage(err, '스케줄러 작동 중 실패했습니다.') }
+    return failed(getErrorMessage(err, '스케줄러 작동 중 실패했습니다.'))
   }
 }
-
