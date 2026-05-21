@@ -74,3 +74,21 @@ This file records meaningful development work, fixes, verification commands, and
 
 ### Notes
 - The renderer currently writes SVG assets through an isolated renderer module. It is intentionally separated so a Sharp/Puppeteer PNG renderer can replace it without changing strategy/copy/image generation stages.
+
+## 2026-05-21 17:42 KST
+
+### Summary
+- Simplified the Instagram connection flow for local demo and early product testing.
+
+### Changes
+- Added `quickConnectInstagramAction()` for one-click mock Instagram account connection.
+- Added `getInstagramAccessToken()` environment helper.
+- Updated `/instagram` to show a prominent demo quick-connect panel when `INSTAGRAM_MOCK_MODE=true`.
+- Kept the real Meta API form available for production connection while making it secondary to the demo path.
+- Made manual save fallback to mock env values in mock mode when fields are empty.
+- Added safe token decrypt handling on the settings page so key rotation or legacy data does not crash the page.
+- Updated README with quick-connect guidance.
+
+### Verification
+- `npm run lint`
+- `npm run build`

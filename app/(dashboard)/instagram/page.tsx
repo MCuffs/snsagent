@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
-import { getSessionUser, saveInstagramAccountAction } from '../../actions'
+import { getSessionUser, quickConnectInstagramAction, saveInstagramAccountAction } from '../../actions'
 import { dbService } from '../../../lib/db-service'
 import { tokenEncryptor } from '../../../lib/instagram/client'
 import { isInstagramMockMode } from '../../../lib/env'
-import { Link2, Link2Off, ShieldAlert, CheckCircle2 } from 'lucide-react'
+import { Link2, Link2Off, ShieldAlert, CheckCircle2, Zap, KeyRound } from 'lucide-react'
 import InstagramIcon from '../../components/InstagramIcon'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ export default async function InstagramSettingsPage() {
   const account = await dbService.getInstagramAccount(user.id, brand.id)
   
   // Re-decrypt access token representation for form pre-population (in secure format)
-  const decryptedToken = account ? tokenEncryptor.decrypt(account.accessTokenEncrypted) : ''
+  const decryptedToken = account ? safeDecryptToken(account.accessTokenEncrypted) : ''
 
   // Form submit handler using inline server action
   async function handleSubmit(formData: FormData) {
@@ -37,6 +37,19 @@ export default async function InstagramSettingsPage() {
     }
   }
 
+  async function handleQuickConnect() {
+    'use server'
+    const res = await quickConnectInstagramAction(brand.id)
+    if (res.success) {
+      redirect('/dashboard')
+    }
+  }
+
+  const mockMode = isInstagramMockMode()
+  const maskedAccountId = account?.instagramAccountId
+    ? `${account.instagramAccountId.slice(0, 6)}••••${account.instagramAccountId.slice(-4)}`
+    : null
+
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8 font-sans">
       {/* Title */}
@@ -46,33 +59,58 @@ export default async function InstagramSettingsPage() {
           <span>인스타그램 계정 연동</span>
         </h1>
         <p className="text-sm text-slate-500 font-medium">
-          Meta Graph API를 연동하여 AI 비서가 생성하고 승인한 카드뉴스를 예약 시각에 피드에 자동으로 게시할 수 있도록 연결합니다.
+          데모 환경에서는 빠른 연동으로 바로 시작하고, 실제 운영 전환 시 Meta Graph API 정보를 직접 입력하면 됩니다.
         </p>
       </div>
 
-      {/* Security Warning Banner */}
-      <div className="p-6 rounded-xl border border-red-200 bg-red-50/50 space-y-3 shadow-sm">
-        <div className="flex items-center gap-2 text-red-700">
-          <ShieldAlert className="w-5.5 h-5.5 flex-shrink-0" />
-          <h3 className="font-extrabold text-sm sm:text-base">보안 경고 및 준수 사항 (Meta API Security Notice)</h3>
+      {/* Quick Connect */}
+      {mockMode && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-6 shadow-sm flex flex-col md:flex-row gap-5 md:items-center md:justify-between">
+          <div className="flex gap-4 items-start">
+            <div className="w-11 h-11 rounded-lg bg-[#ff4f00] text-white flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-base font-black text-slate-900">데모 빠른 연동</h2>
+              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                Meta 개발자 설정 없이 로컬 시뮬레이션 계정을 연결합니다. 카드뉴스 승인, 예약, 가상 발행 흐름을 바로 테스트할 수 있습니다.
+              </p>
+            </div>
+          </div>
+          <form action={handleQuickConnect} className="w-full md:w-auto">
+            <button
+              type="submit"
+              className="w-full md:w-auto px-5 py-3 rounded-lg text-xs font-extrabold bg-[#ff4f00] hover:bg-[#e04500] text-white active:scale-[0.98] transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              <span>1초 만에 데모 계정 연결</span>
+            </button>
+          </form>
         </div>
-        <div className="text-xs text-red-800 leading-relaxed space-y-1.5 font-medium">
-          <p>
-            1. **Access Token 보안**: Instagram Access Token은 귀하의 비즈니스 계정에 글을 작성할 수 있는 핵심 서명 권한을 갖습니다. **절대 클라이언트 브라우저나 프론트엔드 코드에 노출하지 마십시오.**
-          </p>
-          <p>
-            2. **암호화 관리**: 본 시스템은 Access Token을 데이터베이스에 저장하기 전, 서버 내에서 Base64/AES 방식으로 안전하게 암호화(Reversible Obfuscation Boundary)를 실행한 뒤 보관합니다.
-          </p>
-          <p>
-            3. **최소 권한 원칙**: 인스타그램 비즈니스 권한 획득 시, 미디어 게시(`instagram_content_publish`) 권한 외의 불필요한 계정 정보 열람 권한은 비활성화하는 것을 적극 권장합니다.
-          </p>
+      )}
+
+      {/* Security Notice */}
+      <div className="p-5 rounded-xl border border-slate-200 bg-white space-y-3 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-800">
+          <ShieldAlert className="w-5.5 h-5.5 flex-shrink-0" />
+          <h3 className="font-extrabold text-sm sm:text-base">운영 연동 전 확인 사항</h3>
+        </div>
+        <div className="text-xs text-slate-600 leading-relaxed space-y-1.5 font-medium">
+          <p>Access Token은 서버에서 AES 방식으로 암호화해 저장합니다.</p>
+          <p>운영 계정은 `instagram_content_publish` 등 필요한 최소 권한만 부여하세요.</p>
         </div>
       </div>
 
       {/* Status Panel */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 border border-slate-200 rounded-xl bg-white shadow-sm p-8 space-y-6">
-          <h2 className="text-lg font-extrabold text-slate-900">Meta API 정보 수동 입력</h2>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900">실제 Meta API 연동</h2>
+              <p className="text-xs text-slate-500 font-semibold mt-1">운영 계정을 연결할 때만 입력하면 됩니다.</p>
+            </div>
+            <KeyRound className="w-5 h-5 text-slate-400" />
+          </div>
           
           <form action={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -83,8 +121,8 @@ export default async function InstagramSettingsPage() {
                 id="accountId"
                 name="accountId"
                 type="text"
-                required
-                placeholder="예: 17841401234567890"
+                required={!mockMode}
+                placeholder={mockMode ? '데모에서는 비워두고 빠른 연동 사용 가능' : '예: 17841401234567890'}
                 defaultValue={account?.instagramAccountId || ''}
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#ff4f00] focus:ring-1 focus:ring-[#ff4f00] transition-all font-medium"
               />
@@ -101,7 +139,7 @@ export default async function InstagramSettingsPage() {
                 id="accessToken"
                 name="accessToken"
                 type="password"
-                required
+                required={!mockMode}
                 placeholder={decryptedToken ? '••••••••••••••••••••••••••••••••' : 'EAAGxxxxxxxxxxxx...'}
                 defaultValue={decryptedToken}
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#ff4f00] focus:ring-1 focus:ring-[#ff4f00] transition-all font-medium"
@@ -113,13 +151,13 @@ export default async function InstagramSettingsPage() {
 
             <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-3 justify-between items-center">
               <span className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full font-bold">
-                {isInstagramMockMode() ? '개발 환경: 로컬 시뮬레이션 모드 활성화됨' : '운영 환경: Meta API 실시간 연동'}
+                {mockMode ? '개발 환경: 빠른 연동 사용 가능' : '운영 환경: Meta API 실시간 연동'}
               </span>
               <button
                 type="submit"
                 className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-xs font-extrabold bg-[#ff4f00] hover:bg-[#e04500] text-white active:scale-[0.98] transition-all cursor-pointer shadow-sm"
               >
-                연동 정보 저장
+                실제 계정 정보 저장
               </button>
             </div>
           </form>
@@ -137,7 +175,7 @@ export default async function InstagramSettingsPage() {
                     <Link2 className="w-6 h-6" />
                   </div>
                   <p className="font-bold text-slate-900 text-sm">연동 활성화 완료</p>
-                  <p className="text-[11px] text-slate-500 mt-1 font-semibold">@instaagent_business</p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-semibold">{maskedAccountId}</p>
                   <span className="text-[9px] px-2 py-0.5 mt-3 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-250 font-black tracking-wider">ACTIVE</span>
                 </>
               ) : (
@@ -166,4 +204,13 @@ export default async function InstagramSettingsPage() {
       </div>
     </div>
   )
+}
+
+function safeDecryptToken(encryptedToken: string) {
+  try {
+    return tokenEncryptor.decrypt(encryptedToken)
+  } catch (error) {
+    console.warn('Failed to decrypt Instagram token for form display', error)
+    return ''
+  }
 }

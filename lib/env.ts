@@ -19,6 +19,10 @@ export function getInstagramAccountId() {
   return readEnv('INSTAGRAM_ACCOUNT_ID') || 'mock_account_id'
 }
 
+export function getInstagramAccessToken() {
+  return readEnv('INSTAGRAM_ACCESS_TOKEN') || 'mock_access_token'
+}
+
 export function getTokenEncryptionSecret() {
   const secret = readEnv('INSTAGRAM_TOKEN_ENCRYPTION_KEY') || readEnv('AUTH_SECRET')
 

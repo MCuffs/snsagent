@@ -5,7 +5,7 @@ import { dbService, User } from '../lib/db-service'
 import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
-import { getInstagramAccountId, isInstagramMockMode } from '../lib/env'
+import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode } from '../lib/env'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 
@@ -122,7 +122,10 @@ export async function saveInstagramAccountAction(brandId: string, accountId: str
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
-  if (!accountId || !accessToken) {
+  const normalizedAccountId = accountId || (isInstagramMockMode() ? getInstagramAccountId() : '')
+  const normalizedAccessToken = accessToken || (isInstagramMockMode() ? getInstagramAccessToken() : '')
+
+  if (!normalizedAccountId || !normalizedAccessToken) {
     return failed('계정 ID와 Access Token을 입력해 주세요.')
   }
 
@@ -131,25 +134,60 @@ export async function saveInstagramAccountAction(brandId: string, accountId: str
   if (brand.userId !== user.id) return forbidden()
 
   // Validate connection
-  const validation = await validateInstagramConnection(accountId, accessToken)
+  const validation = await validateInstagramConnection(normalizedAccountId, normalizedAccessToken)
   if (!validation.success) {
     return failed(`인스타그램 계정 연동 실패: ${validation.error}`)
   }
 
   try {
     // Encrypt token
-    const encryptedToken = tokenEncryptor.encrypt(accessToken)
+    const encryptedToken = tokenEncryptor.encrypt(normalizedAccessToken)
     
     const account = await dbService.saveInstagramAccount(
       user.id,
       brandId,
-      accountId,
+      normalizedAccountId,
       encryptedToken
     )
     
     return { success: true as const, account, username: validation.username }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '계정 연동 저장 중 오류가 발생했습니다.'))
+  }
+}
+
+export async function quickConnectInstagramAction(brandId: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  const brand = await dbService.getBrand(brandId)
+  if (!brand) return failed('브랜드를 찾을 수 없습니다.')
+  if (brand.userId !== user.id) return forbidden()
+
+  if (!isInstagramMockMode()) {
+    return failed('빠른 연동은 로컬 시뮬레이션 모드에서만 사용할 수 있습니다. 운영 환경에서는 Meta API 정보를 직접 입력해 주세요.')
+  }
+
+  const accountId = getInstagramAccountId()
+  const accessToken = getInstagramAccessToken()
+  const validation = await validateInstagramConnection(accountId, accessToken)
+
+  if (!validation.success) {
+    return failed(`인스타그램 빠른 연동 실패: ${validation.error}`)
+  }
+
+  try {
+    const encryptedToken = tokenEncryptor.encrypt(accessToken)
+    const account = await dbService.saveInstagramAccount(
+      user.id,
+      brandId,
+      accountId,
+      encryptedToken
+    )
+
+    return { success: true as const, account, username: validation.username }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '빠른 연동 저장 중 오류가 발생했습니다.'))
   }
 }
 

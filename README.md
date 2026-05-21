@@ -49,6 +49,7 @@ cp .env.example .env
 - `IMAGE_PROVIDER`: 카드뉴스 배경 이미지 공급자입니다. `mock`, `openai`, `bytedance` 중 하나를 사용합니다.
 - `BYTEDANCE_API_KEY`: ByteDance 이미지 모델 연동 준비용 키입니다. 현재는 인터페이스와 TODO provider만 준비되어 있습니다.
 - `INSTAGRAM_MOCK_MODE`: `true`로 설정 시, Meta API 토큰이 가짜거나 없어도 인스타그램 연동 성공 및 가상 예약/업로드 동작이 활성화됩니다.
+- `INSTAGRAM_ACCOUNT_ID`, `INSTAGRAM_ACCESS_TOKEN`: 로컬 데모 빠른 연동과 운영 Meta API 연동에 사용하는 계정 ID와 토큰입니다.
 
 ### 3. 로컬 서버 구동
 개발 모드로 Next.js 앱을 실행합니다:
@@ -94,6 +95,10 @@ curl -X POST http://localhost:3000/api/campaigns/generate \
 ```
 
 ### 1. 인스타그램 API 연동 방식
+로컬 데모에서는 `/instagram` 화면의 **1초 만에 데모 계정 연결** 버튼으로 Meta 개발자 설정 없이 연결 상태를 만들 수 있습니다. `INSTAGRAM_MOCK_MODE=true`일 때만 노출되며, `.env`의 `INSTAGRAM_ACCOUNT_ID`, `INSTAGRAM_ACCESS_TOKEN` 값이 서버에서 암호화되어 저장됩니다.
+
+운영 환경에서는 같은 화면의 **실제 Meta API 연동** 폼에 비즈니스 계정 ID와 Access Token을 입력합니다.
+
 인스타그램 업로드는 Meta Graph API를 기반으로 3단계 트랜잭션으로 진행됩니다:
 - **1단계**: [lib/instagram/client.ts](file:///Users/jeongminsu/Downloads/SNS%20AI%20Agent/lib/instagram/client.ts) 의 `createMediaContainer` 함수를 통해 업로드할 슬라이드 이미지와 캐러셀 플래그(`is_carousel_item=true`)를 Meta 서버에 임시 업로드하여 컨테이너 ID들을 획득합니다.
 - **2단계**: `createCarouselContainer` 함수에 획득한 슬라이드 컨테이너 ID 배열과 피드 캡션을 묶어서 전달하여 최종 캐러셀 배포 컨테이너 ID를 만듭니다.
