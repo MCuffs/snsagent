@@ -1,4 +1,5 @@
 import { uploadGeneratedAsset } from '../storage/upload'
+import sharp from 'sharp'
 import type { BrandProfile, SlideCopy, SlideDesignPrompt } from './types'
 
 export async function renderSlide(params: {
@@ -37,11 +38,21 @@ export async function renderSlide(params: {
   ${params.showSlideNumber ? `<text x="1010" y="985" text-anchor="end" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#64748b">${params.copy.slideNumber}</text>` : ''}
 </svg>`
 
-  return uploadGeneratedAsset({
-    fileName: `${params.campaignKey}-slide-${params.copy.slideNumber}.svg`,
-    content: svg,
-    contentType: 'image/svg+xml',
-  })
+  try {
+    const png = await sharp(Buffer.from(svg)).png().toBuffer()
+    return uploadGeneratedAsset({
+      fileName: `${params.campaignKey}-slide-${params.copy.slideNumber}.png`,
+      content: png,
+      contentType: 'image/png',
+    })
+  } catch (error) {
+    console.error('[CarouselRenderer] PNG render failed, falling back to SVG', error)
+    return uploadGeneratedAsset({
+      fileName: `${params.campaignKey}-slide-${params.copy.slideNumber}.svg`,
+      content: svg,
+      contentType: 'image/svg+xml',
+    })
+  }
 }
 
 function escapeXml(value: string) {

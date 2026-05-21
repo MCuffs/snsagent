@@ -8,6 +8,7 @@ import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode } from '../lib/env'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
+import { renderSlide } from '../src/lib/carousel/renderer'
 import { getPipelineImageProvider } from '../src/lib/ai/providers'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { generateOverlay } from '../src/lib/layout/overlayEngine'
@@ -430,6 +431,9 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
   if (!campaign) return failed('캠페인을 찾을 수 없습니다.')
   if (campaign.userId !== user.id) return forbidden()
 
+  const brand = await dbService.getBrand(campaign.brandId)
+  if (!brand) return failed('브랜드 정보를 찾을 수 없습니다.')
+
   // Define style prompt prefixes
   const styleKeywords: Record<string, string> = {
     minimalist: 'minimalist clean Scandinavian design, soft pastel tones, high quality empty background',
@@ -443,14 +447,45 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
 
   try {
     const provider = getImageProvider()
+    const campaignKey = `cg-regen-${Date.now()}`
     const updatedSlides = await Promise.all(
       campaign.slides.map(async (slide) => {
         // Construct new design prompt with visual style override
         const finalPrompt = `${keyword}, representing: ${slide.designPrompt}`
         const imgResult = await provider.generateImage(finalPrompt)
         
+        // Compose background image with existing copy text overlays
+        const finalImageUrl = await renderSlide({
+          campaignKey,
+          brand: {
+            id: brand.id,
+            name: brand.name,
+            industry: brand.industry,
+            targetAudience: brand.targetAudience,
+            toneOfVoice: brand.toneOfVoice,
+            mainColor: brand.mainColor,
+            forbiddenWords: brand.forbiddenWords,
+            ctaStyle: brand.ctaStyle,
+          },
+          copy: {
+            slideNumber: slide.slideNumber,
+            headline: slide.headline,
+            body: slide.body,
+            ctaText: slide.slideNumber === campaign.slideCount ? brand.ctaStyle : undefined,
+          },
+          design: {
+            slideNumber: slide.slideNumber,
+            backgroundPrompt: slide.designPrompt,
+            layoutStyle: 'default',
+            textPosition: 'center',
+            visualMood: 'default',
+          },
+          backgroundImageUrl: imgResult.imageUrl,
+          showSlideNumber: true,
+        })
+
         // Save to DB
-        const updated = await dbService.updateSlideContent(slide.id, slide.headline, slide.body, imgResult.imageUrl)
+        const updated = await dbService.updateSlideContent(slide.id, slide.headline, slide.body, finalImageUrl)
         
         // Return matching format
         return {
@@ -494,24 +529,104 @@ export async function triggerSchedulerAction() {
       }
     }
 
-    // Process each post (simulate publisher queue worker)
+    let processedCount = 0
+    let failuresCount = 0
+    let lastError = ''
+
+    // Process each post
     for (const post of scheduledPosts) {
-      const mockMediaId = `ig_media_${Math.floor(10000000 + Math.random() * 90000000)}`
-      
-      // Update DB post status to posted
-      await dbService.updatePostStatus(post.id, 'posted', mockMediaId)
-      
-      // Update campaign status to posted
-      await dbService.updateCampaignStatus(post.campaignId, 'posted')
+      const isMock = isInstagramMockMode()
+      const account = await dbService.getInstagramAccount(user.id, post.brandId)
+
+      if (!isMock && account && account.status === 'CONNECTED') {
+        // Real Instagram publishing integration
+        try {
+          const campaign = await dbService.getCampaign(post.campaignId)
+          if (!campaign) {
+            throw new Error('캠페인을 찾을 수 없습니다.')
+          }
+
+          // Gather all slide images
+          const imageUrls = campaign.slides
+            .sort((a, b) => a.slideNumber - b.slideNumber)
+            .map(s => s.imageUrl)
+            .filter((url): url is string => !!url)
+
+          if (imageUrls.length === 0) {
+            throw new Error('카드뉴스에 유효한 이미지가 없습니다.')
+          }
+
+          const decryptedToken = tokenEncryptor.decrypt(account.accessTokenEncrypted)
+          const accountId = account.instagramAccountId
+
+          // Publish immediately by forcing current time or force immediate inside client
+          const result = await schedulePost(
+            accountId,
+            decryptedToken,
+            imageUrls,
+            `${post.caption}\n\n${post.hashtags}`,
+            new Date() // force immediate
+          )
+
+          if (!result.success) {
+            throw new Error(result.error || '인스타그램 업로드 실패')
+          }
+
+          // Update DB statuses to posted
+          await dbService.updatePostStatus(post.id, 'posted', result.mediaId)
+          await dbService.updateCampaignStatus(post.campaignId, 'posted')
+          processedCount++
+        } catch (err: unknown) {
+          failuresCount++
+          lastError = err instanceof Error ? err.message : '알 수 없는 오류'
+          await dbService.updatePostStatus(post.id, 'failed')
+          await dbService.updateCampaignStatus(post.campaignId, 'failed')
+        }
+      } else {
+        // Mock simulator logic
+        const mockMediaId = `ig_media_${Math.floor(10000000 + Math.random() * 90000000)}`
+        
+        // Update DB post status to posted
+        await dbService.updatePostStatus(post.id, 'posted', mockMediaId)
+        
+        // Update campaign status to posted
+        await dbService.updateCampaignStatus(post.campaignId, 'posted')
+        processedCount++
+      }
     }
+
+    const message = failuresCount > 0
+      ? `스케줄러 시뮬레이터 작동 완료 (성공: ${processedCount}개, 실패: ${failuresCount}개). 마지막 에러: ${lastError}`
+      : `성공: 대기 중이던 ${processedCount}개의 카드뉴스 포스트가 인스타그램에 발행 완료(posted) 처리되었습니다.`
 
     return { 
       success: true as const, 
-      processedCount: scheduledPosts.length, 
-      message: `성공: 대기 중이던 ${scheduledPosts.length}개의 카드뉴스 포스트가 인스타그램에 가상 발행 완료(posted) 처리되었습니다.` 
+      processedCount, 
+      message 
     }
   } catch (err: unknown) {
     console.error('Scheduler manual execution failed:', err)
     return failed(getErrorMessage(err, '스케줄러 작동 중 실패했습니다.'))
+  }
+}
+
+export async function updatePostScheduledTimeAction(postId: string, dateStr: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingPost = await dbService.getPost(postId)
+    if (!existingPost) return failed('피드를 찾을 수 없습니다.')
+    if (existingPost.userId !== user.id) return forbidden()
+
+    const newDate = new Date(dateStr)
+    if (isNaN(newDate.getTime())) {
+      return failed('올바르지 않은 날짜 형식입니다.')
+    }
+
+    const post = await dbService.updatePostScheduledTime(postId, newDate)
+    return { success: true as const, post }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '예약 시간 수정에 실패했습니다.'))
   }
 }

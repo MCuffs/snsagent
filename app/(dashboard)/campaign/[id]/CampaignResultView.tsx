@@ -21,6 +21,7 @@ import {
   approveAndScheduleCampaignAction,
   rerenderMediaSlideAction,
   updatePostDetailsAction,
+  regenerateCampaignImagesAction,
 } from '../../../actions'
 
 interface Slide {
@@ -115,8 +116,52 @@ export default function CampaignResultView({
   const [rerendering, setRerendering] = useState(false)
   const [approving, setApproving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  
+  const [selectedStyle, setSelectedStyle] = useState('minimalist')
+  const [regeneratingStyle, setRegeneratingStyle] = useState(false)
 
   const activeSlide = slides[activeSlideIndex]
+
+  const handleRegenerateStyle = async () => {
+    setRegeneratingStyle(true)
+    setMessage(null)
+
+    try {
+      const result = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '스타일 변경에 실패했습니다.' })
+        return
+      }
+
+      const updated = result.slides.map((s: {
+        id: string
+        slideNumber: number
+        headline: string
+        body: string
+        designPrompt: string
+        imageUrl: string | null
+      }) => ({
+        id: s.id,
+        slideNumber: s.slideNumber,
+        headline: s.headline,
+        body: s.body,
+        designPrompt: s.designPrompt,
+        imageUrl: s.imageUrl,
+      }))
+      setSlides(updated)
+      setMessage({ type: 'success', text: '모든 슬라이드의 AI 카드뉴스 스타일을 성공적으로 일괄 갱신했습니다!' })
+      
+      const activeIdx = activeSlideIndex
+      if (updated[activeIdx]) {
+        setHeadline(updated[activeIdx].headline)
+        setBody(updated[activeIdx].body)
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: getErrorMessage(err, '스타일 변경 처리 도중 오류가 발생했습니다.') })
+    } finally {
+      setRegeneratingStyle(false)
+    }
+  }
   const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
   const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
 
@@ -292,6 +337,62 @@ export default function CampaignResultView({
         </section>
 
         <aside className="space-y-5">
+          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="eyebrow">AI Style Theme</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">스타일 일괄 변경</h2>
+              </div>
+              <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
+            </div>
+
+            <p className="mb-4 text-xs text-[#746a62] leading-relaxed">
+              전체 카드뉴스의 AI 배경 이미지를 특정 스타일 프리셋으로 일괄 변경하여 디자인 톤앤매너를 다르게 생성합니다. 기존 텍스트는 보존됩니다.
+            </p>
+
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              {[
+                { key: 'minimalist', label: '🌿 미니멀 스칸디' },
+                { key: 'gradients', label: '🎨 비비드 그라디언트' },
+                { key: 'cyberpunk', label: '⚡ 사이버펑크' },
+                { key: 'vector', label: '✏️ 2D 일러스트' },
+                { key: 'photo', label: '📸 스튜디오 화보' },
+              ].map((style) => (
+                <button
+                  key={style.key}
+                  type="button"
+                  onClick={() => setSelectedStyle(style.key)}
+                  className={`rounded-[6px] border py-2 text-xs font-bold transition ${
+                    selectedStyle === style.key
+                      ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
+                      : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
+                  }`}
+                >
+                  {style.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRegenerateStyle}
+              disabled={regeneratingStyle}
+              className="btn-primary w-full rounded-[8px] bg-[#ff4f0a] text-white flex items-center justify-center gap-2"
+            >
+              {regeneratingStyle ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>AI 스타일 변환 중...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  <span>일괄 적용 및 재생성</span>
+                </>
+              )}
+            </button>
+          </div>
+
           <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
             <div className="mb-5 flex items-center justify-between">
               <div>

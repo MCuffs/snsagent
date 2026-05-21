@@ -800,4 +800,70 @@ export const dbService = {
     }
     throw new Error('Post not found')
   },
+
+  async getPendingScheduledPosts(): Promise<(Post & { campaign: Campaign; brand: Brand })[]> {
+    const now = new Date()
+    if (!isMock()) {
+      try {
+        const posts = await prisma.post.findMany({
+          where: {
+            status: 'scheduled',
+            scheduledAt: {
+              lte: now,
+            },
+          },
+          include: {
+            campaign: {
+              include: {
+                slides: true,
+              },
+            },
+            brand: true,
+          },
+        })
+        return posts as unknown as (Post & { campaign: Campaign; brand: Brand })[]
+      } catch (err) {
+        console.warn('Prisma getPendingScheduledPosts failed, falling back to mock database', err)
+      }
+    }
+
+    const db = initMockDb()
+    const posts = db.posts.filter(p => p.status === 'scheduled' && p.scheduledAt.getTime() <= now.getTime())
+    return posts.map(p => {
+      const campaign = db.campaigns.find(c => c.id === p.campaignId)!
+      const brand = db.brands.find(b => b.id === p.brandId)!
+      const slides = db.slides.filter(s => s.campaignId === campaign.id).sort((a, b) => a.slideNumber - b.slideNumber)
+      return {
+        ...p,
+        campaign: {
+          ...campaign,
+          slides,
+        },
+        brand,
+      }
+    })
+  },
+
+  async updatePostScheduledTime(postId: string, scheduledAt: Date): Promise<Post> {
+    if (!isMock()) {
+      try {
+        return await prisma.post.update({
+          where: { id: postId },
+          data: { scheduledAt },
+        })
+      } catch (err) {
+        console.warn('Prisma updatePostScheduledTime failed, falling back to mock database', err)
+      }
+    }
+
+    const db = initMockDb()
+    const idx = db.posts.findIndex(p => p.id === postId)
+    if (idx !== -1) {
+      db.posts[idx].scheduledAt = scheduledAt
+      db.posts[idx].updatedAt = new Date()
+      writeMockDb(db)
+      return db.posts[idx]
+    }
+    throw new Error('Post not found')
+  },
 }
