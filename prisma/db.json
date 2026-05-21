@@ -4,12 +4,26 @@
       "id": "u-1779345938327",
       "email": "demo@instaagent.ai",
       "name": "Insta Demo User",
-      "plan": "FREE",
+      "plan": "STARTER",
       "createdAt": "2026-05-21T06:45:38.327Z",
-      "updatedAt": "2026-05-21T06:45:38.327Z"
+      "updatedAt": "2026-05-21T07:58:42.208Z"
     }
   ],
-  "brands": [],
+  "brands": [
+    {
+      "id": "b-1779352764802",
+      "userId": "u-1779345938327",
+      "name": "후백",
+      "industry": "스마트스토어 쇼핑몰",
+      "targetAudience": "3040 여성",
+      "toneOfVoice": "신뢰감을 주는 전문 격식체 (~합니다)",
+      "mainColor": "#EE2A7B",
+      "forbiddenWords": "",
+      "ctaStyle": "스마트스토어에서 자세히 보기",
+      "createdAt": "2026-05-21T08:39:24.802Z",
+      "updatedAt": "2026-05-21T08:39:24.802Z"
+    }
+  ],
   "instagramAccounts": [],
   "campaigns": [],
   "slides": [],
