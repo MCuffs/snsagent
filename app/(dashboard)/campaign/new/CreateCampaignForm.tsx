@@ -2,12 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createCampaignAction } from '../../../actions'
 import { Sparkles, Image as ImageIcon, ArrowRight } from 'lucide-react'
 
 interface Brand {
   id: string
   name: string
+}
+
+interface GenerateCampaignResponse {
+  campaignId?: string
+  error?: string
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -60,17 +64,26 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
     }, 2500)
 
     try {
-      const res = await createCampaignAction(brandId, {
-        productName,
-        productDescription,
-        keyBenefits,
-        objective,
-        slideCount
+      const response = await fetch('/api/campaigns/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          brandId,
+          productName,
+          productDescription,
+          keyBenefits,
+          objective,
+          slideCount,
+          productImageUrls: [],
+        }),
       })
+      const res = await response.json() as GenerateCampaignResponse
 
       clearInterval(stepInterval)
 
-      if (res.success) {
+      if (response.ok && res.campaignId) {
         router.push(`/campaign/${res.campaignId}`)
       } else {
         setError(res.error || '생성에 실패했습니다.')

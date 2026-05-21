@@ -46,6 +46,8 @@ cp .env.example .env
 - `DATABASE_URL`: PostgreSQL 데이터베이스 주소.
 - `DATABASE_MOCK_FALLBACK`: `true`로 설정 시, 데이터베이스가 없는 환경에서도 로컬 JSON 파일 DB(`prisma/db.json`)로 즉시 로그인 및 CRUD 테스트가 실행됩니다 (데모 기본값).
 - `OPENAI_API_KEY`: 실제 OpenAI 텍스트 및 DALL-E 이미지 생성을 검증하고 싶다면 키값을 대입하세요. 비워두거나 기본값일 경우, 고품질 장르별 미리 정의된 시안으로 AI 생성이 진행됩니다.
+- `IMAGE_PROVIDER`: 카드뉴스 배경 이미지 공급자입니다. `mock`, `openai`, `bytedance` 중 하나를 사용합니다.
+- `BYTEDANCE_API_KEY`: ByteDance 이미지 모델 연동 준비용 키입니다. 현재는 인터페이스와 TODO provider만 준비되어 있습니다.
 - `INSTAGRAM_MOCK_MODE`: `true`로 설정 시, Meta API 토큰이 가짜거나 없어도 인스타그램 연동 성공 및 가상 예약/업로드 동작이 활성화됩니다.
 
 ### 3. 로컬 서버 구동
@@ -58,6 +60,38 @@ npm run dev
 ---
 
 ## 핵심 모듈 및 교체 가이드
+
+### 0. 카드뉴스 생성 백엔드 파이프라인
+카드뉴스 생성은 단일 LLM 호출이 아니라 단계형 파이프라인으로 동작합니다. 진입점은 `POST /api/campaigns/generate`이며 실제 구현은 `src/lib/carousel/pipeline.ts`에 있습니다.
+
+순서:
+1. `strategyEngine.generateStrategy()`로 콘텐츠 전략을 정합니다.
+2. `hookEngine.generateHooks()`와 `selectBestHook()`로 첫 장 Hook을 고릅니다.
+3. `structureEngine.generateStructure()`로 슬라이드 역할을 구성합니다.
+4. `copyEngine.generateSlideCopies()`로 슬라이드별 카피를 만듭니다.
+5. `designPromptEngine.generateDesignPrompts()`로 텍스트 없는 배경 이미지 프롬프트를 만듭니다.
+6. `ImageProvider`가 배경 이미지를 생성합니다.
+7. `renderer.renderSlide()`가 텍스트를 별도 오버레이로 합성합니다.
+8. `captionEngine.generateCaption()`이 캡션과 해시태그를 만듭니다.
+9. `qualityCheckEngine.runQualityCheck()`가 슬라이드 수, 문구 길이, 금지어, 이미지 URL, CTA를 검수합니다.
+10. Campaign, CarouselSlide, Post를 저장합니다.
+
+이미지 모델은 `src/lib/ai/imageProvider.ts` 인터페이스 뒤에 숨겨져 있으며 `mock`, `openai`, `bytedance` provider를 교체할 수 있습니다. 현재 renderer는 서버에서 SVG 템플릿 파일을 생성해 `/generated/carousel/*` URL을 반환하며, 추후 Sharp/Puppeteer 기반 PNG renderer로 교체할 수 있도록 독립 모듈로 분리되어 있습니다.
+
+API 요청 예시:
+```bash
+curl -X POST http://localhost:3000/api/campaigns/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "brandId": "brand-id",
+    "productName": "생활 정리함",
+    "productDescription": "작은 공간을 깔끔하게 정리하는 수납 상품",
+    "keyBenefits": "공간 절약, 쉬운 설치, 깔끔한 디자인",
+    "objective": "구매 전환",
+    "slideCount": 5,
+    "productImageUrls": []
+  }'
+```
 
 ### 1. 인스타그램 API 연동 방식
 인스타그램 업로드는 Meta Graph API를 기반으로 3단계 트랜잭션으로 진행됩니다:

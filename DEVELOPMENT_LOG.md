@@ -52,3 +52,25 @@ This file records meaningful development work, fixes, verification commands, and
 ### Notes
 - Server is currently running at `http://localhost:3000`.
 - Network URL: `http://10.31.100.27:3000`.
+
+## 2026-05-21 17:25 KST
+
+### Summary
+- Added a modular carousel generation backend pipeline.
+- Replaced the new campaign creation client flow with `POST /api/campaigns/generate`.
+
+### Changes
+- Added `src/lib/carousel/*` engines for strategy, hooks, structure, copy, design prompts, caption, rendering, quality checks, and orchestration.
+- Added `src/lib/ai/imageProvider.ts` and mock/OpenAI/ByteDance provider implementations.
+- Added `src/lib/usageLimit.ts` for monthly plan-based campaign usage checks.
+- Added `src/app/api/campaigns/generate/route.ts` and a root `app/api/campaigns/generate/route.ts` bridge so the route is active with the existing root `app/` project layout.
+- Updated `CreateCampaignForm` to call the API route instead of the previous single-step Server Action.
+- Added generated asset storage under `public/generated/carousel`.
+- Updated `.env.example` and README pipeline documentation.
+
+### Verification
+- `npm run lint`
+- `npm run build`
+
+### Notes
+- The renderer currently writes SVG assets through an isolated renderer module. It is intentionally separated so a Sharp/Puppeteer PNG renderer can replace it without changing strategy/copy/image generation stages.

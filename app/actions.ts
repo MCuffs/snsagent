@@ -2,12 +2,12 @@
 
 import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
-import { generateCarousel } from '../lib/ai/generateCarousel'
 import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccountId, isInstagramMockMode } from '../lib/env'
 import { isSubscriptionPlan } from '../lib/limits-types'
+import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -175,9 +175,10 @@ export async function createCampaignAction(brandId: string, data: {
   if (brand.userId !== user.id) return forbidden()
 
   try {
-    // Step 1: AI Content Generation (Text logic)
-    const carouselPlan = await generateCarousel(
-      {
+    const result = await generateCarouselCampaign({
+      userId: user.id,
+      brandProfile: {
+        id: brand.id,
         name: brand.name,
         industry: brand.industry,
         targetAudience: brand.targetAudience,
@@ -186,69 +187,16 @@ export async function createCampaignAction(brandId: string, data: {
         forbiddenWords: brand.forbiddenWords,
         ctaStyle: brand.ctaStyle,
       },
-      data,
-      data.slideCount
-    )
-
-    // Step 2: Parallel image generation for each slide using the selected provider
-    const provider = getImageProvider()
-    const slideWithImages = await Promise.all(
-      carouselPlan.slides.map(async (slide) => {
-        try {
-          const imgResult = await provider.generateImage(slide.designPrompt)
-          return {
-            ...slide,
-            imageUrl: imgResult.imageUrl,
-          }
-        } catch (imgErr) {
-          console.error(`Failed to generate image for slide ${slide.slideNumber}:`, imgErr)
-          return {
-            ...slide,
-            imageUrl: null, // Gracefully handle image generation failure
-          }
-        }
-      })
-    )
-
-    // Step 3: Save campaign details and slides to DB
-    const campaign = await dbService.createCampaign(
-      user.id,
-      brandId,
-      {
-        title: carouselPlan.title,
-        productName: data.productName,
-        productDescription: data.productDescription,
-        keyBenefits: data.keyBenefits,
-        objective: data.objective,
-        slideCount: data.slideCount,
+      campaignInput: {
+        ...data,
+        productImageUrls: [],
       },
-      slideWithImages
-    )
-
-    // Step 4: Create a draft Post container ready for Caption Review & Scheduling
-    // ScheduledAt defaults to tomorrow at the AI's recommended time
-    const [recHours, recMinutes] = (carouselPlan.recommendedPostTime || '06:00 PM').split(/[:\s]/)
-    const isPM = (carouselPlan.recommendedPostTime || '').toLowerCase().includes('pm')
-    
-    let hours = parseInt(recHours) || 18
-    if (isPM && hours < 12) hours += 12
-    if (!isPM && hours === 12) hours = 0
-    const minutes = parseInt(recMinutes) || 0
-
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(hours, minutes, 0, 0)
-
-    const post = await dbService.createPost(user.id, brandId, campaign.id, {
-      caption: carouselPlan.caption,
-      hashtags: carouselPlan.hashtags.join(', '),
-      scheduledAt: tomorrow,
     })
 
     return { 
       success: true as const, 
-      campaignId: campaign.id,
-      postId: post.id 
+      campaignId: result.campaignId,
+      postId: result.postId 
     }
   } catch (err: unknown) {
     console.error('Campaign creation failed:', err)
