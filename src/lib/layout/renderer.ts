@@ -84,7 +84,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
 
 function getTextBox(layout: LayoutDefinition) {
   const left = layout.safeArea.left
-  return { x: left, y: 1040, align: 'left' as const }
+  return { x: left, y: 930, align: 'left' as const }
 }
 
 function renderTopChrome(source: string, pageNumber?: number, totalPages?: number) {
