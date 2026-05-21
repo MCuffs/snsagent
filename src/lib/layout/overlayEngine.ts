@@ -16,13 +16,13 @@ export function generateOverlay(overlayStyle: OverlayStyle): OverlayPlan {
         <linearGradient id="overlay-archive-light" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#f4f4f2" stop-opacity="0.10"/>
           <stop offset="46%" stop-color="#f4f4f2" stop-opacity="0.16"/>
-          <stop offset="68%" stop-color="#f4f4f2" stop-opacity="0.58"/>
-          <stop offset="86%" stop-color="#f7f7f5" stop-opacity="0.88"/>
-          <stop offset="100%" stop-color="#f7f7f5" stop-opacity="0.98"/>
+          <stop offset="68%" stop-color="#eeeeea" stop-opacity="0.52"/>
+          <stop offset="86%" stop-color="#b8b8b2" stop-opacity="0.70"/>
+          <stop offset="100%" stop-color="#5f5f5a" stop-opacity="0.82"/>
         </linearGradient>`,
-      svgMarkup: '<rect width="1080" height="1350" fill="#f4f4f2" fill-opacity="0.10"/><rect width="1080" height="1350" fill="url(#overlay-archive-light)"/>',
+      svgMarkup: '<rect width="1080" height="1350" fill="#f4f4f2" fill-opacity="0.08"/><rect width="1080" height="1350" fill="url(#overlay-archive-light)"/>',
       textColor: '#050505',
-      secondaryTextColor: 'rgba(0, 0, 0, 0.46)',
+      secondaryTextColor: 'rgba(0, 0, 0, 0.54)',
     }
   }
 
@@ -31,12 +31,13 @@ export function generateOverlay(overlayStyle: OverlayStyle): OverlayPlan {
       overlayStyle,
       svgDefs: `
         <linearGradient id="overlay-archive-dark" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#8f8f8f" stop-opacity="0.38"/>
-          <stop offset="48%" stop-color="#6f6f6f" stop-opacity="0.46"/>
-          <stop offset="72%" stop-color="#262626" stop-opacity="0.68"/>
-          <stop offset="100%" stop-color="#070707" stop-opacity="0.92"/>
+          <stop offset="0%" stop-color="#8f8f8f" stop-opacity="0.32"/>
+          <stop offset="45%" stop-color="#6f6f6f" stop-opacity="0.42"/>
+          <stop offset="66%" stop-color="#3b3b3b" stop-opacity="0.62"/>
+          <stop offset="86%" stop-color="#151515" stop-opacity="0.84"/>
+          <stop offset="100%" stop-color="#050505" stop-opacity="0.96"/>
         </linearGradient>`,
-      svgMarkup: '<rect width="1080" height="1350" fill="#808080" fill-opacity="0.26"/><rect width="1080" height="1350" fill="url(#overlay-archive-dark)"/>',
+      svgMarkup: '<rect width="1080" height="1350" fill="#808080" fill-opacity="0.22"/><rect width="1080" height="1350" fill="url(#overlay-archive-dark)"/>',
       textColor: '#ffffff',
       secondaryTextColor: 'rgba(255, 255, 255, 0.58)',
     }
@@ -45,8 +46,13 @@ export function generateOverlay(overlayStyle: OverlayStyle): OverlayPlan {
   if (overlayStyle === 'archive-cta') {
     return {
       overlayStyle,
-      svgDefs: '',
-      svgMarkup: '<rect width="1080" height="1350" fill="#000000"/>',
+      svgDefs: `
+        <linearGradient id="overlay-archive-cta" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#000000" stop-opacity="1"/>
+          <stop offset="62%" stop-color="#000000" stop-opacity="1"/>
+          <stop offset="100%" stop-color="#000000" stop-opacity="1"/>
+        </linearGradient>`,
+      svgMarkup: '<rect width="1080" height="1350" fill="url(#overlay-archive-cta)"/>',
       textColor: '#f5f5f5',
       secondaryTextColor: 'rgba(255, 255, 255, 0.42)',
     }

@@ -60,7 +60,7 @@ export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemp
     'product-light': 'bright product archive layout, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for black typography, subtle white fog gradient at bottom',
     'product-dark': 'muted gray product archive layout, object centered in middle, subdued contrast, gray film veil, strong lower shadow for white typography, calm premium catalogue mood',
     'journal-light': 'minimal journal archive layout, grayscale editorial photo placed as a centered rectangular frame with generous light gray margins, quiet documentary mood, clean bottom area for black typography',
-    'cta-dark': 'black closing slide background, very minimal centered blurred brand wordmark area, no object clutter, premium archive ending card',
+    'cta-dark': 'black closing slide background, very minimal centered brand wordmark area, no blur, no object clutter, premium archive ending card',
   }[template]
 
   return [

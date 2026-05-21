@@ -55,16 +55,13 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   <defs>
     ${input.overlay.svgDefs}
     ${renderFallbackOverlayDefs()}
-    <filter id="text-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000000" flood-opacity="0.34"/>
-    </filter>
   </defs>
   <rect width="1080" height="1350" fill="#101114"/>
   <image href="${escapeXml(backgroundImageDataUri || input.backgroundImageUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"/>
   ${input.overlay.svgMarkup || renderFallbackOverlay()}
   ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, textColor)}
   ${kickerMarkup}
-  <g filter="url(#text-shadow)">
+  <g>
     ${headlineMarkup}
     ${bodyMarkup}
   </g>
@@ -155,14 +152,17 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
-  <defs>
-    <filter id="cta-blur" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="2.5"/>
-    </filter>
-  </defs>
   <rect width="1080" height="1350" fill="#000000"/>
+  <defs>
+    <linearGradient id="cta-bottom-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="58%" stop-color="#000000" stop-opacity="0.24"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.92"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#cta-bottom-gradient)"/>
   ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, '#ffffff')}
-  <text x="540" y="675" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="52" font-weight="700" fill="#ffffff" fill-opacity="0.58" letter-spacing="2" filter="url(#cta-blur)">${sourceMark.toUpperCase()}</text>
+  <text x="540" y="675" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="52" font-weight="700" fill="#ffffff" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
   <text x="72" y="970" font-family="${fontFamily('clean-sans')}" font-size="82" font-weight="750" fill="#f5f5f5" letter-spacing="-0.5">${escapeXml(headline)}</text>
   ${bodyLines.slice(0, 2).map((line, index) => `<text x="72" y="${1060 + index * 52}" font-family="${fontFamily('clean-sans')}" font-size="29" font-weight="400" fill="#ffffff" fill-opacity="0.44" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
   <line x1="72" y1="1188" x2="1008" y2="1188" stroke="#ffffff" stroke-opacity="0.16"/>
