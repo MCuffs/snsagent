@@ -1,5 +1,11 @@
 export type SubscriptionPlan = 'FREE' | 'STARTER' | 'PRO' | 'AGENCY'
 
+export const SUBSCRIPTION_PLANS = ['FREE', 'STARTER', 'PRO', 'AGENCY'] as const
+
+export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
+  return SUBSCRIPTION_PLANS.includes(plan as SubscriptionPlan)
+}
+
 export interface PlanFeature {
   name: string
   monthlyCampaignLimit: number

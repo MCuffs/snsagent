@@ -1,4 +1,5 @@
 import { OpenAI } from 'openai'
+import { isConfiguredOpenAIKey } from '../env'
 
 export interface BrandProfile {
   name: string
@@ -35,7 +36,7 @@ export interface GeneratedCarousel {
 
 const getOpenAIClient = () => {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey || apiKey === 'your-openai-api-key-here' || apiKey.trim() === '') {
+  if (!isConfiguredOpenAIKey(apiKey)) {
     return null
   }
   return new OpenAI({ apiKey })

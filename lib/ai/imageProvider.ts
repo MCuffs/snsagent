@@ -1,4 +1,5 @@
 import { OpenAI } from 'openai'
+import { isConfiguredOpenAIKey } from '../env'
 
 export interface ImageProvider {
   generateImage(prompt: string): Promise<{ imageUrl: string }>
@@ -106,7 +107,7 @@ export class OpenAIImageProvider implements ImageProvider {
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey || apiKey === 'your-openai-api-key-here') {
+    if (!isConfiguredOpenAIKey(apiKey)) {
       throw new Error('OpenAI API Key is missing for OpenAIImageProvider')
     }
     this.openai = new OpenAI({ apiKey })
@@ -156,7 +157,7 @@ export class ByteDanceImageProvider implements ImageProvider {
 export function getImageProvider(): ImageProvider {
   const apiKey = process.env.OPENAI_API_KEY
   
-  if (!apiKey || apiKey === 'your-openai-api-key-here' || apiKey.trim() === '') {
+  if (!isConfiguredOpenAIKey(apiKey)) {
     console.log('Using MockImageProvider (OpenAI Key not set)')
     return new MockImageProvider()
   }

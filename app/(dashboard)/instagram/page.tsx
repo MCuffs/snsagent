@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSessionUser, saveInstagramAccountAction } from '../../actions'
 import { dbService } from '../../../lib/db-service'
 import { tokenEncryptor } from '../../../lib/instagram/client'
+import { isInstagramMockMode } from '../../../lib/env'
 import { Link2, Link2Off, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import InstagramIcon from '../../components/InstagramIcon'
 
@@ -112,7 +113,7 @@ export default async function InstagramSettingsPage() {
 
             <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-3 justify-between items-center">
               <span className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full font-bold">
-                {process.env.INSTAGRAM_MOCK_MODE === 'true' ? '개발 환경: 로컬 시뮬레이션 모드 활성화됨' : '운영 환경: Meta API 실시간 연동'}
+                {isInstagramMockMode() ? '개발 환경: 로컬 시뮬레이션 모드 활성화됨' : '운영 환경: Meta API 실시간 연동'}
               </span>
               <button
                 type="submit"

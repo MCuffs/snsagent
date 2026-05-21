@@ -30,3 +30,25 @@ This file records meaningful development work, fixes, verification commands, and
 ### Notes
 - No local server is currently running on port `3000`.
 - `prisma/db.json` contains local demo runtime state and should not be committed unless intentionally updating seed/demo data.
+
+## 2026-05-21 17:10 KST
+
+### Summary
+- Kept the production server running for local review.
+- Continued immediate hardening work around input validation and environment handling.
+
+### Changes
+- Added `lib/env.ts` for typed environment helpers and production token-secret validation.
+- Added `SUBSCRIPTION_PLANS` and `isSubscriptionPlan()` to validate plan changes before updating user state.
+- Reused environment helpers for Instagram mock mode, account fallback, and OpenAI key placeholder checks.
+- Updated Instagram token encryption to reject missing placeholder secrets in production runtime.
+
+### Verification
+- `npm run lint`
+- `npm run build`
+- Restarted `next start`.
+- Confirmed HTTP `200` at `http://127.0.0.1:3000/`.
+
+### Notes
+- Server is currently running at `http://localhost:3000`.
+- Network URL: `http://10.31.100.27:3000`.

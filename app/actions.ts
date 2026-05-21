@@ -6,6 +6,8 @@ import { generateCarousel } from '../lib/ai/generateCarousel'
 import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
+import { getInstagramAccountId, isInstagramMockMode } from '../lib/env'
+import { isSubscriptionPlan } from '../lib/limits-types'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -69,6 +71,10 @@ export async function changeUserPlanAction(plan: string) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
+  if (!isSubscriptionPlan(plan)) {
+    return failed('지원하지 않는 요금제입니다.')
+  }
+
   await dbService.updateUserPlan(user.id, plan)
   
   // Clear layout cache
@@ -87,7 +93,7 @@ export async function saveBrandAction(brandId: string | null, data: {
   ctaStyle: string
 }) {
   const user = await getSessionUser()
-  if (!user) return { success: false, error: '로그인이 필요합니다.' }
+  if (!user) return unauthenticated()
 
   // Limit check for new brand creation
   if (!brandId) {
@@ -306,13 +312,13 @@ export async function approveAndScheduleCampaignAction(
     }
 
     const account = await dbService.getInstagramAccount(user.id, campaign.brandId)
-    const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true'
+    const isMock = isInstagramMockMode()
 
     if (!isMock && (!account || account.status !== 'CONNECTED')) {
       return failed('인스타그램 연동 정보가 없습니다. [Instagram 설정] 메뉴에서 먼저 계정을 연동해 주세요.')
     }
 
-    const accountId = account?.instagramAccountId || process.env.INSTAGRAM_ACCOUNT_ID || 'mock_account_id'
+    const accountId = account?.instagramAccountId || getInstagramAccountId()
     const decryptedToken = account ? tokenEncryptor.decrypt(account.accessTokenEncrypted) : ''
 
     // Gather all slide images

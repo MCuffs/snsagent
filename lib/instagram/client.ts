@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { getTokenEncryptionSecret, isInstagramMockMode } from '../env'
 
 export interface InstagramClientConfig {
   accountId: string
@@ -27,13 +28,7 @@ async function readInstagramError(res: Response, fallback: string) {
 }
 
 function getTokenEncryptionKey() {
-  const secret =
-    process.env.INSTAGRAM_TOKEN_ENCRYPTION_KEY ||
-    process.env.AUTH_SECRET ||
-    process.env.DATABASE_URL ||
-    'instaagent-local-development-token-key'
-
-  return crypto.createHash('sha256').update(secret).digest()
+  return crypto.createHash('sha256').update(getTokenEncryptionSecret()).digest()
 }
 
 /**
@@ -90,7 +85,7 @@ export async function validateInstagramConnection(
   accountId: string,
   accessToken: string
 ): Promise<{ success: boolean; username?: string; error?: string }> {
-  const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true' || !accessToken
+  const isMock = isInstagramMockMode() || !accessToken
 
   if (isMock) {
     // Simulate connection delay
@@ -130,7 +125,7 @@ export async function createMediaContainer(
   caption: string,
   isCarouselItem = false
 ): Promise<{ containerId: string }> {
-  const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true' || !accessToken
+  const isMock = isInstagramMockMode() || !accessToken
 
   if (isMock) {
     await new Promise(resolve => setTimeout(resolve, 400))
@@ -179,7 +174,7 @@ export async function createCarouselContainer(
   childrenContainerIds: string[],
   caption: string
 ): Promise<{ containerId: string }> {
-  const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true' || !accessToken
+  const isMock = isInstagramMockMode() || !accessToken
 
   if (isMock) {
     await new Promise(resolve => setTimeout(resolve, 400))
@@ -221,7 +216,7 @@ export async function publishMedia(
   accessToken: string,
   containerId: string
 ): Promise<{ mediaId: string }> {
-  const isMock = process.env.INSTAGRAM_MOCK_MODE === 'true' || !accessToken
+  const isMock = isInstagramMockMode() || !accessToken
 
   if (isMock) {
     await new Promise(resolve => setTimeout(resolve, 500))
