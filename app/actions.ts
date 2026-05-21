@@ -8,6 +8,11 @@ import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode } from '../lib/env'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
+import { getPipelineImageProvider } from '../src/lib/ai/providers'
+import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
+import { generateOverlay } from '../src/lib/layout/overlayEngine'
+import { renderMediaCard } from '../src/lib/layout/renderer'
+import { planTypography } from '../src/lib/layout/typographyEngine'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -259,6 +264,49 @@ export async function updateSlideAction(slideId: string, headline: string, body:
   }
 }
 
+export async function rerenderMediaSlideAction(slideId: string, headline: string, body: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
+    const layout = LAYOUT_DEFINITIONS[inferLayoutType(existingSlide.designPrompt)]
+    const typography = planTypography({
+      headline,
+      body,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      layout,
+    })
+    const overlay = generateOverlay(layout.overlayStyle)
+    const background = await getPipelineImageProvider().generateImage(existingSlide.designPrompt, {
+      size: '1024x1024',
+      productImageUrls: [],
+    })
+
+    const imageUrl = await renderMediaCard({
+      id: `media-card-rerender-${Date.now()}-${existingSlide.slideNumber}`,
+      layout,
+      typography,
+      overlay,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      headline,
+      body,
+      backgroundImageUrl: background.imageUrl,
+      source: existingSlide.campaign.title,
+      pageNumber: existingSlide.slideNumber,
+      totalPages: existingSlide.campaign.slideCount,
+    })
+
+    const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
+    return { success: true as const, slide }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '슬라이드 재렌더링에 실패했습니다.'))
+  }
+}
+
 // Update post caption & hashtags
 export async function updatePostDetailsAction(postId: string, caption: string, hashtags: string) {
   const user = await getSessionUser()
@@ -274,6 +322,20 @@ export async function updatePostDetailsAction(postId: string, caption: string, h
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '피드 정보 수정에 실패했습니다.'))
   }
+}
+
+function inferLayoutType(prompt: string): LayoutType {
+  const normalized = prompt.toLowerCase()
+  if (normalized.includes('data journalism')) return 'stat-highlight'
+  if (normalized.includes('clean studio')) return 'minimal-clean'
+  if (normalized.includes('cinematic portrait')) return 'cinematic-headline'
+  if (normalized.includes('documentary news')) return 'breaking-news'
+  if (normalized.includes('social feed')) return 'trend-feed'
+  if (normalized.includes('magazine cover')) return 'magazine'
+  if (normalized.includes('split-screen')) return 'split-comparison'
+  if (normalized.includes('community')) return 'community-style'
+  if (normalized.includes('shallow depth')) return 'quote-focus'
+  return 'dark-editorial'
 }
 
 // Campaign & Post approval trigger (Human-in-the-loop)

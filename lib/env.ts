@@ -35,6 +35,14 @@ export function getMetaApiVersion() {
   return readEnv('META_API_VERSION') || 'v19.0'
 }
 
+export function getGoogleClientId() {
+  return readEnv('GOOGLE_CLIENT_ID')
+}
+
+export function getGoogleClientSecret() {
+  return readEnv('GOOGLE_CLIENT_SECRET')
+}
+
 export function getAppBaseUrl(request?: Request) {
   const configured = readEnv('NEXT_PUBLIC_APP_URL') || readEnv('APP_URL')
   if (configured) return configured.replace(/\/$/, '')

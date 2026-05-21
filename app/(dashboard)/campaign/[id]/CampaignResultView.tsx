@@ -2,28 +2,26 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  updateSlideAction, 
-  updatePostDetailsAction, 
-  approveAndScheduleCampaignAction,
-  regenerateCampaignImagesAction 
-} from '../../../actions'
-import { 
-  Sparkles, 
-  ChevronLeft, 
-  ChevronRight, 
-  Check, 
-  Edit3, 
-  Calendar, 
-  Clock, 
-  ArrowRight,
-  RefreshCw,
-  Eye,
-  Settings,
+import {
   AlertCircle,
+  ArrowRight,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  ExternalLink,
   Loader2,
-  Palette
+  RefreshCw,
+  Sparkles,
+  Type,
 } from 'lucide-react'
+import {
+  approveAndScheduleCampaignAction,
+  rerenderMediaSlideAction,
+  updatePostDetailsAction,
+} from '../../../actions'
 
 interface Slide {
   id: string
@@ -68,16 +66,34 @@ interface CampaignResultViewProps {
   canSchedule: boolean
 }
 
-const VISUAL_STYLES = [
-  { key: 'minimalist', name: '미니멀리스트', desc: '북유럽풍 파스텔톤과 깔끔한 단색 조화' },
-  { key: 'gradients', name: '그라데이션 팝', desc: '트렌디한 입체적 글래스모피즘 그라데이션' },
-  { key: 'cyberpunk', name: '네온 사이버', desc: '미래지향적인 네온 다크 테크 스타일' },
-  { key: 'vector', name: '플랫 일러스트', desc: '귀엽고 친근한 2D 플랫 벡터 캐릭터' },
-  { key: 'photo', name: '스튜디오 화보', desc: '프리미엄 상업 브랜드 스튜디오 실사 화보' }
-]
-
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
+}
+
+function formatDateTime(dateStr: string) {
+  const date = new Date(dateStr)
+  const pad = (value: number) => value.toString().padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function inferLayoutLabel(prompt: string) {
+  const normalized = prompt.toLowerCase()
+  if (normalized.includes('data journalism')) return 'stat-highlight'
+  if (normalized.includes('clean studio')) return 'minimal-clean'
+  if (normalized.includes('cinematic portrait')) return 'cinematic-headline'
+  if (normalized.includes('documentary news')) return 'breaking-news'
+  if (normalized.includes('social feed')) return 'trend-feed'
+  if (normalized.includes('magazine cover')) return 'magazine'
+  if (normalized.includes('shallow depth')) return 'quote-focus'
+  return 'dark-editorial'
+}
+
+function inferRole(slideNumber: number, total: number, prompt: string) {
+  if (slideNumber === 1) return 'hook'
+  if (slideNumber === total) return 'save-cta'
+  if (slideNumber === 2) return 'context'
+  if (prompt.toLowerCase().includes('data journalism')) return 'stat'
+  return slideNumber % 2 === 0 ? 'detail' : 'key-point'
 }
 
 export default function CampaignResultView({
@@ -86,459 +102,349 @@ export default function CampaignResultView({
   brand,
   userPlan,
   hasWatermark,
-  canSchedule
+  canSchedule,
 }: CampaignResultViewProps) {
   const router = useRouter()
+  const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
-  const [slides, setSlides] = useState<Slide[]>(
-    [...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber)
-  )
-  
-  // Slide edit state
-  const [editingHeadline, setEditingHeadline] = useState(slides[0]?.headline || '')
-  const [editingBody, setEditingBody] = useState(slides[0]?.body || '')
-  const [updatingSlide, setUpdatingSlide] = useState(false)
-
-  // Visual style state
-  const [selectedStyle, setSelectedStyle] = useState('minimalist')
-  const [regenerating, setRegenerating] = useState(false)
-
-  // Caption/Schedule state
+  const [headline, setHeadline] = useState(slides[0]?.headline || '')
+  const [body, setBody] = useState(slides[0]?.body || '')
   const [caption, setCaption] = useState(post.caption)
   const [hashtags, setHashtags] = useState(post.hashtags)
-  
-  // Format date to local datetime string: YYYY-MM-DDThh:mm
-  const formatDateTime = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const pad = (n: number) => n.toString().padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
   const [scheduledAt, setScheduledAt] = useState(formatDateTime(post.scheduledAt))
-  
-  // Operation Status
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [rerendering, setRerendering] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const activeSlide = slides[activeSlideIndex]
+  const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
+  const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
 
-  // Sync edit state when active slide changes
-  const handleSlideChange = (index: number) => {
+  const selectSlide = (index: number) => {
     setActiveSlideIndex(index)
-    setEditingHeadline(slides[index].headline)
-    setEditingBody(slides[index].body)
+    setHeadline(slides[index]?.headline || '')
+    setBody(slides[index]?.body || '')
+    setMessage(null)
   }
 
-  // Save current slide text edits to DB & local state
-  const handleSaveSlideTexts = async () => {
+  const rerenderSlide = async () => {
     if (!activeSlide) return
-    setUpdatingSlide(true)
+    setRerendering(true)
     setMessage(null)
+
     try {
-      const res = await updateSlideAction(activeSlide.id, editingHeadline, editingBody)
-      if (res.success) {
-        // Update local state
-        const updatedSlides = slides.map(s => {
-          if (s.id === activeSlide.id) {
-            return {
-              ...s,
-              headline: editingHeadline,
-              body: editingBody
+      const result = await rerenderMediaSlideAction(activeSlide.id, headline, body)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '슬라이드 재렌더링에 실패했습니다.' })
+        return
+      }
+
+      const updatedSlides = slides.map((slide) =>
+        slide.id === activeSlide.id
+          ? {
+              ...slide,
+              headline,
+              body,
+              imageUrl: result.slide.imageUrl,
             }
-          }
-          return s
-        })
-        setSlides(updatedSlides)
-        setMessage({ type: 'success', text: `${activeSlide.slideNumber}번 슬라이드 문구가 반영되었습니다.` })
-      } else {
-        setMessage({ type: 'error', text: res.error || '슬라이드 수정에 실패했습니다.' })
-      }
-    } catch (e: unknown) {
-      setMessage({ type: 'error', text: getErrorMessage(e, '네트워크 오류가 발생했습니다.') })
+          : slide
+      )
+      setSlides(updatedSlides)
+      setMessage({ type: 'success', text: `${activeSlide.slideNumber}장 텍스트와 이미지를 다시 합성했습니다.` })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '슬라이드 재렌더링 중 오류가 발생했습니다.') })
     } finally {
-      setUpdatingSlide(false)
+      setRerendering(false)
     }
   }
 
-  // Batch regenerate slide images with selected visual style
-  const handleRegenerateStyle = async () => {
-    setRegenerating(true)
-    setMessage(null)
-    try {
-      const res = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
-      if (res.success) {
-        setSlides(res.slides)
-        // Reset preview back to slide 1
-        setActiveSlideIndex(0)
-        setEditingHeadline(res.slides[0]?.headline || '')
-        setEditingBody(res.slides[0]?.body || '')
-        setMessage({ 
-          type: 'success', 
-          text: `성공: 카드뉴스 시안 이미지가 '${VISUAL_STYLES.find(s => s.key === selectedStyle)?.name}' 컨셉으로 일괄 재생성되었습니다.` 
-        })
-      } else {
-        setMessage({ type: 'error', text: res.error || '스타일 재생성에 실패했습니다.' })
-      }
-    } catch (e: unknown) {
-      setMessage({ type: 'error', text: getErrorMessage(e, '디자인 재생성 중 네트워크 에러가 발생했습니다.') })
-    } finally {
-      setRegenerating(false)
-    }
-  }
-
-  // Approve campaign and queue schedule
-  const handleApprove = async () => {
-    setLoading(true)
+  const approve = async () => {
+    setApproving(true)
     setMessage(null)
 
     try {
-      // First save caption/hashtags details
       await updatePostDetailsAction(post.id, caption, hashtags)
-
-      const res = await approveAndScheduleCampaignAction(campaign.id, post.id, {
+      const result = await approveAndScheduleCampaignAction(campaign.id, post.id, {
         caption,
         hashtags,
-        scheduledAt: new Date(scheduledAt).toISOString()
+        scheduledAt: new Date(scheduledAt).toISOString(),
       })
 
-      if (res.success) {
-        setMessage({ type: 'success', text: res.message || '인스타그램 등록 성공!' })
-        // Redirect to calendar after short delay
-        setTimeout(() => {
-          router.push('/calendar')
-        }, 1500)
-      } else {
-        setMessage({ type: 'error', text: res.error || '승인 처리 등록에 실패했습니다.' })
-        setLoading(false)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '승인 처리에 실패했습니다.' })
+        setApproving(false)
+        return
       }
-    } catch (e: unknown) {
-      setMessage({ type: 'error', text: getErrorMessage(e, '네트워크 오류가 발생했습니다.') })
-      setLoading(false)
+
+      setMessage({ type: 'success', text: result.message || '예약 대기열에 등록했습니다.' })
+      setTimeout(() => router.push('/calendar'), 1200)
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '승인 처리 중 오류가 발생했습니다.') })
+      setApproving(false)
     }
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded bg-[#ff4f00]/10 text-[#ff4f00] border border-[#ff4f00]/20">AI 초안 기획 완성</span>
-            <span className="text-[10px] text-slate-400 font-bold">캠페인 ID: {campaign.id}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">시안 검토 및 승인</h1>
+    <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
+      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="eyebrow">Media Card Review</p>
+          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-0.06em] text-[#1f1512] md:text-5xl">
+            {campaign.title}
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
+            생성된 카드뉴스를 실제 렌더링 결과 기준으로 검토하고, 텍스트를 수정한 뒤 다시 합성할 수 있습니다.
+          </p>
         </div>
-
         <button
+          type="button"
           onClick={() => router.push('/campaign/new')}
-          className="px-4 py-2.5 rounded-lg text-xs font-bold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+          className="btn-secondary px-5"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>다시 생성 (처음으로)</span>
+          <RefreshCw className="h-4 w-4" />
+          새 캠페인
         </button>
       </div>
 
-      {/* Message Notifications */}
       {message && (
-        <div className={`p-4 rounded-lg border flex gap-2.5 text-xs font-semibold ${
-          message.type === 'success' 
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700' 
-            : 'border-red-200 bg-red-50 text-red-700'
+        <div className={`mb-6 rounded-[8px] border px-4 py-3 text-sm font-bold ${
+          message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'
         }`}>
-          <AlertCircle className="w-4.5 h-4.5 flex-shrink-0 mt-0.5" />
-          <span>{message.text}</span>
+          {message.text}
         </div>
       )}
 
-      {/* Main Grid: Left Side Mockup, Right Side Inputs */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left Card Visual Preview Mockup (Col span 5) */}
-        <div className="lg:col-span-5 space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <Eye className="w-4 h-4 text-[#ff4f00]" />
-            <span>카드뉴스 모바일 실시간 미리보기</span>
-          </h2>
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <section className="space-y-5">
+          <div className="rounded-[10px] border border-[#e8dfd4] bg-[#f8f3e9] p-4 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+            <div className="mx-auto max-w-[560px]">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#1f1512] shadow-[0_22px_70px_rgba(31,21,18,0.22)]">
+                {activeSlide?.imageUrl?.endsWith('.png') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={activeSlide.imageUrl}
+                    src={activeSlide.imageUrl}
+                    alt={`${activeSlide.slideNumber}번 카드뉴스`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : activeSlide?.imageUrl ? (
+                  <iframe
+                    key={activeSlide.imageUrl}
+                    src={activeSlide.imageUrl}
+                    title={`${activeSlide.slideNumber}번 카드뉴스`}
+                    className="h-full w-full border-0 bg-white"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm font-bold text-white/70">
+                    렌더링 이미지가 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
 
-          {/* Instagram Square Card Mockup */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-lg relative">
-            <div className="aspect-square w-full relative flex flex-col justify-between p-10 select-none overflow-hidden"
-              style={{
-                backgroundImage: activeSlide?.imageUrl ? `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.75)), url(${activeSlide.imageUrl})` : 'linear-gradient(to bottom, #eaeaea, #d5d5d5)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            >
-              {/* Slide Number Badge */}
-              <div className="self-end px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-[10px] font-bold text-white tracking-widest border border-white/10">
+            <div className="mt-5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => selectSlide(Math.max(0, activeSlideIndex - 1))}
+                disabled={activeSlideIndex === 0}
+                className="btn-secondary min-h-10 px-4 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-sm font-black text-[#1f1512]">
                 {activeSlideIndex + 1} / {slides.length}
               </div>
-
-              {/* Title & Body Card Layout (Styled using Brand Color) */}
-              <div className="space-y-4 my-auto text-center px-4">
-                <h3 className="text-xl sm:text-2xl font-black text-white leading-snug drop-shadow-md whitespace-pre-line border-b-2 pb-4 inline-block max-w-full"
-                  style={{ borderColor: brand.mainColor || '#ff4f00' }}
-                >
-                  {editingHeadline}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-100 font-medium leading-relaxed drop-shadow whitespace-pre-line">
-                  {editingBody}
-                </p>
-              </div>
-
-              {/* Card Footer: Brand watermark & Instagram styling indicators */}
-              <div className="flex justify-between items-center text-[10px] text-white/50">
-                <span className="font-semibold">{brand.name}</span>
-                {hasWatermark && (
-                  <span className="bg-black/60 px-2 py-0.5 rounded border border-white/5 font-extrabold tracking-widest text-[8px] uppercase text-[#ff4f00]">
-                    Watermark: InstaAgent
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Slider Controls */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
               <button
                 type="button"
-                onClick={() => handleSlideChange(Math.max(0, activeSlideIndex - 1))}
-                disabled={activeSlideIndex === 0}
-                className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              
-              <div className="flex gap-1.5">
-                {slides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSlideChange(idx)}
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      activeSlideIndex === idx ? 'w-5 bg-[#ff4f00]' : 'bg-slate-200'
-                    }`}
-                  ></button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleSlideChange(Math.min(slides.length - 1, activeSlideIndex + 1))}
+                onClick={() => selectSlide(Math.min(slides.length - 1, activeSlideIndex + 1))}
                 disabled={activeSlideIndex === slides.length - 1}
-                className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="btn-secondary min-h-10 px-4 disabled:opacity-40"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-2.5 text-xs text-slate-500 font-medium">
-            <Edit3 className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <p className="leading-relaxed">
-              슬라이드 배경 이미지는 AI가 다음 가이드로 그린 초안입니다:<br />
-              <span className="italic text-slate-700 font-semibold">&ldquo;{activeSlide?.designPrompt.slice(0, 60)}...&rdquo;</span>
-            </p>
+          <div className="grid gap-3 sm:grid-cols-5">
+            {slides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => selectSlide(index)}
+                className={`overflow-hidden rounded-[8px] border bg-white p-1 transition ${
+                  activeSlideIndex === index ? 'border-[#ff4f0a] shadow-[0_14px_28px_rgba(255,79,10,0.16)]' : 'border-[#e8dfd4] hover:border-[#ffb08a]'
+                }`}
+              >
+                <div className="aspect-[4/5] overflow-hidden rounded-[5px] bg-[#f8f3e9]">
+                  {slide.imageUrl?.endsWith('.png') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={slide.imageUrl} alt={`${slide.slideNumber} 썸네일`} className="h-full w-full object-cover" />
+                  ) : slide.imageUrl ? (
+                    <iframe src={slide.imageUrl} title={`${slide.slideNumber} 썸네일`} className="h-full w-full scale-[1.03] border-0 bg-white" />
+                  ) : null}
+                </div>
+                <p className="mt-2 truncate px-1 pb-1 text-left text-[11px] font-black text-[#4a4039]">
+                  {slide.slideNumber}. {slide.headline}
+                </p>
+              </button>
+            ))}
           </div>
-        </div>
+        </section>
 
-        {/* Right Side Settings & Edit Inputs (Col span 7) */}
-        <div className="lg:col-span-7 space-y-6">
-          
-          {/* Visual Style Switcher Panel */}
-          <div className="border border-slate-200 rounded-xl bg-white p-6 space-y-4 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              <Palette className="w-4.5 h-4.5 text-[#ff4f00]" />
-              <span>디자인 비주얼 스타일 스위처 (AI 테마)</span>
-            </h3>
-
-            <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-              카드뉴스의 그래픽 스타일을 선택해 일괄 리프레시할 수 있습니다. 원하는 테마 선택 후 적용 버튼을 클릭하세요.
-            </p>
-
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {VISUAL_STYLES.map((style) => (
-                  <button
-                    key={style.key}
-                    type="button"
-                    onClick={() => !regenerating && setSelectedStyle(style.key)}
-                    disabled={regenerating}
-                    className={`p-2.5 text-left rounded-lg border transition-all cursor-pointer ${
-                      selectedStyle === style.key
-                        ? 'border-[#ff4f00] bg-[#ff4f00]/5 text-[#ff4f00] shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    } disabled:opacity-50`}
-                  >
-                    <p className="text-xs font-bold">{style.name}</p>
-                    <p className="text-[9px] text-slate-450 mt-0.5 font-medium leading-none truncate">{style.desc}</p>
-                  </button>
-                ))}
+        <aside className="space-y-5">
+          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="eyebrow">Slide {activeSlide?.slideNumber}</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">타이포그래피 편집</h2>
               </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={handleRegenerateStyle}
-                  disabled={regenerating}
-                  className="px-4 py-2.5 rounded-lg text-xs font-bold bg-[#ff4f00] hover:bg-[#e04500] text-white flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors disabled:opacity-55"
-                >
-                  {regenerating ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>AI 새 스타일 드로잉 중 (15초 소요)...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>스타일 적용 및 전체 이미지 재생성</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <Type className="h-5 w-5 text-[#ff4f0a]" />
             </div>
-          </div>
 
-          {/* Card Content Typo Editor */}
-          <div className="border border-slate-200 rounded-xl bg-white p-6 space-y-4 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              <Settings className="w-4.5 h-4.5 text-[#ff4f00]" />
-              <span>{activeSlideIndex + 1}번 카드뉴스 텍스트 편집</span>
-            </h3>
+            <div className="mb-5 grid grid-cols-2 gap-3">
+              <Meta label="role" value={roleLabel} />
+              <Meta label="layout" value={layoutLabel} />
+              <Meta label="brand" value={brand.name} />
+              <Meta label="plan" value={userPlan} />
+              <Meta label="watermark" value={hasWatermark ? 'on' : 'off'} />
+            </div>
 
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  슬라이드 헤드카피 (제목)
+              <div>
+                <label htmlFor="headline" className="mb-2 block text-xs font-black text-[#4a4039]">
+                  헤드라인
                 </label>
                 <input
-                  type="text"
-                  value={editingHeadline}
-                  onChange={(e) => setEditingHeadline(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-950 focus:outline-none focus:border-[#ff4f00] transition-all font-semibold"
+                  id="headline"
+                  value={headline}
+                  onChange={(event) => setHeadline(event.target.value)}
+                  className="field h-12 px-4 text-base font-bold"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  슬라이드 본문 카피
+              <div>
+                <label htmlFor="body" className="mb-2 block text-xs font-black text-[#4a4039]">
+                  본문
                 </label>
                 <textarea
-                  rows={2}
-                  value={editingBody}
-                  onChange={(e) => setEditingBody(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-950 focus:outline-none focus:border-[#ff4f00] transition-all leading-relaxed"
+                  id="body"
+                  rows={4}
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  className="field resize-none px-4 py-3 text-base leading-7"
                 />
               </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSaveSlideTexts}
-                  disabled={updatingSlide}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {updatingSlide ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  )}
-                  <span>슬라이드 문구 적용</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={rerenderSlide}
+                disabled={rerendering}
+                className="btn-primary w-full rounded-[8px]"
+              >
+                {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                텍스트 저장 및 재렌더링
+              </button>
             </div>
           </div>
 
-          {/* Instagram Post Detail Editor */}
-          <div className="border border-slate-200 rounded-xl bg-white p-6 space-y-4 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm">인스타그램 업로드 캡션 및 해시태그</h3>
-            
+          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="eyebrow">Instagram Post</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">캡션과 예약</h2>
+              </div>
+              <Calendar className="h-5 w-5 text-[#ff4f0a]" />
+            </div>
+
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  피드 캡션 본문
+              <div>
+                <label htmlFor="caption" className="mb-2 block text-xs font-black text-[#4a4039]">
+                  캡션
                 </label>
                 <textarea
+                  id="caption"
                   rows={6}
                   value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-950 focus:outline-none focus:border-[#ff4f00] transition-all font-sans leading-relaxed"
+                  onChange={(event) => setCaption(event.target.value)}
+                  className="field resize-none px-4 py-3 text-sm leading-6"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  해시태그 (쉼표로 구분)
+              <div>
+                <label htmlFor="hashtags" className="mb-2 block text-xs font-black text-[#4a4039]">
+                  해시태그
                 </label>
                 <input
-                  type="text"
+                  id="hashtags"
                   value={hashtags}
-                  onChange={(e) => setHashtags(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-950 focus:outline-none focus:border-[#ff4f00] transition-all font-semibold"
+                  onChange={(event) => setHashtags(event.target.value)}
+                  className="field h-12 px-4 text-sm font-bold"
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Schedule Date Time Picker & Approval */}
-          <div className="border border-slate-200 rounded-xl bg-white p-6 space-y-4 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              <Calendar className="w-4.5 h-4.5 text-[#ff4f00]" />
-              <span>발행 스케줄 및 승인 실행</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  예약 일시 선택
+              <div>
+                <label htmlFor="scheduledAt" className="mb-2 block text-xs font-black text-[#4a4039]">
+                  예약 일시
                 </label>
                 <input
+                  id="scheduledAt"
                   type="datetime-local"
                   value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-950 focus:outline-none focus:border-[#ff4f00] transition-all font-semibold"
+                  onChange={(event) => setScheduledAt(event.target.value)}
+                  className="field h-12 px-4 text-sm font-bold"
                 />
               </div>
-              
-              <div className="p-4 rounded-lg border border-slate-250 bg-slate-50 flex flex-col justify-center">
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">AI 추천 발행 시간대</p>
-                <p className="text-xs text-slate-800 font-extrabold flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-blue-500" />
-                  <span>오늘 오후 06:30 (타겟 고객 활동 피크 타임)</span>
-                </p>
-              </div>
-            </div>
 
-            {/* Plan restriction warning */}
-            {!canSchedule && (
-              <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50 text-[11px] text-amber-800 flex items-start gap-2 leading-relaxed">
-                <AlertCircle className="w-4.5 h-4.5 flex-shrink-0 mt-0.5 text-amber-600" />
-                <p className="font-medium">
-                  **요금제 제한**: 현재 사용 중인 {userPlan} 플랜은 예약 업로드 자동화가 지원되지 않습니다. 승인 버튼 클릭 시 대시보드 저장은 완료되나, Instagram 자동 전송은 대기 상태(draft)로 멈춥니다. 자동 예약을 원하시면 Starter 요금제 이상으로 결제해 주세요.
-                </p>
-              </div>
-            )}
+              {!canSchedule && (
+                <div className="rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                  <div className="flex gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>현재 플랜은 자동 예약 발행이 제한됩니다. 검토용 저장은 가능합니다.</p>
+                  </div>
+                </div>
+              )}
 
-            <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <span className="text-[10px] text-slate-400 font-semibold leading-relaxed max-w-sm">
-                승인 및 예약을 확정하면 지정된 예약 시간에 맞춰 AI 직원이 피드 발행을 대행합니다.
-              </span>
               <button
                 type="button"
-                onClick={handleApprove}
-                disabled={loading}
-                className="w-full sm:w-auto px-6 py-3 rounded-lg text-sm font-extrabold bg-[#ff4f00] hover:bg-[#e04500] text-white flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/10 cursor-pointer disabled:opacity-55 transition-all active:scale-[0.98]"
+                onClick={approve}
+                disabled={approving}
+                className="btn-primary w-full rounded-[8px]"
               >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                <span>승인 및 인스타그램 예약</span>
-                <ArrowRight className="w-4 h-4" />
+                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                승인하고 예약하기
+                <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </div>
-        </div>
+
+          <div className="rounded-[10px] border border-[#d8edf7] bg-[#f3fbff] p-5 text-sm leading-6 text-[#4c6070]">
+            <div className="mb-3 flex items-center gap-2 font-black text-[#1f1512]">
+              <Clock className="h-4 w-4 text-[#2aa2db]" />
+              렌더링 메모
+            </div>
+            <p className="mb-3">
+              이 화면의 이미지는 이미지 모델이 만든 완성 카드가 아니라, 배경 이미지 위에 renderer가 한글 타이포그래피를 합성한 결과입니다.
+            </p>
+            {activeSlide?.imageUrl && (
+              <div className="flex flex-wrap gap-2">
+                <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
+                  <ExternalLink className="h-4 w-4" />
+                  원본 열기
+                </a>
+                <a href={activeSlide.imageUrl} download className="btn-secondary min-h-10 px-4 text-xs">
+                  <Download className="h-4 w-4" />
+                  이미지 저장
+                </a>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
+    </div>
+  )
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[8px] border border-[#e8dfd4] bg-[#fff8f0] px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9a8d82]">{label}</p>
+      <p className="mt-1 truncate text-xs font-black text-[#1f1512]">{value}</p>
     </div>
   )
 }

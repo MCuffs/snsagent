@@ -1,11 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fcfbfa;
-  --foreground: #1e1e1e;
-  --brand-orange: #ff4f00;
-  --brand-orange-hover: #e04500;
-  --border-muted: #e4e4e7;
+  --background: #fffdf8;
+  --surface: #ffffff;
+  --surface-muted: #f8f3e9;
+  --foreground: #1f1512;
+  --muted: #746a62;
+  --brand-orange: #ff4f0a;
+  --brand-orange-hover: #e84505;
+  --brand-blue: #3aa7d8;
+  --border-muted: #e8dfd4;
+  --ring-soft: rgba(255, 79, 10, 0.18);
 }
 
 @theme inline {
@@ -22,5 +27,161 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--background);
+    letter-spacing: 0;
+  }
+
+  body {
+    min-width: 320px;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(185, 71, 24, 0.14);
+    color: #171717;
+  }
+}
+
+@layer components {
+  .app-shell {
+    background:
+      radial-gradient(circle at 18% 10%, rgba(255, 79, 10, 0.08), transparent 26rem),
+      radial-gradient(circle at 86% 4%, rgba(58, 167, 216, 0.1), transparent 30rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 253, 248, 0) 32rem),
+      var(--background);
+  }
+
+  .panel {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border-muted);
+    box-shadow: 0 18px 50px rgba(31, 21, 18, 0.06);
+  }
+
+  .panel-muted {
+    background: rgba(241, 240, 235, 0.72);
+    border: 1px solid var(--border-muted);
+  }
+
+  .eyebrow {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    border-radius: 999px;
+    background: var(--brand-orange);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 750;
+    box-shadow: 0 14px 28px rgba(255, 79, 10, 0.2);
+    transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .btn-primary:hover {
+    background: var(--brand-orange-hover);
+    box-shadow: 0 12px 28px rgba(185, 71, 24, 0.18);
+  }
+
+  .btn-primary:active {
+    transform: translateY(1px);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-muted);
+    background: rgba(255, 255, 255, 0.74);
+    color: #24221f;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+
+  .btn-secondary:hover {
+    background: #fff;
+    border-color: #c7c2b8;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-muted);
+    background: rgba(255, 255, 255, 0.9);
+    color: #171717;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  }
+
+  .field:focus {
+    border-color: var(--brand-orange);
+    box-shadow: 0 0 0 4px var(--ring-soft);
+    background: #fff;
+  }
+
+  .field::placeholder {
+    color: #aaa49a;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 1.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-muted);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+  }
+
+  .hero-word {
+    font-weight: 950;
+    letter-spacing: -0.06em;
+    line-height: 0.9;
+  }
+
+  .soft-grid {
+    background-image:
+      linear-gradient(rgba(58, 167, 216, 0.13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(58, 167, 216, 0.13) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, transparent, black 18%, black 74%, transparent);
+  }
+
+  .paper-noise {
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,0.55) 0 1px, transparent 1px),
+      radial-gradient(circle at 70% 60%, rgba(31,21,18,0.08) 0 1px, transparent 1px);
+    background-size: 18px 18px, 23px 23px;
+  }
 }
 

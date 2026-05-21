@@ -23,8 +23,8 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     brandLimit: 1,
     canSchedule: false,
     hasWatermark: true,
-    description: 'AI 인턴 체험판 - 월 5회 콘텐츠 기획 및 시안 생성',
-    price: '₩0'
+    description: '데모와 초기 검증을 위한 기본 플랜',
+    price: '무료',
   },
   STARTER: {
     name: 'Starter',
@@ -32,8 +32,8 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     brandLimit: 1,
     canSchedule: true,
     hasWatermark: false,
-    description: '1인 창업자용 - 월 30회 예약 업로드 지원',
-    price: '₩29,000 / 월'
+    description: '1인 브랜드와 소상공인을 위한 운영 플랜',
+    price: '월 29,000원',
   },
   PRO: {
     name: 'Pro',
@@ -41,16 +41,16 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     brandLimit: 5,
     canSchedule: true,
     hasWatermark: false,
-    description: '전문 마케터용 - 월 150회 생성, 5개 브랜드 운영',
-    price: '₩79,000 / 월'
+    description: '여러 캠페인을 반복 운영하는 성장형 플랜',
+    price: '월 79,000원',
   },
   AGENCY: {
     name: 'Agency',
-    monthlyCampaignLimit: 9999, // Unlimited for practical purposes
-    brandLimit: 9999, // Unlimited
+    monthlyCampaignLimit: 9999,
+    brandLimit: 9999,
     canSchedule: true,
     hasWatermark: false,
-    description: '대행사 및 스튜디오 - 무제한 브랜드 및 자동 연동',
-    price: '₩199,000 / 월'
-  }
+    description: '다수 브랜드를 관리하는 팀과 대행사용 플랜',
+    price: '월 199,000원',
+  },
 }

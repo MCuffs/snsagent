@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
+import { Info, Sparkles } from 'lucide-react'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import CreateCampaignForm from './CreateCampaignForm'
-import { Sparkles, Info } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,36 +10,35 @@ export default async function NewCampaignPage() {
   const user = await getSessionUser()
   if (!user) return null
 
-  // Fetch brands
   const brands = await dbService.getBrands(user.id)
-  
-  // If no brands are configured, redirect to brand settings page first
   if (brands.length === 0) {
     redirect('/brand')
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8 font-sans">
-      {/* Title */}
-      <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-2">
-          <Sparkles className="w-8 h-8 text-[#ff4f00]" />
-          <span>새 카드뉴스 기획 및 생성</span>
-        </h1>
-        <p className="text-sm text-slate-500 font-medium">
-          홍보하고 싶은 신상품 정보나 비즈니스 혜택을 입력하면, AI 비서가 첫 장의 헤드 카피 훅(Hook)부터 마지막 장의 구매 유도(CTA) 버튼까지 기획안과 디자인 시안을 원클릭으로 빌드합니다.
+    <div className="mx-auto max-w-5xl px-5 py-8 md:px-8">
+      <div className="mb-8">
+        <p className="eyebrow">Media Card Engine</p>
+        <div className="mt-3 flex items-start gap-3">
+          <Sparkles className="mt-1 h-6 w-6 text-[#ff4f0a]" />
+          <div>
+            <h1 className="text-4xl font-black tracking-[-0.055em] text-[#1f1512]">미디어 카드뉴스 생성</h1>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-[#746a62]">
+              뉴스형, 트렌드형, 정보형 카드뉴스를 생성합니다. 이미지는 배경만 만들고,
+              레이아웃과 한글 타이포그래피는 렌더링 엔진이 직접 합성합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex gap-3 rounded-[8px] border border-[#d8edf7] bg-[#f3fbff] p-4 text-sm text-[#4c6070]">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2aa2db]" />
+        <p>
+          현재 브랜드는 <strong>{brands[0].name}</strong>입니다. 생성 결과는 캠페인으로 저장되고,
+          결과 화면에서 슬라이드와 캡션을 확인할 수 있습니다.
         </p>
       </div>
 
-      {/* Info Tip */}
-      <div className="p-4 rounded-xl border border-slate-200 bg-white flex gap-3 text-xs text-slate-500 items-center shadow-sm">
-        <Info className="w-5 h-5 text-indigo-650 flex-shrink-0" />
-        <p className="font-semibold text-slate-600">
-          작성하신 제품 혜택과 설명은 브랜드 설정 시 입력해 둔 **&lsquo;{brands[0].name}&rsquo; 브랜드의 말투와 색상 필터**에 걸러져 최적의 카피로 조리됩니다.
-        </p>
-      </div>
-
-      {/* Campaign Form Client Component */}
       <CreateCampaignForm brands={brands} />
     </div>
   )

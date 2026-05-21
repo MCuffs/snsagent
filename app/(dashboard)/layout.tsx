@@ -1,16 +1,25 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getSessionUser } from '../actions'
-import { 
-  Home, 
-  Sparkles, 
-  Calendar, 
-  CreditCard, 
-  Briefcase, 
-  LogOut 
+import {
+  Briefcase,
+  Calendar,
+  CreditCard,
+  Home,
+  LogOut,
+  Sparkles,
 } from 'lucide-react'
+import { getSessionUser } from '../actions'
 import InstagramIcon from '../components/InstagramIcon'
 import { dbService } from '../../lib/db-service'
+
+const navItems = [
+  { href: '/dashboard', label: '대시보드', icon: Home },
+  { href: '/brand', label: '브랜드', icon: Briefcase },
+  { href: '/instagram', label: '인스타그램', icon: InstagramIcon },
+  { href: '/campaign/new', label: '새 캠페인', icon: Sparkles, primary: true },
+  { href: '/calendar', label: '캘린더', icon: Calendar },
+  { href: '/pricing', label: '요금제', icon: CreditCard },
+]
 
 export default async function DashboardLayout({
   children,
@@ -18,137 +27,99 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const user = await getSessionUser()
-  
-  // Guard clause: redirect to login if no session user found
+
   if (!user) {
     redirect('/login')
   }
 
-  // Fetch brands to display brand status
   const brands = await dbService.getBrands(user.id)
-  const activeBrandName = brands.length > 0 ? brands[0].name : '등록된 브랜드 없음'
+  const activeBrandName = brands[0]?.name || '브랜드 미설정'
 
   return (
-    <div className="flex h-screen bg-[#fcfbfa] text-[#1e1e1e] font-sans antialiased overflow-hidden">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 border-r border-slate-200 bg-white flex flex-col justify-between flex-shrink-0 z-10">
-        <div>
-          {/* Logo */}
-          <div className="h-16 flex items-center px-6 border-b border-slate-200">
-            <Link href="/dashboard" className="flex items-center gap-1 group">
-              <span className="text-[#ff4f00] font-black text-lg tracking-tighter">_insta</span>
-              <span className="font-extrabold text-lg tracking-tighter text-slate-800">agent</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-500 font-bold ml-1.5">MVP</span>
-            </Link>
-          </div>
-
-          {/* User profile brief */}
-          <div className="p-4 mx-3 my-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#ff4f00]/10 flex items-center justify-center text-[#ff4f00] font-black text-sm">
-              {user.name ? user.name[0].toUpperCase() : 'U'}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-[10px] text-slate-400 font-bold leading-none mb-1">AI 직원의 브랜드</p>
-              <p className="text-xs font-bold truncate text-slate-800">{activeBrandName}</p>
-            </div>
-          </div>
-
-          {/* Nav Links */}
-          <nav className="px-3 space-y-1">
-            <Link 
-              href="/dashboard" 
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-black hover:bg-slate-50 transition-all"
-            >
-              <Home className="w-4 h-4 text-slate-400 group-hover:text-black" />
-              <span>대시보드</span>
-            </Link>
-
-            <Link 
-              href="/brand" 
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-black hover:bg-slate-50 transition-all"
-            >
-              <Briefcase className="w-4 h-4 text-slate-400" />
-              <span>브랜드 설정</span>
-            </Link>
-
-            <Link 
-              href="/instagram" 
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-black hover:bg-slate-50 transition-all"
-            >
-              <InstagramIcon className="w-4 h-4 text-slate-400" />
-              <span>인스타그램 연동</span>
-            </Link>
-
-            <Link 
-              href="/campaign/new" 
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-extrabold text-white bg-[#ff4f00] hover:bg-[#e04500] shadow-sm transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>새 카드뉴스 캠페인</span>
-            </Link>
-
-            <Link 
-              href="/calendar" 
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-black hover:bg-slate-50 transition-all"
-            >
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>콘텐츠 캘린더</span>
-            </Link>
-
-            <Link 
-              href="/pricing" 
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-black hover:bg-slate-50 transition-all"
-            >
-              <CreditCard className="w-4 h-4 text-slate-400" />
-              <span>요금제 & 멤버십</span>
-            </Link>
-          </nav>
+    <div className="app-shell flex h-screen overflow-hidden text-[#1f1512]">
+      <aside className="hidden w-72 shrink-0 border-r border-[#e8dfd4] bg-[#fffdf8]/92 backdrop-blur-xl lg:flex lg:flex-col">
+        <div className="flex h-[76px] items-center border-b border-[#e8dfd4] px-6">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span className="h-1.5 w-7 rounded-full bg-[#ff4f0a]" />
+            <span className="text-xl font-black tracking-[-0.05em] text-[#1f1512]">InstaAgent</span>
+            <span className="rounded-full border border-[#e8dfd4] px-2 py-0.5 text-[10px] font-bold text-[#746a62]">
+              MVP
+            </span>
+          </Link>
         </div>
 
-        {/* Footer Area with Sign Out */}
-        <div className="p-3 border-t border-slate-200 bg-slate-50">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex flex-col overflow-hidden max-w-[90%]">
-              <span className="text-[10px] font-bold text-slate-800 truncate">{user.email}</span>
-              <span className="text-[9px] font-black text-[#ff4f00] tracking-wider uppercase mt-0.5">{user.plan} PLAN</span>
+        <div className="px-4 py-5">
+          <div className="rounded-[8px] border border-[#e8dfd4] bg-white p-4 shadow-[0_14px_40px_rgba(31,21,18,0.05)]">
+            <p className="eyebrow">Active Brand</p>
+            <p className="mt-2 truncate text-sm font-bold text-neutral-950">{activeBrandName}</p>
+            <p className="mt-1 truncate text-xs text-[#6f6a61]">{user.email}</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={
+                  item.primary
+                    ? 'mt-3 flex items-center gap-3 rounded-full bg-[#1f1512] px-4 py-3 text-sm font-black text-white transition hover:bg-[#352521]'
+                    : 'flex items-center gap-3 rounded-full px-4 py-3 text-sm font-black text-[#5d584f] transition hover:bg-white hover:text-[#1f1512]'
+                }
+              >
+                <Icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-[#e8dfd4] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-neutral-950">{user.name || 'Demo User'}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#b94718]">
+                {user.plan} plan
+              </p>
             </div>
           </div>
-          <form action={async () => {
-            'use server'
-            const { logoutAction } = await import('../actions')
-            await logoutAction()
-            const { redirect } = await import('next/navigation')
-            redirect('/login')
-          }}>
-            <button 
-              type="submit" 
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-650 text-slate-500 transition-all cursor-pointer"
+          <form
+            action={async () => {
+              'use server'
+              const { logoutAction } = await import('../actions')
+              await logoutAction()
+              const { redirect } = await import('next/navigation')
+              redirect('/login')
+            }}
+          >
+            <button
+              type="submit"
+              className="btn-secondary min-h-10 w-full text-xs"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>로그아웃</span>
+              <LogOut className="h-4 w-4" />
+              로그아웃
             </button>
           </form>
         </div>
       </aside>
 
-      {/* Main Panel Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-white">
-        {/* Header Bar */}
-        <header className="h-16 border-b border-slate-200/80 flex items-center justify-between px-8 bg-white/50 backdrop-blur-md flex-shrink-0">
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">InstaAgent AI Operations Desk</span>
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8dfd4] bg-[#fffdf8]/86 px-5 backdrop-blur-xl md:px-8">
+          <Link href="/dashboard" className="font-black tracking-tight text-[#1f1512] lg:hidden">
+            InstaAgent
+          </Link>
+          <div className="hidden lg:block">
+            <p className="eyebrow">AI Operations Desk</p>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="px-3 py-1 rounded-full border border-emerald-100 bg-emerald-50/50 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-[10px] font-bold text-emerald-700">AI 직원이 상시 대기중</span>
-            </div>
+          <div className="status-pill">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+            데모 환경 실행 중
           </div>
         </header>
 
-        {/* Scrollable Sub-pages Container */}
-        <div className="flex-1 overflow-y-auto bg-[#fcfbfa]">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {children}
         </div>
       </main>

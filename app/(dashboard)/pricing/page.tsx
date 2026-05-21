@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
+import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../actions'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits'
-import { CreditCard } from 'lucide-react'
 import PricingClientView from './PricingClientView'
 
 export const dynamic = 'force-dynamic'
@@ -15,23 +15,21 @@ export default async function PricingPage() {
   const plansList = Object.keys(PRICING_PLANS) as SubscriptionPlan[]
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8 font-sans">
-      {/* Title */}
-      <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-2">
-          <CreditCard className="w-8 h-8 text-[#ff4f00]" />
-          <span>요금제 및 멤버십 설정</span>
-        </h1>
-        <p className="text-xs font-semibold text-slate-500">
-          가상 토스페이먼츠 연동 결제 게이트웨이를 사용하여 등급을 직접 전환하고, 인스타 자동 예약 업로드 및 브랜드 생성 한도 스펙을 테스트할 수 있습니다.
-        </p>
+    <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
+      <div className="mb-8">
+        <p className="eyebrow">Billing</p>
+        <div className="mt-3 flex items-start gap-3">
+          <CreditCard className="mt-1 h-6 w-6 text-[#b94718]" />
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-neutral-950">요금제</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6f6a61]">
+              현재 결제는 시뮬레이터입니다. 플랜을 변경하면 사용량 제한만 즉시 반영됩니다.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Interactive Client Checkout Module */}
-      <PricingClientView 
-        currentPlan={user.plan} 
-        plansList={plansList} 
-      />
+      <PricingClientView currentPlan={user.plan} plansList={plansList} />
     </div>
   )
 }
