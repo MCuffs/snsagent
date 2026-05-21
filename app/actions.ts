@@ -1090,3 +1090,208 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
     return failed(err instanceof Error ? err.message : '웹사이트를 분석하는 중 알 수 없는 오류가 발생했습니다.')
   }
 }
+
+export async function recommendCampaignAction(brandId: string, topic: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  if (!brandId) {
+    return failed('브랜드를 선택해 주세요.')
+  }
+  if (!topic || topic.trim().length === 0) {
+    return failed('카드뉴스 주제를 입력해 주세요.')
+  }
+
+  try {
+    const brand = await dbService.getBrand(brandId)
+    if (!brand) return failed('브랜드를 찾을 수 없습니다.')
+    if (brand.userId !== user.id) return forbidden()
+
+    const apiKey = process.env.OPENAI_API_KEY
+    const useRealAI = isConfiguredOpenAIKey(apiKey)
+
+    if (useRealAI) {
+      const openai = new OpenAI({ apiKey })
+      const prompt = `
+You are an expert AI Marketing Planner.
+Based on the following brand profile and a raw topic/idea for an Instagram carousel campaign, generate optimized configuration values and slide content for the campaign.
+
+[Brand Profile]
+- Brand Name: ${brand.name}
+- Industry: ${brand.industry}
+- Target Audience: ${brand.targetAudience}
+- Tone of Voice: ${brand.toneOfVoice}
+- Main Color: ${brand.mainColor}
+- Forbidden Words: ${brand.forbiddenWords || 'None'}
+- CTA Style: ${brand.ctaStyle || 'None'}
+
+[Campaign Topic/Idea]
+${topic}
+
+[Requirements]
+1. Select the most matching option for each field:
+   - "contentType": One of ['신상품 홍보', '베스트셀러 추천', '고객 리얼 리뷰', '브랜드 스토리', '세일/이벤트 안내', '꿀팁/큐레이션']
+   - "category": One of ['패션/의류', '뷰티/화장품', '리빙/인테리어', '푸드/식품', '디지털/가전', '라이프스타일', '반려동물', '기타']
+   - "tone": One of ['감성적이고 따뜻하게', '시크하고 고급스럽게', '톡톡 튀고 트렌디하게', '정보가 쏙쏙 들어오게', '신뢰감 있고 전문적이게']
+   - "slideCount": Recommended total number of slides (Must be exactly one of [5, 7, 10])
+2. Generate:
+   - "title": A catchy, click-worthy Instagram headline (under 25 chars, no emoji, no markdown bold).
+   - "keyContent": Detailed copy for each slide. Write one line (or a bullet point) per slide. The number of lines/points must match "slideCount". Each line should contain the headline and sub-content for that slide, separated by a dash or newline. Do not include markdown bold syntax (**). E.g., "- 슬라이드 1 헤드라인: 본문내용\n- 슬라이드 2 헤드라인: 본문내용"
+   - "visualHint": A premium prompt description for background image generation (e.g. DALL-E 3). It should describe a clean, non-cluttered, high contrast background scene matching the brand's mainColor (${brand.mainColor}) and tone. (e.g., "monochrome clean minimalist studio setup with soft shadow, brand color highlights")
+   - "source": Recommended brand label/watermark (e.g. brand website, or Instagram handle, or simply "${brand.name}")
+3. CRITICAL: Do NOT use markdown bold syntax (** or ***) anywhere in the text. Keep all text plain and clean.
+
+You MUST respond ONLY with a valid JSON object matching the following structure:
+{
+  "contentType": "...",
+  "category": "...",
+  "tone": "...",
+  "title": "...",
+  "keyContent": "...",
+  "visualHint": "...",
+  "source": "...",
+  "slideCount": 7
+}
+`
+
+      const aiResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional marketing planner AI agent. Return JSON only. Never use markdown bold (**).'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' }
+      })
+
+      const rawJson = aiResponse.choices[0].message.content
+      if (rawJson) {
+        const parsed = JSON.parse(rawJson)
+        return {
+          success: true as const,
+          recommendation: {
+            contentType: parsed.contentType || '신상품 홍보',
+            category: parsed.category || '기타',
+            tone: parsed.tone || '감성적이고 따뜻하게',
+            title: removeMarkdownBold(parsed.title || `[${brand.name}] ${topic}`),
+            keyContent: removeMarkdownBold(parsed.keyContent || `- 핵심가치 소개: ${topic} 관련 브랜드 스토리\n- 주요 특징 안내: 스토어만의 강점`),
+            visualHint: parsed.visualHint || `minimalist design matching brand color ${brand.mainColor}`,
+            source: parsed.source || brand.name,
+            slideCount: Number(parsed.slideCount) || 7
+          }
+        }
+      } else {
+        throw new Error('추천 생성에 실패했습니다.')
+      }
+
+    } else {
+      // Mock simulation logic
+      console.log('Using Mock Campaign Recommendation Engine (OpenAI key not configured)')
+      await new Promise(resolve => setTimeout(resolve, 1500)) // Simulation delay
+
+      const lowerTopic = topic.toLowerCase()
+      const lowerIndustry = brand.industry.toLowerCase()
+
+      // Default values
+      let contentType = '신상품 홍보'
+      let category = '라이프스타일'
+      let tone = '감성적이고 따뜻하게'
+      let title = `[${brand.name}] 올여름 신제품 라인업 공개`
+      let keyContent = `- 신제품 출시 소식: 드디어 공개되는 브랜드 뉴 컬렉션\n- 특별한 디테일: 오직 우리 고객만을 위한 섬세한 가공\n- 소장 가치 가득: 일상에 특별함을 한 스푼 얹어줄 아이템\n- 한정 수량 안내: 서둘러 구매해야 할 소장 가치 제품\n- 런칭 기념 특별 혜택: 오직 지금만 드리는 기간 한정 선물`
+      let visualHint = `minimalist clean studio setup with soft shadow, accentuating brand color ${brand.mainColor}`
+      const slideCount = 5
+
+      // Matching based on topic and industry
+      if (lowerTopic.includes('세일') || lowerTopic.includes('할인') || lowerTopic.includes('이벤트') || lowerTopic.includes('쿠폰')) {
+        contentType = '세일/이벤트 안내'
+        title = `🚨 [단독] ${brand.name} 특별 시즌 세일 EVENT`
+        keyContent = `- 시즌 오프 세일: 역대급 혜택으로 만나는 시그니처 아이템\n- 최대 할인율 안내: 놓칠 수 없는 파격적인 찬스\n- 베스트 아이템 추천: MD가 엄선한 실패 없는 쇼핑 리스트\n- 추가 쿠폰 혜택: 카카오 채널 추가 시 즉시 사용 가능\n- 구매 방법 가이드: 프로필 링크 클릭 후 구매처로 이동`
+      } else if (lowerTopic.includes('리뷰') || lowerTopic.includes('후기') || lowerTopic.includes('추천') || lowerTopic.includes('베스트')) {
+        contentType = '고객 리얼 리뷰'
+        title = `⭐️ 실제 구매 고객이 입증한 ${brand.name} 찐 후기`
+        keyContent = `- 리얼 구매 후기: 사용해 본 분들이 극찬하는 실제 피드백\n- 솔직한 만족도: 피부 자극이 없고 하루 종일 아늑한 사용감\n- 재구매율 1위의 비결: 까다로운 검수로 신뢰를 담은 품질\n- 적극 추천 한마디: 삶의 질이 수직 상승했다는 감동의 메시지\n- 한정 혜택 겟하기: 지금 프로필 링크를 통해 할인 혜택 받기`
+      } else if (lowerTopic.includes('꿀팁') || lowerTopic.includes('정보') || lowerTopic.includes('방법') || lowerTopic.includes('큐레이션')) {
+        contentType = '꿀팁/큐레이션'
+        title = `💡 알아두면 삶의 질 올라가는 3가지 생활 꿀팁`
+        keyContent = `- 유용한 정보 공유: 일상에서 바로 활용 가능한 실전 가이드\n- 핵심 팁 첫 번째: 제품을 더 오랫동안 깨끗하게 유지하는 노하우\n- 핵심 팁 두 번째: 200% 활용해 실용성을 극대화하는 매칭 방법\n- 핵심 팁 세 번째: 브랜드가 권장하는 올바른 사용 주기 관리\n- 더 많은 정보 찾기: ${brand.name} 계정 팔로우하고 꿀팁 받아보기`
+      }
+
+      // Category matching by Industry
+      if (lowerIndustry.includes('온라인') || lowerIndustry.includes('스토어') || lowerIndustry.includes('셀렉')) {
+        category = lowerTopic.includes('원피스') || lowerTopic.includes('의류') || lowerTopic.includes('패션') ? '패션/의류' : '라이프스타일'
+      } else if (lowerIndustry.includes('뷰티') || lowerIndustry.includes('화장') || lowerIndustry.includes('헤어') || lowerIndustry.includes('에스테틱')) {
+        category = '뷰티/화장품'
+        tone = '시크하고 고급스럽게'
+        if (contentType === '신상품 홍보') {
+          title = `✨ 맑고 투명하게 빛나는 피부 비결, 신제품 런칭`
+          keyContent = `- 신제품 런칭: 피부 속부터 은은하게 차오르는 광채 솔루션\n- 고농축 유기농 성분: 지친 피부에 깊은 영양과 수분 공급\n- 저자극 안심 포뮬러: 예민한 피부도 편안하게 바르는 데일리 케어\n- 임상 시험 완료: 단 일주일 사용으로 느껴지는 맑은 변화\n- 단독 예약 판매: 지금 선주문 시 풍성한 샘플 추가 증정`
+        }
+      } else if (lowerIndustry.includes('카페') || lowerIndustry.includes('푸드') || lowerIndustry.includes('식품') || lowerIndustry.includes('커피')) {
+        category = '푸드/식품'
+        tone = '톡톡 튀고 트렌디하게'
+        if (contentType === '신상품 홍보') {
+          title = `☕️ [신메뉴] 입안 가득 퍼지는 달콤 쌉싸름한 힐링`
+          keyContent = `- 새로운 메뉴 출시: 신선함과 달콤함의 조화로운 밸런스\n- 엄선된 최고급 원재료: 로컬 농가에서 직송한 유기농 재료 사용\n- 바리스타 추천 페어링: 디저트와 함께 즐기면 풍미가 두 배\n- 건강한 대체당 활용: 칼로리 부담 없이 가볍게 즐기는 시간\n- 신메뉴 런칭 이벤트: 구매 인증샷 업로드 시 드립백 증정`
+        }
+      } else if (lowerIndustry.includes('피트니스') || lowerIndustry.includes('헬스') || lowerIndustry.includes('운동')) {
+        category = '라이프스타일'
+        tone = '정보가 쏙쏙 들어오게'
+        if (contentType === '신상품 홍보') {
+          title = `💪 단 10분 투자로 굽은 등 펴는 기적의 루틴`
+          keyContent = `- 현대인 필수 스트레칭: 거북목과 굽은 어깨 완화를 위한 홈트\n- 첫 번째 동작: 폼롤러를 활용해 굳어있는 흉추 풀어주기\n- 두 번째 동작: 벽을 짚고 가슴 근육 시원하게 스트레칭하기\n- 세 번째 동작: 등 근육 활성화를 위한 날개뼈 모으기 루틴\n- 체계적인 체형 교정: 더 자세한 1:1 진단은 센터로 문의하기`
+        }
+      } else if (lowerIndustry.includes('it') || lowerIndustry.includes('saas') || lowerIndustry.includes('소프트웨어')) {
+        category = '디지털/가전'
+        tone = '신뢰감 있고 전문적이게'
+      }
+
+      // Add visual hint based on category & color
+      if (category === '패션/의류') {
+        visualHint = `monochrome minimalist Scandinavian fashion aesthetic background with fabric texture, subtle accent of ${brand.mainColor}`
+      } else if (category === '뷰티/화장품') {
+        visualHint = `luxury high-end cosmetics photography background, clean glossy marble surface, gentle water ripple shadows, brand color ${brand.mainColor} hints`
+      } else if (category === '푸드/식품') {
+        visualHint = `warm cozy organic food studio background with neutral tones, rustic wood details, accentuating color ${brand.mainColor}`
+      } else {
+        visualHint = `clean minimalist geometric abstract background with soft studio lighting, showcasing brand color ${brand.mainColor} highlighting`
+      }
+
+      // Custom adjustments based on user input
+      if (lowerTopic.includes('원피스') || lowerTopic.includes('리넨')) {
+        category = '패션/의류'
+        tone = '감성적이고 따뜻하게'
+        title = `올여름 필수템, 핏 예쁘고 아늑한 리넨 원피스`
+        keyContent = `- 편안한 내추럴 무드: 100% 천연 리넨이 주는 기분 좋은 감촉\n- 체형 커버 실루엣: 군더더기 없이 일자로 툭 떨어지는 우아한 피팅\n- 뛰어난 통기성: 무더운 한여름에도 땀 흡수가 빨라 하루 종일 쾌적\n- 다양한 컬러 라인업: 내 마음에 드는 내추럴 컬러 초이스\n- 런칭 특별가 혜택: 오늘만 단독 할인 제공, 프로필 링크 참조`
+      } else if (lowerTopic.includes('건강식품') || lowerTopic.includes('웰빙') || lowerTopic.includes('영양제')) {
+        category = '푸드/식품'
+        tone = '신뢰감 있고 전문적이게'
+        title = `지친 직장인 피로 회복을 돕는 건강 웰빙템`
+        keyContent = `- 매일 활력 충전: 피로와 스트레스에 지친 현대인을 위한 솔루션\n- 엄선한 원료: 합성 보존료를 완전히 제외한 프리미엄 자연 유래 성분\n- 하루 한 포의 습관: 언제 어디서나 간편하게 섭취 가능한 포장 형태\n- 믿을 수 있는 제조 공정: HACCP 인증 마크로 더욱 안심하고 섭취\n- 스토어 알림 혜택: 첫 구매 쿠폰 받고 즉시 건강 챙기기`
+      }
+
+      return {
+        success: true as const,
+        recommendation: {
+          contentType,
+          category,
+          tone,
+          title,
+          keyContent,
+          visualHint,
+          source: brand.name,
+          slideCount
+        }
+      }
+    }
+
+  } catch (err: unknown) {
+    console.error('Campaign recommendation failed:', err)
+    return failed(err instanceof Error ? err.message : '추천 데이터를 기획하는 도중 오류가 발생했습니다.')
+  }
+}
+
