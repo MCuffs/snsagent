@@ -8,6 +8,12 @@ import { recommendCampaignAction } from '../../../../app/actions'
 interface Brand {
   id: string
   name: string
+  industry: string
+  targetAudience: string
+  toneOfVoice: string
+  mainColor: string
+  forbiddenWords: string
+  ctaStyle: string
 }
 
 interface GenerateCampaignResponse {
@@ -51,6 +57,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const [visualHint, setVisualHint] = useState('')
   const [source, setSource] = useState('')
   const [slideCount, setSlideCount] = useState(7)
+  const selectedBrand = brands.find(brand => brand.id === brandId) || brands[0]
 
   // Smart Fill logic for Professional Mode
   const handleSmartFill = async () => {
@@ -282,6 +289,15 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
           </div>
         </div>
 
+        {selectedBrand && (
+          <div className="mt-5 grid gap-3 rounded-[8px] border border-[#e8dfd4] bg-[#fffdf8] p-4 text-xs text-[#746a62] md:grid-cols-4">
+            <BrandMeta label="업종" value={selectedBrand.industry} />
+            <BrandMeta label="타깃" value={selectedBrand.targetAudience} />
+            <BrandMeta label="톤" value={selectedBrand.toneOfVoice} />
+            <BrandMeta label="CTA" value={selectedBrand.ctaStyle} />
+          </div>
+        )}
+
         {/* 1. EASY MODE VIEW */}
         {activeTab === 'easy' && (
           <div className="mt-6 space-y-6 border-t border-[#f0e7dc] pt-6">
@@ -466,6 +482,17 @@ function Field({
           glow ? 'ring-2 ring-amber-500 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)] bg-amber-50/20' : 'border-[#e8dfd4]'
         }`}
       />
+    </div>
+  )
+}
+
+function BrandMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-black uppercase tracking-[0.12em] text-[#a59b91]">{label}</p>
+      <p className="mt-1 truncate font-bold text-[#1f1512]" title={value}>
+        {value || '-'}
+      </p>
     </div>
   )
 }

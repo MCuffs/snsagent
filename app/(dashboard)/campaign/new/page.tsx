@@ -39,7 +39,18 @@ export default async function NewCampaignPage() {
         </p>
       </div>
 
-      <CreateCampaignForm brands={brands} />
+      <CreateCampaignForm
+        brands={brands.map(brand => ({
+          id: brand.id,
+          name: brand.name,
+          industry: brand.industry,
+          targetAudience: brand.targetAudience,
+          toneOfVoice: brand.toneOfVoice,
+          mainColor: brand.mainColor,
+          forbiddenWords: brand.forbiddenWords,
+          ctaStyle: brand.ctaStyle,
+        }))}
+      />
     </div>
   )
 }

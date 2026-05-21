@@ -29,6 +29,7 @@ interface BrandFormProps {
 
 export default function BrandForm({ existingBrand, limitAllowed, limitCount, userPlan }: BrandFormProps) {
   const router = useRouter()
+  const [currentBrandId, setCurrentBrandId] = useState(existingBrand?.id || null)
   
   // Form State
   const [name, setName] = useState(existingBrand?.name || '')
@@ -88,6 +89,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
 
       if (res.brandProfile) {
         const { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle } = res.brandProfile
+        const profile = { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle }
         
         // Populate form with animation delay
         setName(name)
@@ -106,6 +108,14 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         // Trigger visual glow effect on inputs
         setHighlightFields(true)
         setTimeout(() => setHighlightFields(false), 3000)
+
+        const saveResult = await saveBrandAction(currentBrandId, profile)
+        if (saveResult.success) {
+          setCurrentBrandId(saveResult.brand.id)
+          router.refresh()
+        } else {
+          setFormError(saveResult.error || 'AI 브랜드 정보를 저장하지 못했습니다. 저장 버튼을 눌러 다시 시도해 주세요.')
+        }
       }
     } catch (err) {
       console.error(err)
@@ -121,7 +131,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
     setFormError(null)
 
     try {
-      const res = await saveBrandAction(existingBrand?.id || null, {
+      const res = await saveBrandAction(currentBrandId, {
         name,
         industry,
         targetAudience,

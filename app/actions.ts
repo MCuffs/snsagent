@@ -1138,11 +1138,12 @@ ${topic}
    - "tone": One of ['감성적이고 따뜻하게', '시크하고 고급스럽게', '톡톡 튀고 트렌디하게', '정보가 쏙쏙 들어오게', '신뢰감 있고 전문적이게']
    - "slideCount": Recommended total number of slides (Must be exactly one of [5, 7, 10])
 2. Generate:
-   - "title": A catchy, click-worthy Instagram headline (under 25 chars, no emoji, no markdown bold).
-   - "keyContent": Detailed copy for each slide. Write one line (or a bullet point) per slide. The number of lines/points must match "slideCount". Each line should contain the headline and sub-content for that slide, separated by a dash or newline. Do not include markdown bold syntax (**). E.g., "- 슬라이드 1 헤드라인: 본문내용\n- 슬라이드 2 헤드라인: 본문내용"
-   - "visualHint": A premium prompt description for background image generation (e.g. DALL-E 3). It should describe a clean, non-cluttered, high contrast background scene matching the brand's mainColor (${brand.mainColor}) and tone. (e.g., "monochrome clean minimalist studio setup with soft shadow, brand color highlights")
+   - "title": A concise Korean archive-card headline (under 18 Korean chars, no emoji, no markdown bold, do not prepend brand name unless the topic explicitly asks for it).
+   - "keyContent": Detailed copy for each slide. Write one line per slide. The number of lines must match "slideCount". Each line should contain a short headline and sub-content separated by ":". Use the brand's industry, target audience, tone of voice, forbidden words, and CTA style. Do not include markdown bold syntax (**).
+   - "visualHint": A premium archive-card background prompt. It must match the brand industry and audience, but should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left typography space.
    - "source": Recommended brand label/watermark (e.g. brand website, or Instagram handle, or simply "${brand.name}")
 3. CRITICAL: Do NOT use markdown bold syntax (** or ***) anywhere in the text. Keep all text plain and clean.
+4. Avoid forbidden words exactly: ${brand.forbiddenWords || 'None'}.
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
 {
@@ -1200,28 +1201,43 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       const lowerTopic = topic.toLowerCase()
       const lowerIndustry = brand.industry.toLowerCase()
 
+      const brandTone = brand.toneOfVoice || '차분하고 명확한 톤'
+      const audience = brand.targetAudience || '브랜드 고객'
+      const cta = brand.ctaStyle || '프로필 링크에서 자세히 보기'
+      const forbidden = brand.forbiddenWords
+        .split(',')
+        .map(word => word.trim())
+        .filter(Boolean)
+
       // Default values
       let contentType = '신상품 홍보'
       let category = '라이프스타일'
-      let tone = '감성적이고 따뜻하게'
-      let title = `[${brand.name}] 올여름 신제품 라인업 공개`
-      let keyContent = `- 신제품 출시 소식: 드디어 공개되는 브랜드 뉴 컬렉션\n- 특별한 디테일: 오직 우리 고객만을 위한 섬세한 가공\n- 소장 가치 가득: 일상에 특별함을 한 스푼 얹어줄 아이템\n- 한정 수량 안내: 서둘러 구매해야 할 소장 가치 제품\n- 런칭 기념 특별 혜택: 오직 지금만 드리는 기간 한정 선물`
-      let visualHint = `minimalist clean studio setup with soft shadow, accentuating brand color ${brand.mainColor}`
+      let tone = mapBrandToneToCampaignTone(brandTone)
+      let title = archiveTitleFromTopic(topic)
+      let keyContent = buildBrandKeyContent({
+        topic,
+        brandName: brand.name,
+        industry: brand.industry,
+        audience,
+        tone: brandTone,
+        cta,
+      })
+      let visualHint = buildBrandVisualHint(brand.industry, brand.mainColor, brandTone)
       const slideCount = 5
 
       // Matching based on topic and industry
       if (lowerTopic.includes('세일') || lowerTopic.includes('할인') || lowerTopic.includes('이벤트') || lowerTopic.includes('쿠폰')) {
         contentType = '세일/이벤트 안내'
-        title = `🚨 [단독] ${brand.name} 특별 시즌 세일 EVENT`
-        keyContent = `- 시즌 오프 세일: 역대급 혜택으로 만나는 시그니처 아이템\n- 최대 할인율 안내: 놓칠 수 없는 파격적인 찬스\n- 베스트 아이템 추천: MD가 엄선한 실패 없는 쇼핑 리스트\n- 추가 쿠폰 혜택: 카카오 채널 추가 시 즉시 사용 가능\n- 구매 방법 가이드: 프로필 링크 클릭 후 구매처로 이동`
+        title = '놓치기 전 확인'
+        keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'limited-offer' })
       } else if (lowerTopic.includes('리뷰') || lowerTopic.includes('후기') || lowerTopic.includes('추천') || lowerTopic.includes('베스트')) {
         contentType = '고객 리얼 리뷰'
-        title = `⭐️ 실제 구매 고객이 입증한 ${brand.name} 찐 후기`
-        keyContent = `- 리얼 구매 후기: 사용해 본 분들이 극찬하는 실제 피드백\n- 솔직한 만족도: 피부 자극이 없고 하루 종일 아늑한 사용감\n- 재구매율 1위의 비결: 까다로운 검수로 신뢰를 담은 품질\n- 적극 추천 한마디: 삶의 질이 수직 상승했다는 감동의 메시지\n- 한정 혜택 겟하기: 지금 프로필 링크를 통해 할인 혜택 받기`
+        title = '써본 뒤 남은 것'
+        keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'review' })
       } else if (lowerTopic.includes('꿀팁') || lowerTopic.includes('정보') || lowerTopic.includes('방법') || lowerTopic.includes('큐레이션')) {
         contentType = '꿀팁/큐레이션'
-        title = `💡 알아두면 삶의 질 올라가는 3가지 생활 꿀팁`
-        keyContent = `- 유용한 정보 공유: 일상에서 바로 활용 가능한 실전 가이드\n- 핵심 팁 첫 번째: 제품을 더 오랫동안 깨끗하게 유지하는 노하우\n- 핵심 팁 두 번째: 200% 활용해 실용성을 극대화하는 매칭 방법\n- 핵심 팁 세 번째: 브랜드가 권장하는 올바른 사용 주기 관리\n- 더 많은 정보 찾기: ${brand.name} 계정 팔로우하고 꿀팁 받아보기`
+        title = '필요한 것만'
+        keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'curation' })
       }
 
       // Category matching by Industry
@@ -1231,22 +1247,22 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
         category = '뷰티/화장품'
         tone = '시크하고 고급스럽게'
         if (contentType === '신상품 홍보') {
-          title = `✨ 맑고 투명하게 빛나는 피부 비결, 신제품 런칭`
-          keyContent = `- 신제품 런칭: 피부 속부터 은은하게 차오르는 광채 솔루션\n- 고농축 유기농 성분: 지친 피부에 깊은 영양과 수분 공급\n- 저자극 안심 포뮬러: 예민한 피부도 편안하게 바르는 데일리 케어\n- 임상 시험 완료: 단 일주일 사용으로 느껴지는 맑은 변화\n- 단독 예약 판매: 지금 선주문 시 풍성한 샘플 추가 증정`
+          title = '피부가 쉬는 방식'
+          keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'beauty' })
         }
       } else if (lowerIndustry.includes('카페') || lowerIndustry.includes('푸드') || lowerIndustry.includes('식품') || lowerIndustry.includes('커피')) {
         category = '푸드/식품'
         tone = '톡톡 튀고 트렌디하게'
         if (contentType === '신상품 홍보') {
-          title = `☕️ [신메뉴] 입안 가득 퍼지는 달콤 쌉싸름한 힐링`
-          keyContent = `- 새로운 메뉴 출시: 신선함과 달콤함의 조화로운 밸런스\n- 엄선된 최고급 원재료: 로컬 농가에서 직송한 유기농 재료 사용\n- 바리스타 추천 페어링: 디저트와 함께 즐기면 풍미가 두 배\n- 건강한 대체당 활용: 칼로리 부담 없이 가볍게 즐기는 시간\n- 신메뉴 런칭 이벤트: 구매 인증샷 업로드 시 드립백 증정`
+          title = '오늘의 맛 기록'
+          keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'food' })
         }
       } else if (lowerIndustry.includes('피트니스') || lowerIndustry.includes('헬스') || lowerIndustry.includes('운동')) {
         category = '라이프스타일'
         tone = '정보가 쏙쏙 들어오게'
         if (contentType === '신상품 홍보') {
-          title = `💪 단 10분 투자로 굽은 등 펴는 기적의 루틴`
-          keyContent = `- 현대인 필수 스트레칭: 거북목과 굽은 어깨 완화를 위한 홈트\n- 첫 번째 동작: 폼롤러를 활용해 굳어있는 흉추 풀어주기\n- 두 번째 동작: 벽을 짚고 가슴 근육 시원하게 스트레칭하기\n- 세 번째 동작: 등 근육 활성화를 위한 날개뼈 모으기 루틴\n- 체계적인 체형 교정: 더 자세한 1:1 진단은 센터로 문의하기`
+          title = '몸이 기억하는 루틴'
+          keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'wellness' })
         }
       } else if (lowerIndustry.includes('it') || lowerIndustry.includes('saas') || lowerIndustry.includes('소프트웨어')) {
         category = '디지털/가전'
@@ -1255,27 +1271,29 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 
       // Add visual hint based on category & color
       if (category === '패션/의류') {
-        visualHint = `monochrome minimalist Scandinavian fashion aesthetic background with fabric texture, subtle accent of ${brand.mainColor}`
+        visualHint = buildBrandVisualHint('패션/의류', brand.mainColor, brandTone)
       } else if (category === '뷰티/화장품') {
-        visualHint = `luxury high-end cosmetics photography background, clean glossy marble surface, gentle water ripple shadows, brand color ${brand.mainColor} hints`
+        visualHint = buildBrandVisualHint('뷰티/화장품', brand.mainColor, brandTone)
       } else if (category === '푸드/식품') {
-        visualHint = `warm cozy organic food studio background with neutral tones, rustic wood details, accentuating color ${brand.mainColor}`
+        visualHint = buildBrandVisualHint('푸드/식품', brand.mainColor, brandTone)
       } else {
-        visualHint = `clean minimalist geometric abstract background with soft studio lighting, showcasing brand color ${brand.mainColor} highlighting`
+        visualHint = buildBrandVisualHint(brand.industry, brand.mainColor, brandTone)
       }
 
       // Custom adjustments based on user input
       if (lowerTopic.includes('원피스') || lowerTopic.includes('리넨')) {
         category = '패션/의류'
         tone = '감성적이고 따뜻하게'
-        title = `올여름 필수템, 핏 예쁘고 아늑한 리넨 원피스`
-        keyContent = `- 편안한 내추럴 무드: 100% 천연 리넨이 주는 기분 좋은 감촉\n- 체형 커버 실루엣: 군더더기 없이 일자로 툭 떨어지는 우아한 피팅\n- 뛰어난 통기성: 무더운 한여름에도 땀 흡수가 빨라 하루 종일 쾌적\n- 다양한 컬러 라인업: 내 마음에 드는 내추럴 컬러 초이스\n- 런칭 특별가 혜택: 오늘만 단독 할인 제공, 프로필 링크 참조`
+        title = `여름에 남는 옷`
+        keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'fashion' })
       } else if (lowerTopic.includes('건강식품') || lowerTopic.includes('웰빙') || lowerTopic.includes('영양제')) {
         category = '푸드/식품'
         tone = '신뢰감 있고 전문적이게'
-        title = `지친 직장인 피로 회복을 돕는 건강 웰빙템`
-        keyContent = `- 매일 활력 충전: 피로와 스트레스에 지친 현대인을 위한 솔루션\n- 엄선한 원료: 합성 보존료를 완전히 제외한 프리미엄 자연 유래 성분\n- 하루 한 포의 습관: 언제 어디서나 간편하게 섭취 가능한 포장 형태\n- 믿을 수 있는 제조 공정: HACCP 인증 마크로 더욱 안심하고 섭취\n- 스토어 알림 혜택: 첫 구매 쿠폰 받고 즉시 건강 챙기기`
+        title = `매일 챙기는 기준`
+        keyContent = buildBrandKeyContent({ topic, brandName: brand.name, industry: brand.industry, audience, tone: brandTone, cta, angle: 'wellness' })
       }
+
+      keyContent = removeForbiddenTerms(keyContent, forbidden)
 
       return {
         success: true as const,
@@ -1296,5 +1314,86 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
     console.error('Campaign recommendation failed:', err)
     return failed(err instanceof Error ? err.message : '추천 데이터를 기획하는 도중 오류가 발생했습니다.')
   }
+}
+
+function mapBrandToneToCampaignTone(toneOfVoice: string) {
+  const text = toneOfVoice.toLowerCase()
+  if (/고급|차분|프리미엄|시크|minimal|premium/.test(text)) return '시크하고 고급스럽게'
+  if (/전문|신뢰|명확|정보|분석/.test(text)) return '신뢰감 있고 전문적이게'
+  if (/젊|경쾌|트렌디|톡톡|재치/.test(text)) return '톡톡 튀고 트렌디하게'
+  if (/친근|따뜻|감성|부드/.test(text)) return '감성적이고 따뜻하게'
+  return '정보가 쏙쏙 들어오게'
+}
+
+function archiveTitleFromTopic(topic: string) {
+  const clean = topic
+    .replace(/\[[^\]]+\]/g, '')
+    .replace(/[!?.,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (/가방|백|bag/i.test(clean)) return '정돈된 가방'
+  if (/책|독서|문장|글/i.test(clean)) return '가방 속 물건'
+  if (/옷|원피스|리넨|패션/i.test(clean)) return '오래 입는 기준'
+  if (/피부|뷰티|케어|화장/i.test(clean)) return '피부가 쉬는 방식'
+  if (/식품|건강|영양|웰빙/i.test(clean)) return '매일 챙기는 기준'
+  return clean.length > 14 ? clean.slice(0, 14) : clean || '저장해두세요'
+}
+
+function buildBrandKeyContent(input: {
+  topic: string
+  brandName: string
+  industry: string
+  audience: string
+  tone: string
+  cta: string
+  angle?: string
+}) {
+  const subject = archiveTitleFromTopic(input.topic)
+  const context = `${input.industry} 고객인 ${input.audience}`
+  const angleLine = input.angle === 'limited-offer'
+    ? '오늘만 확인할 것: 필요한 혜택과 조건을 차분히 정리합니다'
+    : input.angle === 'review'
+      ? '써본 뒤 남은 것: 실제 선택 이유와 만족 포인트를 정리합니다'
+      : input.angle === 'curation'
+        ? '필요한 것만: 복잡한 정보에서 바로 쓸 내용만 남깁니다'
+        : `${subject}: ${context}에게 필요한 기준을 먼저 보여줍니다`
+
+  return [
+    `${subject}: ${input.tone}으로 브랜드가 제안하는 핵심 기준`,
+    angleLine,
+    `선택 기준: ${input.industry} 맥락에서 놓치기 쉬운 디테일`,
+    `사용 장면: ${input.audience}가 실제로 떠올릴 수 있는 상황`,
+    `저장 포인트: ${input.cta}`,
+  ].join('\n')
+}
+
+function buildBrandVisualHint(industry: string, mainColor: string, toneOfVoice: string) {
+  const context = `${industry} ${toneOfVoice}`.toLowerCase()
+  const base = 'Korean premium archive Instagram card photography, no generated text, no logo, no watermark, object centered in upper-middle, quiet lower-left typography space'
+
+  if (/패션|의류|리빙|스토어|셀렉|온라인|bag|가방/.test(context)) {
+    return `${base}, product archive still life, soft off-white studio background, fabric texture, black object details, subtle brand color ${mainColor}`
+  }
+  if (/뷰티|화장|케어|스킨/.test(context)) {
+    return `${base}, cosmetic product archive still life, translucent packaging, soft bathroom or vanity light, muted gray-white palette, subtle brand color ${mainColor}`
+  }
+  if (/푸드|식품|카페|커피/.test(context)) {
+    return `${base}, editorial food or cafe object still life, neutral table surface, natural window light, muted warm gray palette, subtle brand color ${mainColor}`
+  }
+  if (/건강|웰빙|피트니스|운동/.test(context)) {
+    return `${base}, wellness object still life, clean towel, bottle, notebook, calm natural light, muted gray palette, subtle brand color ${mainColor}`
+  }
+  if (/it|saas|디지털|가전|소프트웨어/.test(context)) {
+    return `${base}, minimal tech desk still life, device and notebook, soft gray background, calm product documentation mood, subtle brand color ${mainColor}`
+  }
+  return `${base}, muted editorial product still life, clean background, calm archive mood, subtle brand color ${mainColor}`
+}
+
+function removeForbiddenTerms(value: string, forbiddenWords: string[]) {
+  return forbiddenWords.reduce((text, word) => {
+    if (!word) return text
+    return text.replaceAll(word, '')
+  }, value).replace(/\s{2,}/g, ' ').trim()
 }
 
