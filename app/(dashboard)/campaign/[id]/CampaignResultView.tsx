@@ -117,7 +117,7 @@ export default function CampaignResultView({
   const [approving, setApproving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
-  const [selectedStyle, setSelectedStyle] = useState('minimalist')
+  const [selectedStyle, setSelectedStyle] = useState('photo')
   const [regeneratingStyle, setRegeneratingStyle] = useState(false)
 
   const activeSlide = slides[activeSlideIndex]
@@ -340,23 +340,23 @@ export default function CampaignResultView({
           <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="eyebrow">AI Style Theme</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">스타일 일괄 변경</h2>
+                <p className="eyebrow">Media Tone</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">미디어 톤 재생성</h2>
               </div>
               <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
             </div>
 
             <p className="mb-4 text-xs text-[#746a62] leading-relaxed">
-              전체 카드뉴스의 AI 배경 이미지를 특정 스타일 프리셋으로 일괄 변경하여 디자인 톤앤매너를 다르게 생성합니다. 기존 텍스트는 보존됩니다.
+              레퍼런스처럼 사진을 크게 쓰고 어두운 오버레이 위에 강한 제목을 올리는 방향으로 다시 생성합니다. 기존 텍스트는 보존됩니다.
             </p>
 
             <div className="mb-4 grid grid-cols-2 gap-2">
               {[
-                { key: 'minimalist', label: '🌿 미니멀 스칸디' },
-                { key: 'gradients', label: '🎨 비비드 그라디언트' },
-                { key: 'cyberpunk', label: '⚡ 사이버펑크' },
-                { key: 'vector', label: '✏️ 2D 일러스트' },
-                { key: 'photo', label: '📸 스튜디오 화보' },
+                { key: 'photo', label: '보도사진' },
+                { key: 'minimalist', label: '다크 에디토리얼' },
+                { key: 'gradients', label: '테크 뉴스' },
+                { key: 'cyberpunk', label: '이슈 브리핑' },
+                { key: 'vector', label: '매거진 포토' },
               ].map((style) => (
                 <button
                   key={style.key}
@@ -387,7 +387,7 @@ export default function CampaignResultView({
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4" />
-                  <span>일괄 적용 및 재생성</span>
+                  <span>미디어 스타일로 재생성</span>
                 </>
               )}
             </button>

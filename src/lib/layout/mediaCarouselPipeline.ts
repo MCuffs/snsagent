@@ -64,12 +64,12 @@ interface MediaSlidePlan {
 
 export async function generateMediaCarousel(input: MediaCarouselInput): Promise<MediaCarouselPipelineResult> {
   const slideCount = normalizeSlideCount(input.slideCount)
-  const baseLayoutType = selectLayout({
+  const baseLayoutType = toMediaLayout(selectLayout({
     category: input.category,
     topic: input.topic,
     tone: input.tone,
     contentType: input.contentType,
-  })
+  }))
   const slidePlans = planMediaSlides(input, slideCount, baseLayoutType)
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
@@ -192,79 +192,91 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 }
 
 function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayoutType: LayoutType): MediaSlidePlan[] {
-  const points = splitKeyPoints(input.keyContent)
-  const slides: MediaSlidePlan[] = [
+  const parsed = parseSlideLines(input.keyContent)
+  const first = parsed[0]
+  const plans: MediaSlidePlan[] = [
     {
       slideNumber: 1,
       role: 'hook',
-      headline: input.title,
-      body: `${input.topic}의 특별한 소식과 핵심 가치를 전해드립니다.`,
+      headline: trimHeadline(input.title || first?.headline || input.topic),
+      body: first?.body || first?.headline || summarize(input.keyContent, 58),
       layoutType: firstSlideLayout(input, baseLayoutType),
-    },
-    {
-      slideNumber: 2,
-      role: 'context',
-      headline: '오늘의 핵심 큐레이션',
-      body: points[0] || `${input.topic}은(는) 많은 분들이 찾으시는 ${input.category}의 인기 추천 아이템입니다.`,
-      layoutType: contextLayout(baseLayoutType),
     },
   ]
 
-  for (let index = 3; index < slideCount; index += 1) {
-    const point = points[index - 2] || points[(index - 2) % Math.max(points.length, 1)] || input.keyContent
-    const hasStat = /[\d%]/.test(point)
-    slides.push({
+  for (let index = 2; index <= slideCount; index += 1) {
+    const item = parsed[index - 1] || parsed[index - 2] || parsed[(index - 2) % Math.max(parsed.length, 1)]
+    const fallback = item?.headline || input.topic
+    const body = item?.body || summarize(item?.headline || input.keyContent, 64)
+    const hasStat = /[\d%]/.test(`${fallback} ${body}`)
+    plans.push({
       slideNumber: index,
-      role: hasStat ? 'stat' : index % 2 === 0 ? 'detail' : 'key-point',
-      headline: hasStat ? '숫자로 확인하는 가치' : `추천 포인트 ${index - 2}`,
-      body: point,
+      role: index === slideCount ? 'summary' : hasStat ? 'stat' : index % 2 === 0 ? 'context' : 'key-point',
+      headline: trimHeadline(index === slideCount && !item ? `${input.topic} 핵심 요약` : fallback),
+      body,
       layoutType: hasStat ? 'stat-highlight' : supportingLayout(baseLayoutType, index),
     })
   }
 
-  slides.push({
-    slideNumber: slideCount,
-    role: 'save-cta',
-    headline: '스토어에서 확인하세요',
-    body: `프로필 링크를 통해 ${input.topic}의 자세한 혜택을 만나보세요.`,
-    layoutType: baseLayoutType === 'minimal-clean' ? 'quote-focus' : 'minimal-clean',
-  })
-
-  return slides.slice(0, slideCount).map((slide, index) => ({
+  return plans.slice(0, slideCount).map((slide, index) => ({
     ...slide,
     slideNumber: index + 1,
   }))
 }
 
-function splitKeyPoints(content: string) {
+function parseSlideLines(content: string) {
   return content
-    .split(/\n|\.|;|,/)
-    .map(item => item.trim())
-    .filter(item => item.length >= 6)
-    .slice(0, 8)
+    .split(/\n+/)
+    .map(line => line.replace(/^[-*•\d.\s]+/, '').trim())
+    .filter(Boolean)
+    .map(line => {
+      const [rawHeadline, ...rest] = line.split(/\s[-–—:：]\s|:\s|：\s/)
+      return {
+        headline: trimHeadline(rawHeadline || line),
+        body: rest.join(' ').trim() || '',
+      }
+    })
+    .filter(item => item.headline.length > 0)
+    .slice(0, 10)
+}
+
+function trimHeadline(value: string) {
+  return value
+    .replace(/\*\*/g, '')
+    .replace(/^슬라이드\s*\d+\s*/i, '')
+    .trim()
+    .slice(0, 34)
+}
+
+function summarize(value: string, maxLength: number) {
+  const clean = value.replace(/\s+/g, ' ').trim()
+  if (clean.length <= maxLength) return clean
+  return `${clean.slice(0, maxLength).replace(/\s+\S*$/, '')}.`
 }
 
 function firstSlideLayout(input: MediaCarouselInput, baseLayoutType: LayoutType): LayoutType {
-  if (/세일|할인|이벤트|특가|혜택/.test(`${input.category} ${input.contentType}`)) return 'breaking-news'
-  if (/통계|실적|데이터|%|\d/.test(`${input.title} ${input.keyContent}`)) return 'stat-highlight'
-  return baseLayoutType === 'minimal-clean' ? 'cinematic-headline' : baseLayoutType
-}
-
-function contextLayout(baseLayoutType: LayoutType): LayoutType {
-  if (baseLayoutType === 'breaking-news') return 'breaking-news'
-  if (baseLayoutType === 'trend-feed') return 'community-style'
-  return 'minimal-clean'
+  if (/속보|긴급|정치|사회|논란|이슈/.test(`${input.category} ${input.contentType} ${input.title}`)) return 'breaking-news'
+  if (/통계|수치|데이터|%|\d/.test(`${input.title} ${input.keyContent}`)) return 'stat-highlight'
+  return baseLayoutType === 'minimal-clean' ? 'dark-editorial' : baseLayoutType
 }
 
 function supportingLayout(baseLayoutType: LayoutType, index: number): LayoutType {
-  if (index % 3 === 0) return 'minimal-clean'
-  if (baseLayoutType === 'trend-feed') return 'community-style'
-  if (baseLayoutType === 'dark-editorial') return 'cinematic-headline'
-  return baseLayoutType
+  if (baseLayoutType === 'breaking-news') return index % 2 === 0 ? 'breaking-news' : 'dark-editorial'
+  if (baseLayoutType === 'trend-feed') return index % 2 === 0 ? 'community-style' : 'dark-editorial'
+  if (baseLayoutType === 'stat-highlight') return index % 2 === 0 ? 'dark-editorial' : 'stat-highlight'
+  if (baseLayoutType === 'magazine') return index % 2 === 0 ? 'magazine' : 'dark-editorial'
+  if (baseLayoutType === 'split-comparison') return index % 2 === 0 ? 'split-comparison' : 'dark-editorial'
+  return index % 2 === 0 ? 'dark-editorial' : 'cinematic-headline'
+}
+
+function toMediaLayout(layoutType: LayoutType): LayoutType {
+  if (layoutType === 'minimal-clean' || layoutType === 'quote-focus') return 'dark-editorial'
+  return layoutType
 }
 
 function buildCaption(input: MediaCarouselInput) {
-  return `${input.title}\n\n${input.keyContent.slice(0, 180)}${input.keyContent.length > 180 ? '...' : ''}\n\n자세한 혜택은 프로필 링크 스토어에서 확인해보세요.`
+  const body = summarize(input.keyContent, 180)
+  return `${input.title}\n\n${body}\n\n저장해두고 필요한 순간 다시 확인해보세요.`
 }
 
 function buildHashtags(input: MediaCarouselInput) {
@@ -273,7 +285,7 @@ function buildHashtags(input: MediaCarouselInput) {
     .map(item => item.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .slice(0, 6)
-  return Array.from(new Set(['카드뉴스', '스토어추천', '쇼핑몰트렌드', ...normalized])).map(tag => `#${tag}`)
+  return Array.from(new Set(['카드뉴스', '인스타그램콘텐츠', '콘텐츠자동화', ...normalized])).map(tag => `#${tag}`)
 }
 
 function normalizeSlideCount(slideCount: number) {

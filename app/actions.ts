@@ -2,14 +2,12 @@
 
 import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
-import { getImageProvider } from '../lib/ai/imageProvider'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey } from '../lib/env'
 import { OpenAI } from 'openai'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
-import { renderSlide } from '../src/lib/carousel/renderer'
 import { getPipelineImageProvider } from '../src/lib/ai/providers'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { generateOverlay } from '../src/lib/layout/overlayEngine'
@@ -329,14 +327,14 @@ export async function updatePostDetailsAction(postId: string, caption: string, h
 function inferLayoutType(prompt: string): LayoutType {
   const normalized = prompt.toLowerCase()
   if (normalized.includes('data journalism')) return 'stat-highlight'
-  if (normalized.includes('clean studio')) return 'minimal-clean'
+  if (normalized.includes('clean studio')) return 'dark-editorial'
   if (normalized.includes('cinematic portrait')) return 'cinematic-headline'
   if (normalized.includes('documentary news')) return 'breaking-news'
   if (normalized.includes('social feed')) return 'trend-feed'
   if (normalized.includes('magazine cover')) return 'magazine'
   if (normalized.includes('split-screen')) return 'split-comparison'
   if (normalized.includes('community')) return 'community-style'
-  if (normalized.includes('shallow depth')) return 'quote-focus'
+  if (normalized.includes('shallow depth')) return 'dark-editorial'
   return 'dark-editorial'
 }
 
@@ -442,54 +440,44 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
   const brand = await dbService.getBrand(campaign.brandId)
   if (!brand) return failed('브랜드 정보를 찾을 수 없습니다.')
 
-  // Define style prompt prefixes
   const styleKeywords: Record<string, string> = {
-    minimalist: 'minimalist clean Scandinavian design, soft pastel tones, high quality empty background',
-    gradients: 'vibrant abstract glassmorphism fluid gradient colors, neon glowing shapes',
-    cyberpunk: 'futuristic dark cyberpunk tech city design, neon blue and orange cyber lighting, high contrast',
-    vector: 'flat 2D vector graphic illustration, cute simple shapes, modern illustration style',
-    photo: 'hyperrealistic commercial brand photoshoot, premium studio lighting, soft shadows, photorealistic'
+    minimalist: 'Korean media documentary photo, subdued realistic scene, dark editorial contrast, no generated text',
+    gradients: 'dark cinematic editorial photography, high contrast colored lighting, no abstract gradient background, no generated text',
+    cyberpunk: 'futuristic documentary city photography, dark cyber lighting, realistic scene, no generated text',
+    vector: 'realistic editorial photo with strong graphic composition, not illustration, no generated text',
+    photo: 'photojournalism, Korean magazine news photography, realistic full-bleed scene, no generated text',
   }
 
-  const keyword = styleKeywords[styleName] || styleKeywords.minimalist
+  const keyword = styleKeywords[styleName] || styleKeywords.photo
 
   try {
-    const provider = getImageProvider()
-    const campaignKey = `cg-regen-${Date.now()}`
+    const provider = getPipelineImageProvider()
     const updatedSlides = await Promise.all(
       campaign.slides.map(async (slide) => {
-        // Construct new design prompt with visual style override
-        const finalPrompt = `${keyword}, representing: ${slide.designPrompt}`
+        const layout = LAYOUT_DEFINITIONS[inferLayoutType(slide.designPrompt)]
+        const typography = planTypography({
+          headline: slide.headline,
+          body: slide.body,
+          category: campaign.keyBenefits || '카드뉴스',
+          layout,
+          brandMainColor: brand.mainColor,
+        })
+        const overlay = generateOverlay(layout.overlayStyle)
+        const finalPrompt = `${keyword}, ${slide.designPrompt}`
         const imgResult = await provider.generateImage(finalPrompt)
         
-        // Compose background image with existing copy text overlays
-        const finalImageUrl = await renderSlide({
-          campaignKey,
-          brand: {
-            id: brand.id,
-            name: brand.name,
-            industry: brand.industry,
-            targetAudience: brand.targetAudience,
-            toneOfVoice: brand.toneOfVoice,
-            mainColor: brand.mainColor,
-            forbiddenWords: brand.forbiddenWords,
-            ctaStyle: brand.ctaStyle,
-          },
-          copy: {
-            slideNumber: slide.slideNumber,
-            headline: slide.headline,
-            body: slide.body,
-            ctaText: slide.slideNumber === campaign.slideCount ? brand.ctaStyle : undefined,
-          },
-          design: {
-            slideNumber: slide.slideNumber,
-            backgroundPrompt: slide.designPrompt,
-            layoutStyle: 'default',
-            textPosition: 'center',
-            visualMood: 'default',
-          },
+        const finalImageUrl = await renderMediaCard({
+          id: `media-card-style-${Date.now()}-${slide.slideNumber}`,
+          layout,
+          typography,
+          overlay,
+          category: campaign.keyBenefits || '카드뉴스',
+          headline: slide.headline,
+          body: slide.body,
           backgroundImageUrl: imgResult.imageUrl,
-          showSlideNumber: true,
+          source: brand.name,
+          pageNumber: slide.slideNumber,
+          totalPages: campaign.slideCount,
         })
 
         // Save to DB
