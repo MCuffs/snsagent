@@ -148,18 +148,18 @@ body {
     justify-content: center;
     gap: 0.5rem;
     min-height: 3rem;
-    border-radius: 999px;
+    border-radius: 0.375rem;
     background: #1c7ed6;
     color: #fff;
     font-size: 0.875rem;
     font-weight: 800;
-    box-shadow: 0 16px 34px rgba(28, 126, 214, 0.22);
+    box-shadow: 0 10px 24px rgba(28, 126, 214, 0.14);
     transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
   }
 
   .btn-blue:hover {
     background: #1769b4;
-    box-shadow: 0 14px 30px rgba(28, 126, 214, 0.2);
+    box-shadow: 0 10px 24px rgba(28, 126, 214, 0.18);
   }
 
   .btn-blue:active {
@@ -172,7 +172,7 @@ body {
     justify-content: center;
     gap: 0.5rem;
     min-height: 3rem;
-    border-radius: 999px;
+    border-radius: 0.375rem;
     border: 1px solid #c7ddf4;
     background: rgba(255, 255, 255, 0.72);
     color: #173b60;
@@ -192,20 +192,20 @@ body {
     justify-content: center;
     gap: 0.875rem;
     min-height: 3.625rem;
-    border-radius: 0.75rem;
-    border: 1px solid #dadce0;
+    border-radius: 0.375rem;
+    border: 1px solid #cfd4da;
     background: #fff;
     color: #3c4043;
     font-size: 0.9375rem;
     font-weight: 700;
-    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 28px rgba(32, 92, 145, 0.08);
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.06), 0 8px 20px rgba(32, 92, 145, 0.05);
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   }
 
   .btn-google:hover {
     border-color: #c6c8cc;
     background: #f8fafd;
-    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12), 0 12px 34px rgba(32, 92, 145, 0.12);
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.1), 0 10px 24px rgba(32, 92, 145, 0.08);
   }
 
   .btn-google:active {
@@ -216,6 +216,22 @@ body {
     height: 1.25rem;
     width: 1.25rem;
     flex: 0 0 auto;
+  }
+
+  .login-panel {
+    border: 1px solid #d7e1ec;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 18px 56px rgba(32, 92, 145, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .login-brand {
+    color: #0d1726;
+    font-size: clamp(2.125rem, 4vw, 3.125rem);
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    line-height: 1;
   }
 
   .field {
@@ -353,9 +369,9 @@ body {
     width: min(100%, 460px);
     aspect-ratio: 4 / 5;
     overflow: hidden;
-    border-radius: 1.15rem;
+    border-radius: 0.5rem;
     background: transparent;
-    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.24);
+    box-shadow: 0 28px 76px rgba(0, 0, 0, 0.22);
   }
 
   .showcase-carousel::after {
@@ -392,7 +408,7 @@ body {
     content: "";
     position: absolute;
     inset: 8% 12% 4%;
-    border-radius: 2rem;
+    border-radius: 0.75rem;
     background: rgba(0, 0, 0, 0.28);
     filter: blur(34px);
     opacity: 0.58;

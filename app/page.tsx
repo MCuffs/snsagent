@@ -47,7 +47,7 @@ export default function LandingPage() {
         <header className="relative z-20 border-b border-[#dbe8f7]/70 bg-white/68 backdrop-blur-xl">
           <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-6 lg:px-10">
             <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-[-0.035em]">
-              <span className="h-2 w-7 rounded-full bg-[#1c7ed6]" />
+              <span className="h-1.5 w-7 rounded-[2px] bg-[#1c7ed6]" />
               InstaAgent
             </Link>
             <nav className="hidden items-center gap-8 text-sm font-bold text-[#314158] md:flex">
@@ -83,8 +83,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="order-1 rounded-[16px] border border-[#d9e8f7] bg-white/76 p-8 text-center shadow-[0_28px_90px_rgba(32,92,145,0.12)] backdrop-blur-xl lg:order-2 lg:p-10">
-            <h1 className="text-4xl font-black tracking-[-0.055em] text-[#0d1726] md:text-5xl">
+          <div className="login-panel order-1 p-8 text-center lg:order-2 lg:p-10">
+            <h1 className="login-brand">
               InstaAgent
             </h1>
             <Link href="/api/auth/google/start" className="btn-google mt-9 w-full text-base">
