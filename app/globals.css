@@ -340,10 +340,8 @@ body {
     aspect-ratio: 4 / 5;
     overflow: hidden;
     border-radius: 1.15rem;
-    border: 1px solid rgba(255, 255, 255, 0.86);
-    background: rgba(255, 255, 255, 0.72);
-    box-shadow: 0 28px 90px rgba(32, 92, 145, 0.16);
-    backdrop-filter: blur(14px);
+    background: transparent;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.24);
   }
 
   .showcase-carousel::after {
@@ -351,7 +349,7 @@ body {
     position: absolute;
     inset: 0;
     z-index: 4;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.26), transparent 42%, rgba(28, 126, 214, 0.08));
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), transparent 44%, rgba(0, 0, 0, 0.08));
   }
 
   .showcase-track {
@@ -370,14 +368,21 @@ body {
   }
 
   .hero-showcase-frame {
+    position: relative;
     display: flex;
     justify-content: center;
-    border-radius: 1.35rem;
-    border: 1px solid rgba(217, 232, 247, 0.86);
-    background: rgba(255, 255, 255, 0.5);
-    padding: clamp(0.75rem, 2vw, 1.25rem);
-    box-shadow: 0 30px 90px rgba(32, 92, 145, 0.12);
-    backdrop-filter: blur(18px);
+    padding: clamp(0.5rem, 1.4vw, 0.875rem);
+  }
+
+  .hero-showcase-frame::before {
+    content: "";
+    position: absolute;
+    inset: 8% 12% 4%;
+    border-radius: 2rem;
+    background: rgba(0, 0, 0, 0.28);
+    filter: blur(34px);
+    opacity: 0.58;
+    transform: translate3d(0, 18px, 0);
   }
 }
 
