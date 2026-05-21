@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Check, ClipboardList, Images, LogIn, PenLine, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, ClipboardList, Images, PenLine, Sparkles } from 'lucide-react'
 
 export const metadata = {
   title: 'InstaAgent - 인스타그램 카드뉴스 자동화',
@@ -33,12 +33,10 @@ const supportCards = [
   },
 ]
 
-const quickFlow = ['주제 입력', '내용 정리', '카드 구성', '결과 확인']
-
 const showcaseImages = [
-  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1', className: 'showcase-slide-one' },
-  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2', className: 'showcase-slide-two' },
-  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3', className: 'showcase-slide-three' },
+  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1' },
+  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2' },
+  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3' },
 ]
 
 export default function LandingPage() {
@@ -65,70 +63,34 @@ export default function LandingPage() {
 
         <div className="relative z-10 mx-auto grid w-full max-w-[1180px] flex-1 items-center gap-10 px-6 py-14 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.78fr)] lg:px-10 lg:py-20">
           <div className="order-2 lg:order-1">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#c7ddf4] bg-white/72 px-4 py-2 text-sm font-black text-[#1c5f9e] shadow-[0_14px_40px_rgba(28,126,214,0.08)] backdrop-blur">
-              <Sparkles className="h-4 w-4" />
-              예시 카드가 순서대로 표시됩니다
-            </div>
-
             <div className="hero-showcase-frame">
               <div className="showcase-carousel" aria-hidden="true">
-                {showcaseImages.map((image) => (
-                  <div key={image.alt} className={`showcase-slide ${image.className}`}>
+                <div className="showcase-track">
+                  {showcaseImages.map((image) => (
                     <Image
+                      key={image.alt}
                       src={image.src}
                       alt={image.alt}
-                      fill
+                      width={720}
+                      height={900}
                       priority
                       sizes="(min-width: 1024px) 420px, 80vw"
-                      className="object-cover"
+                      className="showcase-image"
                     />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-4">
-              {quickFlow.map((item, index) => (
-                <div key={item} className="rounded-[8px] border border-[#d9e8f7] bg-white/66 p-4 shadow-[0_12px_36px_rgba(32,92,145,0.07)] backdrop-blur">
-                  <div className="mb-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#e7f3ff] text-xs font-black text-[#1c7ed6]">
-                    {index + 1}
-                  </div>
-                  <p className="text-sm font-black leading-5 tracking-[-0.02em] text-[#203047]">{item}</p>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
-          <div className="order-1 rounded-[16px] border border-[#d9e8f7] bg-white/72 p-7 shadow-[0_28px_90px_rgba(32,92,145,0.12)] backdrop-blur-xl lg:order-2 lg:p-9">
-            <p className="text-sm font-black uppercase tracking-[0.14em] text-[#1c7ed6]">InstaAgent</p>
-            <h1 className="mt-5 text-4xl font-black leading-[1.08] tracking-[-0.055em] text-[#0d1726] md:text-5xl">
-              불필요한 반복 작업을 간편하게 처리합니다
+          <div className="order-1 rounded-[16px] border border-[#d9e8f7] bg-white/76 p-8 text-center shadow-[0_28px_90px_rgba(32,92,145,0.12)] backdrop-blur-xl lg:order-2 lg:p-10">
+            <h1 className="text-4xl font-black tracking-[-0.055em] text-[#0d1726] md:text-5xl">
+              InstaAgent
             </h1>
-            <p className="mt-6 text-base leading-7 text-[#40536b] md:text-lg">
-              주제와 핵심 내용만 입력하면 카드뉴스에 맞게 내용을 정리하고, 바로 확인할 수 있는 결과물까지 만들어줍니다.
-            </p>
-
-            <div className="mt-8 grid gap-3">
-              <Link href="/login" className="btn-blue min-h-[3.5rem] px-8 text-base">
-                바로 이용하기
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/login" className="btn-blue-secondary min-h-[3.5rem] px-8 text-base">
-                로그인하기
-                <LogIn className="h-4 w-4" />
-              </Link>
-            </div>
-
-            <div className="mt-7 grid gap-3 text-sm font-bold text-[#314158]">
-              <div className="flex items-center gap-3">
-                <Check className="h-4 w-4 text-[#1c7ed6]" />
-                카드뉴스 초안을 빠르게 확인
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="h-4 w-4 text-[#1c7ed6]" />
-                반복 편집 시간을 줄이는 제작 흐름
-              </div>
-            </div>
+            <Link href="/api/auth/google/start" className="btn-google mt-9 w-full text-base">
+              <span className="text-lg font-black text-[#4285f4]">G</span>
+              Google로 로그인
+            </Link>
           </div>
         </div>
       </section>
