@@ -6,12 +6,15 @@ export interface MediaCardHarnessResult {
   layout: LayoutDefinition
   typography: TypographyPlan
   overlay: OverlayPlan
+  template: ArchiveTemplate
   diagnostics: {
     score: number
     issues: string[]
     rules: string[]
   }
 }
+
+export type ArchiveTemplate = 'product-light' | 'product-dark' | 'journal-light' | 'cta-dark'
 
 const HARNESS_RULES = [
   'archive-bottom-left-composition',
@@ -29,9 +32,13 @@ const TEXT_BLOCK_MAX_HEIGHT = 330
 export function applyMediaCardHarness(input: {
   layout: LayoutDefinition
   typography: TypographyPlan
+  slideNumber?: number
+  totalSlides?: number
+  role?: string
 }): MediaCardHarnessResult {
-  const layout = enforceArchiveLayout(input.layout)
-  const typography = enforceArchiveTypography(input.typography)
+  const template = selectArchiveTemplate(input.slideNumber, input.totalSlides, input.role)
+  const layout = enforceArchiveLayout(input.layout, template)
+  const typography = enforceArchiveTypography(input.typography, template)
   const overlay = generateOverlay(layout.overlayStyle)
   const issues = validateHarness(layout, typography)
 
@@ -39,6 +46,7 @@ export function applyMediaCardHarness(input: {
     layout,
     typography,
     overlay,
+    template,
     diagnostics: {
       score: Math.max(0, 100 - issues.length * 12),
       issues,
@@ -47,23 +55,44 @@ export function applyMediaCardHarness(input: {
   }
 }
 
-export function buildHarnessedVisualPrompt(prompt: string) {
+export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemplate = 'product-dark') {
+  const templatePrompt = {
+    'product-light': 'bright product archive layout, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for black typography, subtle white fog gradient at bottom',
+    'product-dark': 'muted gray product archive layout, object centered in middle, subdued contrast, gray film veil, strong lower shadow for white typography, calm premium catalogue mood',
+    'journal-light': 'minimal journal archive layout, grayscale editorial photo placed as a centered rectangular frame with generous light gray margins, quiet documentary mood, clean bottom area for black typography',
+    'cta-dark': 'black closing slide background, very minimal centered blurred brand wordmark area, no object clutter, premium archive ending card',
+  }[template]
+
   return [
+    templatePrompt,
     'archive style Korean Instagram product/news card reference',
-    'centered product or subject with quiet surrounding space',
-    'lower-left area reserved for small editorial typography',
-    'muted gray film layer, subdued contrast, not vivid, not poster-like',
+    'clear top metadata space and lower-left typography safe area',
     'ignore any conflicting centered-title, vivid-gradient, poster, UI, or white-panel layout direction from the source prompt',
     `source visual context: ${prompt}`,
     'no generated text, no typography, no letters, no numbers, no logo, no watermark',
   ].join(', ')
 }
 
-function enforceArchiveLayout(layout: LayoutDefinition): LayoutDefinition {
+function selectArchiveTemplate(slideNumber?: number, totalSlides?: number, role?: string): ArchiveTemplate {
+  if (totalSlides && slideNumber === totalSlides) return 'cta-dark'
+  if (role === 'summary' || role === 'save-cta') return 'cta-dark'
+  if (role === 'detail') return 'journal-light'
+  if (slideNumber && slideNumber % 3 === 1) return 'product-light'
+  if (slideNumber && slideNumber % 3 === 0) return 'journal-light'
+  return 'product-dark'
+}
+
+function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplate): LayoutDefinition {
+  const overlayStyle = template === 'product-light' || template === 'journal-light'
+    ? 'archive-light'
+    : template === 'cta-dark'
+      ? 'archive-cta'
+      : 'archive-dark'
+
   return {
     ...layout,
     typographyStyle: 'clean-sans',
-    overlayStyle: 'dark-gradient',
+    overlayStyle,
     textPosition: 'bottom-left',
     safeArea: {
       top: 72,
@@ -74,7 +103,7 @@ function enforceArchiveLayout(layout: LayoutDefinition): LayoutDefinition {
     preferredColorPalette: ['black', 'white', 'gray'],
     recommendedHeadlineLength: Math.min(layout.recommendedHeadlineLength, 16),
     recommendedBodyLength: Math.min(layout.recommendedBodyLength, 36),
-    visualMood: `${layout.visualMood}, muted archive editorial, quiet premium product card`,
+    visualMood: `${layout.visualMood}, ${template}, muted archive editorial, quiet premium product card`,
     visualDensity: 'low',
     spacingRules: {
       headlineLineGap: 1.03,
@@ -85,11 +114,11 @@ function enforceArchiveLayout(layout: LayoutDefinition): LayoutDefinition {
   }
 }
 
-function enforceArchiveTypography(typography: TypographyPlan): TypographyPlan {
+function enforceArchiveTypography(typography: TypographyPlan, template: ArchiveTemplate): TypographyPlan {
   const headlineLines = rebuildHeadlineLines(typography)
-  const bodyLines = typography.bodyLines.slice(0, 2)
-  const headlineFontSize = fitHeadlineFontSize(headlineLines.length)
-  const bodyFontSize = bodyLines.length > 1 ? 23 : 25
+  const bodyLines = template === 'cta-dark' ? typography.bodyLines.slice(0, 2) : typography.bodyLines.slice(0, 1)
+  const headlineFontSize = template === 'cta-dark' ? 72 : fitHeadlineFontSize(headlineLines.length)
+  const bodyFontSize = template === 'cta-dark' ? 27 : bodyLines.length > 1 ? 23 : 25
 
   return {
     ...typography,
@@ -101,7 +130,7 @@ function enforceArchiveTypography(typography: TypographyPlan): TypographyPlan {
     lineHeight: 1.03,
     maxLineCount: 3,
     textAlign: 'left',
-    emphasisColor: '#ffffff',
+    emphasisColor: template === 'product-light' || template === 'journal-light' ? '#050505' : '#ffffff',
     readabilityScore: Math.max(typography.readabilityScore, 88),
   }
 }
@@ -112,7 +141,7 @@ function validateHarness(layout: LayoutDefinition, typography: TypographyPlan) {
   if (layout.textPosition !== 'bottom-left') {
     issues.push('텍스트 위치가 하단 좌측 아카이브 구도가 아닙니다.')
   }
-  if (layout.overlayStyle !== 'dark-gradient') {
+  if (!['archive-light', 'archive-dark', 'archive-cta', 'dark-gradient'].includes(layout.overlayStyle)) {
     issues.push('회색 필름 오버레이와 하단 그림자 기준을 벗어났습니다.')
   }
   if (typography.textAlign !== 'left') {

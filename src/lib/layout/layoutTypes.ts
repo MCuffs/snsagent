@@ -23,6 +23,9 @@ export type TypographyStyle =
 export type OverlayStyle =
   | 'none'
   | 'dark-gradient'
+  | 'archive-light'
+  | 'archive-dark'
+  | 'archive-cta'
   | 'blur-overlay'
   | 'vignette'
   | 'bottom-shadow'

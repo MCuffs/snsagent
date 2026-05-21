@@ -85,7 +85,13 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       layout,
       brandMainColor: input.brandMainColor,
     })
-    const harness = applyMediaCardHarness({ layout, typography: typographyPlan })
+    const harness = applyMediaCardHarness({
+      layout,
+      typography: typographyPlan,
+      slideNumber: slide.slideNumber,
+      totalSlides: slideCount,
+      role: slide.role,
+    })
     const visualDirection = generateVisualDirection({
       layout: harness.layout,
       category: input.category,
@@ -96,7 +102,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       brandToneOfVoice: input.brandToneOfVoice,
       brandIndustry: input.brandIndustry,
     })
-    const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt), {
+    const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
       size: '1024x1024',
       productImageUrls: [],
     })

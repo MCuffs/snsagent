@@ -52,7 +52,12 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
     category: input.category,
     layout,
   })
-  const harness = applyMediaCardHarness({ layout, typography: typographyPlan })
+  const harness = applyMediaCardHarness({
+    layout,
+    typography: typographyPlan,
+    slideNumber: input.pageNumber,
+    totalSlides: input.totalPages,
+  })
   const visualDirection = generateVisualDirection({
     layout: harness.layout,
     category: input.category,
@@ -61,7 +66,7 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
     visualHint: input.visualHint,
   })
 
-  const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt), {
+  const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
     size: '1024x1024',
     productImageUrls: [],
   })

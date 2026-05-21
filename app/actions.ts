@@ -283,8 +283,13 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
       category: existingSlide.campaign.keyBenefits || '카드뉴스',
       layout,
     })
-    const harness = applyMediaCardHarness({ layout, typography })
-    const background = await getPipelineImageProvider().generateImage(buildHarnessedVisualPrompt(existingSlide.designPrompt), {
+    const harness = applyMediaCardHarness({
+      layout,
+      typography,
+      slideNumber: existingSlide.slideNumber,
+      totalSlides: existingSlide.campaign.slideCount,
+    })
+    const background = await getPipelineImageProvider().generateImage(buildHarnessedVisualPrompt(existingSlide.designPrompt, harness.template), {
       size: '1024x1024',
       productImageUrls: [],
     })
@@ -467,9 +472,14 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
           layout,
           brandMainColor: brand.mainColor,
         })
-        const harness = applyMediaCardHarness({ layout, typography })
+        const harness = applyMediaCardHarness({
+          layout,
+          typography,
+          slideNumber: slide.slideNumber,
+          totalSlides: campaign.slideCount,
+        })
         const finalPrompt = `${keyword}, ${slide.designPrompt}`
-        const imgResult = await provider.generateImage(buildHarnessedVisualPrompt(finalPrompt))
+        const imgResult = await provider.generateImage(buildHarnessedVisualPrompt(finalPrompt, harness.template))
         
         const finalImageUrl = await renderMediaCard({
           id: `media-card-style-${Date.now()}-${slide.slideNumber}`,
