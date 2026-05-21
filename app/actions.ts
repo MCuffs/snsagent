@@ -664,6 +664,11 @@ function cleanHtmlText(html: string): string {
   return text.substring(0, 5000)
 }
 
+function removeMarkdownBold(text: string): string {
+  if (!text) return ''
+  return text.replace(/\*\*/g, '')
+}
+
 function extractSmartStoreShopId(urlStr: string): string | null {
   try {
     const parsedUrl = new URL(urlStr)
@@ -827,6 +832,7 @@ ${cleanedText}
    - "고급스럽고 차분한 톤" (Premium and calm)
 5. The industry must fit one of: '온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'.
 6. Write a brand identity report in Markdown (under "markdownReport"). Keep it professional, informative, and written in Korean (한국어). The report should outline the Brand Identity, Key Strengths, and SNS content strategy suggestions.
+7. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
 {
@@ -837,7 +843,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
   "mainColor": "#HEXCODE",
   "forbiddenWords": "word1, word2, word3",
   "ctaStyle": "A short call-to-action recommendation (e.g. 프로필 링크에서 만나보기)",
-  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서\\n\\n## 1. 브랜드 정체성\\n...\\n\\n## 2. SNS 콘텐츠 전략\\n..."
+  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서\\n\\n## 1. 브랜드 정체성\\n브랜드명: 휴100\\n업종: 온라인 스토어\\n\\n## 2. SNS 콘텐츠 전략\\n..."
 }
 `
 
@@ -846,7 +852,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
         messages: [
           {
             role: 'system',
-            content: 'You are a brand analysis AI agent. Return JSON only.'
+            content: 'You are a brand analysis AI agent. Return JSON only. Never use markdown bold syntax (**).'
           },
           {
             role: 'user',
@@ -870,7 +876,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
             forbiddenWords: parsed.forbiddenWords || '',
             ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
           },
-          markdownReport: parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.'
+          markdownReport: removeMarkdownBold(parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.')
         }
       } else {
         throw new Error('AI 분석 실패: 응답이 비어있습니다.')
@@ -970,27 +976,27 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 본 보고서는 사용자가 입력한 사이트 URL(\`${url}\`)을 AI 기반으로 분석하여 추출한 브랜드 정체성 및 SNS 콘텐츠 가이드라인입니다. *(현재 로컬 시뮬레이션 모드로 분석되었습니다)*
 
 ## 1. 브랜드 기본 프로필
-* **브랜드명**: \`${mockProfile.name}\`
-* **업종**: \`${mockProfile.industry}\` (${typeLabel})
-* **메인 컬러**: ${colorDesc}
+* 브랜드명: \`${mockProfile.name}\`
+* 업종: \`${mockProfile.industry}\` (${typeLabel})
+* 메인 컬러: ${colorDesc}
 
 ## 2. 브랜드 정체성 & 강점
-* **핵심 타겟**: ${mockProfile.targetAudience}
-* **브랜드 경쟁력**: ${strengths}
-* **권장 톤앤매너**: ${mockProfile.toneOfVoice} (일관된 인스타그램 브랜딩에 도움을 줍니다)
+* 핵심 타겟: ${mockProfile.targetAudience}
+* 브랜드 경쟁력: ${strengths}
+* 권장 톤앤매너: ${mockProfile.toneOfVoice} (일관된 인스타그램 브랜딩에 도움을 줍니다)
 
 ## 3. SNS 인스타그램 추천 전략
-* **콘텐츠 포커스**:
+* 콘텐츠 포커스:
   1. 정보성 콘텐츠 위주로 전문성과 신뢰도를 확보합니다.
   2. 고객 피드백과 비포/애프터(혹은 후기)를 가공해 캐러셀 카드뉴스로 발행합니다.
-* **사용 지양 용어 (금칙어)**: \`${mockProfile.forbiddenWords}\` (인스타그램 가이드라인 준수 및 브랜드 신뢰 유지를 위해 사용을 삼가세요)
-* **피드 전환율 상승을 위한 CTA**: \`${mockProfile.ctaStyle}\`
+* 사용 지양 용어 (금칙어): \`${mockProfile.forbiddenWords}\` (인스타그램 가이드라인 준수 및 브랜드 신뢰 유지를 위해 사용을 삼가세요)
+* 피드 전환율 상승을 위한 CTA: \`${mockProfile.ctaStyle}\`
 `
 
       return {
         success: true as const,
         brandProfile: mockProfile,
-        markdownReport
+        markdownReport: removeMarkdownBold(markdownReport)
       }
     }
   } catch (err: unknown) {
@@ -1022,6 +1028,7 @@ Based on this information, infer/predict a highly relevant brand profile and wri
 3. The industry must fit '온라인 스토어'.
 4. Write a beautiful brand identity and Instagram marketing report in Markdown (under "markdownReport") in Korean.
 5. Emphasize in the report that this profile was generated via our smart shop-ID analysis fallback engine due to temporary carrier block, but is tailored for their store.
+6. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
 {
@@ -1032,7 +1039,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
   "mainColor": "#HEXCODE",
   "forbiddenWords": "word1, word2, word3",
   "ctaStyle": "CTA style recommendation",
-  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서 (스마트스토어 분석 복원)\\n\\n..."
+  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서 (스마트스토어 분석 복원)\\n\\n1. 브랜드 정체성\\n브랜드명: 휴100\\n업종: 온라인 스토어\\n\\n2. SNS 콘텐츠 전략\\n..."
 }
 `
           const aiResponse = await openai.chat.completions.create({
@@ -1040,7 +1047,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
             messages: [
               {
                 role: 'system',
-                content: 'You are a brand analysis AI agent. Return JSON only.'
+                content: 'You are a brand analysis AI agent. Return JSON only. Never use markdown bold syntax (**).'
               },
               {
                 role: 'user',
@@ -1064,7 +1071,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
                 forbiddenWords: parsed.forbiddenWords || '',
                 ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
               },
-              markdownReport: parsed.markdownReport || '# 분석 복원 완료\n\n브랜드 분석 결과를 성공적으로 생성했습니다.'
+              markdownReport: removeMarkdownBold(parsed.markdownReport || '# 분석 복원 완료\n\n브랜드 분석 결과를 성공적으로 생성했습니다.')
             }
           }
         } catch (aiErr) {
@@ -1076,7 +1083,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       return {
         success: true as const,
         brandProfile: localResult.brandProfile,
-        markdownReport: localResult.markdownReport
+        markdownReport: removeMarkdownBold(localResult.markdownReport)
       }
     }
 
