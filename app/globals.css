@@ -356,7 +356,7 @@ body {
     display: flex;
     height: 100%;
     width: 300%;
-    animation: showcase-track-slide 12s ease-in-out infinite;
+    animation: showcase-track-slide 15s cubic-bezier(0.76, 0, 0.24, 1) infinite;
     will-change: transform;
   }
 
@@ -421,19 +421,19 @@ body {
 }
 
 @keyframes showcase-track-slide {
-  0%, 26% {
+  0%, 20% {
     transform: translate3d(0, 0, 0) scale(1);
   }
 
-  33%, 59% {
+  28%, 53% {
     transform: translate3d(-33.3333%, 0, 0) scale(1);
   }
 
-  66%, 94% {
+  61%, 86% {
     transform: translate3d(-66.6667%, 0, 0) scale(1);
   }
 
-  100% {
+  94%, 100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
