@@ -110,7 +110,7 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
   return plan.headlineLines.map((line) => {
     const tspans = renderTokenTspans(line.tokens, plan.emphasisColor)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="500" fill="${fill}" letter-spacing="0">${tspans || fallback}</text>`
+    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="600" fill="${fill}" letter-spacing="0">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
     return markup
   }).join('')
