@@ -1,0 +1,101 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  plan             String            @default("FREE") // FREE, STARTER, PRO, AGENCY
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  brands           Brand[]
+  campaigns        Campaign[]
+  posts            Post[]
+  instagramAccount InstagramAccount?
+}
+
+model Brand {
+  id             String            @id @default(uuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  industry       String
+  targetAudience String
+  toneOfVoice    String
+  mainColor      String
+  forbiddenWords String
+  ctaStyle       String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  campaigns      Campaign[]
+  instagram      InstagramAccount?
+  posts          Post[]
+}
+
+model InstagramAccount {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId               String   @unique
+  brand                 Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  instagramAccountId    String
+  accessTokenEncrypted  String
+  status                String   @default("DISCONNECTED") // CONNECTED, DISCONNECTED
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Campaign {
+  id                 String          @id @default(uuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId            String
+  brand              Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  title              String
+  productName        String
+  productDescription String
+  keyBenefits        String
+  objective          String
+  slideCount         Int
+  status             String          @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  slides             CarouselSlide[]
+  posts              Post[]
+}
+
+model CarouselSlide {
+  id           String   @id @default(uuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  slideNumber  Int
+  headline     String
+  body         String
+  designPrompt String
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Post {
+  id               String   @id @default(uuid())
+  campaignId       String
+  campaign         Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId          String
+  brand            Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  caption          String
+  hashtags         String   // Comma-separated or space-separated
+  scheduledAt      DateTime
+  instagramMediaId String?
+  status           String   @default("draft") // draft, pending_approval, scheduled, posted, failed
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
