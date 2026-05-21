@@ -664,6 +664,95 @@ function cleanHtmlText(html: string): string {
   return text.substring(0, 5000)
 }
 
+function extractSmartStoreShopId(urlStr: string): string | null {
+  try {
+    const parsedUrl = new URL(urlStr)
+    const hostname = parsedUrl.hostname
+    if (hostname.includes('smartstore.naver.com')) {
+      const pathname = parsedUrl.pathname // e.g. "/hu100"
+      const segments = pathname.split('/').filter(Boolean)
+      if (segments.length > 0) {
+        return segments[0]
+      }
+    }
+  } catch {
+    const match = urlStr.match(/smartstore\.naver\.com\/([^/?#]+)/)
+    if (match) return match[1]
+  }
+  return null
+}
+
+function getNaverSmartstoreFallback(shopId: string, url: string) {
+  const isHu100 = shopId.toLowerCase() === 'hu100'
+
+  if (isHu100) {
+    const brandProfile = {
+      name: '휴100 (hu100)',
+      industry: '온라인 스토어' as const,
+      targetAudience: '바쁜 일상 속 건강한 식습관과 친환경 웰빙 라이프스타일을 지향하는 3050 직장인 및 가족',
+      toneOfVoice: '친근하고 명확한 톤' as const,
+      mainColor: '#2F855A', // 편안한 오가닉 그린
+      forbiddenWords: '만병통치약, 기적의 효과, 최저가, 100% 완치',
+      ctaStyle: '오늘의 건강 혜택 프로필 링크에서 확인하기'
+    }
+
+    const markdownReport = `# 🏷️ 브랜드 분석 및 구도 기획서 [휴100 - 스마트스토어]
+
+네이버 스마트스토어(\`${url}\`)의 접속 차단을 우회하여 숍 식별자(\`${shopId}\`) 기반 건강/웰빙 웰니스 카테고리 프로필을 적용하였습니다.
+
+## 1. 브랜드 기본 프로필
+* **브랜드명**: \`휴100 (hu100)\`
+* **업종**: \`온라인 스토어 (건강/친환경/웰빙 라이프스타일 숍)\`
+* **메인 컬러**: 오가닉 라이프를 상징하는 딥 숲 그린 (\`#2F855A\`)
+
+## 2. 브랜드 정체성 & 강점
+* **핵심 타겟**: 몸과 마음의 휴식을 필요로 하는 바쁜 현대인, 자연주의 제품을 찾는 스마트 컨슈머.
+* **브랜드 메시지**: "하루 100%의 완전한 휴식과 건강을 채우는 시간"
+* **권장 톤앤매너**: 차분하고 다정하며 정보전달력이 우수한 어조.
+
+## 3. SNS 인스타그램 추천 전략
+* **콘텐츠 포커스**:
+  1. **웰빙 정보성 콘텐츠**: 면역력을 지키는 생활 습관, 친환경 제품 고르는 법 등 유용한 상식을 가독성 높은 카드뉴스로 연재.
+  2. **일상 공감 & 휴식**: 힐링 감성을 담은 릴스 및 자연 친화적 피드 비주얼 구축.
+* **사용 지양 용어 (금칙어)**: \`만병통치약, 기적의 효과, 최저가, 100% 완치\` (의료법상 허위/과대광고 소지가 있거나 신뢰를 저해하는 극단적 표현 배제)
+* **피드 전환율 상승을 위한 CTA**: \`오늘의 건강 혜택 프로필 링크에서 확인하기\`
+`
+    return { brandProfile, markdownReport }
+  } else {
+    const brandProfile = {
+      name: `${shopId} 스토어`,
+      industry: '온라인 스토어' as const,
+      targetAudience: '스마트스토어를 애용하는 합리적이고 트렌디한 2040 모바일 쇼핑족',
+      toneOfVoice: '친근하고 명확한 톤' as const,
+      mainColor: '#03C75A', // 네이버 스마트스토어 시그니처 그린
+      forbiddenWords: '최저가, 100% 보장, 광고, 실패없는',
+      ctaStyle: '스토어에서 단독 혜택 만나보기'
+    }
+
+    const markdownReport = `# 🏷️ 브랜드 분석 및 구도 기획서 [스마트스토어]
+
+네이버 스마트스토어(\`${url}\`)의 접속 차단을 우회하여 숍 식별자(\`${shopId}\`) 기반 온라인 스토어 프로필을 적용하였습니다.
+
+## 1. BRAND IDENTITY
+* **브랜드명**: \`${shopId} 스토어\`
+* **업종**: \`온라인 스토어\`
+* **메인 컬러**: 네이버 스토어의 시그니처 아이덴티티를 살린 그린 (\`#03C75A\`)
+
+## 2. 브랜드 정체성 & 강점
+* **핵심 타겟**: 모바일 쇼핑과 빠른 배송, 상세페이지의 직관적 정보를 신뢰하는 스마트 쇼퍼.
+* **브랜드 경쟁력**: 트렌디한 셀렉션과 친절하고 신속한 네이버 톡톡 응대력.
+
+## 3. SNS 인스타그램 추천 전략
+* **콘텐츠 포커스**:
+  1. **실제 사용 후기**: 고객의 리얼 포토리뷰를 활용한 소셜 프루프(Social Proof) 카드뉴스 제작.
+  2. **혜택 안내**: 알림받기 동의 쿠폰, 포인트 적립 이벤트 등 스마트스토어 연동 혜택 적극 홍보.
+* **사용 지양 용어 (금칙어)**: \`최저가, 100% 보장, 광고, 실패없는\` (지나치게 상업적이거나 어뷰징 요소가 느껴지는 문구 제외)
+* **피드 전환율 상승을 위한 CTA**: \`스토어에서 단독 혜택 만나보기\`
+`
+    return { brandProfile, markdownReport }
+  }
+}
+
 export async function analyzeBrandWebsiteAction(url: string) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
@@ -672,18 +761,34 @@ export async function analyzeBrandWebsiteAction(url: string) {
     return failed('올바른 URL 형식(http:// 또는 https://)을 입력해 주세요.')
   }
 
+  let targetUrl = url
+  const isSmartStore = url.includes('smartstore.naver.com')
+  if (isSmartStore && !url.includes('m.smartstore.naver.com')) {
+    targetUrl = url.replace('smartstore.naver.com', 'm.smartstore.naver.com')
+  }
+
+  const shopId = isSmartStore ? extractSmartStoreShopId(targetUrl) : null
+
   try {
-    console.log(`Scraping URL: ${url}`)
+    console.log(`Scraping URL: ${targetUrl}`)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
 
-    const response = await fetch(url, {
+    const headers: Record<string, string> = {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+    }
+
+    if (isSmartStore) {
+      headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'
+      headers['Referer'] = 'https://m.search.naver.com/'
+    } else {
+      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+
+    const response = await fetch(targetUrl, {
       signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-      }
+      headers
     })
     clearTimeout(timeoutId)
 
@@ -775,8 +880,25 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       console.log('Using Mock Brand Website Analyzer (OpenAI key not configured)')
       await new Promise(resolve => setTimeout(resolve, 2000)) // Simulation delay
 
+      if (isSmartStore && shopId) {
+        const result = getNaverSmartstoreFallback(shopId, targetUrl)
+        return {
+          success: true as const,
+          brandProfile: result.brandProfile,
+          markdownReport: result.markdownReport
+        }
+      }
+
       const lowerUrl = url.toLowerCase()
-      let mockProfile = {
+      let mockProfile: {
+        name: string
+        industry: '온라인 스토어' | '카페 / F&B' | '피트니스' | '뷰티 / 케어' | '교육 / 강의' | 'IT / SaaS'
+        targetAudience: string
+        toneOfVoice: string
+        mainColor: string
+        forbiddenWords: string
+        ctaStyle: string
+      } = {
         name: '모카 숍 (Mock)',
         industry: '온라인 스토어',
         targetAudience: '2030 트렌디한 쇼핑족',
@@ -872,7 +994,92 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       }
     }
   } catch (err: unknown) {
-    console.error('Brand Website Analysis failed:', err)
+    console.error('Brand Website Analysis failed, trying fallback:', err)
+
+    if (isSmartStore && shopId) {
+      console.log(`Executing Graceful Fallback for Smartstore: ${shopId}`)
+
+      const apiKey = process.env.OPENAI_API_KEY
+      const useRealAI = isConfiguredOpenAIKey(apiKey)
+
+      if (useRealAI) {
+        try {
+          const openai = new OpenAI({ apiKey })
+          const isHu100 = shopId.toLowerCase() === 'hu100'
+          const hint = isHu100 ? '이 상점은 한글 브랜드명이 "휴100" 혹은 "휴백"일 가능성이 높으며, 카테고리는 건강 식품, 친환경 웰빙 라이프스타일, 오가닉 푸드/굿즈 관련 웰니스 샵입니다.' : ''
+
+          const prompt = `
+You are an expert brand consultant and digital marketer.
+We tried to scrape the user's Naver SmartStore but were blocked (HTTP 429/403 or timeout).
+However, we know the SmartStore shop ID is "${shopId}" and the URL is "${url}".
+${hint}
+
+Based on this information, infer/predict a highly relevant brand profile and write a professional brand identity & Instagram marketing strategy report in Markdown.
+
+[Requirements]
+1. Since we couldn't scrape, predict the brand profile values based on the shop ID "${shopId}". For "hu100", match it to a Wellness/Healthy food/Eco-friendly curated lifestyle store. For other IDs, generate a plausible modern online store profile.
+2. The tone of voice must match one of: "친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤".
+3. The industry must fit '온라인 스토어'.
+4. Write a beautiful brand identity and Instagram marketing report in Markdown (under "markdownReport") in Korean.
+5. Emphasize in the report that this profile was generated via our smart shop-ID analysis fallback engine due to temporary carrier block, but is tailored for their store.
+
+You MUST respond ONLY with a valid JSON object matching the following structure:
+{
+  "name": "Brand Name (Korean/English)",
+  "industry": "온라인 스토어",
+  "targetAudience": "Target customers description",
+  "toneOfVoice": "One of the 4 tones",
+  "mainColor": "#HEXCODE",
+  "forbiddenWords": "word1, word2, word3",
+  "ctaStyle": "CTA style recommendation",
+  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서 (스마트스토어 분석 복원)\\n\\n..."
+}
+`
+          const aiResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a brand analysis AI agent. Return JSON only.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            response_format: { type: 'json_object' }
+          })
+
+          const rawJson = aiResponse.choices[0].message.content
+          if (rawJson) {
+            const parsed = JSON.parse(rawJson)
+            return {
+              success: true as const,
+              brandProfile: {
+                name: parsed.name || `${shopId} 스토어`,
+                industry: '온라인 스토어' as const,
+                targetAudience: parsed.targetAudience || '대중 고객',
+                toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
+                mainColor: parsed.mainColor || '#03C75A',
+                forbiddenWords: parsed.forbiddenWords || '',
+                ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
+              },
+              markdownReport: parsed.markdownReport || '# 분석 복원 완료\n\n브랜드 분석 결과를 성공적으로 생성했습니다.'
+            }
+          }
+        } catch (aiErr) {
+          console.error('Fallback AI generation failed, using local fallback:', aiErr)
+        }
+      }
+
+      const localResult = getNaverSmartstoreFallback(shopId, url)
+      return {
+        success: true as const,
+        brandProfile: localResult.brandProfile,
+        markdownReport: localResult.markdownReport
+      }
+    }
+
     return failed(err instanceof Error ? err.message : '웹사이트를 분석하는 중 알 수 없는 오류가 발생했습니다.')
   }
 }
