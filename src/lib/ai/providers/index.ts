@@ -5,9 +5,9 @@ import { MockImageProvider } from './mockImageProvider'
 import { OpenAIImageProvider } from './openAIImageProvider'
 
 export function getPipelineImageProvider(): ImageProvider {
-  const provider = (process.env.IMAGE_PROVIDER || 'mock').toLowerCase()
+  const provider = (process.env.IMAGE_PROVIDER || 'auto').toLowerCase()
 
-  if (provider === 'openai' && isConfiguredOpenAIKey(process.env.OPENAI_API_KEY)) {
+  if ((provider === 'auto' || provider === 'openai') && isConfiguredOpenAIKey(process.env.OPENAI_API_KEY)) {
     return new OpenAIImageProvider()
   }
 
