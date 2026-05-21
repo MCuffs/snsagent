@@ -14,15 +14,15 @@ export function generateOverlay(overlayStyle: OverlayStyle): OverlayPlan {
       overlayStyle,
       svgDefs: `
         <linearGradient id="overlay-dark-gradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#000000" stop-opacity="0.0"/>
-          <stop offset="35%" stop-color="#000000" stop-opacity="0.12"/>
-          <stop offset="60%" stop-color="#000000" stop-opacity="0.48"/>
-          <stop offset="85%" stop-color="#000000" stop-opacity="0.82"/>
-          <stop offset="100%" stop-color="#000000" stop-opacity="0.94"/>
+          <stop offset="0%" stop-color="#171717" stop-opacity="0.28"/>
+          <stop offset="42%" stop-color="#171717" stop-opacity="0.34"/>
+          <stop offset="68%" stop-color="#171717" stop-opacity="0.54"/>
+          <stop offset="88%" stop-color="#111111" stop-opacity="0.78"/>
+          <stop offset="100%" stop-color="#0b0b0b" stop-opacity="0.92"/>
         </linearGradient>`,
-      svgMarkup: '<rect width="1080" height="1350" fill="url(#overlay-dark-gradient)"/>',
+      svgMarkup: '<rect width="1080" height="1350" fill="#8c8c8c" fill-opacity="0.24"/><rect width="1080" height="1350" fill="url(#overlay-dark-gradient)"/>',
       textColor: '#ffffff',
-      secondaryTextColor: 'rgba(255, 255, 255, 0.74)',
+      secondaryTextColor: 'rgba(255, 255, 255, 0.68)',
     }
   }
 
@@ -48,14 +48,14 @@ export function generateOverlay(overlayStyle: OverlayStyle): OverlayPlan {
       overlayStyle,
       svgDefs: `
         <linearGradient id="overlay-bottom-shadow" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#000000" stop-opacity="0.0"/>
-          <stop offset="55%" stop-color="#000000" stop-opacity="0.10"/>
-          <stop offset="80%" stop-color="#000000" stop-opacity="0.54"/>
-          <stop offset="100%" stop-color="#000000" stop-opacity="0.88"/>
+          <stop offset="0%" stop-color="#202020" stop-opacity="0.24"/>
+          <stop offset="58%" stop-color="#202020" stop-opacity="0.32"/>
+          <stop offset="82%" stop-color="#101010" stop-opacity="0.66"/>
+          <stop offset="100%" stop-color="#080808" stop-opacity="0.90"/>
         </linearGradient>`,
-      svgMarkup: '<rect width="1080" height="1350" fill="url(#overlay-bottom-shadow)"/>',
+      svgMarkup: '<rect width="1080" height="1350" fill="#8c8c8c" fill-opacity="0.18"/><rect width="1080" height="1350" fill="url(#overlay-bottom-shadow)"/>',
       textColor: '#ffffff',
-      secondaryTextColor: 'rgba(255, 255, 255, 0.76)',
+      secondaryTextColor: 'rgba(255, 255, 255, 0.68)',
     }
   }
 

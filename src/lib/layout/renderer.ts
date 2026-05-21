@@ -33,8 +33,8 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const headlineToBodyGap = input.layout.spacingRules?.headlineToBodyGap || 36
 
   let currentY = textBox.y
-  const sourceMarkup = renderTopHandle(source, textBox.x, currentY, textColor, textBox.align)
-  currentY += 30 + badgeToHeadlineGap
+  const kickerMarkup = renderKicker(source, textBox.x, currentY, textColor)
+  currentY += 24 + badgeToHeadlineGap
 
   const headlineStartBaseline = currentY + input.typography.headlineFontSize * 0.95
   const headlineMarkup = renderHeadline(input.typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam)
@@ -51,19 +51,18 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
     ${input.overlay.svgDefs}
     ${renderFallbackOverlayDefs()}
     <filter id="text-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.58"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000000" flood-opacity="0.34"/>
     </filter>
   </defs>
   <rect width="1080" height="1350" fill="#101114"/>
   <image href="${escapeXml(backgroundImageDataUri || input.backgroundImageUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"/>
   ${input.overlay.svgMarkup || renderFallbackOverlay()}
-  ${sourceMarkup}
+  ${renderTopChrome(source, input.pageNumber, input.totalPages)}
+  ${kickerMarkup}
   <g filter="url(#text-shadow)">
     ${headlineMarkup}
     ${bodyMarkup}
   </g>
-  ${renderSourceBadge(source, input.layout.safeArea.left, 1268, textColor)}
-  ${input.totalPages && input.pageNumber ? renderPaginationDots(input.pageNumber, input.totalPages, 540, 1284) : ''}
 </svg>`
 
   try {
@@ -85,21 +84,24 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
 
 function getTextBox(layout: LayoutDefinition) {
   const left = layout.safeArea.left
-  const right = 1080 - layout.safeArea.right
-  const centerX = 540
-
-  if (layout.textPosition === 'center') return { x: centerX, y: 560, align: 'center' as const }
-  if (layout.textPosition === 'bottom-center') return { x: centerX, y: 720, align: 'center' as const }
-  if (layout.textPosition === 'top-left') return { x: left, y: 620, align: 'left' as const }
-  if (layout.textPosition === 'left-column') return { x: left, y: 600, align: 'left' as const }
-  if (layout.textPosition === 'right-column') return { x: right - 520, y: 600, align: 'left' as const }
-  return { x: left, y: 710, align: 'left' as const }
+  return { x: left, y: 1040, align: 'left' as const }
 }
 
-function renderTopHandle(source: string, x: number, y: number, fill: string, align: 'left' | 'center') {
-  const anchor = align === 'center' ? 'middle' : 'start'
+function renderTopChrome(source: string, pageNumber?: number, totalPages?: number) {
+  const pageLabel = pageNumber && totalPages
+    ? `${String(pageNumber).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}`
+    : ''
   return `
-    <text x="${x}" y="${y + 24}" text-anchor="${anchor}" font-family="${fontFamily('clean-sans')}" font-size="22" font-weight="500" fill="${fill}" fill-opacity="0.88" letter-spacing="0">${source}</text>
+    <g class="top-chrome">
+      <text x="60" y="78" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="#ffffff" fill-opacity="0.62" letter-spacing="3">${source}</text>
+      ${pageLabel ? `<text x="1020" y="78" text-anchor="end" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="#ffffff" fill-opacity="0.54" letter-spacing="2">${pageLabel}</text>` : ''}
+    </g>
+  `
+}
+
+function renderKicker(source: string, x: number, y: number, fill: string) {
+  return `
+    <text x="${x}" y="${y + 22}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="0.62" letter-spacing="2">${source}</text>
   `
 }
 
@@ -108,19 +110,18 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
   let currentY = y
 
   return plan.headlineLines.map((line) => {
-    const tspans = renderTokenTspans(line.tokens, plan.emphasisColor)
+    const tspans = renderTokenTspans(line.tokens)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="600" fill="${fill}" letter-spacing="0">${tspans || fallback}</text>`
+    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="650" fill="${fill}" letter-spacing="-0.4">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
     return markup
   }).join('')
 }
 
-function renderTokenTspans(tokens: TypographyToken[], emphasisColor: string) {
+function renderTokenTspans(tokens: TypographyToken[]) {
   return tokens.map((token, index) => {
-    const fill = token.style === 'headline-emphasis' ? ` fill="${emphasisColor}"` : ''
     const prefix = index === 0 ? '' : ' '
-    return `<tspan${fill}>${prefix}${escapeXml(token.text)}</tspan>`
+    return `<tspan>${prefix}${escapeXml(token.text)}</tspan>`
   }).join('')
 }
 
@@ -129,46 +130,25 @@ function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, al
   let currentY = y
 
   return plan.bodyLines.map((line) => {
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="400" fill="${fill}" letter-spacing="0">${escapeXml(line)}</text>`
+    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="400" fill="${fill}" letter-spacing="-0.1">${escapeXml(line)}</text>`
     currentY += plan.bodyFontSize * bodyLineGap
     return markup
   }).join('')
 }
 
-function renderPaginationDots(pageNumber: number, totalPages: number, centerX: number, y: number) {
-  const count = Math.min(Math.max(totalPages, 1), 12)
-  const gap = 20
-  const startX = centerX - ((count - 1) * gap) / 2
-  const dots = Array.from({ length: count }, (_, index) => {
-    const active = index + 1 === pageNumber
-    return `<circle cx="${startX + index * gap}" cy="${y}" r="${active ? 6 : 5}" fill="#ffffff" fill-opacity="${active ? 0.96 : 0.42}"/>`
-  }).join('')
-  return `<g class="pagination-dots">${dots}</g>`
-}
-
-function renderSourceBadge(source: string, x: number, y: number, textColor: string) {
-  if (!source) return ''
-  const fontColor = textColor === '#ffffff' ? '#ffffff' : '#111111'
-  return `
-    <g class="brand-badge">
-      <text x="${x}" y="${y}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="500" fill="${fontColor}" fill-opacity="0.72" letter-spacing="0">${escapeXml(source)}</text>
-    </g>
-  `
-}
-
 function renderFallbackOverlayDefs() {
   return `
     <linearGradient id="fallback-media-overlay" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#000000" stop-opacity="0.16"/>
-      <stop offset="44%" stop-color="#000000" stop-opacity="0.24"/>
-      <stop offset="74%" stop-color="#000000" stop-opacity="0.72"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.92"/>
+      <stop offset="0%" stop-color="#171717" stop-opacity="0.30"/>
+      <stop offset="58%" stop-color="#171717" stop-opacity="0.38"/>
+      <stop offset="82%" stop-color="#101010" stop-opacity="0.72"/>
+      <stop offset="100%" stop-color="#080808" stop-opacity="0.92"/>
     </linearGradient>
   `
 }
 
 function renderFallbackOverlay() {
-  return '<rect width="1080" height="1350" fill="url(#fallback-media-overlay)"/>'
+  return '<rect width="1080" height="1350" fill="#8c8c8c" fill-opacity="0.22"/><rect width="1080" height="1350" fill="url(#fallback-media-overlay)"/>'
 }
 
 function fontFamily(style: string) {
