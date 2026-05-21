@@ -80,6 +80,20 @@
       "status": "pending_approval",
       "createdAt": "2026-05-21T15:47:25.418Z",
       "updatedAt": "2026-05-21T15:47:25.419Z"
+    },
+    {
+      "id": "c-1779378721320",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "title": "신제품",
+      "productName": "신제품 출시",
+      "productDescription": "신제품 입니다",
+      "keyBenefits": "푸드/식품",
+      "objective": "신상품 홍보 / 감성적이고 따뜻하게",
+      "slideCount": 5,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.322Z"
     }
   ],
   "slides": [
@@ -291,6 +305,61 @@
       "imageUrl": "/generated/carousel/cg-regen-1779378463094-slide-5.png",
       "createdAt": "2026-05-21T15:47:25.418Z",
       "updatedAt": "2026-05-21T15:47:44.132Z"
+    },
+    {
+      "id": "s-1779378721320-1",
+      "campaignId": "c-1779378721320",
+      "slideNumber": 1,
+      "headline": "신제품",
+      "body": "신제품 출시의 특별한 소식과 핵심 가치를 전해드립니다.",
+      "designPrompt": "highly desaturated photography with a very subtle organic forest green monochrome tint, high contrast, atmospheric editorial shadows, natural soft lighting, a close-up symbolic texture of organic plants, soft shadows of leaves, raw wooden table surface, clean minimalist apothecary elements, topic: 신제품 출시, category: 푸드/식품, brand tone: 친근하고 명확한 톤, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, ensure the text area has zero visual noise, perfect clean dark background for heavy text overlay, consider overlay readability: dark-gradient, realistic Instagram editorial media aesthetic, raw photography, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378720784-1-bkmw6p.png",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.320Z"
+    },
+    {
+      "id": "s-1779378721320-2",
+      "campaignId": "c-1779378721320",
+      "slideNumber": 2,
+      "headline": "오늘의 핵심 큐레이션",
+      "body": "신제품 입니다",
+      "designPrompt": "highly desaturated photography with a very subtle organic forest green monochrome tint, high contrast, atmospheric editorial shadows, natural soft lighting, a close-up symbolic texture of organic plants, soft shadows of leaves, raw wooden table surface, clean minimalist apothecary elements, topic: 신제품 출시, category: 푸드/식품, brand tone: 친근하고 명확한 톤, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, ensure the text area has zero visual noise, perfect clean dark background for heavy text overlay, consider overlay readability: none, realistic Instagram editorial media aesthetic, raw photography, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378720938-2-ambadp.png",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.320Z"
+    },
+    {
+      "id": "s-1779378721320-3",
+      "campaignId": "c-1779378721320",
+      "slideNumber": 3,
+      "headline": "추천 포인트 1",
+      "body": "신제품 입니다",
+      "designPrompt": "highly desaturated photography with a very subtle organic forest green monochrome tint, high contrast, atmospheric editorial shadows, natural soft lighting, a close-up symbolic texture of organic plants, soft shadows of leaves, raw wooden table surface, clean minimalist apothecary elements, topic: 신제품 출시, category: 푸드/식품, brand tone: 친근하고 명확한 톤, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, ensure the text area has zero visual noise, perfect clean dark background for heavy text overlay, consider overlay readability: none, realistic Instagram editorial media aesthetic, raw photography, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378721044-3-ebfxc0.png",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.320Z"
+    },
+    {
+      "id": "s-1779378721320-4",
+      "campaignId": "c-1779378721320",
+      "slideNumber": 4,
+      "headline": "추천 포인트 2",
+      "body": "신제품 입니다",
+      "designPrompt": "highly desaturated photography with a very subtle organic forest green monochrome tint, high contrast, atmospheric editorial shadows, natural soft lighting, a close-up symbolic texture of organic plants, soft shadows of leaves, raw wooden table surface, clean minimalist apothecary elements, topic: 신제품 출시, category: 푸드/식품, brand tone: 친근하고 명확한 톤, preferred color palette: black, white, orange, subject positioning: upper-center or center-right, reserve clean empty space for typography at bottom-center, ensure the text area has zero visual noise, perfect clean dark background for heavy text overlay, consider overlay readability: dark-gradient, realistic Instagram editorial media aesthetic, raw photography, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378721116-4-q0gayg.png",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.320Z"
+    },
+    {
+      "id": "s-1779378721320-5",
+      "campaignId": "c-1779378721320",
+      "slideNumber": 5,
+      "headline": "스토어에서 확인하세요",
+      "body": "프로필 링크를 통해 신제품 출시의 자세한 혜택을 만나보세요.",
+      "designPrompt": "highly desaturated photography with a very subtle organic forest green monochrome tint, high contrast, atmospheric editorial shadows, natural soft lighting, a close-up symbolic texture of organic plants, soft shadows of leaves, raw wooden table surface, clean minimalist apothecary elements, topic: 신제품 출시, category: 푸드/식품, brand tone: 친근하고 명확한 톤, preferred color palette: white, black, blue, subject positioning: center-right, reserve clean empty space for typography at top-left, ensure the text area has zero visual noise, perfect clean dark background for heavy text overlay, consider overlay readability: none, realistic Instagram editorial media aesthetic, raw photography, no text, no letters, no Hangul, no captions, no logo, no watermark, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779378721228-5-et9itu.png",
+      "createdAt": "2026-05-21T15:52:01.320Z",
+      "updatedAt": "2026-05-21T15:52:01.320Z"
     }
   ],
   "posts": [
@@ -332,6 +401,19 @@
       "status": "pending_approval",
       "createdAt": "2026-05-21T15:47:25.421Z",
       "updatedAt": "2026-05-21T15:47:25.423Z"
+    },
+    {
+      "id": "p-1779378721326",
+      "campaignId": "c-1779378721320",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "caption": "신제품\n\n신제품 입니다\n\n자세한 혜택은 프로필 링크 스토어에서 확인해보세요.",
+      "hashtags": "#카드뉴스, #스토어추천, #쇼핑몰트렌드, #푸드식품, #신제품, #출시, #신상품, #홍보",
+      "scheduledAt": "2026-05-23T11:00:00.000Z",
+      "instagramMediaId": null,
+      "status": "pending_approval",
+      "createdAt": "2026-05-21T15:52:01.326Z",
+      "updatedAt": "2026-05-21T15:52:01.328Z"
     }
   ]
 }

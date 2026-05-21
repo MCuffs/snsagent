@@ -3,6 +3,8 @@ import sharp from 'sharp'
 import type { LayoutDefinition } from './layoutTypes'
 import type { OverlayPlan } from './overlayEngine'
 import type { TypographyPlan, TypographyToken } from './typographyEngine'
+import fs from 'fs'
+import path from 'path'
 
 export interface RenderMediaCardInput {
   id: string
@@ -137,19 +139,50 @@ function escapeXml(value: string) {
 
 async function toImageDataUri(imageUrl: string) {
   if (!imageUrl || imageUrl.startsWith('data:')) return imageUrl
-  if (imageUrl.startsWith('/')) {
-    return ''
+
+  // 로컬 파일 경로인 경우 (예: /background-showcase/showcase-1.webp)
+  if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
+    try {
+      const cleanPath = imageUrl.startsWith('file://') 
+        ? imageUrl.replace('file://', '') 
+        : imageUrl
+      
+      const filePath = path.join(process.cwd(), 'public', cleanPath)
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath)
+        const ext = path.extname(filePath).slice(1) || 'png'
+        const contentType = ext === 'webp' ? 'image/webp' : `image/${ext}`
+        const base64 = fileBuffer.toString('base64')
+        return `data:${contentType};base64,${base64}`
+      }
+    } catch (e) {
+      console.warn('[ImageDataUri] Failed to read local file:', imageUrl, e)
+    }
   }
 
+  // 원격 URL인 경우 (http, https)
   try {
     const response = await fetch(imageUrl)
-    if (!response.ok) return ''
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const contentType = response.headers.get('content-type') || 'image/jpeg'
     const arrayBuffer = await response.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
     return `data:${contentType};base64,${base64}`
   } catch (error) {
-    console.warn('[MediaCardRenderer] Failed to inline background image', error)
+    console.warn('[ImageDataUri] Failed to inline remote background image', error)
+    
+    // 원격 이미지 로드 실패 시, 로컬의 기본 showcase-1.webp 파일을 읽어 base64 폴백
+    try {
+      const fallbackPath = path.join(process.cwd(), 'public', 'background-showcase', 'showcase-1.webp')
+      if (fs.existsSync(fallbackPath)) {
+        const fileBuffer = fs.readFileSync(fallbackPath)
+        const base64 = fileBuffer.toString('base64')
+        return `data:image/webp;base64,${base64}`
+      }
+    } catch (fallbackErr) {
+      console.error('[ImageDataUri] Fallback image read failed', fallbackErr)
+    }
+    
     return ''
   }
 }

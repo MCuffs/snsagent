@@ -1,6 +1,9 @@
 import type { ImageProvider } from '../imageProvider'
 
 const PLACEHOLDERS = [
+  '/background-showcase/showcase-1.webp',
+  '/background-showcase/showcase-2.webp',
+  '/background-showcase/showcase-3.webp',
   'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=1080&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=1080&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1080&auto=format&fit=crop',
