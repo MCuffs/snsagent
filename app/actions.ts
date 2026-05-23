@@ -97,15 +97,15 @@ export async function saveBrandAction(brandId: string | null, data: {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
-  // Limit check for new brand creation
-  if (!brandId) {
-    const limitCheck = await checkBrandCountLimit(user.id)
-    if (!limitCheck.allowed) {
-      return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
-    }
-  }
-
   try {
+    // Limit check for new brand creation
+    if (!brandId) {
+      const limitCheck = await checkBrandCountLimit(user.id)
+      if (!limitCheck.allowed) {
+        return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
+      }
+    }
+
     let effectiveBrandId = brandId
     if (effectiveBrandId) {
       const existingBrand = await dbService.getBrand(effectiveBrandId)
