@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
+import { saveErrorLog } from '../lib/errorLogger'
 import { validateInstagramConnection, schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccessToken, getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey } from '../lib/env'
@@ -117,6 +118,7 @@ export async function saveBrandAction(brandId: string | null, data: {
     const brand = await dbService.saveBrand(user.id, effectiveBrandId, data)
     return { success: true as const, brand }
   } catch (err: unknown) {
+    await saveErrorLog(user?.id, 'saveBrandAction', err, { brandId, ...data })
     return failed(getErrorMessage(err, '브랜드 저장에 실패했습니다.'))
   }
 }
@@ -156,6 +158,7 @@ export async function saveInstagramAccountAction(brandId: string, accountId: str
     
     return { success: true as const, account, username: validation.username }
   } catch (err: unknown) {
+    await saveErrorLog(user?.id, 'saveInstagramAccountAction', err, { brandId, accountId })
     return failed(getErrorMessage(err, '계정 연동 저장 중 오류가 발생했습니다.'))
   }
 }
@@ -330,6 +333,7 @@ export async function updatePostDetailsAction(postId: string, caption: string, h
     const post = await dbService.updatePostDetails(postId, caption, hashtags)
     return { success: true as const, post }
   } catch (err: unknown) {
+    await saveErrorLog(user?.id, 'updatePostDetailsAction', err, { postId })
     return failed(getErrorMessage(err, '피드 정보 수정에 실패했습니다.'))
   }
 }
@@ -433,7 +437,7 @@ export async function approveAndScheduleCampaignAction(
       message: targetStatus === 'posted' ? '인스타그램에 즉시 업로드 완료!' : '예약이 승인되어 스케줄러에 등록되었습니다.'
     }
   } catch (err: unknown) {
-    console.error('Approval flow error:', err)
+    await saveErrorLog(user?.id, 'approveAndScheduleCampaignAction', err, { campaignId, postId })
     return failed(getErrorMessage(err, '승인 처리 도중 오류가 발생했습니다.'))
   }
 }
@@ -517,7 +521,7 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
 
     return { success: true as const, slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber) }
   } catch (err: unknown) {
-    console.error('Failed to regenerate style images:', err)
+    await saveErrorLog(user?.id, 'regenerateCampaignImagesAction', err, { campaignId, styleName })
     return failed(getErrorMessage(err, '이미지 스타일 일괄 재생성에 실패했습니다.'))
   }
 }
@@ -625,7 +629,7 @@ export async function triggerSchedulerAction() {
       message 
     }
   } catch (err: unknown) {
-    console.error('Scheduler manual execution failed:', err)
+    await saveErrorLog(user?.id, 'triggerSchedulerAction', err, {})
     return failed(getErrorMessage(err, '스케줄러 작동 중 실패했습니다.'))
   }
 }
@@ -647,6 +651,7 @@ export async function updatePostScheduledTimeAction(postId: string, dateStr: str
     const post = await dbService.updatePostScheduledTime(postId, newDate)
     return { success: true as const, post }
   } catch (err: unknown) {
+    await saveErrorLog(user?.id, 'updatePostScheduledTimeAction', err, { postId, dateStr })
     return failed(getErrorMessage(err, '예약 시간 수정에 실패했습니다.'))
   }
 }
@@ -933,7 +938,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
         messages: [
           {
             role: 'system',
-            content: 'You are a brand analysis AI agent. Return JSON only. Never use markdown bold syntax (**).'
+            content: 'You are a brand analysis AI agent. Return JSON only. Never use markdown bold (**).'
           },
           {
             role: 'user',
@@ -1081,6 +1086,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       }
     }
   } catch (err: unknown) {
+    await saveErrorLog(user?.id, 'analyzeBrandWebsiteAction', err, { url })
     console.error('Brand Website Analysis failed, trying fallback:', err)
 
     if (isNaverStore && shopId) {
@@ -1396,7 +1402,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
     }
 
   } catch (err: unknown) {
-    console.error('Campaign recommendation failed:', err)
+    await saveErrorLog(user?.id, 'recommendCampaignAction', err, { brandId, topic })
     return failed(err instanceof Error ? err.message : '추천 데이터를 기획하는 도중 오류가 발생했습니다.')
   }
 }

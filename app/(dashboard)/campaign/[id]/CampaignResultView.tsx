@@ -38,6 +38,7 @@ interface Campaign {
   slideCount: number
   status: string
   slides: Slide[]
+  agentReport?: string | null
 }
 
 interface Post {
@@ -132,6 +133,16 @@ export default function CampaignResultView({
   const [selectedStyle, setSelectedStyle] = useState('photo')
   const [regeneratingStyle, setRegeneratingStyle] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
+
+  let agentReportData: any = null
+  if (campaign.agentReport) {
+    try {
+      agentReportData = JSON.parse(campaign.agentReport)
+    } catch (e) {
+      console.error('Failed to parse agentReport JSON', e)
+    }
+  }
 
   const activeSlide = slides[activeSlideIndex]
   const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
@@ -358,129 +369,240 @@ export default function CampaignResultView({
         </section>
 
         <aside className="space-y-5">
-          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <p className="eyebrow">Style</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">전체 스타일 재생성</h2>
-              </div>
-              <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
-            </div>
-
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              {[
-                { key: 'photo', label: '보도사진' },
-                { key: 'minimalist', label: '미니멀' },
-                { key: 'gradients', label: '다크 무드' },
-                { key: 'cyberpunk', label: '이슈 브리핑' },
-                { key: 'vector', label: '매거진 포토' },
-              ].map((style) => (
-                <button
-                  key={style.key}
-                  type="button"
-                  onClick={() => setSelectedStyle(style.key)}
-                  className={`rounded-[6px] border py-2 text-xs font-bold transition ${
-                    selectedStyle === style.key
-                      ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
-                      : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
-                  }`}
-                >
-                  {style.label}
-                </button>
-              ))}
-            </div>
-
+          {/* Sidebar Tabs */}
+          <div className="flex border-b border-[#e8dfd4] mb-4">
             <button
               type="button"
-              onClick={handleRegenerateStyle}
-              disabled={regeneratingStyle}
-              className="btn-primary w-full rounded-[8px]"
+              onClick={() => setSidebarTab('edit')}
+              className={`flex-1 py-3 text-center text-xs font-black tracking-wider uppercase transition-colors ${
+                sidebarTab === 'edit'
+                  ? 'border-b-2 border-[#ff4f0a] text-[#ff4f0a]'
+                  : 'text-[#746a62] hover:text-[#1f1512]'
+              }`}
             >
-              {regeneratingStyle ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              스타일 다시 만들기
+              편집 에디터
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('agent')}
+              className={`flex-1 py-3 text-center text-xs font-black tracking-wider uppercase transition-colors ${
+                sidebarTab === 'agent'
+                  ? 'border-b-2 border-[#ff4f0a] text-[#ff4f0a]'
+                  : 'text-[#746a62] hover:text-[#1f1512]'
+              }`}
+            >
+              AI 에이전트 리포트
             </button>
           </div>
 
-          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <p className="eyebrow">Slide {activeSlide?.slideNumber}</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">문구 편집</h2>
-              </div>
-              <Type className="h-5 w-5 text-[#ff4f0a]" />
-            </div>
+          {sidebarTab === 'edit' && (
+            <>
+              <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <p className="eyebrow">Style</p>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">전체 스타일 재생성</h2>
+                  </div>
+                  <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
+                </div>
 
-            <div className="mb-5 grid grid-cols-2 gap-3">
-              <Meta label="role" value={roleLabel} />
-              <Meta label="layout" value={layoutLabel} />
-              <Meta label="brand" value={brand.name} />
-              <Meta label="plan" value={userPlan} />
-              <Meta label="watermark" value={hasWatermark ? 'on' : 'off'} />
-            </div>
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'photo', label: '보도사진' },
+                    { key: 'minimalist', label: '미니멀' },
+                    { key: 'gradients', label: '다크 무드' },
+                    { key: 'cyberpunk', label: '이슈 브리핑' },
+                    { key: 'vector', label: '매거진 포토' },
+                  ].map((style) => (
+                    <button
+                      key={style.key}
+                      type="button"
+                      onClick={() => setSelectedStyle(style.key)}
+                      className={`rounded-[6px] border py-2 text-xs font-bold transition ${
+                        selectedStyle === style.key
+                          ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
+                          : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="headline" className="mb-2 block text-xs font-black text-[#4a4039]">
-                  헤드라인
-                </label>
-                <input
-                  id="headline"
-                  value={headline}
-                  onChange={(event) => setHeadline(event.target.value)}
-                  className="field h-12 px-4 text-base font-bold"
-                />
+                <button
+                  type="button"
+                  onClick={handleRegenerateStyle}
+                  disabled={regeneratingStyle}
+                  className="btn-primary w-full rounded-[8px]"
+                >
+                  {regeneratingStyle ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  스타일 다시 만들기
+                </button>
               </div>
-              <div>
-                <label htmlFor="body" className="mb-2 block text-xs font-black text-[#4a4039]">
-                  본문
-                </label>
-                <textarea
-                  id="body"
-                  rows={4}
-                  value={body}
-                  onChange={(event) => setBody(event.target.value)}
-                  className="field resize-none px-4 py-3 text-base leading-7"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={rerenderSlide}
-                disabled={rerendering}
-                className="btn-primary w-full rounded-[8px]"
-              >
-                {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                이 카드 다시 렌더링
-              </button>
-            </div>
-          </div>
 
-          <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <p className="eyebrow">Caption</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">게시글 문안 메모</h2>
-              </div>
-              <Check className="h-5 w-5 text-[#ff4f0a]" />
-            </div>
+              <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <p className="eyebrow">Slide {activeSlide?.slideNumber}</p>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">문구 편집</h2>
+                  </div>
+                  <Type className="h-5 w-5 text-[#ff4f0a]" />
+                </div>
 
-            <div className="space-y-4">
-              <textarea
-                rows={6}
-                value={caption}
-                onChange={(event) => setCaption(event.target.value)}
-                className="field resize-none px-4 py-3 text-sm leading-6"
-              />
-              <input
-                value={hashtags}
-                onChange={(event) => setHashtags(event.target.value)}
-                className="field h-12 px-4 text-sm font-bold"
-              />
-              <button type="button" onClick={saveCaption} disabled={savingCaption} className="btn-secondary w-full rounded-[8px]">
-                {savingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                문안 저장
-              </button>
+                <div className="mb-5 grid grid-cols-2 gap-3">
+                  <Meta label="role" value={roleLabel} />
+                  <Meta label="layout" value={layoutLabel} />
+                  <Meta label="brand" value={brand.name} />
+                  <Meta label="plan" value={userPlan} />
+                  <Meta label="watermark" value={hasWatermark ? 'on' : 'off'} />
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="headline" className="mb-2 block text-xs font-black text-[#4a4039]">
+                      헤드라인
+                    </label>
+                    <input
+                      id="headline"
+                      value={headline}
+                      onChange={(event) => setHeadline(event.target.value)}
+                      className="field h-12 px-4 text-base font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="body" className="mb-2 block text-xs font-black text-[#4a4039]">
+                      본문
+                    </label>
+                    <textarea
+                      id="body"
+                      rows={4}
+                      value={body}
+                      onChange={(event) => setBody(event.target.value)}
+                      className="field resize-none px-4 py-3 text-base leading-7"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={rerenderSlide}
+                    disabled={rerendering}
+                    className="btn-primary w-full rounded-[8px]"
+                  >
+                    {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    이 카드 다시 렌더링
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <p className="eyebrow">Caption</p>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">게시글 문안 메모</h2>
+                  </div>
+                  <Check className="h-5 w-5 text-[#ff4f0a]" />
+                </div>
+
+                <div className="space-y-4">
+                  <textarea
+                    rows={6}
+                    value={caption}
+                    onChange={(event) => setCaption(event.target.value)}
+                    className="field resize-none px-4 py-3 text-sm leading-6"
+                  />
+                  <input
+                    value={hashtags}
+                    onChange={(event) => setHashtags(event.target.value)}
+                    className="field h-12 px-4 text-sm font-bold"
+                  />
+                  <button type="button" onClick={saveCaption} disabled={savingCaption} className="btn-secondary w-full rounded-[8px]">
+                    {savingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    문안 저장
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {sidebarTab === 'agent' && (
+            <div className="space-y-5">
+              {agentReportData ? (
+                <>
+                  <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+                    <p className="eyebrow">Quality Score</p>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div>
+                        <div className="text-4xl font-black text-[#1f1512]">
+                          {agentReportData.score}점
+                        </div>
+                        <p className="mt-1 text-[11px] font-bold text-[#746a62]">
+                          {agentReportData.status === 'passed'
+                            ? '✅ 품질 기준 통과 (발행 권장)'
+                            : '⚠️ 일부 조정 권장 (needs_review)'}
+                        </p>
+                      </div>
+                      <div className={`h-12 w-12 rounded-full border-4 flex items-center justify-center font-black text-sm ${
+                        agentReportData.status === 'passed'
+                          ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                          : 'border-amber-500 text-amber-600 bg-amber-50'
+                      }`}>
+                        {agentReportData.score >= 90 ? 'A+' : agentReportData.score >= 80 ? 'A' : 'B'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
+                    <h3 className="text-sm font-black text-[#1f1512] mb-5">AI 에이전트 상세 활약 로그</h3>
+                    <div className="relative border-l-2 border-[#e8dfd4] pl-4 ml-2 space-y-6">
+                      {agentReportData.logs?.map((log: any, idx: number) => {
+                        let icon = 'ℹ️'
+                        let color = 'text-[#746a62]'
+                        let bg = 'bg-[#f8f3e9] border-[#e8dfd4]'
+                        if (log.status === 'success') {
+                          icon = '✅'
+                          color = 'text-emerald-800'
+                          bg = 'bg-emerald-50/50 border-emerald-100'
+                        } else if (log.status === 'warn') {
+                          icon = '⚠️'
+                          color = 'text-amber-800'
+                          bg = 'bg-amber-50/50 border-amber-100'
+                        } else if (log.status === 'error') {
+                          icon = '🚨'
+                          color = 'text-rose-800'
+                          bg = 'bg-rose-50/50 border-rose-100'
+                        }
+
+                        return (
+                          <div key={idx} className="relative">
+                            <span className="absolute -left-[25px] top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-white border-2 border-[#ff4f0a] text-[8px] font-bold">
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-[#ff4f0a]">{log.agentName}</span>
+                                <span className="text-[10px] text-[#746a62] font-semibold">{log.role}</span>
+                              </div>
+                              <div className={`mt-2 rounded-[6px] border p-3 text-xs leading-5 font-bold ${color} ${bg}`}>
+                                <span className="mr-1">{icon}</span> {log.message}
+                                {log.details && (
+                                  <pre className="mt-2 overflow-x-auto rounded bg-black/5 p-2 text-[10px] text-[#4a4039] font-mono leading-4">
+                                    {JSON.stringify(log.details, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 text-center text-sm font-bold text-[#746a62]">
+                  이 캠페인은 AI 에이전트 리포트 기능이 구현되기 전에 제작되었습니다.
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           <div className="rounded-[10px] border border-[#d8edf7] bg-[#f3fbff] p-5 text-sm leading-6 text-[#4c6070]">
             <div className="mb-3 flex items-center gap-2 font-black text-[#1f1512]">

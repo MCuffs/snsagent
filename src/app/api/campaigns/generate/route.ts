@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../app/actions'
 import { dbService } from '../../../../../lib/db-service'
+import { saveErrorLog } from '../../../../../lib/errorLogger'
 import { generateCarouselCampaign } from '../../../../lib/carousel/pipeline'
 import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types'
 import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipeline'
@@ -28,13 +29,15 @@ interface GenerateCampaignRequest {
 }
 
 export async function POST(request: Request) {
+  let user: any = null
+  let body: any = null
   try {
-    const user = await getSessionUser()
+    user = await getSessionUser()
     if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
 
-    const body = await request.json() as GenerateCampaignRequest
+    body = await request.json() as GenerateCampaignRequest
     const validation = validateBody(body)
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
@@ -126,6 +129,7 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('[CampaignGeneration] API generation failed', error)
+    await saveErrorLog(user?.id, 'api/campaigns/generate', error, { body })
     const message = error instanceof Error ? error.message : '카드뉴스 생성 중 오류가 발생했습니다.'
     return NextResponse.json({ error: message }, { status: 500 })
   }

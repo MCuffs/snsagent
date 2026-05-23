@@ -9,6 +9,15 @@ import { renderSlide } from './renderer'
 import { generateStrategy } from './strategyEngine'
 import { generateStructure } from './structureEngine'
 import { runQualityCheck } from './qualityCheckEngine'
+import {
+  BrandIdentityAgent,
+  CopywritingAgent,
+  VisualConceptAgent,
+  QualityGuardAgent,
+  type AgentReport,
+  type AgentReportItem,
+  type AgentSlideData
+} from './agents'
 import type {
   BrandProfile,
   CampaignInput,
@@ -56,6 +65,71 @@ export async function generateCarouselCampaign(params: {
     )
     log('Slide copies generated')
 
+    // Initialize Agents
+    const brandAgent = new BrandIdentityAgent()
+    const copyAgent = new CopywritingAgent()
+    const visualAgent = new VisualConceptAgent()
+    const qualityAgent = new QualityGuardAgent()
+
+    const agentReportLogs: AgentReportItem[] = []
+
+    // Convert copies to AgentSlideData for agent chain
+    let agentSlides: AgentSlideData[] = copies.map(c => {
+      const isFirst = c.slideNumber === 1
+      const isLast = c.slideNumber === copies.length
+      const role = isFirst ? 'hook' : isLast ? 'save-cta' : 'key-point'
+      return {
+        slideNumber: c.slideNumber,
+        role,
+        headline: c.headline,
+        body: c.body,
+        layoutType: 'commerce-standard',
+      }
+    })
+
+    // Execute BrandIdentityAgent
+    const brandRes = brandAgent.run({
+      brandName: params.brandProfile.name,
+      brandToneOfVoice: params.brandProfile.toneOfVoice,
+      forbiddenWords: params.brandProfile.forbiddenWords,
+      ctaStyle: params.brandProfile.ctaStyle,
+      slides: agentSlides,
+    })
+    agentSlides = brandRes.slides
+    agentReportLogs.push(...brandRes.logs)
+
+    // Execute CopywritingAgent
+    const copyRes = copyAgent.run({
+      title: `${params.campaignInput.productName} 카드뉴스`,
+      topic: params.campaignInput.productName,
+      category: params.campaignInput.objective,
+      brandName: params.brandProfile.name,
+      slides: agentSlides,
+    })
+    agentSlides = copyRes.slides
+    agentReportLogs.push(...copyRes.logs)
+
+    // Sync adjusted copies back to pipeline copies array
+    copies.forEach((c) => {
+      const updated = agentSlides.find(s => s.slideNumber === c.slideNumber)
+      if (updated) {
+        c.headline = updated.headline
+        c.body = updated.body
+      }
+    })
+
+    // Execute VisualConceptAgent
+    const visualRes = visualAgent.run({
+      category: params.campaignInput.objective,
+      topic: params.campaignInput.productName,
+      tone: params.brandProfile.toneOfVoice || '전문적이고 신뢰감 있게',
+      brandMainColor: params.brandProfile.mainColor,
+      brandIndustry: params.brandProfile.industry,
+      slides: agentSlides,
+    })
+    agentSlides = visualRes.slides
+    agentReportLogs.push(...visualRes.logs)
+
     const designPrompts = await runStep('Design prompt generation', () =>
       generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure)
     )
@@ -95,6 +169,12 @@ export async function generateCarouselCampaign(params: {
         showSlideNumber: true,
       })
 
+      // Sync background url to agent slides for diagnostics
+      const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
+      if (matchingAgentSlide) {
+        matchingAgentSlide.backgroundImageUrl = backgroundImageUrl
+      }
+
       slides.push({
         slideNumber: copy.slideNumber,
         headline: copy.headline,
@@ -130,9 +210,29 @@ export async function generateCarouselCampaign(params: {
       }
     }
 
-    log(qualityCheck.passed ? 'Quality check passed' : 'Quality check needs review')
+    // Populate diagnostics into agent slides
+    agentSlides.forEach(as => {
+      // Find matching issues/suggestions to record in agent report
+      as.diagnostics = qualityCheck.issues.filter(issue => issue.includes(`슬라이드 ${as.slideNumber}`) || issue.includes(`Slide ${as.slideNumber}`))
+    })
 
-    const status = qualityCheck.passed ? 'pending_approval' : 'needs_review'
+    // Execute QualityGuardAgent
+    const qualityRes = qualityAgent.run({
+      slides: agentSlides,
+      hasFallbackImage: imageFallbackUsed,
+    })
+    agentReportLogs.push(...qualityRes.logs)
+
+    const agentReport: AgentReport = {
+      timestamp: new Date().toISOString(),
+      status: qualityRes.passed ? 'passed' : 'needs_review',
+      score: qualityRes.score,
+      logs: agentReportLogs,
+    }
+
+    log(qualityRes.passed ? 'Quality check passed' : 'Quality check needs review')
+
+    const status = qualityRes.passed ? 'pending_approval' : 'needs_review'
     const title = `${params.campaignInput.productName} 카드뉴스`
 
     const campaign = await dbService.createCampaign(
@@ -145,6 +245,7 @@ export async function generateCarouselCampaign(params: {
         keyBenefits: params.campaignInput.keyBenefits,
         objective: params.campaignInput.objective,
         slideCount: slides.length,
+        agentReport: JSON.stringify(agentReport), // Save agent report to DB
       },
       slides.map(slide => ({
         slideNumber: slide.slideNumber,
@@ -179,7 +280,11 @@ export async function generateCarouselCampaign(params: {
       caption: captionResult.caption,
       hashtags: captionResult.hashtags,
       recommendedPostTime: captionResult.recommendedPostTime,
-      qualityCheck,
+      qualityCheck: {
+        passed: qualityRes.passed,
+        issues: agentReportLogs.filter(l => l.status === 'error' || l.status === 'warn').map(l => l.message),
+        suggestions: agentReportLogs.filter(l => l.status === 'info').map(l => l.message),
+      },
       logs,
     }
   } catch (error) {

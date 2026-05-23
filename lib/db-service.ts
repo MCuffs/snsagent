@@ -2,6 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import prisma from './db'
+import { saveErrorLog } from './errorLogger'
 
 const DB_FILE_PATH = process.env.VERCEL
   ? path.join(os.tmpdir(), 'shuffla-db.json')
@@ -59,6 +60,7 @@ export interface Campaign {
   objective: string
   slideCount: number
   status: string // draft, generated, pending_approval, scheduled, posted, failed
+  agentReport?: string | null
   createdAt: Date
   updatedAt: Date
   slides?: CarouselSlide[]
@@ -162,13 +164,23 @@ const isMock = () => {
 export const dbService = {
   // User operations
   async getUser(userId: string): Promise<User | null> {
+    if (userId.startsWith('u-')) {
+      const db = initMockDb()
+      return db.users.find(u => u.id === userId) || null
+    }
+
     if (!isMock()) {
       try {
-        return await prisma.user.findUnique({
+        const user = await prisma.user.findUnique({
           where: { id: userId },
         })
+        if (user) return user
       } catch (err) {
         console.warn('Prisma getUser failed, falling back to mock database', err)
+        await saveErrorLog(userId, 'getUser', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -187,6 +199,10 @@ export const dbService = {
         return user
       } catch (err) {
         console.warn('Prisma getOrCreateUser failed, falling back to mock database', err)
+        await saveErrorLog(null, 'getOrCreateUser', err, { email })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -216,6 +232,10 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateUserPlan failed, falling back to mock database', err)
+        await saveErrorLog(userId, 'updateUserPlan', err, { plan })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -240,6 +260,10 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma getBrands failed, falling back to mock database', err)
+        await saveErrorLog(userId, 'getBrands', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -248,13 +272,23 @@ export const dbService = {
   },
 
   async getBrand(brandId: string): Promise<Brand | null> {
+    if (brandId.startsWith('b-')) {
+      const db = initMockDb()
+      return db.brands.find(b => b.id === brandId) || null
+    }
+
     if (!isMock()) {
       try {
-        return await prisma.brand.findUnique({
+        const brand = await prisma.brand.findUnique({
           where: { id: brandId },
         })
+        if (brand) return brand
       } catch (err) {
         console.warn('Prisma getBrand failed, falling back to mock database', err)
+        await saveErrorLog(null, 'getBrand', err, { brandId })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -263,15 +297,32 @@ export const dbService = {
   },
 
   async getSlide(slideId: string): Promise<(CarouselSlide & { campaign: Campaign }) | null> {
+    if (slideId.startsWith('s-') || slideId.startsWith('media-')) {
+      const db = initMockDb()
+      const slide = db.slides.find(s => s.id === slideId)
+      if (!slide) return null
+
+      const campaign = db.campaigns.find(c => c.id === slide.campaignId)
+      if (!campaign) return null
+
+      return {
+        ...slide,
+        campaign,
+      }
+    }
+
     if (!isMock()) {
       try {
         const slide = await prisma.carouselSlide.findUnique({
           where: { id: slideId },
           include: { campaign: true },
         })
-        return slide
+        if (slide) return slide
       } catch (err) {
         console.warn('Prisma getSlide failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -291,7 +342,15 @@ export const dbService = {
   async saveBrand(userId: string, brandId: string | null, data: Omit<Brand, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Brand> {
     if (!isMock()) {
       try {
-        if (brandId) {
+        let exists = false
+        if (brandId && !brandId.startsWith('b-')) {
+          const count = await prisma.brand.count({
+            where: { id: brandId },
+          })
+          exists = count > 0
+        }
+
+        if (brandId && exists) {
           return await prisma.brand.update({
             where: { id: brandId },
             data,
@@ -306,6 +365,10 @@ export const dbService = {
         }
       } catch (err) {
         console.warn('Prisma saveBrand failed, falling back to mock database', err)
+        await saveErrorLog(userId, 'saveBrand', err, { brandId, ...data })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -347,13 +410,22 @@ export const dbService = {
 
   // Instagram operations
   async getInstagramAccount(userId: string, brandId: string): Promise<InstagramAccount | null> {
+    if (brandId.startsWith('b-') || userId.startsWith('u-')) {
+      const db = initMockDb()
+      return db.instagramAccounts.find(ia => ia.brandId === brandId) || null
+    }
+
     if (!isMock()) {
       try {
-        return await prisma.instagramAccount.findUnique({
+        const account = await prisma.instagramAccount.findUnique({
           where: { brandId }, // unique index
         })
+        if (account) return account
       } catch (err) {
         console.warn('Prisma getInstagramAccount failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -383,6 +455,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma saveInstagramAccount failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -457,6 +532,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma saveInstagramOAuthAccount failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -500,7 +578,7 @@ export const dbService = {
   async createCampaign(
     userId: string,
     brandId: string,
-    campaignData: { title: string; productName: string; productDescription: string; keyBenefits: string; objective: string; slideCount: number },
+    campaignData: { title: string; productName: string; productDescription: string; keyBenefits: string; objective: string; slideCount: number; agentReport?: string | null },
     slides: { slideNumber: number; headline: string; body: string; designPrompt: string; imageUrl?: string | null }[]
   ): Promise<Campaign> {
     if (!isMock()) {
@@ -528,6 +606,10 @@ export const dbService = {
         return campaign
       } catch (err) {
         console.warn('Prisma createCampaign failed, falling back to mock database', err)
+        await saveErrorLog(userId, 'createCampaign', err, { brandId, ...campaignData })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -566,15 +648,33 @@ export const dbService = {
   },
 
   async getCampaign(campaignId: string): Promise<(Campaign & { slides: CarouselSlide[] }) | null> {
+    if (campaignId.startsWith('c-')) {
+      const db = initMockDb()
+      const campaign = db.campaigns.find(c => c.id === campaignId)
+      if (!campaign) return null
+
+      const slides = db.slides
+        .filter(s => s.campaignId === campaignId)
+        .sort((a, b) => a.slideNumber - b.slideNumber)
+
+      return {
+        ...campaign,
+        slides,
+      }
+    }
+
     if (!isMock()) {
       try {
         const c = await prisma.campaign.findUnique({
           where: { id: campaignId },
           include: { slides: { orderBy: { slideNumber: 'asc' } } },
         })
-        return c
+        if (c) return c
       } catch (err) {
         console.warn('Prisma getCampaign failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -602,6 +702,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma getCampaigns failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -622,6 +725,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateCampaignStatus failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -649,6 +755,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateSlideContent failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -669,13 +778,22 @@ export const dbService = {
 
   // Post & Scheduling operations
   async getPost(postId: string): Promise<Post | null> {
+    if (postId.startsWith('p-') || postId.startsWith('post-')) {
+      const db = initMockDb()
+      return db.posts.find(p => p.id === postId) || null
+    }
+
     if (!isMock()) {
       try {
-        return await prisma.post.findUnique({
+        const post = await prisma.post.findUnique({
           where: { id: postId },
         })
+        if (post) return post
       } catch (err) {
         console.warn('Prisma getPost failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -701,6 +819,9 @@ export const dbService = {
         return posts as unknown as (Post & { campaign: Campaign; brand: Brand })[]
       } catch (err) {
         console.warn('Prisma getPosts failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -737,6 +858,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma createPost failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -771,6 +895,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostStatus failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -797,6 +924,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostDetails failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -835,6 +965,9 @@ export const dbService = {
         return posts as unknown as (Post & { campaign: Campaign; brand: Brand })[]
       } catch (err) {
         console.warn('Prisma getPendingScheduledPosts failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 
@@ -864,6 +997,9 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostScheduledTime failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
       }
     }
 

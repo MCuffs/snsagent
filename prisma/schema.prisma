@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -70,6 +71,7 @@ model Campaign {
   objective          String
   slideCount         Int
   status             String          @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
+  agentReport        String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   slides             CarouselSlide[]
@@ -104,4 +106,14 @@ model Post {
   status           String   @default("draft") // draft, pending_approval, scheduled, posted, failed
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model ErrorLog {
+  id           String   @id @default(uuid())
+  userId       String?
+  actionName   String
+  errorMessage String
+  errorStack   String?
+  contextData  String?  // JSON stringified context
+  createdAt    DateTime @default(now())
 }

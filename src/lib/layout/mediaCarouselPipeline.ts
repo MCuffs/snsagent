@@ -10,6 +10,15 @@ import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
+import {
+  BrandIdentityAgent,
+  CopywritingAgent,
+  VisualConceptAgent,
+  QualityGuardAgent,
+  type AgentReport,
+  type AgentReportItem,
+  type AgentSlideData
+} from '../carousel/agents'
 
 export interface MediaCarouselInput {
   userId: string
@@ -74,27 +83,64 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     contentType: input.contentType,
   }))
   const plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
-  const agentReview = runCardNewsAgent({
-    input: {
-      brandName: input.brandName,
-      brandToneOfVoice: input.brandToneOfVoice,
-      topic: input.topic,
-      category: input.category,
-      title: input.title,
-      keyContent: input.keyContent,
-      ctaStyle: input.brandCtaStyle,
-      forbiddenWords: input.brandForbiddenWords,
-    },
-    slides: plannedSlides,
+
+  // 1. Initialize Agents
+  const brandAgent = new BrandIdentityAgent()
+  const copyAgent = new CopywritingAgent()
+  const visualAgent = new VisualConceptAgent()
+  const qualityAgent = new QualityGuardAgent()
+
+  const agentReportLogs: AgentReportItem[] = []
+
+  let agentSlides: AgentSlideData[] = plannedSlides.map(s => ({
+    slideNumber: s.slideNumber,
+    role: s.role,
+    headline: s.headline,
+    body: s.body,
+    layoutType: s.layoutType,
+  }))
+
+  // 2. Execute BrandIdentityAgent
+  const brandRes = brandAgent.run({
+    brandName: input.brandName,
+    brandToneOfVoice: input.brandToneOfVoice,
+    forbiddenWords: input.brandForbiddenWords,
+    ctaStyle: input.brandCtaStyle,
+    slides: agentSlides,
   })
-  const slidePlans = agentReview.slides
+  agentSlides = brandRes.slides
+  agentReportLogs.push(...brandRes.logs)
+
+  // 3. Execute CopywritingAgent
+  const copyRes = copyAgent.run({
+    title: input.title,
+    topic: input.topic,
+    category: input.category,
+    brandName: input.brandName,
+    slides: agentSlides,
+  })
+  agentSlides = copyRes.slides
+  agentReportLogs.push(...copyRes.logs)
+
+  // 4. Execute VisualConceptAgent
+  const visualRes = visualAgent.run({
+    category: input.category,
+    topic: input.topic,
+    tone: input.tone,
+    brandMainColor: input.brandMainColor,
+    brandIndustry: input.brandIndustry,
+    slides: agentSlides,
+  })
+  agentSlides = visualRes.slides
+  agentReportLogs.push(...visualRes.logs)
+
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
-  const qualityIssues: string[] = [...agentReview.issues]
-  const qualitySuggestions: string[] = [...agentReview.suggestions]
+  let hasFallbackImage = false
 
-  for (const slide of slidePlans) {
-    const layout = LAYOUT_DEFINITIONS[slide.layoutType]
+  // 5. Render slides and evaluate quality metrics
+  for (const slide of agentSlides) {
+    const layout = LAYOUT_DEFINITIONS[slide.layoutType as LayoutType] || LAYOUT_DEFINITIONS['dark-editorial']
     const typographyPlan = planTypography({
       headline: slide.headline,
       body: slide.body,
@@ -107,7 +153,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       typography: typographyPlan,
       slideNumber: slide.slideNumber,
       totalSlides: slideCount,
-      role: slide.role,
+      role: slide.role as MediaSlideRole,
     })
     const visualDirection = generateVisualDirection({
       layout: harness.layout,
@@ -119,10 +165,22 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       brandToneOfVoice: input.brandToneOfVoice,
       brandIndustry: input.brandIndustry,
     })
-    const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
-      size: '1024x1024',
-      productImageUrls: [],
-    })
+
+    let backgroundImageUrl = ''
+    try {
+      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
+        size: '1024x1024',
+        productImageUrls: [],
+      })
+      backgroundImageUrl = background.imageUrl
+    } catch (err) {
+      console.error('[MediaCarouselPipeline] Background image generation failed', err)
+      hasFallbackImage = true
+      // Use mock image fallback
+      const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${visualDirection.prompt}`)
+      backgroundImageUrl = fallbackImage.imageUrl
+    }
+
     analyzeReferencePattern({
       layoutType: harness.layout.layoutType,
       headlineLength: slide.headline.length,
@@ -130,16 +188,18 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
     })
 
-    const qualityCheck = runMediaCardQualityCheck({
+    const slideQualityCheck = runMediaCardQualityCheck({
       layout: harness.layout,
       typography: harness.typography,
       headline: slide.headline,
       body: slide.body,
-      backgroundImageUrl: background.imageUrl,
+      backgroundImageUrl,
       harnessDiagnostics: harness.diagnostics,
     })
-    qualityIssues.push(...qualityCheck.issues.map(issue => `${slide.slideNumber}장: ${issue}`))
-    qualitySuggestions.push(...qualityCheck.suggestions.map(suggestion => `${slide.slideNumber}장: ${suggestion}`))
+
+    // Feed slide diagnostics to Quality Agent
+    slide.diagnostics = slideQualityCheck.issues
+    slide.backgroundImageUrl = backgroundImageUrl
 
     const finalImageUrl = await renderMediaCard({
       id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
@@ -149,7 +209,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       category: input.category,
       headline: slide.headline,
       body: slide.body,
-      backgroundImageUrl: background.imageUrl,
+      backgroundImageUrl,
       source: input.source || input.brandName,
       pageNumber: slide.slideNumber,
       totalPages: slideCount,
@@ -157,15 +217,29 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
     slides.push({
       slideNumber: slide.slideNumber,
-      role: slide.role,
-      layoutType: slide.layoutType,
+      role: slide.role as MediaSlideRole,
+      layoutType: slide.layoutType as LayoutType,
       headline: slide.headline,
       body: slide.body,
       designPrompt: visualDirection.prompt,
-      backgroundImageUrl: background.imageUrl,
+      backgroundImageUrl,
       finalImageUrl,
-      qualityCheck,
+      qualityCheck: slideQualityCheck,
     })
+  }
+
+  // 6. Execute QualityGuardAgent
+  const qualityRes = qualityAgent.run({
+    slides: agentSlides,
+    hasFallbackImage,
+  })
+  agentReportLogs.push(...qualityRes.logs)
+
+  const agentReport: AgentReport = {
+    timestamp: new Date().toISOString(),
+    status: qualityRes.passed ? 'passed' : 'needs_review',
+    score: qualityRes.score,
+    logs: agentReportLogs,
   }
 
   const campaign = await dbService.createCampaign(
@@ -178,6 +252,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       keyBenefits: input.category,
       objective: `${input.contentType} / ${input.tone}`,
       slideCount: slides.length,
+      agentReport: JSON.stringify(agentReport), // Save agent report to DB
     },
     slides.map(slide => ({
       slideNumber: slide.slideNumber,
@@ -189,9 +264,9 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   )
 
   const qualityCheck: MediaCardQualityResult = {
-    passed: qualityIssues.length === 0,
-    issues: qualityIssues,
-    suggestions: qualitySuggestions,
+    passed: qualityRes.passed,
+    issues: agentReportLogs.filter(l => l.status === 'error' || l.status === 'warn').map(l => l.message),
+    suggestions: agentReportLogs.filter(l => l.status === 'info').map(l => l.message),
   }
   const status = qualityCheck.passed ? 'pending_approval' : 'needs_review'
   await dbService.updateCampaignStatus(campaign.id, status)
