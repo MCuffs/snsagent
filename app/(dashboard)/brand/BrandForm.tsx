@@ -43,6 +43,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [formSuccess, setFormSuccess] = useState<string | null>(null)
   
   // AI Profiler State
   const [url, setUrl] = useState('')
@@ -76,6 +77,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
     setIsAnalyzing(true)
     setAnalyzeStep(0)
     setFormError(null)
+    setFormSuccess(null)
     setAnalysisReport(null)
 
     try {
@@ -129,6 +131,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
     e.preventDefault()
     setIsSubmitting(true)
     setFormError(null)
+    setFormSuccess(null)
 
     try {
       const res = await saveBrandAction(currentBrandId, {
@@ -142,7 +145,8 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
       })
 
       if (res.success) {
-        router.push('/dashboard')
+        setCurrentBrandId(res.brand.id)
+        setFormSuccess('브랜드 정보가 저장되었습니다.')
         router.refresh()
       } else {
         setFormError(res.error || '저장에 실패했습니다.')
@@ -179,6 +183,16 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
             <p>
               현재 {userPlan} 요금제에서는 브랜드를 최대 {limitCount}개까지 등록할 수 있습니다.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Form Success Banner */}
+      {formSuccess && (
+        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <div className="flex gap-3">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+            <p>{formSuccess}</p>
           </div>
         </div>
       )}
