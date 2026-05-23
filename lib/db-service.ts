@@ -321,7 +321,15 @@ export const dbService = {
         }
         db.brands[idx] = brand
       } else {
-        throw new Error('Brand not found')
+        // ID not found in DB — create new brand (upsert fallback)
+        brand = {
+          id: `b-${Date.now()}`,
+          userId,
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+        db.brands.push(brand)
       }
     } else {
       brand = {
