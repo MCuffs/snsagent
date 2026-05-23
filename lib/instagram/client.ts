@@ -93,7 +93,7 @@ export async function validateInstagramConnection(
     if (accountId.length < 10) {
       return { success: false, error: 'Invalid Instagram Account ID. Must be at least 10 digits.' }
     }
-    return { success: true, username: 'instaagent_mock_business' }
+    return { success: true, username: 'shuffla_mock_business' }
   }
 
   try {

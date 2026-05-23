@@ -26,7 +26,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   }
 
   const textBox = getTextBox(input.layout)
-  const sourceHandle = normalizeInstagramHandle(input.source || 'instaagent')
+  const sourceHandle = normalizeInstagramHandle(input.source || 'shuffla')
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
   const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
   const fontFam = fontFamily(input.layout.typographyStyle)
@@ -143,7 +143,7 @@ function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, al
 }
 
 async function renderArchiveCta(input: RenderMediaCardInput) {
-  const sourceHandle = normalizeInstagramHandle(input.source || 'instaagent')
+  const sourceHandle = normalizeInstagramHandle(input.source || 'shuffla')
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
   const headline = input.typography.headlineLines
     .map(line => line.tokens.map(token => token.text).join(' '))
@@ -219,13 +219,13 @@ function fontFamily(style: string) {
 
 function normalizeInstagramHandle(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return '@instaagent'
+  if (!trimmed) return '@shuffla'
   const withoutUrl = trimmed
     .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
     .replace(/^instagram\.com\//i, '')
     .split(/[/?#]/)[0]
   const handle = withoutUrl.replace(/^@+/, '').replace(/\s+/g, '').toLowerCase()
-  return `@${handle || 'instaagent'}`
+  return `@${handle || 'shuffla'}`
 }
 
 function formatSourceMark(handle: string) {

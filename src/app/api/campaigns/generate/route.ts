@@ -65,6 +65,8 @@ export async function POST(request: Request) {
         brandMainColor: brand.mainColor,
         brandToneOfVoice: brand.toneOfVoice,
         brandIndustry: brand.industry,
+        brandForbiddenWords: brand.forbiddenWords,
+        brandCtaStyle: brand.ctaStyle,
         topic: body.topic!,
         category: body.category!,
         title: body.title!,

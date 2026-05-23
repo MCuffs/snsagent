@@ -1,5 +1,6 @@
 import { dbService } from '../../../lib/db-service'
 import type { ImageProvider } from '../ai/imageProvider'
+import { runCardNewsAgent } from './cardNewsAgent'
 import { getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
@@ -17,6 +18,8 @@ export interface MediaCarouselInput {
   brandMainColor?: string
   brandToneOfVoice?: string
   brandIndustry?: string
+  brandForbiddenWords?: string
+  brandCtaStyle?: string
   topic: string
   category: string
   title: string
@@ -70,11 +73,25 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
-  const slidePlans = planMediaSlides(input, slideCount, baseLayoutType)
+  const plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
+  const agentReview = runCardNewsAgent({
+    input: {
+      brandName: input.brandName,
+      brandToneOfVoice: input.brandToneOfVoice,
+      topic: input.topic,
+      category: input.category,
+      title: input.title,
+      keyContent: input.keyContent,
+      ctaStyle: input.brandCtaStyle,
+      forbiddenWords: input.brandForbiddenWords,
+    },
+    slides: plannedSlides,
+  })
+  const slidePlans = agentReview.slides
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
-  const qualityIssues: string[] = []
-  const qualitySuggestions: string[] = []
+  const qualityIssues: string[] = [...agentReview.issues]
+  const qualitySuggestions: string[] = [...agentReview.suggestions]
 
   for (const slide of slidePlans) {
     const layout = LAYOUT_DEFINITIONS[slide.layoutType]

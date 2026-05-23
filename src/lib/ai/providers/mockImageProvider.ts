@@ -92,10 +92,11 @@ function renderJournalBackground(seed: number) {
 }
 
 function renderCtaBackground(seed: number) {
-  const mark = pick(seed, ['ARCHIVE', 'JOURNAL', 'STUDIO', 'MEDIA'])
+  const ringColor = pick(seed, ['#ffffff', '#d6d2c6', '#c2c8d6', '#d1c1b4'])
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
     <rect width="1080" height="1350" fill="#000000"/>
-    <text x="540" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="70" font-weight="700" fill="#ffffff" opacity="0.16" letter-spacing="3">${mark}</text>
+    <circle cx="540" cy="674" r="118" fill="none" stroke="${ringColor}" stroke-width="2" opacity="0.18"/>
+    <circle cx="540" cy="674" r="8" fill="${ringColor}" opacity="0.2"/>
   </svg>`
 }
 

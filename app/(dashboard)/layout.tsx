@@ -2,22 +2,20 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
   Briefcase,
-  Calendar,
   CreditCard,
   Home,
   LogOut,
   Sparkles,
+  UploadCloud,
 } from 'lucide-react'
 import { getSessionUser } from '../actions'
-import InstagramIcon from '../components/InstagramIcon'
 import { dbService } from '../../lib/db-service'
 
 const navItems = [
   { href: '/dashboard', label: '대시보드', icon: Home },
   { href: '/brand', label: '브랜드', icon: Briefcase },
-  { href: '/instagram', label: '인스타그램', icon: InstagramIcon },
-  { href: '/campaign/new', label: '새 캠페인', icon: Sparkles, primary: true },
-  { href: '/calendar', label: '캘린더', icon: Calendar },
+  { href: '/campaign/new', label: '카드 만들기', icon: Sparkles, primary: true },
+  { href: '/instagram', label: 'SNS 자동 업로드', icon: UploadCloud },
   { href: '/pricing', label: '요금제', icon: CreditCard },
 ]
 
@@ -39,11 +37,11 @@ export default async function DashboardLayout({
     <div className="app-shell flex h-screen overflow-hidden text-[#1f1512]">
       <aside className="hidden w-72 shrink-0 border-r border-[#e8dfd4] bg-[#fffdf8]/92 backdrop-blur-xl lg:flex lg:flex-col">
         <div className="flex h-[76px] items-center border-b border-[#e8dfd4] px-6">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2" title="메인으로 이동">
             <span className="h-1.5 w-7 rounded-full bg-[#ff4f0a]" />
-            <span className="text-xl font-black tracking-[-0.05em] text-[#1f1512]">InstaAgent</span>
+            <span className="text-xl font-black tracking-[-0.05em] text-[#1f1512]">Shuffla</span>
             <span className="rounded-full border border-[#e8dfd4] px-2 py-0.5 text-[10px] font-bold text-[#746a62]">
-              MVP
+              Studio
             </span>
           </Link>
         </div>
@@ -108,14 +106,14 @@ export default async function DashboardLayout({
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8dfd4] bg-[#fffdf8]/86 px-5 backdrop-blur-xl md:px-8">
           <Link href="/dashboard" className="font-black tracking-tight text-[#1f1512] lg:hidden">
-            InstaAgent
+            Shuffla
           </Link>
           <div className="hidden lg:block">
-            <p className="eyebrow">AI Operations Desk</p>
+            <p className="eyebrow">Card News Studio</p>
           </div>
           <div className="status-pill">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-            데모 환경 실행 중
+            다운로드 중심 모드
           </div>
         </header>
 

@@ -21,7 +21,7 @@ const HARNESS_RULES = [
   'muted-gray-film-overlay',
   'no-inline-color-emphasis',
   'medium-weight-korean-typography',
-  'instagram-handle-metadata',
+  'app-rendered-metadata-only',
   'image-model-background-only',
   'bounded-title-fit',
 ]
@@ -57,19 +57,21 @@ export function applyMediaCardHarness(input: {
 
 export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemplate = 'product-dark') {
   const templatePrompt = {
-    'product-light': 'bright product archive layout, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for black typography, subtle white fog gradient at bottom',
-    'product-dark': 'muted gray product archive layout, object centered in middle, subdued contrast, gray film veil, strong lower shadow for white typography, calm premium catalogue mood',
-    'journal-light': 'minimal journal archive layout, grayscale editorial photo placed as a centered rectangular frame with generous light gray margins, quiet documentary mood, clean bottom area for black typography',
-    'cta-dark': 'black closing slide background, very minimal centered brand wordmark area, no blur, no object clutter, premium archive ending card',
+    'product-light': 'bright product archive background, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for app-rendered overlay later, subtle white fog gradient at bottom',
+    'product-dark': 'muted gray product archive background, object centered in middle, subdued contrast, gray film veil, strong lower shadow, calm premium catalogue mood, clean empty lower-left area for app-rendered overlay later',
+    'journal-light': 'minimal journal archive background, grayscale editorial photo placed as a centered rectangular frame with generous light gray margins, quiet documentary mood, clean empty bottom area for app-rendered overlay later',
+    'cta-dark': 'black closing slide background, very minimal centered blank negative space, no blur, no object clutter, premium archive ending background',
   }[template]
 
   return [
     templatePrompt,
-    'archive style Korean Instagram product/news card reference',
-    'clear top metadata space and lower-left typography safe area',
+    'archive style Korean editorial background photo reference',
+    'clear top negative space and lower-left overlay-safe empty area',
     'ignore any conflicting centered-title, vivid-gradient, poster, UI, or white-panel layout direction from the source prompt',
     `source visual context: ${prompt}`,
-    'no generated text, no typography, no letters, no numbers, no logo, no watermark',
+    'background image only',
+    'no generated text, no pseudo text, no typography, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no icons, no symbols',
+    'no signs, posters, menu boards, labels, book covers, newspaper headlines, package text, screen text, handwriting, or calligraphy',
   ].join(', ')
 }
 

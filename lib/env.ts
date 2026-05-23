@@ -61,7 +61,7 @@ export function getTokenEncryptionSecret() {
     throw new Error('INSTAGRAM_TOKEN_ENCRYPTION_KEY must be set to a strong secret in production.')
   }
 
-  return 'instaagent-local-development-token-key'
+  return 'shuffla-local-development-token-key'
 }
 
 export function isConfiguredOpenAIKey(apiKey: string | undefined) {

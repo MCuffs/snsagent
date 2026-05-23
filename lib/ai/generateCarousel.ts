@@ -79,7 +79,7 @@ Create a highly engaging Instagram Carousel (Card News) outline in JSON format b
 5. No exaggerated or spammy advertising phrases. Keep it authentic.
 6. Slide ${slideCount} (the last slide) MUST be a clear Call-to-Action (CTA) slide designed in the specified CTA style: "${brand.ctaStyle}".
 7. Generate between 8 to 15 relevant hashtags that are aligned with the audience. Do not spam.
-8. Design prompt for each slide should describe the layout, background, and illustration style (maintaining high contrast, simple backgrounds, and using the brand color: ${brand.mainColor}).
+8. Design prompt for each slide should describe a background-only visual direction. It must not ask the image model to create text, letters, numbers, logos, buttons, captions, labels, or typography. Leave clean negative space for app-rendered copy.
 9. Recommended post time should suggest the best hour of the day (e.g. "12:30 PM" or "7:45 PM") based on the target audience.
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
@@ -91,7 +91,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       "slideNumber": 1,
       "headline": "Hook Title (Under 20 chars)",
       "body": "Brief body copy (Under 60 chars)",
-      "designPrompt": "DALL-E image prompt describing visual composition (minimalist, incorporating brand color ${brand.mainColor})"
+      "designPrompt": "Image prompt describing a background-only visual composition with no text, labels, logos, or typography"
     }
   ],
   "caption": "Instagram caption copy including emojis, written in the specified tone (${brand.toneOfVoice})",
@@ -162,7 +162,7 @@ function generateMockCarousel(
     slideNumber: 1,
     headline: hookTitle,
     body: subTitle,
-    designPrompt: `A bold minimalist design for Instagram card news cover. Centered text with large typography, a subtle modern gradient, incorporating brand color ${brand.mainColor}. High contrast layout.`
+    designPrompt: `Background-only editorial image for an Instagram card cover. Minimal composition, no text, no letters, no numbers, no logo, no typography, clean empty space for app-rendered copy later, subtle brand color ${brand.mainColor}. High contrast layout.`
   })
 
   // Body slides
@@ -209,7 +209,7 @@ function generateMockCarousel(
       slideNumber: i,
       headline,
       body,
-      designPrompt: `Instagram card slide showcasing details. Minimalist graphic representation of ${headline}, clean layout, spacious text area, incorporating color ${brand.mainColor} in details.`
+      designPrompt: `Background-only Instagram card image inspired by ${headline}. Minimal editorial composition, no text, no letters, no numbers, no labels, no logo, clean negative space for app-rendered copy later, subtle color ${brand.mainColor} in details.`
     })
   }
 
@@ -218,7 +218,7 @@ function generateMockCarousel(
     slideNumber: slideCount,
     headline: `지금 바로 시작해 보세요!`,
     body: `${brand.ctaStyle || '프로필 링크 클릭 후 예약하기'}`,
-    designPrompt: `Instagram card news ending slide with a strong call-to-action button layout. Clean design with direct text, utilizing brand color ${brand.mainColor} to highlight the button.`
+    designPrompt: `Background-only Instagram card news ending slide. Clean premium composition with blank negative space for app-rendered call-to-action later, no text, no letters, no numbers, no button, no logo, subtle brand color ${brand.mainColor}.`
   })
 
   // Emojis for tone

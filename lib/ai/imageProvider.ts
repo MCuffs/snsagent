@@ -5,6 +5,13 @@ export interface ImageProvider {
   generateImage(prompt: string): Promise<{ imageUrl: string }>
 }
 
+const NO_TEXT_IMAGE_INSTRUCTIONS = [
+  'background image only',
+  'do not generate any readable or pseudo-readable text',
+  'no letters, Hangul, alphabet, numbers, captions, signs, labels, posters, menus, packaging text, logos, watermarks, UI, icons, typography, handwriting, calligraphy, brand marks, or symbols',
+  'leave clean empty negative space for application-rendered text later',
+].join(', ')
+
 /**
  * MockImageProvider returns beautiful, high-quality stock imagery placeholders 
  * from Unsplash matching keywords in the prompt, or abstract gradient layouts.
@@ -111,31 +118,37 @@ export class MockImageProvider implements ImageProvider {
 }
 
 /**
- * OpenAIImageProvider integrates with DALL-E 3 API to generate images.
+ * OpenAIImageProvider integrates with the OpenAI image API to generate images.
  */
 export class OpenAIImageProvider implements ImageProvider {
   private openai: OpenAI
+  private model: string
 
-  constructor() {
-    const apiKey = process.env.OPENAI_API_KEY
+  constructor(apiKey = process.env.OPENAI_API_KEY, model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1') {
     if (!isConfiguredOpenAIKey(apiKey)) {
       throw new Error('OpenAI API Key is missing for OpenAIImageProvider')
     }
     this.openai = new OpenAI({ apiKey })
+    this.model = model
   }
 
   async generateImage(prompt: string): Promise<{ imageUrl: string }> {
     try {
       const response = await this.openai.images.generate({
-        model: 'dall-e-3',
-        prompt: `${prompt}, square instagram layout, empty central space for text overlay, photorealistic, professional brand style`,
+        model: this.model,
+        prompt: `${prompt}, square instagram layout, photorealistic, professional brand style, ${NO_TEXT_IMAGE_INSTRUCTIONS}`,
         n: 1,
         size: '1024x1024',
+        output_format: 'png',
+        quality: 'low',
       })
-      const imageUrl = response.data?.[0]?.url || ''
-      return { imageUrl }
+      const image = response.data?.[0]
+      if (image?.b64_json) {
+        return { imageUrl: `data:image/png;base64,${image.b64_json}` }
+      }
+      return { imageUrl: image?.url || '' }
     } catch (err) {
-      console.error('DALL-E image generation failed, falling back to mock image', err)
+      console.error('OpenAI image generation failed, falling back to mock image', err)
       const mock = new MockImageProvider()
       return mock.generateImage(prompt)
     }

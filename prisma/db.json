@@ -30,11 +30,11 @@
       "userId": "u-1779345938327",
       "brandId": "b-1779352764802",
       "instagramAccountId": "17841400000000000",
-      "accessTokenEncrypted": "v1:JHUKlN3eoau74aan:8REvkyfjL47QktuN4OvoYA:GwfwpmwcS_CLGRLth4P6tV3Gahn5Tiiy",
+      "accessTokenEncrypted": "v1:DjA1zDypyI3oD9BP:gsUj1V9QkQrU6uIOQKP22Q:Vo2n4cg8VZtkh4Y3GMoNxkuioSHqm5ZM",
       "connectionMethod": "manual",
       "status": "CONNECTED",
       "createdAt": "2026-05-21T15:44:54.965Z",
-      "updatedAt": "2026-05-21T15:44:54.965Z",
+      "updatedAt": "2026-05-23T13:01:54.886Z",
       "tokenExpiresAt": null
     }
   ],
@@ -262,6 +262,20 @@
       "status": "needs_review",
       "createdAt": "2026-05-21T17:47:33.074Z",
       "updatedAt": "2026-05-21T17:47:33.077Z"
+    },
+    {
+      "id": "c-1779540746356",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "title": "건강한 습관, 시작해요",
+      "productName": "신제품 출시",
+      "productDescription": "Slide 1: 신제품 출시: 건강한 식습관의 새로운 시작, 소개합니다.\nSlide 2: 제품의 특징: 엄선된 재료로 만든 고품질 제품!\nSlide 3: 친환경 원료: 자연과 건강을 생각한 원료 구성.\nSlide 4: 바쁜 일상 속 건강: 쉽게 실천할 수 있는 웰빙 라이프.\nSlide 5: 가족을 위한 선택: 온 가족이 함께 즐길 수 있는 제품.\nSlide 6: 어떤 변화가?: 생활에 건강한 변화를 가져옵니다.\nSlide 7: 자세히 알기: 오늘의 건강 혜택 프로필 링크에서 확인하기.",
+      "keyBenefits": "푸드/식품",
+      "objective": "신상품 홍보 / 정보가 쏙쏙 들어오게",
+      "slideCount": 7,
+      "status": "needs_review",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.361Z"
     }
   ],
   "slides": [
@@ -1188,6 +1202,83 @@
       "imageUrl": "/generated/carousel/media-card-1779385653047-5-fkgo39.png",
       "createdAt": "2026-05-21T17:47:33.074Z",
       "updatedAt": "2026-05-21T17:47:33.074Z"
+    },
+    {
+      "id": "s-1779540746356-1",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 1,
+      "headline": "안녕하세요",
+      "body": "신제품 출시 건강한 식습관의 새로운 시작, 소개합니다.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-light, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-rerender-1779542060052-1.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T13:14:20.255Z"
+    },
+    {
+      "id": "s-1779540746356-2",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 2,
+      "headline": "Slide 2",
+      "body": "제품의 특징 엄선된 재료로 만든 고품질 제품!",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-dark, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540675724-2-s0rxfr.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
+    },
+    {
+      "id": "s-1779540746356-3",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 3,
+      "headline": "Slide 3",
+      "body": "친환경 원료 자연과 건강을 생각한 원료 구성.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-light, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540688503-3-fjmoro.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
+    },
+    {
+      "id": "s-1779540746356-4",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 4,
+      "headline": "Slide 4",
+      "body": "바쁜 일상 속 건강 쉽게 실천할 수 있는 웰빙 라이프.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-light, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540700157-4-plp3a5.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
+    },
+    {
+      "id": "s-1779540746356-5",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 5,
+      "headline": "Slide 5",
+      "body": "가족을 위한 선택 온 가족이 함께 즐길 수 있는 제품.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-dark, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540721343-5-nwtglj.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
+    },
+    {
+      "id": "s-1779540746356-6",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 6,
+      "headline": "Slide 6",
+      "body": "어떤 변화가? 생활에 건강한 변화를 가져옵니다.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-light, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540733468-6-iqduq0.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
+    },
+    {
+      "id": "s-1779540746356-7",
+      "campaignId": "c-1779540746356",
+      "slideNumber": 7,
+      "headline": "Slide 7",
+      "body": "자세히 알기 오늘의 건강 혜택 프로필 링크에서 확인하기.",
+      "designPrompt": "Korean Instagram media card news background, realistic editorial documentary photography, photojournalism, high contrast, full-bleed vertical image, dark cinematic shadows, desaturated natural colors, subtle film grain, premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage, topic: 신제품 출시, category: 푸드/식품, tone: 친근하고 명확한 톤, reference direction: A serene kitchen setting with soft, natural lighting, featuring eco-friendly packaged food products on a wooden table, suggesting a calm lifestyle moment., preferred palette: black, white, gray, subject positioning: center-right composition, keeping left area readable, leave bottom-left area readable under a dark gradient overlay, overlay style: archive-cta, no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame, 1080x1350 portrait composition",
+      "imageUrl": "/generated/carousel/media-card-1779540746317-7-r6m6lr.png",
+      "createdAt": "2026-05-23T12:52:26.356Z",
+      "updatedAt": "2026-05-23T12:52:26.356Z"
     }
   ],
   "posts": [
@@ -1398,6 +1489,19 @@
       "status": "pending_approval",
       "createdAt": "2026-05-21T17:47:33.081Z",
       "updatedAt": "2026-05-21T17:47:33.083Z"
+    },
+    {
+      "id": "p-1779540746367",
+      "campaignId": "c-1779540746356",
+      "userId": "u-1779345938327",
+      "brandId": "b-1779352764802",
+      "caption": "건강한 습관, 시작해요\n\nSlide 1: 신제품 출시: 건강한 식습관의 새로운 시작, 소개합니다. Slide 2: 제품의 특징: 엄선된 재료로 만든 고품질 제품! Slide 3: 친환경 원료: 자연과 건강을 생각한 원료 구성. Slide 4: 바쁜 일상 속 건강: 쉽게 실천할 수 있는 웰빙 라이프. Slide 5: 가족을 위한 선택: 온 가족이.\n\n저장해두고 필요한 순간 다시 확인해보세요.",
+      "hashtags": "#카드뉴스, #인스타그램콘텐츠, #콘텐츠자동화, #푸드식품, #신제품, #출시, #신상품, #홍보",
+      "scheduledAt": "2026-05-24T11:00:00.000Z",
+      "instagramMediaId": null,
+      "status": "pending_approval",
+      "createdAt": "2026-05-23T12:52:26.367Z",
+      "updatedAt": "2026-05-23T12:52:26.372Z"
     }
   ]
 }

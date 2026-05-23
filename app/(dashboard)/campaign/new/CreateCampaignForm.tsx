@@ -312,7 +312,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-[#4a4039] list-inside list-disc">
                 <li>클릭률이 높은 인스타 전용 헤드라인 카피</li>
                 <li>기승전결 구조의 슬라이드별 요약 내용</li>
-                <li>브랜드 메인 컬러 기반의 DALL-E 비주얼 힌트</li>
+                <li>브랜드 메인 컬러 기반의 배경 이미지 힌트</li>
                 <li>콘텐츠의 성격에 적합한 최적의 톤앤매너</li>
               </ul>
             </div>
@@ -398,7 +398,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
 
             <div className="grid gap-6 md:grid-cols-2">
               <Field
-                label="비주얼 힌트 (DALL-E 프롬프트용)"
+                label="비주얼 힌트 (배경 이미지용)"
                 value={visualHint}
                 onChange={setVisualHint}
                 placeholder="예: 밝은 자연광이 비치는 화이트 톤 스튜디오, 리넨 패브릭 질감"

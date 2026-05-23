@@ -28,7 +28,7 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
 
   const scene = inferScene(context)
   const prompt = [
-    'Korean Instagram media card news background',
+    'background-only realistic editorial photograph for a Korean social media card',
     'realistic editorial documentary photography',
     'photojournalism, high contrast, full-bleed vertical image',
     'dark cinematic shadows, desaturated natural colors, subtle film grain',
@@ -39,9 +39,11 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
     input.visualHint ? `reference direction: ${input.visualHint}` : '',
     `preferred palette: ${palette}`,
     `subject positioning: ${subjectPosition}`,
-    `leave ${safeTypographyArea} area readable under a dark gradient overlay`,
+    `leave ${safeTypographyArea} area as clean negative space for app-rendered overlay later`,
     `overlay style: ${input.layout.overlayStyle}`,
-    'no generated text, no letters, no Hangul, no numbers, no logo, no watermark, no UI, no frame',
+    'blank surfaces only where text could appear',
+    'no generated text, no pseudo text, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no UI, no frame',
+    'no signage, no posters, no menu boards, no book covers, no newspaper headlines, no package labels, no screens with text',
     '1080x1350 portrait composition',
   ].filter(Boolean).join(', ')
 

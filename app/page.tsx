@@ -1,42 +1,41 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Check, ClipboardList, Images, PenLine, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Download, Images, PenLine, Type } from 'lucide-react'
 
 export const metadata = {
-  title: 'InstaAgent - 인스타그램 카드뉴스 자동화',
-  description:
-    '반복되는 카드뉴스 제작 업무를 간편하게 처리합니다. 주제만 입력하면 문구 정리, 화면 구성, 이미지 저장까지 이어집니다.',
+  title: 'Shuffla - AI 카드뉴스 스튜디오',
+  description: '주제만 입력하면 카드뉴스를 만들고, 문구를 편집하고, 이미지로 다운로드하는 AI 제작 도구입니다.',
 }
 
 const repeatedTasks = [
-  '매번 새로 짜는 카드뉴스 구성',
-  '제목과 본문을 다시 다듬는 작업',
-  '피드에 어울리는 분위기 맞추기',
-  '슬라이드별 핵심 문구 정리',
+  '카드뉴스 구성 잡기',
+  '제목과 본문 다시 다듬기',
+  '브랜드 톤에 맞는 비주얼 만들기',
+  '슬라이드별 이미지 저장하기',
 ]
 
 const supportCards = [
   {
-    title: '내용을 정리합니다',
-    desc: '긴 설명을 카드뉴스에 맞게 나누고, 첫 장에서 바로 읽히는 문장으로 다듬습니다.',
-    icon: ClipboardList,
+    title: '문구를 정리합니다',
+    desc: '긴 설명을 카드뉴스에 맞는 헤드라인과 짧은 본문으로 나눕니다.',
+    icon: Type,
   },
   {
-    title: '분위기를 맞춥니다',
-    desc: '뉴스형, 트렌드형, 정보형 콘텐츠에 맞는 톤과 화면 구성을 추천합니다.',
-    icon: Sparkles,
-  },
-  {
-    title: '이미지로 완성합니다',
-    desc: '검토할 수 있는 카드 이미지를 만들어 반복 편집 시간을 줄입니다.',
+    title: '이미지를 만듭니다',
+    desc: '브랜드와 주제에 맞는 배경 이미지를 만들고 카드 형태로 합성합니다.',
     icon: Images,
+  },
+  {
+    title: '바로 다운로드합니다',
+    desc: '완성된 슬라이드를 개별 또는 전체 이미지 파일로 저장할 수 있습니다.',
+    icon: Download,
   },
 ]
 
 const showcaseImages = [
-  { src: '/background-showcase/showcase-1.webp', alt: '카드뉴스 자동화 예시 이미지 1' },
-  { src: '/background-showcase/showcase-2.webp', alt: '카드뉴스 자동화 예시 이미지 2' },
-  { src: '/background-showcase/showcase-3.webp', alt: '카드뉴스 자동화 예시 이미지 3' },
+  { src: '/background-showcase/showcase-1.webp', alt: 'Shuffla 카드뉴스 예시 1' },
+  { src: '/background-showcase/showcase-2.webp', alt: 'Shuffla 카드뉴스 예시 2' },
+  { src: '/background-showcase/showcase-3.webp', alt: 'Shuffla 카드뉴스 예시 3' },
 ]
 
 export default function LandingPage() {
@@ -48,15 +47,15 @@ export default function LandingPage() {
           <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-6 lg:px-10">
             <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-[-0.035em]">
               <span className="h-1.5 w-7 rounded-[2px] bg-[#1c7ed6]" />
-              InstaAgent
+              Shuffla
             </Link>
             <nav className="hidden items-center gap-8 text-sm font-bold text-[#314158] md:flex">
               <a href="#identity">핵심 가치</a>
-              <a href="#support">도움받는 일</a>
+              <a href="#support">기능</a>
               <a href="#start">시작하기</a>
             </nav>
-            <Link href="/login" className="btn-blue px-5">
-              무료로 시작
+            <Link href="/api/auth/google/start" className="btn-blue px-5">
+              구글 로그인하기
             </Link>
           </div>
         </header>
@@ -84,29 +83,13 @@ export default function LandingPage() {
           </div>
 
           <div className="login-panel order-1 p-8 text-center lg:order-2 lg:p-10">
-            <h1 className="login-brand">
-              InstaAgent
-            </h1>
-            <Link href="/api/auth/google/start" className="btn-google mt-9 w-full text-base">
-              <svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38z"
-                />
-              </svg>
-              Google 계정으로 계속하기
+            <h1 className="login-brand">Shuffla</h1>
+            <p className="mt-5 text-sm font-bold leading-6 text-[#40536b]">
+              카드뉴스 생성, 편집, 다운로드를 한 화면에서 끝내는 AI 스튜디오
+            </p>
+            <Link href="/api/auth/google/start" className="btn-blue mt-9 w-full text-base">
+              구글 로그인하기
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -118,10 +101,10 @@ export default function LandingPage() {
           <div>
             <p className="text-sm font-black uppercase tracking-[0.14em] text-[#1c7ed6]">Core identity</p>
             <h2 className="mt-4 text-3xl font-black leading-[1.12] tracking-[-0.045em] text-[#0d1726] md:text-5xl">
-              매번 반복하던 준비 과정을 짧게 줄입니다.
+              카드뉴스 제작의 반복 작업을 줄입니다.
             </h2>
             <p className="mt-5 text-base leading-7 text-[#40536b]">
-              카드뉴스를 만들 때마다 다시 고민하던 구성, 문구, 분위기, 저장 과정을 한 흐름으로 묶습니다.
+              주제와 브랜드 정보만 입력하면 구성, 문구, 이미지, 렌더링까지 이어서 처리합니다.
             </p>
           </div>
           <div className="grid gap-4">
@@ -140,10 +123,10 @@ export default function LandingPage() {
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-sm font-black uppercase tracking-[0.14em] text-[#1c7ed6]">What it helps</p>
             <h2 className="mt-4 text-3xl font-black leading-[1.12] tracking-[-0.045em] text-[#0d1726] md:text-5xl">
-              어려운 설정 없이 카드뉴스 초안을 만듭니다.
+              만들고, 고치고, 저장합니다.
             </h2>
             <p className="mt-5 text-base leading-7 text-[#40536b]">
-              사용자는 만들고 싶은 내용을 입력하고, 결과를 확인하고, 필요한 부분만 고치면 됩니다.
+              SNS 자동 업로드는 추후 출시 예정이며, 현재는 카드뉴스 제작과 다운로드 경험에 집중합니다.
             </p>
           </div>
 
@@ -168,13 +151,13 @@ export default function LandingPage() {
             <PenLine className="h-5 w-5" />
           </div>
           <h2 className="text-3xl font-black tracking-[-0.045em] text-[#0d1726] md:text-5xl">
-            첫 카드뉴스를 바로 만들어보세요.
+            첫 카드뉴스를 바로 만들어 보세요.
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#40536b]">
-            로그인 후 주제, 제목, 핵심 내용을 입력하면 카드뉴스 제작 흐름을 바로 테스트할 수 있습니다.
+            로그인 후 브랜드를 설정하고 주제를 입력하면 결과 화면에서 편집과 다운로드를 할 수 있습니다.
           </p>
-          <Link href="/login" className="btn-blue mt-8 px-8 text-base">
-            시작하기
+          <Link href="/api/auth/google/start" className="btn-blue mt-8 px-8 text-base">
+            구글 로그인하기
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

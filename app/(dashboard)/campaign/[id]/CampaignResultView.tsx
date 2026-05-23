@@ -3,13 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  AlertCircle,
-  ArrowRight,
-  Calendar,
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   ExternalLink,
   Loader2,
@@ -18,7 +14,6 @@ import {
   Type,
 } from 'lucide-react'
 import {
-  approveAndScheduleCampaignAction,
   rerenderMediaSlideAction,
   updatePostDetailsAction,
   regenerateCampaignImagesAction,
@@ -64,17 +59,10 @@ interface CampaignResultViewProps {
   brand: Brand
   userPlan: string
   hasWatermark: boolean
-  canSchedule: boolean
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
-}
-
-function formatDateTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const pad = (value: number) => value.toString().padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function inferLayoutLabel(prompt: string) {
@@ -85,7 +73,6 @@ function inferLayoutLabel(prompt: string) {
   if (normalized.includes('documentary news')) return 'breaking-news'
   if (normalized.includes('social feed')) return 'trend-feed'
   if (normalized.includes('magazine cover')) return 'magazine'
-  if (normalized.includes('shallow depth')) return 'quote-focus'
   return 'dark-editorial'
 }
 
@@ -97,13 +84,40 @@ function inferRole(slideNumber: number, total: number, prompt: string) {
   return slideNumber % 2 === 0 ? 'detail' : 'key-point'
 }
 
+function fileNameFor(campaignTitle: string, slideNumber: number, extension = 'png') {
+  const safeTitle = campaignTitle
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .slice(0, 48) || 'card-news'
+  return `${safeTitle}-${String(slideNumber).padStart(2, '0')}.${extension}`
+}
+
+async function downloadImage(url: string, fileName: string) {
+  if (url.startsWith('data:')) {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.click()
+    return
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`download failed: HTTP ${response.status}`)
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
 export default function CampaignResultView({
   campaign,
   post,
   brand,
   userPlan,
   hasWatermark,
-  canSchedule,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
@@ -112,56 +126,14 @@ export default function CampaignResultView({
   const [body, setBody] = useState(slides[0]?.body || '')
   const [caption, setCaption] = useState(post.caption)
   const [hashtags, setHashtags] = useState(post.hashtags)
-  const [scheduledAt, setScheduledAt] = useState(formatDateTime(post.scheduledAt))
   const [rerendering, setRerendering] = useState(false)
-  const [approving, setApproving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  
+  const [savingCaption, setSavingCaption] = useState(false)
+  const [downloadingAll, setDownloadingAll] = useState(false)
   const [selectedStyle, setSelectedStyle] = useState('photo')
   const [regeneratingStyle, setRegeneratingStyle] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const activeSlide = slides[activeSlideIndex]
-
-  const handleRegenerateStyle = async () => {
-    setRegeneratingStyle(true)
-    setMessage(null)
-
-    try {
-      const result = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
-      if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '스타일 변경에 실패했습니다.' })
-        return
-      }
-
-      const updated = result.slides.map((s: {
-        id: string
-        slideNumber: number
-        headline: string
-        body: string
-        designPrompt: string
-        imageUrl: string | null
-      }) => ({
-        id: s.id,
-        slideNumber: s.slideNumber,
-        headline: s.headline,
-        body: s.body,
-        designPrompt: s.designPrompt,
-        imageUrl: s.imageUrl,
-      }))
-      setSlides(updated)
-      setMessage({ type: 'success', text: '모든 슬라이드의 AI 카드뉴스 스타일을 성공적으로 일괄 갱신했습니다!' })
-      
-      const activeIdx = activeSlideIndex
-      if (updated[activeIdx]) {
-        setHeadline(updated[activeIdx].headline)
-        setBody(updated[activeIdx].body)
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: getErrorMessage(err, '스타일 변경 처리 도중 오류가 발생했습니다.') })
-    } finally {
-      setRegeneratingStyle(false)
-    }
-  }
   const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
   const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
 
@@ -170,6 +142,41 @@ export default function CampaignResultView({
     setHeadline(slides[index]?.headline || '')
     setBody(slides[index]?.body || '')
     setMessage(null)
+  }
+
+  const handleRegenerateStyle = async () => {
+    setRegeneratingStyle(true)
+    setMessage(null)
+
+    try {
+      const result = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '스타일 재생성에 실패했습니다.' })
+        return
+      }
+
+      const updated = result.slides
+        .map((slide: Slide) => ({
+          id: slide.id,
+          slideNumber: slide.slideNumber,
+          headline: slide.headline,
+          body: slide.body,
+          designPrompt: slide.designPrompt,
+          imageUrl: slide.imageUrl,
+        }))
+        .sort((a: Slide, b: Slide) => a.slideNumber - b.slideNumber)
+
+      setSlides(updated)
+      if (updated[activeSlideIndex]) {
+        setHeadline(updated[activeSlideIndex].headline)
+        setBody(updated[activeSlideIndex].body)
+      }
+      setMessage({ type: 'success', text: '전체 카드 스타일을 다시 생성했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '스타일 재생성 중 오류가 발생했습니다.') })
+    } finally {
+      setRegeneratingStyle(false)
+    }
   }
 
   const rerenderSlide = async () => {
@@ -195,7 +202,7 @@ export default function CampaignResultView({
           : slide
       )
       setSlides(updatedSlides)
-      setMessage({ type: 'success', text: `${activeSlide.slideNumber}장 텍스트와 이미지를 다시 합성했습니다.` })
+      setMessage({ type: 'success', text: `${activeSlide.slideNumber}번 카드를 다시 렌더링했습니다.` })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '슬라이드 재렌더링 중 오류가 발생했습니다.') })
     } finally {
@@ -203,29 +210,50 @@ export default function CampaignResultView({
     }
   }
 
-  const approve = async () => {
-    setApproving(true)
+  const saveCaption = async () => {
+    setSavingCaption(true)
     setMessage(null)
 
     try {
-      await updatePostDetailsAction(post.id, caption, hashtags)
-      const result = await approveAndScheduleCampaignAction(campaign.id, post.id, {
-        caption,
-        hashtags,
-        scheduledAt: new Date(scheduledAt).toISOString(),
-      })
-
+      const result = await updatePostDetailsAction(post.id, caption, hashtags)
       if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '승인 처리에 실패했습니다.' })
-        setApproving(false)
+        setMessage({ type: 'error', text: result.error || '캡션 저장에 실패했습니다.' })
         return
       }
-
-      setMessage({ type: 'success', text: result.message || '예약 대기열에 등록했습니다.' })
-      setTimeout(() => router.push('/calendar'), 1200)
+      setMessage({ type: 'success', text: '캡션과 해시태그를 저장했습니다.' })
+      router.refresh()
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '승인 처리 중 오류가 발생했습니다.') })
-      setApproving(false)
+      setMessage({ type: 'error', text: getErrorMessage(error, '캡션 저장 중 오류가 발생했습니다.') })
+    } finally {
+      setSavingCaption(false)
+    }
+  }
+
+  const downloadActiveSlide = async () => {
+    if (!activeSlide?.imageUrl) return
+    setMessage(null)
+    try {
+      await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '이미지 다운로드에 실패했습니다.') })
+    }
+  }
+
+  const downloadAllSlides = async () => {
+    setDownloadingAll(true)
+    setMessage(null)
+    try {
+      for (const slide of slides) {
+        if (slide.imageUrl) {
+          await downloadImage(slide.imageUrl, fileNameFor(campaign.title, slide.slideNumber))
+          await new Promise(resolve => setTimeout(resolve, 140))
+        }
+      }
+      setMessage({ type: 'success', text: '전체 카드 다운로드를 시작했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '전체 다운로드 중 오류가 발생했습니다.') })
+    } finally {
+      setDownloadingAll(false)
     }
   }
 
@@ -233,22 +261,24 @@ export default function CampaignResultView({
     <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="eyebrow">Media Card Review</p>
+          <p className="eyebrow">Card News Studio</p>
           <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-0.06em] text-[#1f1512] md:text-5xl">
             {campaign.title}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
-            생성된 카드뉴스를 실제 렌더링 결과 기준으로 검토하고, 텍스트를 수정한 뒤 다시 합성할 수 있습니다.
+            카드뉴스를 검토하고 문구를 편집한 뒤 PNG 파일로 다운로드하세요. 새 카드뉴스가 필요하면 바로 이어서 만들 수 있습니다.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/campaign/new')}
-          className="btn-secondary px-5"
-        >
-          <RefreshCw className="h-4 w-4" />
-          새 캠페인
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={downloadAllSlides} disabled={downloadingAll} className="btn-primary px-5">
+            {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            전체 다운로드
+          </button>
+          <button type="button" onClick={() => router.push('/campaign/new')} className="btn-secondary px-5">
+            <RefreshCw className="h-4 w-4" />
+            새 카드뉴스 만들기
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -264,20 +294,13 @@ export default function CampaignResultView({
           <div className="rounded-[10px] border border-[#e8dfd4] bg-[#f8f3e9] p-4 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
             <div className="mx-auto max-w-[560px]">
               <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#1f1512] shadow-[0_22px_70px_rgba(31,21,18,0.22)]">
-                {activeSlide?.imageUrl?.endsWith('.png') ? (
+                {activeSlide?.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={activeSlide.imageUrl}
                     src={activeSlide.imageUrl}
                     alt={`${activeSlide.slideNumber}번 카드뉴스`}
                     className="h-full w-full object-cover"
-                  />
-                ) : activeSlide?.imageUrl ? (
-                  <iframe
-                    key={activeSlide.imageUrl}
-                    src={activeSlide.imageUrl}
-                    title={`${activeSlide.slideNumber}번 카드뉴스`}
-                    className="h-full w-full border-0 bg-white"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm font-bold text-white/70">
@@ -321,12 +344,10 @@ export default function CampaignResultView({
                 }`}
               >
                 <div className="aspect-[4/5] overflow-hidden rounded-[5px] bg-[#f8f3e9]">
-                  {slide.imageUrl?.endsWith('.png') ? (
+                  {slide.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={slide.imageUrl} alt={`${slide.slideNumber} 썸네일`} className="h-full w-full object-cover" />
-                  ) : slide.imageUrl ? (
-                    <iframe src={slide.imageUrl} title={`${slide.slideNumber} 썸네일`} className="h-full w-full scale-[1.03] border-0 bg-white" />
-                  ) : null}
+                    <img src={slide.imageUrl} alt={`${slide.slideNumber}번 썸네일`} className="h-full w-full object-cover" />
+                  )}
                 </div>
                 <p className="mt-2 truncate px-1 pb-1 text-left text-[11px] font-black text-[#4a4039]">
                   {slide.slideNumber}. {slide.headline}
@@ -340,21 +361,17 @@ export default function CampaignResultView({
           <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="eyebrow">Media Tone</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">미디어 톤 재생성</h2>
+                <p className="eyebrow">Style</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">전체 스타일 재생성</h2>
               </div>
               <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
             </div>
 
-            <p className="mb-4 text-xs text-[#746a62] leading-relaxed">
-              레퍼런스처럼 사진을 크게 쓰고 어두운 오버레이 위에 강한 제목을 올리는 방향으로 다시 생성합니다. 기존 텍스트는 보존됩니다.
-            </p>
-
             <div className="mb-4 grid grid-cols-2 gap-2">
               {[
                 { key: 'photo', label: '보도사진' },
-                { key: 'minimalist', label: '다크 에디토리얼' },
-                { key: 'gradients', label: '테크 뉴스' },
+                { key: 'minimalist', label: '미니멀' },
+                { key: 'gradients', label: '다크 무드' },
                 { key: 'cyberpunk', label: '이슈 브리핑' },
                 { key: 'vector', label: '매거진 포토' },
               ].map((style) => (
@@ -377,19 +394,10 @@ export default function CampaignResultView({
               type="button"
               onClick={handleRegenerateStyle}
               disabled={regeneratingStyle}
-              className="btn-primary w-full rounded-[8px] bg-[#ff4f0a] text-white flex items-center justify-center gap-2"
+              className="btn-primary w-full rounded-[8px]"
             >
-              {regeneratingStyle ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>AI 스타일 변환 중...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" />
-                  <span>미디어 스타일로 재생성</span>
-                </>
-              )}
+              {regeneratingStyle ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              스타일 다시 만들기
             </button>
           </div>
 
@@ -397,7 +405,7 @@ export default function CampaignResultView({
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <p className="eyebrow">Slide {activeSlide?.slideNumber}</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">타이포그래피 편집</h2>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">문구 편집</h2>
               </div>
               <Type className="h-5 w-5 text-[#ff4f0a]" />
             </div>
@@ -441,7 +449,7 @@ export default function CampaignResultView({
                 className="btn-primary w-full rounded-[8px]"
               >
                 {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                텍스트 저장 및 재렌더링
+                이 카드 다시 렌더링
               </button>
             </div>
           </div>
@@ -449,91 +457,57 @@ export default function CampaignResultView({
           <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="eyebrow">Instagram Post</p>
-                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">캡션과 예약</h2>
+                <p className="eyebrow">Caption</p>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">게시글 문안 메모</h2>
               </div>
-              <Calendar className="h-5 w-5 text-[#ff4f0a]" />
+              <Check className="h-5 w-5 text-[#ff4f0a]" />
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="caption" className="mb-2 block text-xs font-black text-[#4a4039]">
-                  캡션
-                </label>
-                <textarea
-                  id="caption"
-                  rows={6}
-                  value={caption}
-                  onChange={(event) => setCaption(event.target.value)}
-                  className="field resize-none px-4 py-3 text-sm leading-6"
-                />
-              </div>
-              <div>
-                <label htmlFor="hashtags" className="mb-2 block text-xs font-black text-[#4a4039]">
-                  해시태그
-                </label>
-                <input
-                  id="hashtags"
-                  value={hashtags}
-                  onChange={(event) => setHashtags(event.target.value)}
-                  className="field h-12 px-4 text-sm font-bold"
-                />
-              </div>
-              <div>
-                <label htmlFor="scheduledAt" className="mb-2 block text-xs font-black text-[#4a4039]">
-                  예약 일시
-                </label>
-                <input
-                  id="scheduledAt"
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(event) => setScheduledAt(event.target.value)}
-                  className="field h-12 px-4 text-sm font-bold"
-                />
-              </div>
-
-              {!canSchedule && (
-                <div className="rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-                  <div className="flex gap-2">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>현재 플랜은 자동 예약 발행이 제한됩니다. 검토용 저장은 가능합니다.</p>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={approve}
-                disabled={approving}
-                className="btn-primary w-full rounded-[8px]"
-              >
-                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                승인하고 예약하기
-                <ArrowRight className="h-4 w-4" />
+              <textarea
+                rows={6}
+                value={caption}
+                onChange={(event) => setCaption(event.target.value)}
+                className="field resize-none px-4 py-3 text-sm leading-6"
+              />
+              <input
+                value={hashtags}
+                onChange={(event) => setHashtags(event.target.value)}
+                className="field h-12 px-4 text-sm font-bold"
+              />
+              <button type="button" onClick={saveCaption} disabled={savingCaption} className="btn-secondary w-full rounded-[8px]">
+                {savingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                문안 저장
               </button>
             </div>
           </div>
 
           <div className="rounded-[10px] border border-[#d8edf7] bg-[#f3fbff] p-5 text-sm leading-6 text-[#4c6070]">
             <div className="mb-3 flex items-center gap-2 font-black text-[#1f1512]">
-              <Clock className="h-4 w-4 text-[#2aa2db]" />
-              렌더링 메모
+              <Download className="h-4 w-4 text-[#2aa2db]" />
+              다운로드
             </div>
             <p className="mb-3">
-              이 화면의 이미지는 이미지 모델이 만든 완성 카드가 아니라, 배경 이미지 위에 renderer가 한글 타이포그래피를 합성한 결과입니다.
+              완성된 카드뉴스를 이미지 파일로 내려받을 수 있습니다. 추가 콘텐츠가 필요하면 새 카드뉴스를 바로 만들어 이어가세요.
             </p>
-            {activeSlide?.imageUrl && (
-              <div className="flex flex-wrap gap-2">
-                <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
-                  <ExternalLink className="h-4 w-4" />
-                  원본 열기
-                </a>
-                <a href={activeSlide.imageUrl} download className="btn-secondary min-h-10 px-4 text-xs">
-                  <Download className="h-4 w-4" />
-                  이미지 저장
-                </a>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {activeSlide?.imageUrl && (
+                <>
+                  <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
+                    <ExternalLink className="h-4 w-4" />
+                    원본 열기
+                  </a>
+                  <button type="button" onClick={downloadActiveSlide} className="btn-secondary min-h-10 px-4 text-xs">
+                    <Download className="h-4 w-4" />
+                    현재 카드 다운로드
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={downloadAllSlides} disabled={downloadingAll} className="btn-primary min-h-10 px-4 text-xs">
+                {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                전체 다운로드
+              </button>
+            </div>
           </div>
         </aside>
       </div>

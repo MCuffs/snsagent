@@ -1,8 +1,11 @@
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import prisma from './db'
 
-const DB_FILE_PATH = path.join(process.cwd(), 'prisma', 'db.json')
+const DB_FILE_PATH = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'shuffla-db.json')
+  : path.join(process.cwd(), 'prisma', 'db.json')
 
 // Define TypeScript interfaces for our DB models
 export interface User {

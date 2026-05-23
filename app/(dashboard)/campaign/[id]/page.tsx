@@ -42,7 +42,6 @@ export default async function CampaignDetailsPage({
   const userPlan = (user.plan || 'FREE') as SubscriptionPlan
   const planConfig = PRICING_PLANS[userPlan]
   const hasWatermark = planConfig.hasWatermark
-  const canSchedule = planConfig.canSchedule
 
   // Format objects for client serialization
   const serializedCampaign = {
@@ -84,7 +83,6 @@ export default async function CampaignDetailsPage({
       brand={serializedBrand}
       userPlan={userPlan}
       hasWatermark={hasWatermark}
-      canSchedule={canSchedule}
     />
   )
 }

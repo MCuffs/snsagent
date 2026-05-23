@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { GOOGLE_OAUTH_STATE_COOKIE_NAME, normalizeSessionEmail, SESSION_COOKIE_NAME, sessionCookieOptions } from '../../../../../lib/auth/session'
 import { dbService } from '../../../../../lib/db-service'
 import { exchangeGoogleCode, fetchGoogleUserInfo } from '../../../../../lib/google/oauth'
 
@@ -21,23 +22,19 @@ export async function GET(request: Request) {
     }
 
     const cookieStore = await cookies()
-    const expectedState = cookieStore.get('google_oauth_state')?.value
+    const expectedState = cookieStore.get(GOOGLE_OAUTH_STATE_COOKIE_NAME)?.value
     if (!expectedState || expectedState !== state) {
       return NextResponse.redirect(new URL('/login?error=google_state_invalid', request.url))
     }
 
     const token = await exchangeGoogleCode(request, code)
     const profile = await fetchGoogleUserInfo(token.access_token)
-    await dbService.getOrCreateUser(profile.email, profile.name || profile.email.split('@')[0])
+    const email = normalizeSessionEmail(profile.email)
+    await dbService.getOrCreateUser(email, profile.name || email.split('@')[0])
 
     const response = NextResponse.redirect(new URL('/dashboard', request.url))
-    response.cookies.delete('google_oauth_state')
-    response.cookies.set('instaagent_session_email', profile.email, {
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-    })
+    response.cookies.delete(GOOGLE_OAUTH_STATE_COOKIE_NAME)
+    response.cookies.set(SESSION_COOKIE_NAME, email, sessionCookieOptions())
 
     return response
   } catch (err) {

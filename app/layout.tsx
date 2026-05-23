@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InstaAgent",
-  description: "AI Instagram operations workspace for card news campaigns.",
+  title: "Shuffla",
+  description: "AI card news studio for generating, editing, and downloading visual content.",
 };
 
 export default function RootLayout({

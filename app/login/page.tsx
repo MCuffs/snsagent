@@ -1,8 +1,6 @@
-'use server'
-
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail, ShieldCheck } from 'lucide-react'
 import { getSessionUser, loginAction } from '../actions'
 
 export default async function LoginPage({
@@ -20,9 +18,9 @@ export default async function LoginPage({
 
   async function handleSubmit(formData: FormData) {
     'use server'
+
     const email = formData.get('email') as string
     const name = formData.get('name') as string
-
     const result = await loginAction(email, name)
     if (result.success) {
       redirect('/dashboard')
@@ -31,7 +29,8 @@ export default async function LoginPage({
 
   async function handleDemoLogin() {
     'use server'
-    const demoEmail = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@instaagent.ai'
+
+    const demoEmail = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
     const result = await loginAction(demoEmail, 'Demo User')
     if (result.success) {
       redirect('/dashboard')
@@ -43,23 +42,24 @@ export default async function LoginPage({
       <header className="flex h-[76px] items-center justify-between border-b border-[#ece2d6] bg-[#fffdf8]/88 px-6 backdrop-blur-xl lg:px-12">
         <Link href="/" className="flex items-center gap-2 text-2xl font-black tracking-[-0.05em]">
           <span className="h-1.5 w-7 rounded-full bg-[#ff4f0a]" />
-          InstaAgent
+          Shuffla
         </Link>
-        <Link href="/" className="text-sm font-black text-[#1f1512]">
-          홈으로
+        <Link href="/" className="flex items-center gap-2 text-sm font-black text-[#1f1512]">
+          <ArrowLeft className="h-4 w-4" />
+          메인으로
         </Link>
       </header>
 
       <section className="mx-auto grid min-h-[calc(100vh-76px)] max-w-[1320px] items-center gap-12 px-6 py-14 lg:grid-cols-[1fr_560px] lg:px-12">
         <div>
           <p className="mb-8 text-sm font-black uppercase tracking-[0.14em] text-[#746a62]">
-            Free forever for core features
+            Shuffla Card News Studio
           </p>
           <h1 className="max-w-3xl text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
-            Start your AI content desk in seconds
+            카드뉴스 제작을 바로 시작하세요
           </h1>
           <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
-            Google 계정으로 들어가 브랜드 설정, 카드뉴스 생성, 캘린더 예약 흐름을 바로 확인하세요.
+            Google 계정으로 로그인하면 브랜드 설정, 카드뉴스 생성, 편집, 다운로드 작업을 한 곳에서 이어갈 수 있습니다.
           </p>
         </div>
 
@@ -75,20 +75,22 @@ export default async function LoginPage({
               href="/api/auth/google/start"
               className="mb-7 flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-lg font-black transition hover:bg-[#fff8f0]"
             >
-              <span className="text-xl font-black text-[#4285f4]">G</span>
-              Sign up with Google
+              <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-base font-black text-[#4285f4]">
+                G
+              </span>
+              Google로 계속하기
             </Link>
 
             <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
               <div className="h-px flex-1 bg-[#e8dfd4]" />
-              OR
+              또는
               <div className="h-px flex-1 bg-[#e8dfd4]" />
             </div>
 
             <form action={handleSubmit} className="space-y-5">
               <div>
                 <label htmlFor="email" className="mb-2 block text-sm font-black">
-                  Work email *
+                  이메일 *
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
@@ -102,9 +104,10 @@ export default async function LoginPage({
                   />
                 </div>
               </div>
+
               <div>
                 <label htmlFor="name" className="mb-2 block text-sm font-black">
-                  Name or brand
+                  이름 또는 브랜드명
                 </label>
                 <input
                   id="name"
@@ -116,11 +119,11 @@ export default async function LoginPage({
               </div>
 
               <p className="text-sm leading-6 text-[#4a4039]">
-                로그인하면 AI가 생성한 콘텐츠를 게시 전 직접 검토하는 데 동의한 것으로 간주합니다.
+                이메일 로그인은 로컬 테스트용입니다. 실제 운영에서는 Google 로그인을 기본 진입 방식으로 사용합니다.
               </p>
 
               <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
-                Get started for free
+                이메일로 시작하기
                 <ArrowRight className="h-5 w-5" />
               </button>
             </form>

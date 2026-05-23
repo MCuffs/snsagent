@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { Info, Sparkles } from 'lucide-react'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
@@ -10,9 +9,18 @@ export default async function NewCampaignPage() {
   const user = await getSessionUser()
   if (!user) return null
 
-  const brands = await dbService.getBrands(user.id)
+  let brands = await dbService.getBrands(user.id)
   if (brands.length === 0) {
-    redirect('/brand')
+    const defaultBrand = await dbService.saveBrand(user.id, null, {
+      name: '기본 브랜드',
+      industry: '소상공인/온라인 스토어',
+      targetAudience: '브랜드의 상품과 서비스를 찾는 잠재 고객',
+      toneOfVoice: '친근하고 신뢰감 있게',
+      mainColor: '#ff4f0a',
+      forbiddenWords: '',
+      ctaStyle: '자세히 보기',
+    })
+    brands = [defaultBrand]
   }
 
   return (

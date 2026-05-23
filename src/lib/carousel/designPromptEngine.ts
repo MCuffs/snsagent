@@ -34,9 +34,11 @@ function buildBackgroundPrompt(
   const base = [
     'Korean Instagram card news style',
     'square 1080x1080 composition',
-    'no text, no letters, no typography, no Hangul, no watermark',
+    'background image only',
+    'no text, no pseudo text, no letters, no numbers, no typography, no Hangul, no logo, no watermark',
+    'no signage, labels, posters, menus, packaging text, screen text, handwriting, or calligraphy',
     `brand accent color ${brand.mainColor}`,
-    'plenty of whitespace for text overlay',
+    'clean empty negative space for app-rendered overlay later',
   ]
 
   const productContext = `product: ${input.productName}`

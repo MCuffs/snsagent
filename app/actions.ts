@@ -13,6 +13,7 @@ import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTyp
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
+import { normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -33,7 +34,7 @@ function failed(error: string) {
 // Helper to get authenticated user from session cookies
 export async function getSessionUser(): Promise<User | null> {
   const cookieStore = await cookies()
-  const email = cookieStore.get('instaagent_session_email')?.value
+  const email = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!email) return null
   
   try {
@@ -46,20 +47,15 @@ export async function getSessionUser(): Promise<User | null> {
 
 // User Mock Login Action
 export async function loginAction(email: string, name?: string) {
-  if (!email || !email.includes('@')) {
+  const normalizedEmail = normalizeSessionEmail(email)
+  if (!normalizedEmail || !normalizedEmail.includes('@')) {
     return failed('올바른 이메일 주소를 입력해주세요.')
   }
 
-  const user = await dbService.getOrCreateUser(email, name)
+  const user = await dbService.getOrCreateUser(normalizedEmail, name?.trim())
   const cookieStore = await cookies()
   
-  // Set session cookie for 30 days
-  cookieStore.set('instaagent_session_email', email, {
-    maxAge: 30 * 24 * 60 * 60,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  })
+  cookieStore.set(SESSION_COOKIE_NAME, normalizedEmail, sessionCookieOptions())
 
   return { success: true as const, user }
 }
@@ -67,7 +63,7 @@ export async function loginAction(email: string, name?: string) {
 // Logout Action
 export async function logoutAction() {
   const cookieStore = await cookies()
-  cookieStore.delete('instaagent_session_email')
+  cookieStore.delete(SESSION_COOKIE_NAME)
   return { success: true as const }
 }
 
@@ -109,13 +105,16 @@ export async function saveBrandAction(brandId: string | null, data: {
   }
 
   try {
-    if (brandId) {
-      const existingBrand = await dbService.getBrand(brandId)
-      if (!existingBrand) return failed('브랜드를 찾을 수 없습니다.')
-      if (existingBrand.userId !== user.id) return forbidden()
+    let effectiveBrandId = brandId
+    if (effectiveBrandId) {
+      const existingBrand = await dbService.getBrand(effectiveBrandId)
+      if (!existingBrand || existingBrand.userId !== user.id) {
+        // Stale or foreign ID — treat as new brand creation
+        effectiveBrandId = null
+      }
     }
 
-    const brand = await dbService.saveBrand(user.id, brandId, data)
+    const brand = await dbService.saveBrand(user.id, effectiveBrandId, data)
     return { success: true as const, brand }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '브랜드 저장에 실패했습니다.'))
@@ -213,9 +212,12 @@ export async function createCampaignAction(brandId: string, data: {
     return failed(`월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
   }
 
-  const brand = await dbService.getBrand(brandId)
-  if (!brand) return failed('브랜드를 찾을 수 없습니다.')
-  if (brand.userId !== user.id) return forbidden()
+  let brand = await dbService.getBrand(brandId)
+  if (!brand || brand.userId !== user.id) {
+    const brands = await dbService.getBrands(user.id)
+    brand = brands[0] || null
+  }
+  if (!brand) return failed('브랜드를 먼저 설정해주세요. 브랜드 설정 탭에서 브랜드 정보를 입력해 주세요.')
 
   try {
     const result = await generateCarouselCampaign({
@@ -275,7 +277,7 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
 
     const brand = await dbService.getBrand(existingSlide.campaign.brandId)
     const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
-    const source = account?.username || brand?.name || 'instaagent'
+    const source = account?.username || brand?.name || 'shuffla'
     const layout = LAYOUT_DEFINITIONS[inferLayoutType(existingSlide.designPrompt)]
     const typography = planTypography({
       headline,
@@ -667,27 +669,101 @@ function cleanHtmlText(html: string): string {
   return text.substring(0, 5000)
 }
 
-function removeMarkdownBold(text: string): string {
+function removeMarkdownBold(value: unknown): string {
+  const text = stringifyAiText(value)
   if (!text) return ''
   return text.replace(/\*\*/g, '')
+}
+
+function stringifyAiText(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stringifyAiText(item))
+      .filter(Boolean)
+      .join('\n')
+  }
+  if (typeof value === 'object') {
+    return Object.values(value)
+      .map((item) => stringifyAiText(item))
+      .filter(Boolean)
+      .join('\n')
+  }
+  return ''
 }
 
 function extractSmartStoreShopId(urlStr: string): string | null {
   try {
     const parsedUrl = new URL(urlStr)
     const hostname = parsedUrl.hostname
-    if (hostname.includes('smartstore.naver.com')) {
-      const pathname = parsedUrl.pathname // e.g. "/hu100"
+    if (hostname.includes('smartstore.naver.com') || hostname.includes('brand.naver.com')) {
+      const pathname = parsedUrl.pathname // e.g. "/hu100" or "/verish"
       const segments = pathname.split('/').filter(Boolean)
       if (segments.length > 0) {
         return segments[0]
       }
     }
   } catch {
-    const match = urlStr.match(/smartstore\.naver\.com\/([^/?#]+)/)
+    const match = urlStr.match(/(?:smartstore|brand)\.naver\.com\/([^/?#]+)/)
     if (match) return match[1]
   }
   return null
+}
+
+function isNaverStoreUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname
+    return hostname.includes('smartstore.naver.com') || hostname.includes('brand.naver.com')
+  } catch {
+    return /(?:smartstore|brand)\.naver\.com/i.test(url)
+  }
+}
+
+function getGenericWebsiteFallback(url: string) {
+  let host = 'brand'
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '').split('.')[0] || host
+  } catch {
+    host = url.replace(/^https?:\/\//, '').split(/[/?#.:]/)[0] || host
+  }
+  const displayName = host
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ') || '브랜드'
+
+  const brandProfile = {
+    name: displayName,
+    industry: '온라인 스토어',
+    targetAudience: '온라인에서 상품과 서비스를 비교하고 구매하는 잠재 고객',
+    toneOfVoice: '친근하고 신뢰감 있게',
+    mainColor: '#1f1512',
+    forbiddenWords: '무조건, 100% 보장, 업계 최고, 한정 수량 과장',
+    ctaStyle: '스토어에서 자세히 보기',
+  }
+
+  const markdownReport = `# 브랜드 분석 및 구도 기획서
+
+입력한 웹사이트가 일시적으로 접근 제한, 과도한 요청 제한, 보안 정책 등으로 직접 수집되지 않아 Shuffla의 대체 분석 엔진으로 브랜드 초안을 생성했습니다.
+
+## 1. 브랜드 기본 프로필
+브랜드명: ${displayName}
+업종: 온라인 스토어
+메인 컬러: #1f1512
+
+## 2. 브랜드 방향
+대상 고객: 온라인에서 상품과 서비스를 비교하고 구매하는 잠재 고객
+톤앤매너: 친근하고 신뢰감 있게
+
+## 3. 카드뉴스 운영 제안
+상품의 핵심 특징, 사용 상황, 고객이 얻는 이점을 짧은 카드뉴스 구조로 정리하는 방향을 권장합니다.
+금칙어: 무조건, 100% 보장, 업계 최고, 한정 수량 과장
+CTA: 스토어에서 자세히 보기
+`
+
+  return { brandProfile, markdownReport }
 }
 
 function getNaverSmartstoreFallback(shopId: string, url: string) {
@@ -771,11 +847,12 @@ export async function analyzeBrandWebsiteAction(url: string) {
 
   let targetUrl = url
   const isSmartStore = url.includes('smartstore.naver.com')
+  const isNaverStore = isNaverStoreUrl(url)
   if (isSmartStore && !url.includes('m.smartstore.naver.com')) {
     targetUrl = url.replace('smartstore.naver.com', 'm.smartstore.naver.com')
   }
 
-  const shopId = isSmartStore ? extractSmartStoreShopId(targetUrl) : null
+  const shopId = isNaverStore ? extractSmartStoreShopId(targetUrl) : null
 
   try {
     console.log(`Scraping URL: ${targetUrl}`)
@@ -787,7 +864,7 @@ export async function analyzeBrandWebsiteAction(url: string) {
       'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
     }
 
-    if (isSmartStore) {
+    if (isNaverStore) {
       headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'
       headers['Referer'] = 'https://m.search.naver.com/'
     } else {
@@ -815,7 +892,8 @@ export async function analyzeBrandWebsiteAction(url: string) {
     const useRealAI = isConfiguredOpenAIKey(apiKey)
 
     if (useRealAI) {
-      const openai = new OpenAI({ apiKey })
+      const baseURL = process.env.OPENAI_BASE_URL || undefined
+      const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
       const prompt = `
 You are an expert brand consultant and digital marketer.
 Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
@@ -889,7 +967,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       console.log('Using Mock Brand Website Analyzer (OpenAI key not configured)')
       await new Promise(resolve => setTimeout(resolve, 2000)) // Simulation delay
 
-      if (isSmartStore && shopId) {
+      if (isNaverStore && shopId) {
         const result = getNaverSmartstoreFallback(shopId, targetUrl)
         return {
           success: true as const,
@@ -1005,7 +1083,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
   } catch (err: unknown) {
     console.error('Brand Website Analysis failed, trying fallback:', err)
 
-    if (isSmartStore && shopId) {
+    if (isNaverStore && shopId) {
       console.log(`Executing Graceful Fallback for Smartstore: ${shopId}`)
 
       const apiKey = process.env.OPENAI_API_KEY
@@ -1013,7 +1091,8 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 
       if (useRealAI) {
         try {
-          const openai = new OpenAI({ apiKey })
+          const baseURL = process.env.OPENAI_BASE_URL || undefined
+          const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
           const isHu100 = shopId.toLowerCase() === 'hu100'
           const hint = isHu100 ? '이 상점은 한글 브랜드명이 "휴100" 혹은 "휴백"일 가능성이 높으며, 카테고리는 건강 식품, 친환경 웰빙 라이프스타일, 오가닉 푸드/굿즈 관련 웰니스 샵입니다.' : ''
 
@@ -1090,7 +1169,12 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       }
     }
 
-    return failed(err instanceof Error ? err.message : '웹사이트를 분석하는 중 알 수 없는 오류가 발생했습니다.')
+    const fallback = getGenericWebsiteFallback(url)
+    return {
+      success: true as const,
+      brandProfile: fallback.brandProfile,
+      markdownReport: removeMarkdownBold(fallback.markdownReport)
+    }
   }
 }
 
@@ -1114,7 +1198,8 @@ export async function recommendCampaignAction(brandId: string, topic: string) {
     const useRealAI = isConfiguredOpenAIKey(apiKey)
 
     if (useRealAI) {
-      const openai = new OpenAI({ apiKey })
+      const baseURL = process.env.OPENAI_BASE_URL || undefined
+      const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
       const prompt = `
 You are an expert AI Marketing Planner.
 Based on the following brand profile and a raw topic/idea for an Instagram carousel campaign, generate optimized configuration values and slide content for the campaign.
@@ -1140,7 +1225,7 @@ ${topic}
 2. Generate:
    - "title": A concise Korean archive-card headline (under 18 Korean chars, no emoji, no markdown bold, do not prepend brand name unless the topic explicitly asks for it).
    - "keyContent": Detailed copy for each slide. Write one line per slide. The number of lines must match "slideCount". Each line should contain a short headline and sub-content separated by ":". Use the brand's industry, target audience, tone of voice, forbidden words, and CTA style. Do not include markdown bold syntax (**).
-   - "visualHint": A premium archive-card background prompt. It must match the brand industry and audience, but should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left typography space.
+   - "visualHint": A premium archive-card background prompt. It must match the brand industry and audience, but should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left blank negative space for app-rendered copy.
    - "source": Recommended brand label/watermark (e.g. brand website, or Instagram handle, or simply "${brand.name}")
 3. CRITICAL: Do NOT use markdown bold syntax (** or ***) anywhere in the text. Keep all text plain and clean.
 4. Avoid forbidden words exactly: ${brand.forbiddenWords || 'None'}.
@@ -1370,7 +1455,7 @@ function buildBrandKeyContent(input: {
 
 function buildBrandVisualHint(industry: string, mainColor: string, toneOfVoice: string) {
   const context = `${industry} ${toneOfVoice}`.toLowerCase()
-  const base = 'Korean premium archive Instagram card photography, no generated text, no logo, no watermark, object centered in upper-middle, quiet lower-left typography space'
+  const base = 'Korean premium archive Instagram card background photography, background image only, no generated text, no pseudo text, no letters, no numbers, no logo, no watermark, no signage, no labels, object centered in upper-middle, quiet lower-left blank negative space'
 
   if (/패션|의류|리빙|스토어|셀렉|온라인|bag|가방/.test(context)) {
     return `${base}, product archive still life, soft off-white studio background, fabric texture, black object details, subtle brand color ${mainColor}`

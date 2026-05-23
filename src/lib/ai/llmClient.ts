@@ -14,7 +14,8 @@ export class OpenAILLMClient implements LLMClient {
   private client: OpenAI
 
   constructor() {
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const baseURL = process.env.OPENAI_BASE_URL || undefined
+    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...(baseURL ? { baseURL } : {}) })
   }
 
   async generateJson<T>(stepName: string, prompt: string, fallback: () => T): Promise<T> {
