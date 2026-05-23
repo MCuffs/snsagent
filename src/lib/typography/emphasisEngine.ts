@@ -1,3 +1,5 @@
+import { splitPreservingBrackets } from './lineBreakEngine'
+
 const PARTICLES_REGEX = /(은|는|이|가|을|를|의|에|에서|으로|로|와|과|도|만|하고|이랑|랑|에게|한테|이며|고|며|면|서|니까)$/;
 
 /**
@@ -16,7 +18,7 @@ export function detectEmphasis(headline: string, userEmphasisWords?: string[]): 
     ? userEmphasisWords 
     : extractDefaultEmphasisWords(normalized)
 
-  const words = normalized.split(' ')
+  const words = splitPreservingBrackets(normalized)
   return words.map(word => {
     // 순수 단어만 비교하기 위해 조사 제거 및 따옴표 제거 후 검증
     const cleanWord = word.replace(PARTICLES_REGEX, '').replace(/['"“”‘’]/g, '').trim()

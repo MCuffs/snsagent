@@ -262,7 +262,7 @@ export default function CampaignResultView({
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="eyebrow">Card News Studio</p>
-          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-0.06em] text-[#1f1512] md:text-5xl">
+          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] text-[#1f1512] md:text-5xl">
             {campaign.title}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">

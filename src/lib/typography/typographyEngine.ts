@@ -1,5 +1,5 @@
 import type { LayoutDefinition } from '../layout/layoutTypes'
-import { breakKoreanLines } from './lineBreakEngine'
+import { breakKoreanLines, splitPreservingBrackets } from './lineBreakEngine'
 import { detectEmphasis } from './emphasisEngine'
 
 export interface TypographyToken {
@@ -53,7 +53,7 @@ export function planTypography(input: TypographyInput): TypographyPlan {
 
   // 4. 헤드라인 라인별 토큰 매핑
   const headlineLines: TypographyLine[] = rawHeadlineLines.map(lineText => {
-    const lineWords = lineText.split(' ')
+    const lineWords = splitPreservingBrackets(lineText)
     const tokens: TypographyToken[] = lineWords.map(word => {
       // 해당 단어가 강조 대상인지 검출
       const isEmp = detectedTokens.some(dt => dt.text === word && dt.isEmphasis)

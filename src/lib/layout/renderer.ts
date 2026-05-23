@@ -97,8 +97,8 @@ function renderTopChrome(source: string, pageNumber: number | undefined, totalPa
   const opacity = fill === '#050505' ? 0.30 : 0.46
   return `
     <g class="top-chrome">
-      <text x="72" y="78" font-family="${fontFamily('clean-sans')}" font-size="22" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="4">${source}</text>
-      ${pageLabel ? `<text x="1008" y="78" text-anchor="end" font-family="${fontFamily('clean-sans')}" font-size="20" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="2">${pageLabel}</text>` : ''}
+      <text xml:space="preserve" x="72" y="78" font-family="${fontFamily('clean-sans')}" font-size="22" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="4">${source}</text>
+      ${pageLabel ? `<text xml:space="preserve" x="1008" y="78" text-anchor="end" font-family="${fontFamily('clean-sans')}" font-size="20" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="2">${pageLabel}</text>` : ''}
     </g>
   `
 }
@@ -107,7 +107,7 @@ function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: s
   const label = buildSlideLabel(input)
   const opacity = fill === '#050505' ? 0.34 : 0.46
   return `
-    <text x="${x}" y="${y + 22}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="5">${escapeXml(label)}</text>
+    <text xml:space="preserve" x="${x}" y="${y + 22}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="5">${escapeXml(label)}</text>
   `
 }
 
@@ -118,7 +118,7 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
   return plan.headlineLines.map((line) => {
     const tspans = renderTokenTspans(line.tokens)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="650" fill="${fill}" letter-spacing="-0.4">${tspans || fallback}</text>`
+    const markup = `<text xml:space="preserve" x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="650" fill="${fill}" letter-spacing="-0.4">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
     return markup
   }).join('')
@@ -127,7 +127,7 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
 function renderTokenTspans(tokens: TypographyToken[]) {
   return tokens.map((token, index) => {
     const prefix = index === 0 ? '' : ' '
-    return `<tspan>${prefix}${escapeXml(token.text)}</tspan>`
+    return `<tspan xml:space="preserve">${prefix}${escapeXml(token.text)}</tspan>`
   }).join('')
 }
 
@@ -136,7 +136,7 @@ function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, al
   let currentY = y
 
   return plan.bodyLines.map((line) => {
-    const markup = `<text x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="400" fill="${fill}" letter-spacing="-0.1">${escapeXml(line)}</text>`
+    const markup = `<text xml:space="preserve" x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.bodyFontSize}" font-weight="400" fill="${fill}" letter-spacing="-0.1">${escapeXml(line)}</text>`
     currentY += plan.bodyFontSize * bodyLineGap
     return markup
   }).join('')
@@ -162,12 +162,12 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
   </defs>
   <rect width="1080" height="1350" fill="url(#cta-bottom-gradient)"/>
   ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, '#ffffff')}
-  <text x="540" y="675" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="52" font-weight="700" fill="#ffffff" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
-  <text x="72" y="970" font-family="${fontFamily('clean-sans')}" font-size="82" font-weight="750" fill="#f5f5f5" letter-spacing="-0.5">${escapeXml(headline)}</text>
-  ${bodyLines.slice(0, 2).map((line, index) => `<text x="72" y="${1060 + index * 52}" font-family="${fontFamily('clean-sans')}" font-size="29" font-weight="400" fill="#ffffff" fill-opacity="0.44" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
+  <text xml:space="preserve" x="540" y="675" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="52" font-weight="700" fill="#ffffff" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
+  <text xml:space="preserve" x="72" y="970" font-family="${fontFamily('clean-sans')}" font-size="82" font-weight="750" fill="#f5f5f5" letter-spacing="-0.5">${escapeXml(headline)}</text>
+  ${bodyLines.slice(0, 2).map((line, index) => `<text xml:space="preserve" x="72" y="${1060 + index * 52}" font-family="${fontFamily('clean-sans')}" font-size="29" font-weight="400" fill="#ffffff" fill-opacity="0.44" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
   <line x1="72" y1="1188" x2="1008" y2="1188" stroke="#ffffff" stroke-opacity="0.16"/>
   <rect x="72" y="1230" width="936" height="78" fill="#f3f3f3"/>
-  <text x="540" y="1280" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="28" font-weight="700" fill="#050505" letter-spacing="0">팔로우 ${escapeXml(sourceHandle)}</text>
+  <text xml:space="preserve" x="540" y="1280" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="28" font-weight="700" fill="#050505" letter-spacing="0">팔로우 ${escapeXml(sourceHandle)}</text>
 </svg>`
 
   try {

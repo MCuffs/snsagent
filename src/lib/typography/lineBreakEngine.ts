@@ -1,3 +1,36 @@
+export function splitPreservingBrackets(text: string): string[] {
+  const tokens: string[] = []
+  let currentToken = ''
+  let squareBracketDepth = 0
+  let parenthesisDepth = 0
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (char === '[') {
+      squareBracketDepth++
+    } else if (char === ']') {
+      squareBracketDepth = Math.max(0, squareBracketDepth - 1)
+    } else if (char === '(') {
+      parenthesisDepth++
+    } else if (char === ')') {
+      parenthesisDepth = Math.max(0, parenthesisDepth - 1)
+    }
+
+    if (char === ' ' && squareBracketDepth === 0 && parenthesisDepth === 0) {
+      if (currentToken) {
+        tokens.push(currentToken)
+        currentToken = ''
+      }
+    } else {
+      currentToken += char
+    }
+  }
+  if (currentToken) {
+    tokens.push(currentToken)
+  }
+  return tokens.filter(Boolean)
+}
+
 const PARTICLES = [
   '은', '는', '이', '가', '을', '를', '의', '에', '에서', '으로', '로',
   '와', '과', '도', '만', '하고', '이랑', '랑', '에게', '한테', '이며',
@@ -9,7 +42,8 @@ const PARTICLES = [
  * 자연스러운 의미 단위(어절/조사 그룹)로 줄바꿈되도록 개행 배열을 반환하는 엔진입니다.
  */
 export function breakKoreanLines(text: string, maxCharsPerLine: number, maxLines: number): string[] {
-  const words = text.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean)
+  const normalized = text.trim().replace(/\s+/g, ' ')
+  const words = splitPreservingBrackets(normalized)
   const groupedPhrases: string[] = []
   
   // 조사 결합: 단어가 조사로 시작하거나 이전 단어와 결합되어야 하는 경우 병합
