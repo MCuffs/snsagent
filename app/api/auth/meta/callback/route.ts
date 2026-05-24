@@ -4,7 +4,7 @@ import { getSessionUser } from '../../../../actions'
 import { dbService } from '../../../../../lib/db-service'
 import { tokenEncryptor } from '../../../../../lib/instagram/client'
 import { exchangeCodeForShortLivedToken, exchangeForLongLivedToken } from '../../../../../lib/meta/oauth'
-import { fetchInstagramBusinessAccounts, getFirstInstagramBusinessAccount } from '../../../../../lib/meta/pages'
+import { fetchInstagramLoginAccount } from '../../../../../lib/meta/pages'
 
 export const runtime = 'nodejs'
 
@@ -48,32 +48,31 @@ export async function GET(request: Request) {
 
     const shortToken = await exchangeCodeForShortLivedToken(request, code)
     const longToken = await exchangeForLongLivedToken(shortToken.access_token)
-    const accounts = await fetchInstagramBusinessAccounts(longToken.access_token)
-    const selectedAccount = getFirstInstagramBusinessAccount(accounts)
-
-    if (!selectedAccount) {
-      return NextResponse.redirect(new URL('/instagram?error=no_instagram_business_account', request.url))
-    }
+    const account = await fetchInstagramLoginAccount(longToken.access_token)
 
     const expiresAt = longToken.expires_in
       ? new Date(Date.now() + longToken.expires_in * 1000)
       : null
 
     await dbService.saveInstagramOAuthAccount(user.id, brand.id, {
-      instagramAccountId: selectedAccount.instagramAccountId,
+      instagramAccountId: account.instagramAccountId,
       accessTokenEncrypted: tokenEncryptor.encrypt(longToken.access_token),
-      facebookPageId: selectedAccount.facebookPageId,
-      pageAccessTokenEncrypted: tokenEncryptor.encrypt(selectedAccount.pageAccessToken),
+      facebookPageId: '',
+      pageAccessTokenEncrypted: tokenEncryptor.encrypt(''),
       tokenExpiresAt: expiresAt,
-      username: selectedAccount.username,
-      profilePictureUrl: selectedAccount.profilePictureUrl,
+      username: account.username,
+      profilePictureUrl: account.profilePictureUrl,
       connectionMethod: 'oauth',
     })
 
     return NextResponse.redirect(new URL('/instagram?connected=meta', request.url))
   } catch (error) {
     console.error('Meta OAuth callback failed:', error)
-    return NextResponse.redirect(new URL('/instagram?error=meta_oauth_failed', request.url))
+    const errorCode =
+      error instanceof Error && error.message === 'no_instagram_business_account'
+        ? 'no_instagram_business_account'
+        : 'meta_oauth_failed'
+    return NextResponse.redirect(new URL(`/instagram?error=${errorCode}`, request.url))
   }
 }
 

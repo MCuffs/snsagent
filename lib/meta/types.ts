@@ -23,3 +23,10 @@ export interface InstagramOAuthAccount {
   username?: string
   profilePictureUrl?: string
 }
+
+export interface InstagramLoginAccount {
+  instagramAccountId: string
+  username?: string
+  profilePictureUrl?: string
+  accountType?: string
+}
