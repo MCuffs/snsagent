@@ -10,7 +10,7 @@ export default async function LoginPage({
 }) {
   const user = await getSessionUser()
   if (user) {
-    redirect('/dashboard')
+    redirect('/brand')
   }
 
   const params = searchParams ? await searchParams : {}
@@ -23,7 +23,7 @@ export default async function LoginPage({
     const name = formData.get('name') as string
     const result = await loginAction(email, name)
     if (result.success) {
-      redirect('/dashboard')
+      redirect('/brand')
     }
   }
 
@@ -33,7 +33,7 @@ export default async function LoginPage({
     const demoEmail = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
     const result = await loginAction(demoEmail, 'Demo User')
     if (result.success) {
-      redirect('/dashboard')
+      redirect('/brand')
     }
   }
 
