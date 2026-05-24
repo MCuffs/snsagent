@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Briefcase, Info, Save, Sparkles, CheckCircle2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
+import { AlertCircle, ArrowRight, Briefcase, Info, Save, Sparkles, CheckCircle2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
 import { saveBrandAction, analyzeBrandWebsiteAction } from '../../actions'
 
 const industries = ['온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS']
@@ -18,6 +18,7 @@ interface BrandData {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  brandDna?: string | null
 }
 
 interface BrandFormProps {
@@ -39,6 +40,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
   const [mainColor, setMainColor] = useState(existingBrand?.mainColor || '#b94718')
   const [forbiddenWords, setForbiddenWords] = useState(existingBrand?.forbiddenWords || '')
   const [ctaStyle, setCtaStyle] = useState(existingBrand?.ctaStyle || '')
+  const [brandDna, setBrandDna] = useState(existingBrand?.brandDna || null)
 
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -90,8 +92,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
       }
 
       if (res.brandProfile) {
-        const { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle } = res.brandProfile
-        const profile = { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle }
+        const { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle, brandDna } = res.brandProfile
         
         // Populate form with animation delay
         setName(name)
@@ -101,6 +102,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         setMainColor(mainColor)
         setForbiddenWords(forbiddenWords)
         setCtaStyle(ctaStyle)
+        setBrandDna(brandDna || null)
         
         if (res.markdownReport) {
           setAnalysisReport(res.markdownReport)
@@ -111,13 +113,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         setHighlightFields(true)
         setTimeout(() => setHighlightFields(false), 3000)
 
-        const saveResult = await saveBrandAction(currentBrandId, profile)
-        if (saveResult.success) {
-          setCurrentBrandId(saveResult.brand.id)
-          router.refresh()
-        } else {
-          setFormError(saveResult.error || 'AI 브랜드 정보를 저장하지 못했습니다. 저장 버튼을 눌러 다시 시도해 주세요.')
-        }
+        setFormSuccess('AI 분석이 완료되었습니다. 내용을 확인한 뒤 저장하기를 눌러 브랜드 정보를 저장하세요.')
       }
     } catch (err) {
       console.error(err)
@@ -129,6 +125,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const shouldGoToCampaign = !currentBrandId
     setIsSubmitting(true)
     setFormError(null)
     setFormSuccess(null)
@@ -142,12 +139,17 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         mainColor,
         forbiddenWords,
         ctaStyle,
+        brandDna,
       })
 
       if (res.success) {
         setCurrentBrandId(res.brand.id)
         setFormSuccess('브랜드 정보가 저장되었습니다.')
-        router.refresh()
+        if (shouldGoToCampaign) {
+          router.push('/campaign/new')
+        } else {
+          router.refresh()
+        }
       } else {
         setFormError(res.error || '저장에 실패했습니다.')
       }
@@ -157,6 +159,138 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!currentBrandId) {
+    const canSaveOnboarding = Boolean(name && industry && targetAudience && toneOfVoice && mainColor && ctaStyle)
+
+    return (
+      <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-3xl flex-col justify-center px-5 py-10 md:px-8">
+        <div className="mb-8">
+          <p className="eyebrow">Brand Onboarding</p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight text-neutral-950 md:text-5xl">
+            브랜드 웹사이트를 먼저 분석합니다.
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#6f6a61]">
+            처음 로그인한 사용자는 브랜드 설정을 완료해야 카드 만들기와 CMS 메뉴를 사용할 수 있습니다.
+            브랜드 사이트 URL을 입력하면 AI가 기본 프로필을 채우고, 저장 후 바로 카드 만들기로 이동합니다.
+          </p>
+        </div>
+
+        {formError && (
+          <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+            <div className="flex gap-3">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <p>{formError}</p>
+            </div>
+          </div>
+        )}
+
+        {formSuccess && (
+          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
+            <div className="flex gap-3">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              <p>{formSuccess}</p>
+            </div>
+          </div>
+        )}
+
+        <section className="panel rounded-xl p-5 md:p-7">
+          <form onSubmit={handleAIAnalyze} className="space-y-4">
+            <label htmlFor="onboarding-url" className="block text-xs font-black uppercase tracking-[0.12em] text-[#6f6a61]">
+              브랜드 사이트 URL
+            </label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Globe className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8479]" />
+                <input
+                  id="onboarding-url"
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  disabled={isAnalyzing}
+                  required
+                  placeholder="https://example.com"
+                  className="field h-12 pl-11 pr-4 text-base"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isAnalyzing || !url}
+                className="btn-primary h-12 shrink-0 px-5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isAnalyzing ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                AI 분석 시작
+              </button>
+            </div>
+          </form>
+
+          {isAnalyzing && (
+            <div className="mt-5 rounded-lg border border-[#dedbd2] bg-[#f8f3e9] p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold text-[#b94718]">{analyzeSteps[analyzeStep]}</span>
+                <span className="text-xs text-[#6f6a61]">{Math.round(((analyzeStep + 1) / 4) * 100)}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200">
+                <div
+                  className="h-full bg-[#b94718] transition-all duration-1000 ease-out"
+                  style={{ width: `${((analyzeStep + 1) / 4) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {analysisReport && (
+            <div className="mt-6 rounded-lg border border-[#dedbd2] bg-white p-4">
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                <SummaryItem label="브랜드명" value={name} />
+                <SummaryItem label="업종" value={industry} />
+                <SummaryItem label="타깃" value={targetAudience} />
+                <SummaryItem label="톤앤매너" value={toneOfVoice} />
+                <SummaryItem label="브랜드 컬러" value={mainColor} />
+                <SummaryItem label="CTA" value={ctaStyle} />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowReport(!showReport)}
+                className="mt-5 flex w-full items-center justify-between border-t border-[#ece9e0] pt-4 text-left text-xs font-black text-[#4a4039]"
+              >
+                AI 분석 리포트
+                {showReport ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {showReport && (
+                <div className="mt-4 max-h-72 overflow-y-auto rounded-lg bg-[#fffdf8] p-4">
+                  <MiniMarkdown content={analysisReport} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {analysisReport && (
+            <form onSubmit={handleSubmit} className="mt-6 flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting || !canSaveOnboarding}
+                className="btn-primary h-12 px-6 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                브랜드 저장하고 카드 만들기
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </form>
+          )}
+        </section>
+      </div>
+    )
   }
 
   return (
@@ -454,7 +588,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         <div className="mt-8 flex justify-end border-t border-[#ece9e0] pt-6">
           <button
             type="submit"
-            disabled={isSubmitting || (!existingBrand && !limitAllowed)}
+            disabled={isSubmitting || isAnalyzing || (!currentBrandId && !limitAllowed)}
             className="btn-primary px-5 disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-2 bg-[#b94718] hover:bg-[#a33d13] text-white h-11 font-bold rounded-lg"
           >
             {isSubmitting ? (
@@ -529,6 +663,17 @@ function MiniMarkdown({ content }: { content: string }) {
         }
         return <div key={idx} className="h-1" />
       })}
+    </div>
+  )
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[#ece9e0] bg-[#fffdf8] px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9a8d82]">{label}</p>
+      <p className="mt-1 truncate text-sm font-bold text-neutral-950" title={value}>
+        {value || '-'}
+      </p>
     </div>
   )
 }

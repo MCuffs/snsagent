@@ -15,6 +15,8 @@ import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
 import { normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
+import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
+import { collectBrandUrlContext } from '../lib/brand-url-collector'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -30,6 +32,38 @@ function unauthenticated() {
 
 function failed(error: string) {
   return { success: false as const, error }
+}
+
+async function getOwnedBrandOrFallback(userId: string, brandId?: string | null) {
+  const brand = brandId ? await dbService.getBrand(brandId) : null
+  if (brand?.userId === userId) return brand
+
+  const [fallbackBrand] = await dbService.getBrands(userId)
+  return fallbackBrand || null
+}
+
+function withBrandDna<T extends {
+  name: string
+  industry: string
+  targetAudience: string
+  toneOfVoice: string
+  mainColor: string
+  ctaStyle: string
+  brandDna?: string | null
+}>(profile: T, sourceText?: string, parsed?: Record<string, unknown>) {
+  return {
+    ...profile,
+    brandDna: profile.brandDna || buildBrandDnaFromProfile({
+      name: profile.name,
+      industry: profile.industry,
+      targetAudience: profile.targetAudience,
+      toneOfVoice: profile.toneOfVoice,
+      mainColor: profile.mainColor,
+      ctaStyle: profile.ctaStyle,
+      sourceText,
+      parsed,
+    }),
+  }
 }
 
 // Helper to get authenticated user from session cookies
@@ -93,25 +127,27 @@ export async function saveBrandAction(brandId: string | null, data: {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  brandDna?: string | null
 }) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
   try {
-    // Limit check for new brand creation
-    if (!brandId) {
-      const limitCheck = await checkBrandCountLimit(user.id)
-      if (!limitCheck.allowed) {
-        return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
-      }
-    }
-
     let effectiveBrandId = brandId
     if (effectiveBrandId) {
       const existingBrand = await dbService.getBrand(effectiveBrandId)
       if (!existingBrand || existingBrand.userId !== user.id) {
-        // Stale or foreign ID — treat as new brand creation
-        effectiveBrandId = null
+        // Stale or foreign ID: update this user's existing brand if one exists.
+        const [fallbackBrand] = await dbService.getBrands(user.id)
+        effectiveBrandId = fallbackBrand?.id || null
+      }
+    }
+
+    // Run the creation limit check after stale ID normalization.
+    if (!effectiveBrandId) {
+      const limitCheck = await checkBrandCountLimit(user.id)
+      if (!limitCheck.allowed) {
+        return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
       }
     }
 
@@ -135,9 +171,8 @@ export async function saveInstagramAccountAction(brandId: string, accountId: str
     return failed('계정 ID와 Access Token을 입력해 주세요.')
   }
 
-  const brand = await dbService.getBrand(brandId)
+  const brand = await getOwnedBrandOrFallback(user.id, brandId)
   if (!brand) return failed('브랜드를 찾을 수 없습니다.')
-  if (brand.userId !== user.id) return forbidden()
 
   // Validate connection
   const validation = await validateInstagramConnection(normalizedAccountId, normalizedAccessToken)
@@ -167,9 +202,8 @@ export async function quickConnectInstagramAction(brandId: string) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
-  const brand = await dbService.getBrand(brandId)
+  const brand = await getOwnedBrandOrFallback(user.id, brandId)
   if (!brand) return failed('브랜드를 찾을 수 없습니다.')
-  if (brand.userId !== user.id) return forbidden()
 
   if (!isInstagramMockMode()) {
     return failed('빠른 연동은 로컬 시뮬레이션 모드에서만 사용할 수 있습니다. 운영 환경에서는 Meta API 정보를 직접 입력해 주세요.')
@@ -768,7 +802,7 @@ function getGenericWebsiteFallback(url: string) {
 CTA: 스토어에서 자세히 보기
 `
 
-  return { brandProfile, markdownReport }
+  return { brandProfile: withBrandDna(brandProfile, url), markdownReport }
 }
 
 function getNaverSmartstoreFallback(shopId: string, url: string) {
@@ -806,7 +840,7 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
 * **사용 지양 용어 (금칙어)**: \`만병통치약, 기적의 효과, 최저가, 100% 완치\` (의료법상 허위/과대광고 소지가 있거나 신뢰를 저해하는 극단적 표현 배제)
 * **피드 전환율 상승을 위한 CTA**: \`오늘의 건강 혜택 프로필 링크에서 확인하기\`
 `
-    return { brandProfile, markdownReport }
+    return { brandProfile: withBrandDna(brandProfile, `${shopId} ${url}`), markdownReport }
   } else {
     const brandProfile = {
       name: `${shopId} 스토어`,
@@ -838,7 +872,7 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
 * **사용 지양 용어 (금칙어)**: \`최저가, 100% 보장, 광고, 실패없는\` (지나치게 상업적이거나 어뷰징 요소가 느껴지는 문구 제외)
 * **피드 전환율 상승을 위한 CTA**: \`스토어에서 단독 혜택 만나보기\`
 `
-    return { brandProfile, markdownReport }
+    return { brandProfile: withBrandDna(brandProfile, `${shopId} ${url}`), markdownReport }
   }
 }
 
@@ -860,38 +894,10 @@ export async function analyzeBrandWebsiteAction(url: string) {
   const shopId = isNaverStore ? extractSmartStoreShopId(targetUrl) : null
 
   try {
-    console.log(`Scraping URL: ${targetUrl}`)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
-
-    const headers: Record<string, string> = {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-    }
-
-    if (isNaverStore) {
-      headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'
-      headers['Referer'] = 'https://m.search.naver.com/'
-    } else {
-      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-
-    const response = await fetch(targetUrl, {
-      signal: controller.signal,
-      headers
-    })
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`웹사이트를 불러오지 못했습니다. (HTTP ${response.status})`)
-    }
-
-    const html = await response.text()
-    const cleanedText = cleanHtmlText(html)
-
-    if (cleanedText.length < 50) {
-      throw new Error('웹사이트에서 텍스트 정보를 충분히 추출할 수 없습니다. 빈 페이지이거나 차단되었을 수 있습니다.')
-    }
+    console.log(`Collecting brand URL context: ${targetUrl}`)
+    const collected = await collectBrandUrlContext(targetUrl, { isNaverStore })
+    const cleanedText = collected.promptContext
+    console.log(`Brand URL collection complete: ${collected.finalUrl} | ${collected.diagnostics.join(', ')}`)
 
     const apiKey = process.env.OPENAI_API_KEY
     const useRealAI = isConfiguredOpenAIKey(apiKey)
@@ -904,11 +910,11 @@ You are an expert brand consultant and digital marketer.
 Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
 Also, write a professional brand analysis report in Markdown format.
 
-[Scraped Website Content]
+[Collected Brand URL Context]
 ${cleanedText}
 
 [Requirements]
-1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style for Instagram.
+1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style for Instagram. Prioritize Page Metadata, JSON-LD structured data, headings, image alt text, product/category signals, and important body text. Do not overfit to footer/legal/navigation text.
 2. The primary brand color must be a high-quality hex color code (e.g. '#B94718', '#2D3748', etc.) that represents the brand's aesthetic.
 3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry.
 4. The tone of voice must match one of these pre-defined options or a custom short variant:
@@ -919,6 +925,7 @@ ${cleanedText}
 5. The industry must fit one of: '온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'.
 6. Write a brand identity report in Markdown (under "markdownReport"). Keep it professional, informative, and written in Korean (한국어). The report should outline the Brand Identity, Key Strengths, and SNS content strategy suggestions.
 7. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
+8. Extract brand-specific DNA fields for downstream card-news generation. These must be concrete to the website, not generic industry labels.
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
 {
@@ -929,6 +936,14 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
   "mainColor": "#HEXCODE",
   "forbiddenWords": "word1, word2, word3",
   "ctaStyle": "A short call-to-action recommendation (e.g. 프로필 링크에서 만나보기)",
+  "coreProducts": ["specific product/service names"],
+  "valueProposition": "specific brand promise",
+  "customerPainPoints": ["specific customer problem"],
+  "differentiators": ["specific differentiator"],
+  "visualMood": "specific background-image mood",
+  "contentPillars": ["SNS pillar"],
+  "brandKeywords": ["brand-specific keyword"],
+  "avoidVisuals": ["generic visual trope to avoid"],
   "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서\\n\\n## 1. 브랜드 정체성\\n브랜드명: 휴100\\n업종: 온라인 스토어\\n\\n## 2. SNS 콘텐츠 전략\\n..."
 }
 `
@@ -960,7 +975,17 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
             toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
             mainColor: parsed.mainColor || '#b94718',
             forbiddenWords: parsed.forbiddenWords || '',
-            ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
+            ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기',
+            brandDna: buildBrandDnaFromProfile({
+              name: parsed.name || 'Unknown brand',
+              industry: parsed.industry || 'Online store',
+              targetAudience: parsed.targetAudience || 'Target customers',
+              toneOfVoice: parsed.toneOfVoice || 'Friendly and clear',
+              mainColor: parsed.mainColor || '#b94718',
+              ctaStyle: parsed.ctaStyle || '',
+              sourceText: collected.sourceText,
+              parsed,
+            })
           },
           markdownReport: removeMarkdownBold(parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.')
         }
@@ -976,7 +1001,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
         const result = getNaverSmartstoreFallback(shopId, targetUrl)
         return {
           success: true as const,
-          brandProfile: result.brandProfile,
+          brandProfile: withBrandDna(result.brandProfile, `${shopId} ${targetUrl}`),
           markdownReport: result.markdownReport
         }
       }
@@ -1081,7 +1106,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 
       return {
         success: true as const,
-        brandProfile: mockProfile,
+        brandProfile: withBrandDna(mockProfile, `${url} ${markdownReport}`),
         markdownReport: removeMarkdownBold(markdownReport)
       }
     }
@@ -1157,7 +1182,17 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
                 toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
                 mainColor: parsed.mainColor || '#03C75A',
                 forbiddenWords: parsed.forbiddenWords || '',
-                ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기'
+                ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기',
+                brandDna: buildBrandDnaFromProfile({
+                  name: parsed.name || `${shopId} store`,
+                  industry: '온라인 스토어',
+                  targetAudience: parsed.targetAudience || 'Target customers',
+                  toneOfVoice: parsed.toneOfVoice || 'Friendly and clear',
+                  mainColor: parsed.mainColor || '#03C75A',
+                  ctaStyle: parsed.ctaStyle || '',
+                  sourceText: `${shopId} ${url}`,
+                  parsed,
+                })
               },
               markdownReport: removeMarkdownBold(parsed.markdownReport || '# 분석 복원 완료\n\n브랜드 분석 결과를 성공적으로 생성했습니다.')
             }
@@ -1170,7 +1205,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       const localResult = getNaverSmartstoreFallback(shopId, url)
       return {
         success: true as const,
-        brandProfile: localResult.brandProfile,
+        brandProfile: withBrandDna(localResult.brandProfile, `${shopId} ${url}`),
         markdownReport: removeMarkdownBold(localResult.markdownReport)
       }
     }
@@ -1178,7 +1213,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
     const fallback = getGenericWebsiteFallback(url)
     return {
       success: true as const,
-      brandProfile: fallback.brandProfile,
+      brandProfile: withBrandDna(fallback.brandProfile, url),
       markdownReport: removeMarkdownBold(fallback.markdownReport)
     }
   }
@@ -1196,9 +1231,8 @@ export async function recommendCampaignAction(brandId: string, topic: string) {
   }
 
   try {
-    const brand = await dbService.getBrand(brandId)
+    const brand = await getOwnedBrandOrFallback(user.id, brandId)
     if (!brand) return failed('브랜드를 찾을 수 없습니다.')
-    if (brand.userId !== user.id) return forbidden()
 
     const apiKey = process.env.OPENAI_API_KEY
     const useRealAI = isConfiguredOpenAIKey(apiKey)
@@ -1219,6 +1253,9 @@ Based on the following brand profile and a raw topic/idea for an Instagram carou
 - Forbidden Words: ${brand.forbiddenWords || 'None'}
 - CTA Style: ${brand.ctaStyle || 'None'}
 
+[Brand DNA Harness]
+${formatBrandDnaForPrompt(brand.brandDna)}
+
 [Campaign Topic/Idea]
 ${topic}
 
@@ -1230,8 +1267,8 @@ ${topic}
    - "slideCount": Recommended total number of slides (Must be exactly one of [5, 7, 10])
 2. Generate:
    - "title": A concise Korean archive-card headline (under 18 Korean chars, no emoji, no markdown bold, do not prepend brand name unless the topic explicitly asks for it).
-   - "keyContent": Detailed copy for each slide. Write one line per slide. The number of lines must match "slideCount". Each line should contain a short headline and sub-content separated by ":". Use the brand's industry, target audience, tone of voice, forbidden words, and CTA style. Do not include markdown bold syntax (**).
-   - "visualHint": A premium archive-card background prompt. It must match the brand industry and audience, but should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left blank negative space for app-rendered copy.
+   - "keyContent": Detailed copy for each slide. Write one line per slide. The number of lines must match "slideCount". Each line should contain a short headline and sub-content separated by ":". Use the brand's industry, target audience, tone of voice, forbidden words, CTA style, and Brand DNA. At least 70% of slides must mention or imply the Brand DNA's product/service, differentiator, customer pain, or value proposition. Do not include markdown bold syntax (**).
+   - "visualHint": A premium archive-card background prompt. It must match the Brand DNA's core products, visual mood, differentiators, and avoidVisuals. It should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left blank negative space for app-rendered copy.
    - "source": Recommended brand label/watermark (e.g. brand website, or Instagram handle, or simply "${brand.name}")
 3. CRITICAL: Do NOT use markdown bold syntax (** or ***) anywhere in the text. Keep all text plain and clean.
 4. Avoid forbidden words exactly: ${brand.forbiddenWords || 'None'}.

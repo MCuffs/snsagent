@@ -93,6 +93,7 @@ export async function generateCarouselCampaign(params: {
       brandToneOfVoice: params.brandProfile.toneOfVoice,
       forbiddenWords: params.brandProfile.forbiddenWords,
       ctaStyle: params.brandProfile.ctaStyle,
+      brandDna: params.brandProfile.brandDna,
       slides: agentSlides,
     })
     agentSlides = brandRes.slides

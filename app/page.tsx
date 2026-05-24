@@ -39,6 +39,8 @@ const showcaseImages = [
 ]
 
 export default function LandingPage() {
+  const showLocalTestAccess = process.env.NODE_ENV !== 'production'
+
   return (
     <main className="min-h-screen overflow-hidden bg-white text-[#101827]">
       <section className="premium-blue-bg relative flex min-h-screen flex-col">
@@ -54,6 +56,11 @@ export default function LandingPage() {
               <a href="#support">기능</a>
               <a href="#start">시작하기</a>
             </nav>
+            {showLocalTestAccess && (
+              <Link href="/api/auth/test-login" className="btn-blue-secondary min-h-10 px-4 text-xs">
+                테스트 접근
+              </Link>
+            )}
             <Link href="/api/auth/google/start" className="btn-blue px-5">
               구글 로그인하기
             </Link>
@@ -91,6 +98,12 @@ export default function LandingPage() {
               구글 로그인하기
               <ArrowRight className="h-4 w-4" />
             </Link>
+            {showLocalTestAccess && (
+              <Link href="/api/auth/test-login" className="btn-blue-secondary mt-3 w-full text-base">
+                테스트 접근
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
         </div>
       </section>

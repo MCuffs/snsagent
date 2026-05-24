@@ -1,9 +1,20 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Clock, Sparkles, UploadCloud } from 'lucide-react'
+import { getSessionUser } from '../../actions'
+import { dbService } from '../../../lib/db-service'
 
 export const dynamic = 'force-dynamic'
 
-export default function InstagramSettingsPage() {
+export default async function InstagramSettingsPage() {
+  const user = await getSessionUser()
+  if (!user) redirect('/login')
+
+  const brands = await dbService.getBrands(user.id)
+  if (brands.length === 0) {
+    redirect('/brand')
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-10 md:px-8">
       <section className="panel rounded-2xl p-8 md:p-10">

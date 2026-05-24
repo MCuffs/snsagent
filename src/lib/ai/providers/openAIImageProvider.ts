@@ -30,8 +30,15 @@ export class OpenAIImageProvider implements ImageProvider {
   ): Promise<{ imageUrl: string }> {
     const fullPrompt = `${prompt}. ${NO_TEXT_IMAGE_INSTRUCTIONS}`
     const size = '1024x1024'
+    const refUrls = options?.productImageUrls?.filter(Boolean) ?? []
 
     try {
+      // When reference images are provided, use images.edit so the model
+      // can use them as visual anchors (style, subject, color palette, etc.)
+      if (refUrls.length > 0 && this.model.startsWith('gpt-image-')) {
+        return await this.generateWithReferences(fullPrompt, refUrls, size)
+      }
+
       if (this.model.startsWith('gpt-image-')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const response = await (this.openai.images.generate as any)({
@@ -60,7 +67,7 @@ export class OpenAIImageProvider implements ImageProvider {
       return { imageUrl: response.data?.[0]?.url || '' }
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : String(err)
-      
+
       // Fallback 1: dall-e-3 -> dall-e-2
       if (
         this.model === 'dall-e-3' &&
@@ -81,9 +88,46 @@ export class OpenAIImageProvider implements ImageProvider {
         }
       }
 
-      // Fallback 2: Any DALL-E / gpt-image-2 error -> Mock SVG Image
+      // Fallback 2: Any DALL-E / gpt-image error -> Mock SVG Image
       console.warn(`Image generation failed for model ${this.model}, falling back to mock image provider`, err)
       return new MockImageProvider().generateImage(prompt)
     }
+  }
+
+  // Fetch reference image URLs and call images.edit so the model uses them
+  // as visual references for subject, style, and color palette
+  private async generateWithReferences(
+    prompt: string,
+    refUrls: string[],
+    size: string
+  ): Promise<{ imageUrl: string }> {
+    const imageFiles = await Promise.all(
+      refUrls.slice(0, 4).map(async (url, i) => {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`Reference image fetch failed: ${url}`)
+        const arrayBuffer = await res.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const contentType = res.headers.get('content-type') || 'image/png'
+        const ext = contentType.split('/')[1]?.split('+')[0] || 'png'
+        return new File([buffer], `ref-${i}.${ext}`, { type: contentType })
+      })
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (this.openai.images.edit as any)({
+      model: this.model,
+      image: imageFiles.length === 1 ? imageFiles[0] : imageFiles,
+      prompt,
+      size,
+      output_format: 'png',
+      quality: 'low',
+      n: 1,
+    })
+
+    const image = response.data?.[0]
+    if (image?.b64_json) {
+      return { imageUrl: `data:image/png;base64,${image.b64_json}` }
+    }
+    return { imageUrl: image?.url || '' }
   }
 }

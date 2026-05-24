@@ -28,6 +28,7 @@ export interface Brand {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  brandDna?: string | null
   createdAt: Date
   updatedAt: Date
 }

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { Info, Sparkles } from 'lucide-react'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
@@ -9,18 +10,9 @@ export default async function NewCampaignPage() {
   const user = await getSessionUser()
   if (!user) return null
 
-  let brands = await dbService.getBrands(user.id)
+  const brands = await dbService.getBrands(user.id)
   if (brands.length === 0) {
-    const defaultBrand = await dbService.saveBrand(user.id, null, {
-      name: '기본 브랜드',
-      industry: '소상공인/온라인 스토어',
-      targetAudience: '브랜드의 상품과 서비스를 찾는 잠재 고객',
-      toneOfVoice: '친근하고 신뢰감 있게',
-      mainColor: '#ff4f0a',
-      forbiddenWords: '',
-      ctaStyle: '자세히 보기',
-    })
-    brands = [defaultBrand]
+    redirect('/brand')
   }
 
   return (
@@ -32,8 +24,7 @@ export default async function NewCampaignPage() {
           <div>
             <h1 className="text-4xl font-black tracking-[-0.055em] text-[#1f1512]">미디어 카드뉴스 생성</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[#746a62]">
-              뉴스형, 트렌드형, 정보형 카드뉴스를 생성합니다. 이미지는 배경만 만들고,
-              레이아웃과 한글 타이포그래피는 렌더링 엔진이 직접 합성합니다.
+              저장된 브랜드 프로필을 바탕으로 뉴스형, 트렌드형, 정보형 카드뉴스를 생성합니다.
             </p>
           </div>
         </div>
@@ -42,7 +33,7 @@ export default async function NewCampaignPage() {
       <div className="mb-6 flex gap-3 rounded-[8px] border border-[#d8edf7] bg-[#f3fbff] p-4 text-sm text-[#4c6070]">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2aa2db]" />
         <p>
-          현재 브랜드는 <strong>{brands[0].name}</strong>입니다. 생성 결과는 캠페인으로 저장되고,
+          현재 브랜드는 <strong>{brands[0].name}</strong>입니다. 생성 결과는 캠페인으로 저장되고
           결과 화면에서 슬라이드와 캡션을 확인할 수 있습니다.
         </p>
       </div>
@@ -57,6 +48,7 @@ export default async function NewCampaignPage() {
           mainColor: brand.mainColor,
           forbiddenWords: brand.forbiddenWords,
           ctaStyle: brand.ctaStyle,
+          brandDna: brand.brandDna,
         }))}
       />
     </div>

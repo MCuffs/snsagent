@@ -5,6 +5,7 @@ import { getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
+import { buildBrandHarnessPrompt, checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
@@ -29,6 +30,7 @@ export interface MediaCarouselInput {
   brandIndustry?: string
   brandForbiddenWords?: string
   brandCtaStyle?: string
+  brandDna?: string | null
   topic: string
   category: string
   title: string
@@ -38,6 +40,7 @@ export interface MediaCarouselInput {
   slideCount: number
   source?: string
   visualHint?: string
+  productImageUrls?: string[]
   imageProvider?: ImageProvider
 }
 
@@ -83,6 +86,13 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     contentType: input.contentType,
   }))
   const plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
+  const brandHarnessPrompt = buildBrandHarnessPrompt({
+    brandName: input.brandName,
+    brandIndustry: input.brandIndustry,
+    brandToneOfVoice: input.brandToneOfVoice,
+    brandMainColor: input.brandMainColor,
+    brandDna: input.brandDna,
+  })
 
   // 1. Initialize Agents
   const brandAgent = new BrandIdentityAgent()
@@ -106,6 +116,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     brandToneOfVoice: input.brandToneOfVoice,
     forbiddenWords: input.brandForbiddenWords,
     ctaStyle: input.brandCtaStyle,
+    brandDna: input.brandDna,
     slides: agentSlides,
   })
   agentSlides = brandRes.slides
@@ -133,6 +144,14 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   agentSlides = visualRes.slides
   agentReportLogs.push(...visualRes.logs)
+  agentSlides = reinforceSlidesWithBrandDna(agentSlides, input.brandDna)
+  agentReportLogs.push({
+    agentName: 'BrandHarness',
+    role: 'brand-fit',
+    status: 'info',
+    message: 'Brand DNA harness applied to slide copy and visual prompt.',
+    timestamp: new Date().toISOString(),
+  })
 
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
@@ -164,13 +183,14 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       brandMainColor: input.brandMainColor,
       brandToneOfVoice: input.brandToneOfVoice,
       brandIndustry: input.brandIndustry,
+      brandDna: input.brandDna,
     })
 
     let backgroundImageUrl = ''
     try {
-      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
+      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${visualDirection.prompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
         size: '1024x1024',
-        productImageUrls: [],
+        productImageUrls: input.productImageUrls || [],
       })
       backgroundImageUrl = background.imageUrl
     } catch (err) {
@@ -188,13 +208,20 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
     })
 
-    const slideQualityCheck = runMediaCardQualityCheck({
+    const baseSlideQualityCheck = runMediaCardQualityCheck({
       layout: harness.layout,
       typography: harness.typography,
       headline: slide.headline,
       body: slide.body,
       backgroundImageUrl,
       harnessDiagnostics: harness.diagnostics,
+    })
+    const slideQualityCheck = checkBrandFit({
+      headline: slide.headline,
+      body: slide.body,
+      designPrompt: visualDirection.prompt,
+      brandDna: input.brandDna,
+      qualityCheck: baseSlideQualityCheck,
     })
 
     // Feed slide diagnostics to Quality Agent

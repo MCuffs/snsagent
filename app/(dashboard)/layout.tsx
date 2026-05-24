@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
+  ArrowRight,
   Briefcase,
   CreditCard,
   Home,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
   }
 
   const brands = await dbService.getBrands(user.id)
+  const hasBrand = brands.length > 0
   const activeBrandName = brands[0]?.name || '브랜드 미설정'
 
   return (
@@ -48,31 +50,47 @@ export default async function DashboardLayout({
 
         <div className="px-4 py-5">
           <div className="rounded-[8px] border border-[#e8dfd4] bg-white p-4 shadow-[0_14px_40px_rgba(31,21,18,0.05)]">
-            <p className="eyebrow">Active Brand</p>
-            <p className="mt-2 truncate text-sm font-bold text-neutral-950">{activeBrandName}</p>
-            <p className="mt-1 truncate text-xs text-[#6f6a61]">{user.email}</p>
+            <p className="eyebrow">{hasBrand ? 'Active Brand' : 'Setup Required'}</p>
+            <p className="mt-2 truncate text-sm font-bold text-neutral-950">
+              {hasBrand ? activeBrandName : '브랜드 사이트 분석부터 시작하세요'}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[#6f6a61]">
+              {hasBrand ? user.email : 'URL을 입력해 브랜드 프로필을 저장하면 CMS 메뉴가 열립니다.'}
+            </p>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={
-                  item.primary
-                    ? 'mt-3 flex items-center gap-3 rounded-full bg-[#1f1512] px-4 py-3 text-sm font-black text-white transition hover:bg-[#352521]'
-                    : 'flex items-center gap-3 rounded-full px-4 py-3 text-sm font-black text-[#5d584f] transition hover:bg-white hover:text-[#1f1512]'
-                }
-              >
-                <Icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </nav>
+        {hasBrand ? (
+          <nav className="flex-1 space-y-1 px-3">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={
+                    item.primary
+                      ? 'mt-3 flex items-center gap-3 rounded-full bg-[#1f1512] px-4 py-3 text-sm font-black text-white transition hover:bg-[#352521]'
+                      : 'flex items-center gap-3 rounded-full px-4 py-3 text-sm font-black text-[#5d584f] transition hover:bg-white hover:text-[#1f1512]'
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+        ) : (
+          <nav className="flex-1 px-3">
+            <Link
+              href="/brand"
+              className="flex items-center gap-3 rounded-full bg-[#1f1512] px-4 py-3 text-sm font-black text-white"
+            >
+              <ArrowRight className="h-4 w-4" />
+              <span>브랜드 URL 입력</span>
+            </Link>
+          </nav>
+        )}
 
         <div className="border-t border-[#e8dfd4] p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -105,15 +123,15 @@ export default async function DashboardLayout({
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8dfd4] bg-[#fffdf8]/86 px-5 backdrop-blur-xl md:px-8">
-          <Link href="/dashboard" className="font-black tracking-tight text-[#1f1512] lg:hidden">
+          <Link href={hasBrand ? '/dashboard' : '/brand'} className="font-black tracking-tight text-[#1f1512] lg:hidden">
             Shuffla
           </Link>
           <div className="hidden lg:block">
-            <p className="eyebrow">Card News Studio</p>
+            <p className="eyebrow">{hasBrand ? 'Card News Studio' : 'Brand Onboarding'}</p>
           </div>
           <div className="status-pill">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-            다운로드 중심 모드
+            {hasBrand ? '다운로드 중심 모드' : '브랜드 설정 필요'}
           </div>
         </header>
 

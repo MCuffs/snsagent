@@ -1,4 +1,5 @@
 import { LAYOUT_DEFINITIONS, type LayoutDefinition } from './layoutTypes'
+import { buildVisualBrandAnchors } from './brandHarness'
 
 export interface VisualDirectionInput {
   layout: LayoutDefinition
@@ -9,6 +10,7 @@ export interface VisualDirectionInput {
   brandMainColor?: string
   brandToneOfVoice?: string
   brandIndustry?: string
+  brandDna?: string | null
 }
 
 export interface VisualDirection {
@@ -25,23 +27,35 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
   const safeTypographyArea = input.layout.textPosition
   const palette = input.layout.preferredColorPalette.join(', ')
   const context = `${input.brandIndustry || ''} ${input.category} ${input.topic} ${input.tone}`.toLowerCase()
+  const brandAnchors = buildVisualBrandAnchors(input.brandDna)
 
   const scene = inferScene(context)
+  // Reference design system: dark editorial card style (observed from reference templates)
+  // - Full-bleed vertical photo with strong cinematic subject
+  // - Strong gradient-dark overlay in lower 40% for headline legibility
+  // - Dramatic lighting, desaturated tones, high contrast
+  // - Upper-left brand watermark area stays minimal
+  // - Bottom-left typography safe zone is the primary text anchor
+  const referenceStyleBase = [
+    'Korean social media editorial card background — full-bleed cinematic portrait photograph',
+    'inspired by premium Korean news card layout: dramatic subject, lower half darkened for text overlay',
+    'deep shadow gradient at bottom 40% of frame',
+    'photojournalism quality, documentary lighting, subtle film grain',
+    'high contrast, cinematic color grade, muted naturalistic palette',
+  ].join(', ')
+
   const prompt = [
-    'background-only realistic editorial photograph for a Korean social media card',
-    'realistic editorial documentary photography',
-    'photojournalism, high contrast, full-bleed vertical image',
-    'dark cinematic shadows, desaturated natural colors, subtle film grain',
+    referenceStyleBase,
     scene,
     `topic: ${input.topic}`,
     `category: ${input.category}`,
     `tone: ${input.brandToneOfVoice || input.tone}`,
     input.visualHint ? `reference direction: ${input.visualHint}` : '',
+    brandAnchors ? `brand visual anchors: ${brandAnchors}` : '',
     `preferred palette: ${palette}`,
     `subject positioning: ${subjectPosition}`,
-    `leave ${safeTypographyArea} area as clean negative space for app-rendered overlay later`,
+    `keep ${safeTypographyArea} area as clean dark negative space for app-rendered text overlay`,
     `overlay style: ${input.layout.overlayStyle}`,
-    'blank surfaces only where text could appear',
     'no generated text, no pseudo text, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no UI, no frame',
     'no signage, no posters, no menu boards, no book covers, no newspaper headlines, no package labels, no screens with text',
     '1080x1350 portrait composition',

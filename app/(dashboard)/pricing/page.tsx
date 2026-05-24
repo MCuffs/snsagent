@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../actions'
+import { dbService } from '../../../lib/db-service'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits'
 import PricingClientView from './PricingClientView'
 
@@ -10,6 +11,11 @@ export default async function PricingPage() {
   const user = await getSessionUser()
   if (!user) {
     redirect('/login')
+  }
+
+  const brands = await dbService.getBrands(user.id)
+  if (brands.length === 0) {
+    redirect('/brand')
   }
 
   const plansList = Object.keys(PRICING_PLANS) as SubscriptionPlan[]

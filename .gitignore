@@ -45,3 +45,9 @@ next-env.d.ts
 .claude
 /scratch
 /test-db.js
+
+# local dev upload cache
+/public/uploads/
+
+# runtime logs
+prisma/errors.log

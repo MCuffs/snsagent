@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2, Sparkles, Sliders, Wand2 } from 'lucide-react'
+import { ArrowRight, Loader2, Sparkles, Sliders, Wand2, ImagePlus, X } from 'lucide-react'
 import { recommendCampaignAction } from '../../../../app/actions'
 
 interface Brand {
@@ -14,10 +14,19 @@ interface Brand {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  brandDna?: string | null
 }
 
 interface GenerateCampaignResponse {
   campaignId?: string
+  error?: string
+}
+
+interface UploadPreview {
+  file: File
+  previewUrl: string
+  uploadedUrl?: string
+  uploading: boolean
   error?: string
 }
 
@@ -58,6 +67,87 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const [source, setSource] = useState('')
   const [slideCount, setSlideCount] = useState(7)
   const selectedBrand = brands.find(brand => brand.id === brandId) || brands[0]
+
+  // Easy mode extra context
+  const [targetCustomer, setTargetCustomer] = useState('')
+  const [keyMessage, setKeyMessage] = useState('')
+  const [productFeature, setProductFeature] = useState('')
+
+  // Reference image upload
+  const [imagePreviews, setImagePreviews] = useState<UploadPreview[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle reference image file selection — generate local previews, then upload
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+
+    const newPreviews: UploadPreview[] = files.map(file => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      uploading: true,
+    }))
+    setImagePreviews(prev => [...prev, ...newPreviews])
+
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json() as { urls?: string[]; error?: string }
+
+      if (!res.ok || !data.urls) {
+        setImagePreviews(prev =>
+          prev.map((p, i) => i >= prev.length - files.length
+            ? { ...p, uploading: false, error: data.error || '업로드 실패' }
+            : p
+          )
+        )
+        return
+      }
+
+      setImagePreviews(prev => {
+        const updated = [...prev]
+        data.urls!.forEach((url, idx) => {
+          const targetIdx = updated.length - files.length + idx
+          if (updated[targetIdx]) {
+            updated[targetIdx] = { ...updated[targetIdx], uploading: false, uploadedUrl: url }
+          }
+        })
+        return updated
+      })
+    } catch {
+      setImagePreviews(prev =>
+        prev.map((p, i) => i >= prev.length - files.length
+          ? { ...p, uploading: false, error: '업로드 오류' }
+          : p
+        )
+      )
+    }
+
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const removeImage = (index: number) => {
+    setImagePreviews(prev => {
+      const updated = [...prev]
+      URL.revokeObjectURL(updated[index].previewUrl)
+      updated.splice(index, 1)
+      return updated
+    })
+  }
+
+  // Build enriched topic string for recommendCampaignAction
+  const buildEnrichedTopic = () => {
+    const extras = [
+      targetCustomer ? `타겟 고객: ${targetCustomer}` : '',
+      keyMessage ? `핵심 메시지: ${keyMessage}` : '',
+      productFeature ? `상품/서비스 특징: ${productFeature}` : '',
+    ].filter(Boolean)
+    if (!extras.length) return topic
+    return `${topic}\n\n추가 컨텍스트:\n${extras.join('\n')}`
+  }
 
   // Smart Fill logic for Professional Mode
   const handleSmartFill = async () => {
@@ -124,7 +214,20 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
     }, 2500)
 
     try {
-      let finalPayload = {
+      let finalPayload: {
+      campaignType: string
+      brandId: string
+      contentType: string
+      category: string
+      topic: string
+      title: string
+      keyContent: string
+      tone: string
+      visualHint: string
+      source: string
+      slideCount: number
+      productImageUrls?: string[]
+    } = {
         campaignType: 'media',
         brandId,
         contentType,
@@ -141,10 +244,14 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
       // In Easy Mode, fetch AI recommendations behind the scenes first
       if (activeTab === 'easy') {
         setLoadingStep(0) // Reset step text
-        const recResult = await recommendCampaignAction(brandId, topic)
+        const enrichedTopic = buildEnrichedTopic()
+        const recResult = await recommendCampaignAction(brandId, enrichedTopic)
         if (recResult.success) {
           if (recResult.recommendation) {
             const rec = recResult.recommendation
+            const uploadedUrls = imagePreviews
+              .filter(p => p.uploadedUrl)
+              .map(p => p.uploadedUrl!)
             finalPayload = {
               campaignType: 'media',
               brandId,
@@ -157,6 +264,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               visualHint: rec.visualHint,
               source: rec.source,
               slideCount: rec.slideCount,
+              productImageUrls: uploadedUrls,
             }
           } else {
             throw new Error('AI 자동 기획 추천 데이터가 올바르지 않습니다.')
@@ -315,6 +423,117 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 <li>브랜드 메인 컬러 기반의 배경 이미지 힌트</li>
                 <li>콘텐츠의 성격에 적합한 최적의 톤앤매너</li>
               </ul>
+            </div>
+
+            {/* Context questions — optional but strongly improve output */}
+            <div className="space-y-4">
+              <p className="text-xs font-black text-[#4a4039]">
+                컨텍스트 보강 <span className="font-normal text-[#a59b91]">(선택, 입력할수록 카드뉴스 품질이 높아집니다)</span>
+              </p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-[#746a62]">
+                    주요 타겟 고객
+                  </label>
+                  <input
+                    type="text"
+                    value={targetCustomer}
+                    onChange={e => setTargetCustomer(e.target.value)}
+                    placeholder="예: 30대 직장여성, 피부 트러블 고민"
+                    className="field h-11 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-[#746a62]">
+                    핵심 전달 메시지
+                  </label>
+                  <input
+                    type="text"
+                    value={keyMessage}
+                    onChange={e => setKeyMessage(e.target.value)}
+                    placeholder="예: 일주일 안에 피부가 바뀝니다"
+                    className="field h-11 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-[#746a62]">
+                    상품/서비스 핵심 특징
+                  </label>
+                  <input
+                    type="text"
+                    value={productFeature}
+                    onChange={e => setProductFeature(e.target.value)}
+                    placeholder="예: 자연유래 성분 97%, 피부과 테스트"
+                    className="field h-11 px-3 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Reference image upload */}
+            <div>
+              <p className="mb-3 text-xs font-black text-[#4a4039]">
+                참고 이미지 첨부{' '}
+                <span className="font-normal text-[#a59b91]">(선택 — 배경 이미지 생성 시 비주얼 레퍼런스로 활용됩니다)</span>
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <div className="flex flex-wrap gap-3">
+                {imagePreviews.map((preview, index) => (
+                  <div
+                    key={index}
+                    className="relative h-20 w-20 overflow-hidden rounded-[8px] border border-[#e8dfd4] bg-[#f5efe6]"
+                  >
+                    <img
+                      src={preview.previewUrl}
+                      alt={`ref ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    {preview.uploading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    )}
+                    {preview.error && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-900/60">
+                        <span className="text-[9px] text-white font-bold text-center px-1">오류</span>
+                      </div>
+                    )}
+                    {!preview.uploading && !preview.error && (
+                      <div className="absolute top-1 right-1 h-3 w-3 rounded-full bg-green-500 border border-white" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {imagePreviews.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-[8px] border border-dashed border-[#e8dfd4] bg-[#fffdf8] text-[#a59b91] hover:border-[#ff4f0a] hover:text-[#ff4f0a] transition-colors"
+                  >
+                    <ImagePlus className="h-5 w-5" />
+                    <span className="text-[10px] font-bold">이미지 추가</span>
+                  </button>
+                )}
+              </div>
+              {imagePreviews.length > 0 && (
+                <p className="mt-2 text-[11px] text-[#a59b91]">
+                  {imagePreviews.filter(p => p.uploadedUrl).length}/{imagePreviews.length}개 업로드 완료
+                  {imagePreviews.some(p => p.uploading) ? ' — 업로드 중...' : ''}
+                </p>
+              )}
             </div>
 
             <div>

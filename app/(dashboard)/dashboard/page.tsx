@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import {
   AlertCircle,
   ArrowRight,
@@ -36,6 +37,9 @@ export default async function DashboardPage() {
 
   const campaigns = await dbService.getCampaigns(user.id)
   const brands = await dbService.getBrands(user.id)
+  if (brands.length === 0) {
+    redirect('/brand')
+  }
 
   const editableCount = campaigns.filter((campaign) =>
     ['generated', 'pending_approval', 'needs_review'].includes(campaign.status)

@@ -23,6 +23,7 @@ export default async function BrandSettingsPage() {
         mainColor: existingBrand.mainColor,
         forbiddenWords: existingBrand.forbiddenWords,
         ctaStyle: existingBrand.ctaStyle,
+        brandDna: existingBrand.brandDna,
       }
     : null
 

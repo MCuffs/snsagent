@@ -1,9 +1,20 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Calendar, Download, Sparkles } from 'lucide-react'
+import { getSessionUser } from '../../actions'
+import { dbService } from '../../../lib/db-service'
 
 export const dynamic = 'force-dynamic'
 
-export default function ContentCalendarPage() {
+export default async function ContentCalendarPage() {
+  const user = await getSessionUser()
+  if (!user) redirect('/login')
+
+  const brands = await dbService.getBrands(user.id)
+  if (brands.length === 0) {
+    redirect('/brand')
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-10 md:px-8">
       <section className="panel rounded-2xl p-8 md:p-10">

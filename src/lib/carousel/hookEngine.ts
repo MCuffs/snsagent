@@ -1,4 +1,5 @@
 import { getLLMClient } from '../ai/llmClient'
+import { parseBrandDna } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, ContentStrategy, HookCandidate, HookType } from './types'
 
 const FALLBACK_HOOKS: { text: string; type: HookType; baseScore: number }[] = [
@@ -15,6 +16,14 @@ export async function generateHooks(
   strategy: ContentStrategy
 ): Promise<HookCandidate[]> {
   const client = getLLMClient()
+  const dna = parseBrandDna(brand.brandDna)
+
+  const painSection = dna.customerPainPoints.length
+    ? `\n고객 페인포인트 (pain_point 훅 작성 시 이 중에서 골라 구체화하세요):\n${dna.customerPainPoints.map(p => `- ${p}`).join('\n')}\n`
+    : ''
+  const diffSection = dna.differentiators.length
+    ? `\n브랜드 차별점 (comparison/benefit 훅 작성 시 반영하세요):\n${dna.differentiators.map(d => `- ${d}`).join('\n')}\n`
+    : ''
 
   const prompt = `한국 인스타그램 카드뉴스 첫 슬라이드에 사용할 훅 문구를 5개 생성해주세요.
 
@@ -25,12 +34,14 @@ export async function generateHooks(
 핵심 혜택: ${input.keyBenefits}
 캠페인 목표: ${input.objective}
 콘텐츠 전략: ${strategy.strategyType} — ${strategy.angle}
-
+${painSection}${diffSection}
 훅 조건:
 - 반드시 20자 이하 (공백 포함)
 - 스크롤을 멈추게 하는 강렬한 첫 문장
 - 타겟 고객의 공감 또는 호기심 자극
 - 과장·클리셰 금지
+- pain_point 훅은 반드시 위의 고객 페인포인트 중 하나를 구체적으로 반영하세요
+- comparison/benefit 훅은 위의 브랜드 차별점을 토대로 작성하세요
 
 유형(type):
 - curiosity: 궁금증 유발 ("왜?", "몰랐던")
