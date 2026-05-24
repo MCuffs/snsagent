@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 export function MarketingNav() {
     return (
@@ -8,7 +9,7 @@ export function MarketingNav() {
                     href="/"
                     className="flex items-center gap-2 text-[19px] font-black tracking-[-0.04em] text-[#0a0a0a] hover:opacity-75 transition-opacity"
                 >
-                    <span className="inline-block h-2 w-7 rounded-sm bg-[#ff6b35]" />
+                    <Image src="/logo.svg" width={28} height={28} alt="Shuffla 로고" />
                     Shuffla
                 </Link>
                 <nav className="hidden items-center gap-10 text-[14px] font-semibold text-[#525252] md:flex">

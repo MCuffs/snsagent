@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { MessageSquare } from 'lucide-react'
 
 export function MarketingFooter() {
@@ -9,7 +10,7 @@ export function MarketingFooter() {
                     <div className="grid gap-12 md:grid-cols-12">
                         <div className="md:col-span-5">
                             <Link href="/" className="inline-flex items-center gap-2 text-[19px] font-black tracking-[-0.04em] text-white mb-6">
-                                <span className="inline-block h-2 w-7 rounded-sm bg-[#ff6b35]" />
+                                <Image src="/logo.svg" width={28} height={28} alt="Shuffla 로고" />
                                 Shuffla
                             </Link>
                             <p className="text-[15px] text-white/70 leading-relaxed mb-8 max-w-sm">

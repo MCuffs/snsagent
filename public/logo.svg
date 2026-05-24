@@ -1,0 +1,27 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Far right card (+38°) -->
+  <g transform="translate(50 82) rotate(38) translate(-17 -50)">
+    <rect width="34" height="52" rx="7" fill="white"/>
+    <rect x="2.5" y="2.5" width="29" height="47" rx="5.5" fill="#ff6200"/>
+  </g>
+  <!-- Right card (+20°) -->
+  <g transform="translate(50 82) rotate(20) translate(-17 -50)">
+    <rect width="34" height="52" rx="7" fill="white"/>
+    <rect x="2.5" y="2.5" width="29" height="47" rx="5.5" fill="#ff6200"/>
+  </g>
+  <!-- Far left card (-40°) -->
+  <g transform="translate(50 82) rotate(-40) translate(-17 -50)">
+    <rect width="34" height="52" rx="7" fill="white"/>
+    <rect x="2.5" y="2.5" width="29" height="47" rx="5.5" fill="#ff6200"/>
+  </g>
+  <!-- Left card (-20°) -->
+  <g transform="translate(50 82) rotate(-20) translate(-17 -50)">
+    <rect width="34" height="52" rx="7" fill="white"/>
+    <rect x="2.5" y="2.5" width="29" height="47" rx="5.5" fill="#ff6200"/>
+  </g>
+  <!-- Center card (0°) — front -->
+  <g transform="translate(50 82) rotate(0) translate(-17 -50)">
+    <rect width="34" height="52" rx="7" fill="white"/>
+    <rect x="2.5" y="2.5" width="29" height="47" rx="5.5" fill="#ff6200"/>
+  </g>
+</svg>
