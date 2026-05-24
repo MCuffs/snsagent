@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  outputFileTracingIncludes: {
+    '**': ['./public/fonts/**'],
+  },
 };
 
 export default nextConfig;
