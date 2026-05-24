@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import { tokenEncryptor } from '../../../../lib/instagram/client'
-import { fetchInstagramBusinessAccounts } from '../../../../lib/meta/pages'
+import { fetchInstagramLoginAccount } from '../../../../lib/meta/pages'
 
 export const runtime = 'nodejs'
 
@@ -23,7 +23,8 @@ export async function GET() {
     }
 
     const accessToken = tokenEncryptor.decrypt(account.accessTokenEncrypted)
-    const accounts = await fetchInstagramBusinessAccounts(accessToken)
+    const igAccount = await fetchInstagramLoginAccount(accessToken)
+    const accounts = [igAccount]
     return NextResponse.json({ accounts })
   } catch (error) {
     console.error('Failed to fetch Instagram accounts:', error)

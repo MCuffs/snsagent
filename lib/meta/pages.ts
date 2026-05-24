@@ -1,42 +1,33 @@
-import { getMetaApiVersion } from '../env'
-import type { InstagramOAuthAccount, MetaPage } from './types'
+import type { InstagramLoginAccount } from './types'
 
-const META_GRAPH_BASE_URL = 'https://graph.facebook.com'
+const INSTAGRAM_GRAPH_URL = 'https://graph.instagram.com'
 
-interface MetaPagesResponse {
-  data?: MetaPage[]
-  error?: {
-    message?: string
-  }
-}
-
-export async function fetchInstagramBusinessAccounts(userAccessToken: string): Promise<InstagramOAuthAccount[]> {
-  const url = new URL(`/${getMetaApiVersion()}/me/accounts`, META_GRAPH_BASE_URL)
-  url.searchParams.set(
-    'fields',
-    'id,name,access_token,instagram_business_account{id,username,profile_picture_url}'
-  )
+export async function fetchInstagramLoginAccount(userAccessToken: string): Promise<InstagramLoginAccount> {
+  const url = new URL('/me', INSTAGRAM_GRAPH_URL)
+  url.searchParams.set('fields', 'id,username,account_type,profile_picture_url')
   url.searchParams.set('access_token', userAccessToken)
 
   const response = await fetch(url)
-  const data = await response.json() as MetaPagesResponse
-
-  if (!response.ok) {
-    throw new Error(data.error?.message || `Meta page request failed with HTTP ${response.status}`)
+  const data = await response.json() as {
+    id?: string
+    username?: string
+    account_type?: string
+    profile_picture_url?: string
+    error?: { message?: string }
   }
 
-  return (data.data || [])
-    .filter(page => page.instagram_business_account?.id && page.access_token)
-    .map(page => ({
-      facebookPageId: page.id,
-      pageName: page.name,
-      pageAccessToken: page.access_token,
-      instagramAccountId: page.instagram_business_account!.id,
-      username: page.instagram_business_account?.username,
-      profilePictureUrl: page.instagram_business_account?.profile_picture_url,
-    }))
-}
+  if (!response.ok || !data.id) {
+    throw new Error(data.error?.message || `Instagram 계정 정보를 가져오는 데 실패했습니다. (HTTP ${response.status})`)
+  }
 
-export function getFirstInstagramBusinessAccount(accounts: InstagramOAuthAccount[]) {
-  return accounts[0] || null
+  if (data.account_type === 'PERSONAL') {
+    throw new Error('no_instagram_business_account')
+  }
+
+  return {
+    instagramAccountId: data.id,
+    username: data.username,
+    profilePictureUrl: data.profile_picture_url,
+    accountType: data.account_type,
+  }
 }

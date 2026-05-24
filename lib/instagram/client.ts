@@ -98,7 +98,7 @@ export async function validateInstagramConnection(
 
   try {
     // Meta Graph API Call: GET /v19.0/{instagram-business-account-id}?fields=username&access_token={access-token}
-    const url = `https://graph.facebook.com/v19.0/${accountId}?fields=username&access_token=${accessToken}`
+    const url = `https://graph.instagram.com/v21.0/${accountId}?fields=username&access_token=${accessToken}`
     const res = await fetch(url)
     
     if (!res.ok) {
@@ -135,7 +135,7 @@ export async function createMediaContainer(
   try {
     // Meta Graph API Call: POST /v19.0/{instagram-business-account-id}/media
     // Form parameters: image_url, caption, access_token, and is_carousel_item if part of carousel
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media`
+    const url = `https://graph.instagram.com/v21.0/${accountId}/media`
     const body: Record<string, string> = {
       image_url: imageUrl,
       access_token: accessToken,
@@ -184,7 +184,7 @@ export async function createCarouselContainer(
   try {
     // Meta Graph API Call: POST /v19.0/{instagram-business-account-id}/media
     // Body: { media_type: 'CAROUSEL', children: [id1, id2...], caption, access_token }
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media`
+    const url = `https://graph.instagram.com/v21.0/${accountId}/media`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -226,7 +226,7 @@ export async function publishMedia(
   try {
     // Meta Graph API Call: POST /v19.0/{instagram-business-account-id}/media_publish
     // Body: { creation_id: containerId, access_token }
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media_publish`
+    const url = `https://graph.instagram.com/v21.0/${accountId}/media_publish`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
