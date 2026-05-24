@@ -43,12 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
 
-    const brand = await dbService.getBrand(body.brandId!)
+    const requestedBrand = await dbService.getBrand(body.brandId!)
+    const brand = requestedBrand?.userId === user.id
+      ? requestedBrand
+      : (await dbService.getBrands(user.id))[0]
     if (!brand) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
-    }
-    if (brand.userId !== user.id) {
-      return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 })
     }
 
     const usage = await checkMonthlyCampaignUsage(user.id)
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         brandIndustry: brand.industry,
         brandForbiddenWords: brand.forbiddenWords,
         brandCtaStyle: brand.ctaStyle,
+        brandDna: brand.brandDna,
         topic: body.topic!,
         category: body.category!,
         title: body.title!,
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
         slideCount: normalizeSlideCount(body.slideCount),
         source,
         visualHint: body.visualHint,
+        productImageUrls: body.productImageUrls || [],
       })
 
       return NextResponse.json({
@@ -101,6 +103,7 @@ export async function POST(request: Request) {
       mainColor: brand.mainColor,
       forbiddenWords: brand.forbiddenWords,
       ctaStyle: brand.ctaStyle,
+      brandDna: brand.brandDna,
     }
 
     const campaignInput: CampaignInput = {

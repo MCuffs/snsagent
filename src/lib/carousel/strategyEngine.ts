@@ -1,3 +1,4 @@
+import { parseBrandDna } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, ContentStrategy, StrategyType } from './types'
 
 export async function generateStrategy(
@@ -5,23 +6,47 @@ export async function generateStrategy(
   input: CampaignInput
 ): Promise<ContentStrategy> {
   const text = `${brand.industry} ${input.objective} ${input.productDescription}`.toLowerCase()
+  const dna = parseBrandDna(brand.brandDna)
+
   let strategyType: StrategyType = 'problem_solution'
 
-  if (text.includes('비교') || text.includes('차이')) strategyType = 'comparison'
-  else if (text.includes('후기') || text.includes('리뷰')) strategyType = 'review_style'
-  else if (text.includes('체크') || text.includes('방법')) strategyType = 'checklist'
-  else if (text.includes('할인') || text.includes('특가')) strategyType = 'discount'
-  else if (text.includes('시즌') || text.includes('여름') || text.includes('겨울')) strategyType = 'seasonal'
-  else if (text.includes('브랜드') || text.includes('스토리')) strategyType = 'storytelling'
-  else if (text.includes('혜택') || text.includes('장점')) strategyType = 'benefit_focused'
+  // Brand DNA 우선 적용: DNA가 있으면 DNA 기반으로 전략 선택
+  if (dna.differentiators.length >= 2) {
+    strategyType = 'comparison'
+  } else if (dna.customerPainPoints.length >= 2) {
+    strategyType = 'problem_solution'
+  } else if (dna.valueProposition && dna.coreProducts.length > 0) {
+    strategyType = 'benefit_focused'
+  } else {
+    // DNA 없거나 빈약하면 키워드 매칭 폴백
+    if (text.includes('비교') || text.includes('차이')) strategyType = 'comparison'
+    else if (text.includes('후기') || text.includes('리뷰')) strategyType = 'review_style'
+    else if (text.includes('체크') || text.includes('방법')) strategyType = 'checklist'
+    else if (text.includes('할인') || text.includes('특가')) strategyType = 'discount'
+    else if (text.includes('시즌') || text.includes('여름') || text.includes('겨울')) strategyType = 'seasonal'
+    else if (text.includes('브랜드') || text.includes('스토리')) strategyType = 'storytelling'
+    else if (text.includes('혜택') || text.includes('장점')) strategyType = 'benefit_focused'
+  }
+
+  // 입력값으로 명시된 의도가 있으면 DNA보다 우선
+  if (text.includes('후기') || text.includes('리뷰')) strategyType = 'review_style'
+  if (text.includes('할인') || text.includes('특가')) strategyType = 'discount'
 
   const recommendedSlideCount = Math.min(Math.max(input.slideCount || 5, 5), 10)
+
+  const dnaAngle = dna.differentiators.length
+    ? `브랜드 차별점(${dna.differentiators.slice(0, 2).join(', ')})을 중심으로`
+    : dna.valueProposition
+      ? `브랜드 가치 제안(${dna.valueProposition.slice(0, 40)})을 토대로`
+      : ''
 
   return {
     strategyType,
     targetEmotion: strategyType === 'discount' ? '기회와 긴급성' : '공감과 필요성',
     contentGoal: input.objective || '저장 및 구매 전환',
-    angle: getAngle(strategyType, input.productName),
+    angle: dnaAngle
+      ? `${dnaAngle} ${getAngle(strategyType, input.productName)}`
+      : getAngle(strategyType, input.productName),
     recommendedSlideCount,
     reason: `${brand.industry} 맥락에서는 첫 장에서 관심을 붙잡고, 문제 인식부터 CTA까지 단계적으로 설득하는 흐름이 효과적입니다.`,
   }

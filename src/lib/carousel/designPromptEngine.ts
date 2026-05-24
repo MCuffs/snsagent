@@ -1,3 +1,4 @@
+import { parseBrandDna } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition } from './types'
 
 export async function generateDesignPrompts(
@@ -9,11 +10,14 @@ export async function generateDesignPrompts(
   const roleMap = new Map(
     structure?.slides.map(s => [s.slideNumber, s.role]) ?? []
   )
+  const dna = parseBrandDna(brand.brandDna)
+  const visualMood = dna.visualMood || ''
+  const avoidVisuals = dna.avoidVisuals.length ? dna.avoidVisuals : []
 
   return copies.map((copy): SlideDesignPrompt => {
     const role = roleMap.get(copy.slideNumber) ?? 'product_solution'
     const textPosition = pickTextPosition(copy.slideNumber, copies.length)
-    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand)
+    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals)
 
     return {
       slideNumber: copy.slideNumber,
@@ -29,8 +33,14 @@ function buildBackgroundPrompt(
   role: string,
   copy: SlideCopy,
   input: CampaignInput,
-  brand: BrandProfile
+  brand: BrandProfile,
+  visualMood: string,
+  avoidVisuals: string[]
 ): string {
+  const avoidClause = avoidVisuals.length
+    ? avoidVisuals.map(v => `no ${v}`).join(', ')
+    : ''
+
   const base = [
     'Korean Instagram card news style',
     'square 1080x1080 composition',
@@ -38,8 +48,10 @@ function buildBackgroundPrompt(
     'no text, no pseudo text, no letters, no numbers, no typography, no Hangul, no logo, no watermark',
     'no signage, labels, posters, menus, packaging text, screen text, handwriting, or calligraphy',
     `brand accent color ${brand.mainColor}`,
+    visualMood ? `visual mood: ${visualMood}` : '',
+    avoidClause,
     'clean empty negative space for app-rendered overlay later',
-  ]
+  ].filter(Boolean)
 
   const productContext = `product: ${input.productName}`
   const industryContext = `industry: ${brand.industry}`

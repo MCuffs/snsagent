@@ -1,3 +1,5 @@
+import { parseBrandDna } from '../../../lib/brand-dna'
+
 export interface AgentReportItem {
   agentName: string
   role: string
@@ -45,6 +47,7 @@ export class BrandIdentityAgent {
     brandToneOfVoice?: string
     forbiddenWords?: string
     ctaStyle?: string
+    brandDna?: string | null
     slides: AgentSlideData[]
   }): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
     this.logs = []
@@ -55,11 +58,17 @@ export class BrandIdentityAgent {
     })
 
     const forbiddenWords = this.parseForbiddenWords(params.forbiddenWords)
-    
+    const dna = parseBrandDna(params.brandDna)
+    const brandSignals = [
+      ...dna.brandKeywords,
+      ...dna.coreProducts,
+      ...dna.differentiators,
+    ].map(k => k.toLowerCase()).filter(Boolean)
+
     const processedSlides = params.slides.map((slide) => {
       let headline = this.normalizeCopy(slide.headline)
       let body = this.normalizeCopy(slide.body)
-      const isLast = slide.role === 'save-cta' || slide.role === 'summary' // 혹은 인덱스 기반
+      const isLast = slide.role === 'save-cta' || slide.role === 'summary'
 
       // 금칙어 검사
       const beforeForbidden = `${headline}\n${body}`
@@ -73,6 +82,17 @@ export class BrandIdentityAgent {
         })
       }
 
+      // 브랜드 DNA 신호 커버리지 검증
+      if (brandSignals.length > 0) {
+        const slideText = `${headline} ${body}`.toLowerCase()
+        const hasSignal = brandSignals.some(signal => slideText.includes(signal))
+        if (!hasSignal) {
+          this.log('warn', `슬라이드 ${slide.slideNumber}번: 브랜드 고유 키워드/차별점이 카피에 없습니다. 검토 권장.`)
+        } else {
+          this.log('info', `슬라이드 ${slide.slideNumber}번: 브랜드 DNA 신호 확인 완료.`)
+        }
+      }
+
       // 브랜드 톤앤매너 검증 로그
       if (params.brandToneOfVoice) {
         this.log('info', `슬라이드 ${slide.slideNumber}번: 브랜드 톤앤매너 '${params.brandToneOfVoice}' 적합성 검사 완료.`)
@@ -84,11 +104,7 @@ export class BrandIdentityAgent {
         this.log('success', `마지막 슬라이드에 브랜드 지정 CTA 스타일 적용 완료: "${body}"`)
       }
 
-      return {
-        ...slide,
-        headline,
-        body,
-      }
+      return { ...slide, headline, body }
     })
 
     this.log('success', `브랜드 가이드라인 준수 여부 검증 및 보정 완료.`)

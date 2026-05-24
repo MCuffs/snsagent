@@ -1,4 +1,5 @@
 import { getLLMClient } from '../ai/llmClient'
+import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, HookCandidate, SlideRole, SlideCopy } from './types'
 
 const BANNED_CLICHES = ['혁신적인', '최고의', '완벽한']
@@ -15,6 +16,10 @@ export async function generateSlideCopies(
     .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${s.purpose}`)
     .join('\n')
 
+  const brandDnaSection = brand.brandDna
+    ? `\n브랜드 DNA (반드시 카피에 반영할 핵심 인사이트):\n${formatBrandDnaForPrompt(brand.brandDna)}\n`
+    : ''
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 브랜드 정보:
@@ -23,7 +28,7 @@ export async function generateSlideCopies(
 - 타겟 고객: ${brand.targetAudience}
 - 어조: ${brand.toneOfVoice}
 - 금지어: ${brand.forbiddenWords || '없음'}
-
+${brandDnaSection}
 상품 정보:
 - 상품명: ${input.productName}
 - 상품 설명: ${input.productDescription}
@@ -42,6 +47,8 @@ ${slideDescriptions}
 - 금지어와 과장 표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 슬라이드 역할(role)에 맞는 내용으로 작성
 - hook 슬라이드의 headline은 반드시 "${selectedHook.text}" 그대로 사용
+- 브랜드 DNA가 제공된 경우, 핵심 상품·차별점·고객 페인포인트·가치 제안 중 하나 이상이 슬라이드 카피에 반드시 녹아들어야 합니다
+- 일반적인 업종 표현 대신 브랜드 고유의 언어와 키워드를 사용하세요
 
 JSON 응답 형식:
 {

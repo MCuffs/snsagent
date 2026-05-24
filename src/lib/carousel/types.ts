@@ -35,6 +35,7 @@ export interface BrandProfile {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  brandDna?: string | null
 }
 
 export interface CampaignInput {

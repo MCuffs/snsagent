@@ -5,13 +5,22 @@ export async function uploadGeneratedAsset(params: {
   fileName: string
   content: string | Buffer
   contentType: 'image/svg+xml' | 'image/png'
-}) {
+}): Promise<string> {
+  const safeFileName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
+
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob')
+    const blob = await put(`carousel/${safeFileName}`, params.content, {
+      access: 'public',
+      contentType: params.contentType,
+    })
+    return blob.url
+  }
+
+  // 로컬 개발: public/ 폴더에 저장
   const directory = path.join(process.cwd(), 'public', 'generated', 'carousel')
   fs.mkdirSync(directory, { recursive: true })
-
-  const safeFileName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
   const filePath = path.join(directory, safeFileName)
   fs.writeFileSync(filePath, params.content)
-
   return `/generated/carousel/${safeFileName}`
 }
