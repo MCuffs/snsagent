@@ -186,7 +186,7 @@ export default function CardNewsDemo() {
                                 <button
                                     key={card.label}
                                     onClick={() => phase === 'done' && setSelectedCard(i)}
-                                    className={`relative rounded-xl bg-gradient-to-br ${card.bg || card.gradient} flex flex-col items-center justify-center transition-all duration-500
+                                    className={`relative rounded-xl bg-gradient-to-br ${card.gradient} flex flex-col items-center justify-center transition-all duration-500
                     ${visibleCards[i]
                                             ? 'opacity-100 translate-y-0 scale-100'
                                             : 'opacity-0 translate-y-4 scale-95'
