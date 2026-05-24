@@ -17,7 +17,7 @@ const navItems = [
   { href: '/brand', label: '브랜드', icon: Briefcase },
   { href: '/campaign/new', label: '카드 만들기', icon: Sparkles, primary: true },
   { href: '/instagram', label: 'SNS 자동 업로드', icon: UploadCloud },
-  { href: '/pricing', label: '요금제', icon: CreditCard },
+  { href: '/billing', label: '요금제', icon: CreditCard },
 ]
 
 export default async function DashboardLayout({
