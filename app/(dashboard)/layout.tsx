@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Briefcase,
   CreditCard,
-  Home,
   LogOut,
   Sparkles,
   UploadCloud,
@@ -13,7 +12,6 @@ import { getSessionUser } from '../actions'
 import { dbService } from '../../lib/db-service'
 
 const navItems = [
-  { href: '/dashboard', label: '대시보드', icon: Home },
   { href: '/brand', label: '브랜드', icon: Briefcase },
   { href: '/campaign/new', label: '카드 만들기', icon: Sparkles, primary: true },
   { href: '/instagram', label: 'SNS 자동 업로드', icon: UploadCloud },
@@ -123,7 +121,7 @@ export default async function DashboardLayout({
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8dfd4] bg-[#fffdf8]/86 px-5 backdrop-blur-xl md:px-8">
-          <Link href={hasBrand ? '/dashboard' : '/brand'} className="font-black tracking-tight text-[#1f1512] lg:hidden">
+          <Link href="/brand" className="font-black tracking-tight text-[#1f1512] lg:hidden">
             Shuffla
           </Link>
           <div className="hidden lg:block">

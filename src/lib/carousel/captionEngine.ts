@@ -100,8 +100,8 @@ function buildFallbackHashtags(brand: BrandProfile, input: CampaignInput): strin
     '#쇼핑팁',
   ]
 
-  const industry = brand.industry.replace(/\s+/g, '')
-  const product = input.productName.replace(/\s+/g, '')
+  const industry = (brand.industry ?? '').replace(/\s+/g, '')
+  const product = (input.productName ?? '').replace(/\s+/g, '')
   const extra = [industry && `#${industry}`, product && `#${product}`].filter(Boolean) as string[]
 
   return [...new Set([...base, ...extra])].slice(0, 15)

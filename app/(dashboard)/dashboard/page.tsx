@@ -32,14 +32,7 @@ function statusClass(status: string) {
 }
 
 export default async function DashboardPage() {
-  const user = await getSessionUser()
-  if (!user) return null
-
-  const campaigns = await dbService.getCampaigns(user.id)
-  const brands = await dbService.getBrands(user.id)
-  if (brands.length === 0) {
-    redirect('/brand')
-  }
+  redirect('/brand')
 
   const editableCount = campaigns.filter((campaign) =>
     ['generated', 'pending_approval', 'needs_review'].includes(campaign.status)

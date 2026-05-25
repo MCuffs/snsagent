@@ -239,9 +239,9 @@ ${toneEmoji} 인스타그램 카드뉴스를 쉽고 편리하게 관리하는 �
 
 📍 ${brand.ctaStyle}`,
     hashtags: [
-      brand.name.replace(/\s+/g, ''),
-      campaign.productName.replace(/\s+/g, ''),
-      brand.industry.replace(/\s+/g, ''),
+      (brand.name ?? '').replace(/\s+/g, ''),
+      (campaign.productName ?? '').replace(/\s+/g, ''),
+      (brand.industry ?? '').replace(/\s+/g, ''),
       '인스타운영',
       '카드뉴스',
       '마케팅꿀팁',
