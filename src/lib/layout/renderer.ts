@@ -1,39 +1,10 @@
 import fs from 'fs'
 import path from 'path'
-import sharp from 'sharp'
 import { uploadGeneratedAsset } from '../storage/upload'
+import { renderSvgToPng } from '../render/svgToPng'
 import type { LayoutDefinition } from './layoutTypes'
 import type { OverlayPlan } from './overlayEngine'
 import type { TypographyPlan, TypographyToken } from './typographyEngine'
-
-// Cached font base64 data (populated lazily per cold start)
-const fontCache: Record<string, string> = {}
-
-function loadFontB64(filename: string): string {
-  if (fontCache[filename]) return fontCache[filename]
-  const fontPath = path.join(process.cwd(), 'public', 'fonts', filename)
-  if (fs.existsSync(fontPath)) {
-    fontCache[filename] = fs.readFileSync(fontPath).toString('base64')
-  }
-  return fontCache[filename] || ''
-}
-
-function buildFontFaceDefs(): string {
-  const weights: Array<{ file: string; weight: number }> = [
-    { file: 'Pretendard-Regular.otf', weight: 400 },
-    { file: 'Pretendard-SemiBold.otf', weight: 600 },
-    { file: 'Pretendard-Bold.otf', weight: 700 },
-  ]
-  const faces = weights
-    .map(({ file, weight }) => {
-      const b64 = loadFontB64(file)
-      if (!b64) return ''
-      return `@font-face { font-family: 'Pretendard'; font-weight: ${weight}; src: url('data:font/otf;base64,${b64}') format('opentype'); }`
-    })
-    .filter(Boolean)
-    .join(' ')
-  return faces ? `<style>${faces}</style>` : ''
-}
 
 export interface RenderMediaCardInput {
   id: string
@@ -82,7 +53,6 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
   <defs>
-    ${buildFontFaceDefs()}
     ${input.overlay.svgDefs}
     ${renderFallbackOverlayDefs()}
   </defs>
@@ -98,7 +68,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
 </svg>`
 
   try {
-    const png = await sharp(Buffer.from(svg)).png().toBuffer()
+    const png = renderSvgToPng(svg)
     return uploadGeneratedAsset({
       fileName: `${input.id}.png`,
       content: png,
@@ -184,7 +154,6 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
   <rect width="1080" height="1350" fill="#000000"/>
   <defs>
-    ${buildFontFaceDefs()}
     <linearGradient id="cta-bottom-gradient" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
       <stop offset="58%" stop-color="#000000" stop-opacity="0.24"/>
@@ -202,7 +171,7 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
 </svg>`
 
   try {
-    const png = await sharp(Buffer.from(svg)).png().toBuffer()
+    const png = renderSvgToPng(svg)
     return uploadGeneratedAsset({
       fileName: `${input.id}.png`,
       content: png,

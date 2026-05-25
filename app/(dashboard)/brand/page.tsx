@@ -5,10 +5,15 @@ import BrandForm from './BrandForm'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BrandSettingsPage() {
+export default async function BrandSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ start?: string }>
+}) {
   const user = await getSessionUser()
   if (!user) return null
 
+  const params = await searchParams
   const brands = await dbService.getBrands(user.id)
   const existingBrand = brands[0] || null
   const limitCheck = await checkBrandCountLimit(user.id)
@@ -33,6 +38,7 @@ export default async function BrandSettingsPage() {
       limitAllowed={limitCheck.allowed}
       limitCount={limitCheck.limit}
       userPlan={user.plan}
+      startWithUrl={params.start === '1'}
     />
   )
 }

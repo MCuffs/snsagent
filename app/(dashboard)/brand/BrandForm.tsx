@@ -26,11 +26,13 @@ interface BrandFormProps {
   limitAllowed: boolean
   limitCount: number
   userPlan: string
+  startWithUrl: boolean
 }
 
-export default function BrandForm({ existingBrand, limitAllowed, limitCount, userPlan }: BrandFormProps) {
+export default function BrandForm({ existingBrand, limitAllowed, limitCount, userPlan, startWithUrl }: BrandFormProps) {
   const router = useRouter()
   const [currentBrandId, setCurrentBrandId] = useState(existingBrand?.id || null)
+  const [isOnboarding] = useState(startWithUrl || !existingBrand)
   
   // Form State
   const [name, setName] = useState(existingBrand?.name || '')
@@ -93,16 +95,26 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
 
       if (res.brandProfile) {
         const { name, industry, targetAudience, toneOfVoice, mainColor, forbiddenWords, ctaStyle, brandDna } = res.brandProfile
+        const analyzedBrand = {
+          name,
+          industry,
+          targetAudience,
+          toneOfVoice,
+          mainColor,
+          forbiddenWords,
+          ctaStyle,
+          brandDna: brandDna || null,
+        }
         
         // Populate form with animation delay
-        setName(name)
-        setIndustry(industry)
-        setTargetAudience(targetAudience)
-        setToneOfVoice(toneOfVoice)
-        setMainColor(mainColor)
-        setForbiddenWords(forbiddenWords)
-        setCtaStyle(ctaStyle)
-        setBrandDna(brandDna || null)
+        setName(analyzedBrand.name)
+        setIndustry(analyzedBrand.industry)
+        setTargetAudience(analyzedBrand.targetAudience)
+        setToneOfVoice(analyzedBrand.toneOfVoice)
+        setMainColor(analyzedBrand.mainColor)
+        setForbiddenWords(analyzedBrand.forbiddenWords)
+        setCtaStyle(analyzedBrand.ctaStyle)
+        setBrandDna(analyzedBrand.brandDna)
         
         if (res.markdownReport) {
           setAnalysisReport(res.markdownReport)
@@ -112,6 +124,18 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         // Trigger visual glow effect on inputs
         setHighlightFields(true)
         setTimeout(() => setHighlightFields(false), 3000)
+
+        if (isOnboarding) {
+          const saved = await saveBrandAction(currentBrandId, analyzedBrand)
+          if (!saved.success) {
+            setFormError(saved.error || '분석된 브랜드 정보를 저장하지 못했습니다.')
+            return
+          }
+
+          setCurrentBrandId(saved.brand.id)
+          router.push('/campaign/new')
+          return
+        }
 
         setFormSuccess('AI 분석이 완료되었습니다. 내용을 확인한 뒤 저장하기를 눌러 브랜드 정보를 저장하세요.')
       }
@@ -125,7 +149,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const shouldGoToCampaign = !currentBrandId
+    const shouldGoToCampaign = isOnboarding
     setIsSubmitting(true)
     setFormError(null)
     setFormSuccess(null)
@@ -161,7 +185,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
     }
   }
 
-  if (!currentBrandId) {
+  if (isOnboarding) {
     const canSaveOnboarding = Boolean(name && industry && targetAudience && toneOfVoice && mainColor && ctaStyle)
 
     return (
@@ -172,8 +196,8 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
             브랜드 웹사이트를 먼저 분석합니다.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[#6f6a61]">
-            처음 로그인한 사용자는 브랜드 설정을 완료해야 카드 만들기와 CMS 메뉴를 사용할 수 있습니다.
-            브랜드 사이트 URL을 입력하면 AI가 기본 프로필을 채우고, 저장 후 바로 카드 만들기로 이동합니다.
+            로그인 후 브랜드 사이트 URL을 분석하면 카드뉴스 생성에 사용할 프로필을 준비합니다.
+            브랜드 사이트 URL을 입력하면 AI가 프로필을 저장하고 바로 카드 만들기로 이동합니다.
           </p>
         </div>
 

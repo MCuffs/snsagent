@@ -11,7 +11,7 @@ export async function saveErrorLog(
   userId: string | null | undefined,
   actionName: string,
   error: unknown,
-  contextData?: Record<string, any>
+  contextData?: Record<string, unknown>
 ): Promise<void> {
   const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack || null : null

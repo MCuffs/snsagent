@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const email = normalizeSessionEmail(profile.email)
     await dbService.getOrCreateUser(email, profile.name || email.split('@')[0])
 
-    const response = NextResponse.redirect(new URL('/brand', request.url))
+    const response = NextResponse.redirect(new URL('/brand?start=1', request.url))
     response.cookies.delete(GOOGLE_OAUTH_STATE_COOKIE_NAME)
     response.cookies.set(SESSION_COOKIE_NAME, email, sessionCookieOptions())
 

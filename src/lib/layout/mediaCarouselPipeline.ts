@@ -1,6 +1,5 @@
 import { dbService } from '../../../lib/db-service'
 import type { ImageProvider } from '../ai/imageProvider'
-import { runCardNewsAgent } from './cardNewsAgent'
 import { getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'

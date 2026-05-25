@@ -5,7 +5,7 @@ export interface AgentReportItem {
   role: string
   status: 'info' | 'warn' | 'success' | 'error'
   message: string
-  details?: any
+  details?: unknown
   timestamp: string
 }
 
@@ -31,7 +31,7 @@ export interface AgentSlideData {
 export class BrandIdentityAgent {
   private logs: AgentReportItem[] = []
 
-  private log(status: AgentReportItem['status'], message: string, details?: any) {
+  private log(status: AgentReportItem['status'], message: string, details?: unknown) {
     this.logs.push({
       agentName: 'BrandIdentityAgent',
       role: '브랜드 아이덴티티 및 가이드라인 가드',
@@ -140,7 +140,7 @@ export class BrandIdentityAgent {
 export class CopywritingAgent {
   private logs: AgentReportItem[] = []
 
-  private log(status: AgentReportItem['status'], message: string, details?: any) {
+  private log(status: AgentReportItem['status'], message: string, details?: unknown) {
     this.logs.push({
       agentName: 'CopywritingAgent',
       role: '카피 최적화 및 가독성 메이커',
@@ -268,7 +268,7 @@ export class CopywritingAgent {
 export class VisualConceptAgent {
   private logs: AgentReportItem[] = []
 
-  private log(status: AgentReportItem['status'], message: string, details?: any) {
+  private log(status: AgentReportItem['status'], message: string, details?: unknown) {
     this.logs.push({
       agentName: 'VisualConceptAgent',
       role: '비주얼 아트 디렉터',
@@ -321,7 +321,7 @@ export class VisualConceptAgent {
 export class QualityGuardAgent {
   private logs: AgentReportItem[] = []
 
-  private log(status: AgentReportItem['status'], message: string, details?: any) {
+  private log(status: AgentReportItem['status'], message: string, details?: unknown) {
     this.logs.push({
       agentName: 'QualityGuardAgent',
       role: '최종 퀄리티 게이트 및 발행 가부 판정단',
@@ -340,13 +340,11 @@ export class QualityGuardAgent {
     this.log('info', `최종 카드뉴스 퀄리티 검사(가독성, 정렬, 안전성)를 진행합니다.`)
 
     let totalScore = 100
-    let issueCount = 0
     const issues: string[] = []
 
     // 1. 이미지 폴백 여부 확인
     if (params.hasFallbackImage) {
       totalScore -= 20
-      issueCount += 1
       issues.push('이미지 생성 API 실패로 대체 임시 이미지가 사용되었습니다.')
       this.log('warn', `디자인 품질 주의: 일부 슬라이드에 대체(Mock) 이미지가 배치되었습니다. 감점(-20점)`)
     }
@@ -356,7 +354,6 @@ export class QualityGuardAgent {
       const textLen = slide.headline.length + slide.body.length
       if (textLen > 80) {
         totalScore -= 5
-        issueCount += 1
         issues.push(`${slide.slideNumber}번 슬라이드: 총 글자수(${textLen}자)가 많아 모바일 가독성이 저하될 우려가 있습니다.`)
         this.log('warn', `슬라이드 ${slide.slideNumber}번: 글자수가 다소 많음. 가독성 경고. 감점(-5점)`)
       }
@@ -364,7 +361,6 @@ export class QualityGuardAgent {
       if (slide.diagnostics && slide.diagnostics.length > 0) {
         slide.diagnostics.forEach(diag => {
           totalScore -= 2
-          issueCount += 1
           issues.push(`${slide.slideNumber}번 슬라이드: ${diag}`)
           this.log('warn', `슬라이드 ${slide.slideNumber}번 레이아웃 진단 경고: ${diag}. 감점(-2점)`)
         })

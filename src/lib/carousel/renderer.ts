@@ -1,8 +1,8 @@
 import { uploadGeneratedAsset } from '../storage/upload'
-import sharp from 'sharp'
 import type { BrandProfile, SlideCopy, SlideDesignPrompt } from './types'
 import fs from 'fs'
 import path from 'path'
+import { renderSvgToPng } from '../render/svgToPng'
 
 export async function renderSlide(params: {
   campaignKey: string
@@ -14,8 +14,8 @@ export async function renderSlide(params: {
 }) {
   const y = params.design.textPosition === 'top' ? 250 : params.design.textPosition === 'bottom' ? 700 : 500
   const escapedHeadline = escapeXml(params.copy.headline)
-  const escapedBody = escapeXml(params.copy.body)
   const escapedCta = escapeXml(params.copy.ctaText || '')
+  const bodyLines = wrapText(params.copy.body, 30)
   
   const backgroundImageDataUri = await toImageDataUri(params.backgroundImageUrl)
 
@@ -34,16 +34,14 @@ export async function renderSlide(params: {
   <image href="${escapeXml(backgroundImageDataUri || params.backgroundImageUrl)}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice" opacity="0.24"/>
   <rect x="110" y="${y - 190}" width="860" height="${escapedCta ? 390 : 320}" rx="34" fill="#ffffff" opacity="0.92" filter="url(#shadow)"/>
   <text x="540" y="${y - 40}" text-anchor="middle" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="64" font-weight="800" fill="#111827">${escapedHeadline}</text>
-  <foreignObject x="190" y="${y + 10}" width="700" height="150">
-    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif; font-size: 34px; font-weight: 600; color: #334155; line-height: 1.35; text-align: center;">${escapedBody}</div>
-  </foreignObject>
+  ${bodyLines.slice(0, 3).map((line, index) => `<text x="540" y="${y + 42 + index * 48}" text-anchor="middle" font-family="Pretendard, sans-serif" font-size="34" font-weight="600" fill="#334155">${escapeXml(line)}</text>`).join('')}
   ${escapedCta ? `<rect x="350" y="${y + 180}" width="380" height="74" rx="37" fill="${escapeXml(params.brand.mainColor || '#ff4f00')}"/><text x="540" y="${y + 228}" text-anchor="middle" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="28" font-weight="800" fill="#ffffff">${escapedCta}</text>` : ''}
   <text x="70" y="985" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="26" font-weight="800" fill="#111827" opacity="0.72">${escapeXml(params.brand.name)}</text>
   ${params.showSlideNumber ? `<text x="1010" y="985" text-anchor="end" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#64748b">${params.copy.slideNumber}</text>` : ''}
 </svg>`
 
   try {
-    const png = await sharp(Buffer.from(svg)).png().toBuffer()
+    const png = renderSvgToPng(svg)
     return uploadGeneratedAsset({
       fileName: `${params.campaignKey}-slide-${params.copy.slideNumber}.png`,
       content: png,
@@ -57,6 +55,27 @@ export async function renderSlide(params: {
       contentType: 'image/svg+xml',
     })
   }
+}
+
+function wrapText(value: string, maxLength: number) {
+  const compact = value.replace(/\s+/g, ' ').trim()
+  if (!compact) return ['']
+
+  const lines: string[] = []
+  let line = ''
+
+  for (const word of compact.split(' ')) {
+    const next = line ? `${line} ${word}` : word
+    if (line && next.length > maxLength) {
+      lines.push(line)
+      line = word
+    } else {
+      line = next
+    }
+  }
+
+  if (line) lines.push(line)
+  return lines
 }
 
 function escapeXml(value: string) {

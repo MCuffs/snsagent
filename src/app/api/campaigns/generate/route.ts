@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../app/actions'
-import { dbService } from '../../../../../lib/db-service'
+import { dbService, type User } from '../../../../../lib/db-service'
 import { saveErrorLog } from '../../../../../lib/errorLogger'
 import { generateCarouselCampaign } from '../../../../lib/carousel/pipeline'
 import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types'
@@ -29,8 +29,8 @@ interface GenerateCampaignRequest {
 }
 
 export async function POST(request: Request) {
-  let user: any = null
-  let body: any = null
+  let user: User | null = null
+  let body: GenerateCampaignRequest | null = null
   try {
     user = await getSessionUser()
     if (!user) {

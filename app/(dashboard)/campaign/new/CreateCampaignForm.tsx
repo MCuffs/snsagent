@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, Sparkles, Sliders, Wand2, ImagePlus, X } from 'lucide-react'
 import { recommendCampaignAction } from '../../../../app/actions'
@@ -490,9 +491,11 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                     key={index}
                     className="relative h-20 w-20 overflow-hidden rounded-[8px] border border-[#e8dfd4] bg-[#f5efe6]"
                   >
-                    <img
+                    <Image
                       src={preview.previewUrl}
                       alt={`ref ${index + 1}`}
+                      fill
+                      unoptimized
                       className="h-full w-full object-cover"
                     />
                     {preview.uploading && (

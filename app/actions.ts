@@ -68,7 +68,7 @@ function withBrandDna<T extends {
 // Helper to get authenticated user from session cookies
 export async function getSessionUser(): Promise<User | null> {
   const cookieStore = await cookies()
-  const email = cookieStore.get('instaagent_session_email')?.value
+  const email = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!email) return null
   
   try {
@@ -85,16 +85,10 @@ export async function loginAction(email: string, name?: string) {
     return failed('올바른 이메일 주소를 입력해주세요.')
   }
 
-  const user = await dbService.getOrCreateUser(email, name)
+  const normalizedEmail = normalizeSessionEmail(email)
+  const user = await dbService.getOrCreateUser(normalizedEmail, name)
   const cookieStore = await cookies()
-  
-  // Set session cookie for 30 days
-  cookieStore.set('instaagent_session_email', email, {
-    maxAge: 30 * 24 * 60 * 60,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  })
+  cookieStore.set(SESSION_COOKIE_NAME, normalizedEmail, sessionCookieOptions())
 
   return { success: true as const, user }
 }
@@ -102,7 +96,7 @@ export async function loginAction(email: string, name?: string) {
 // Logout Action
 export async function logoutAction() {
   const cookieStore = await cookies()
-  cookieStore.delete('instaagent_session_email')
+  cookieStore.delete(SESSION_COOKIE_NAME)
   return { success: true as const }
 }
 
@@ -623,24 +617,6 @@ export async function updatePostScheduledTimeAction(postId: string, dateStr: str
   }
 }
 
-function cleanHtmlText(html: string): string {
-  // Remove script, style, svg, header, footer, nav tags and their contents
-  let text = html.replace(/<(script|style|svg|noscript|header|footer|nav)[^>]*>([\s\S]*?)<\/\1>/gi, '')
-  // Remove all HTML tags
-  text = text.replace(/<[^>]+>/g, ' ')
-  // Decode common HTML entities
-  text = text.replace(/&nbsp;/g, ' ')
-             .replace(/&lt;/g, '<')
-             .replace(/&gt;/g, '>')
-             .replace(/&amp;/g, '&')
-             .replace(/&quot;/g, '"')
-             .replace(/&#39;/g, "'")
-  // Normalize whitespace
-  text = text.replace(/\s+/g, ' ').trim()
-  // Limit character size to optimize token usage
-  return text.substring(0, 5000)
-}
-
 function removeMarkdownBold(text: string): string {
   if (!text) return ''
   return text.replace(/\*\*/g, '')
@@ -662,15 +638,6 @@ function extractSmartStoreShopId(urlStr: string): string | null {
     if (match) return match[1]
   }
   return null
-}
-
-function isNaverStoreUrl(url: string) {
-  try {
-    const hostname = new URL(url).hostname
-    return hostname.includes('smartstore.naver.com') || hostname.includes('brand.naver.com')
-  } catch {
-    return /(?:smartstore|brand)\.naver\.com/i.test(url)
-  }
 }
 
 function getGenericWebsiteFallback(url: string) {

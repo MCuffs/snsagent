@@ -18,6 +18,7 @@ import {
   updatePostDetailsAction,
   regenerateCampaignImagesAction,
 } from '../../../actions'
+import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
 
 interface Slide {
   id: string
@@ -135,10 +136,10 @@ export default function CampaignResultView({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
 
-  let agentReportData: any = null
+  let agentReportData: AgentReport | null = null
   if (campaign.agentReport) {
     try {
-      agentReportData = JSON.parse(campaign.agentReport)
+      agentReportData = JSON.parse(campaign.agentReport) as AgentReport
     } catch (e) {
       console.error('Failed to parse agentReport JSON', e)
     }
@@ -553,7 +554,7 @@ export default function CampaignResultView({
                   <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
                     <h3 className="text-sm font-black text-[#1f1512] mb-5">AI 에이전트 상세 활약 로그</h3>
                     <div className="relative border-l-2 border-[#e8dfd4] pl-4 ml-2 space-y-6">
-                      {agentReportData.logs?.map((log: any, idx: number) => {
+                      {agentReportData.logs?.map((log: AgentReportItem, idx: number) => {
                         let icon = 'ℹ️'
                         let color = 'text-[#746a62]'
                         let bg = 'bg-[#f8f3e9] border-[#e8dfd4]'
@@ -583,7 +584,7 @@ export default function CampaignResultView({
                               </div>
                               <div className={`mt-2 rounded-[6px] border p-3 text-xs leading-5 font-bold ${color} ${bg}`}>
                                 <span className="mr-1">{icon}</span> {log.message}
-                                {log.details && (
+                                {log.details !== undefined && log.details !== null && (
                                   <pre className="mt-2 overflow-x-auto rounded bg-black/5 p-2 text-[10px] text-[#4a4039] font-mono leading-4">
                                     {JSON.stringify(log.details, null, 2)}
                                   </pre>
