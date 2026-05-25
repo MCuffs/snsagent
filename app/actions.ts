@@ -233,7 +233,12 @@ export async function updateSlideAction(slideId: string, headline: string, body:
   }
 }
 
-export async function rerenderMediaSlideAction(slideId: string, headline: string, body: string) {
+export async function rerenderMediaSlideAction(
+  slideId: string,
+  headline: string,
+  body: string,
+  options?: { fontFamily?: string; textColor?: string }
+) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
@@ -275,6 +280,8 @@ export async function rerenderMediaSlideAction(slideId: string, headline: string
       source,
       pageNumber: existingSlide.slideNumber,
       totalPages: existingSlide.campaign.slideCount,
+      fontOverride: options?.fontFamily,
+      textColorOverride: options?.textColor,
     })
 
     const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
@@ -812,62 +819,77 @@ export async function analyzeBrandWebsiteAction(url: string) {
 
     if (useRealAI) {
       const openai = new OpenAI({ apiKey })
-      const prompt = `
-You are an expert brand consultant and digital marketer.
-Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
-Also, write a professional brand analysis report in Markdown format.
 
-[Collected Brand URL Context]
-${cleanedText}
+      // ── HARNESS: STAGE 1 — extract key signals (cheap, fast) ──────────────
+      const signalPrompt = `당신은 한국 디지털 마케팅 전문가입니다. 아래 웹사이트 스크랩 데이터에서 브랜드 분석에 필요한 핵심 신호를 추출하세요.
 
-[Requirements]
-1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style for Instagram. Prioritize Page Metadata, JSON-LD structured data, headings, image alt text, product/category signals, and important body text. Do not overfit to footer/legal/navigation text.
-2. The primary brand color must be a high-quality hex color code (e.g. '#B94718', '#2D3748', etc.) that represents the brand's aesthetic.
-3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry.
-4. The tone of voice must match one of these pre-defined options or a custom short variant:
-   - "친근하고 명확한 톤" (Friendly and clear)
-   - "전문적이고 신뢰감 있는 톤" (Professional and trustworthy)
-   - "젊고 경쾌한 톤" (Young and cheerful)
-   - "고급스럽고 차분한 톤" (Premium and calm)
-5. The industry must fit one of: '온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'.
-6. Write a brand identity report in Markdown (under "markdownReport"). Keep it professional, informative, and written in Korean (한국어). The report should outline the Brand Identity, Key Strengths, and SNS content strategy suggestions.
-7. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
-8. Extract brand-specific DNA fields for downstream card-news generation. These must be concrete to the website, not generic industry labels.
+[스크랩 데이터]
+${cleanedText.slice(0, 6000)}
 
-You MUST respond ONLY with a valid JSON object matching the following structure:
+다음 JSON 형식으로만 응답하세요:
 {
-  "name": "Brand Name (Korean/English)",
-  "industry": "One of the 6 industries listed above",
-  "targetAudience": "Target customers description (e.g. 2030 여성 직장인)",
-  "toneOfVoice": "One of the 4 tones listed above",
-  "mainColor": "#HEXCODE",
-  "forbiddenWords": "word1, word2, word3",
-  "ctaStyle": "A short call-to-action recommendation (e.g. 프로필 링크에서 만나보기)",
-  "coreProducts": ["specific product/service names"],
-  "valueProposition": "specific brand promise",
-  "customerPainPoints": ["specific customer problem"],
-  "differentiators": ["specific differentiator"],
-  "visualMood": "specific background-image mood",
-  "contentPillars": ["SNS pillar"],
-  "brandKeywords": ["brand-specific keyword"],
-  "avoidVisuals": ["generic visual trope to avoid"],
-  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서\\n\\n## 1. 브랜드 정체성\\n브랜드명: 휴100\\n업종: 온라인 스토어\\n\\n## 2. SNS 콘텐츠 전략\\n..."
-}
-`
+  "brandName": "정확한 브랜드명 (공식 명칭 우선)",
+  "platformType": "smartstore|coupang|brandsite|cafe|instagram|other",
+  "topProducts": ["최대 5개 핵심 상품/서비스"],
+  "priceRange": "저가/중가/고가/프리미엄",
+  "primaryColor": "#HEXCODE (메타데이터, 로고, 헤더에서 추출한 주요 컬러)",
+  "targetSignals": "타겟 고객 신호 (나이대, 성별, 라이프스타일)",
+  "uniqueSellingPoints": ["차별화 포인트 최대 3개"],
+  "categoryKeywords": ["업종 관련 키워드 최대 5개"]
+}`
+
+      const signalResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: signalPrompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 600,
+      })
+      const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
+
+      // ── HARNESS: STAGE 2 — full brand profile synthesis ──────────────────
+      const synthPrompt = `당신은 한국 SNS 카드뉴스 전문 브랜드 전략가입니다.
+아래 1차 신호 분석 결과와 원본 데이터를 기반으로 완전한 브랜드 프로필과 콘텐츠 DNA를 생성하세요.
+
+[1차 신호 분석 결과]
+${JSON.stringify(signals, null, 2)}
+
+[원본 웹사이트 데이터 (보충 참고용)]
+${cleanedText.slice(0, 5000)}
+
+[생성 규칙]
+- name: 공식 브랜드명. 플랫폼명(스마트스토어, 쿠팡 등)은 포함하지 않음
+- industry: 반드시 아래 6개 중 하나 선택
+  · 온라인 스토어 · 카페 / F&B · 피트니스 · 뷰티 / 케어 · 교육 / 강의 · IT / SaaS
+- targetAudience: "20~30대 직장인 여성" 처럼 나이+성별+라이프스타일 조합 (50자 이내)
+- toneOfVoice: 반드시 아래 4개 중 하나
+  · "친근하고 명확한 톤" · "전문적이고 신뢰감 있는 톤" · "젊고 경쾌한 톤" · "고급스럽고 차분한 톤"
+- mainColor: 브랜드 아이덴티티에 맞는 HEX 코드. 너무 밝거나(#ffffff 계열) 너무 어두운(#000000 계열) 극단값 금지
+- forbiddenWords: 이 업종에서 남용/스팸으로 여겨지는 표현 2~4개, 쉼표 구분
+- ctaStyle: 인스타그램에서 실제 사용할 짧은 CTA 문구 (예: 프로필 링크에서 주문하기)
+- brandDescription: 이 브랜드를 처음 보는 사람에게 설명하는 한국어 2~3문장 소개. 핵심 가치와 차별점 포함
+- coreProducts: 실제 판매/제공하는 구체적 상품명/서비스명 (최대 5개)
+- valueProposition: 브랜드가 고객에게 제공하는 핵심 약속 (1문장)
+- customerPainPoints: 이 브랜드가 해결하는 고객 고민 (최대 4개)
+- differentiators: 경쟁사 대비 구체적 차별점 (최대 4개)
+- visualMood: 카드뉴스 이미지 방향 (예: "깔끔한 화이트 배경에 제품 클로즈업, 자연광, 미니멀")
+- contentPillars: 인스타그램 콘텐츠 주제 축 (최대 5개)
+- brandKeywords: AI 카드뉴스 생성 시 반드시 반영할 키워드 (최대 8개)
+- avoidVisuals: 이 브랜드에 어울리지 않는 비주얼 스타일 (최대 4개)
+
+JSON 형식으로만 응답하세요:`
 
       const aiResponse = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are a brand analysis AI agent. Return JSON only. Never use markdown bold syntax (**).'
+            content: '당신은 한국 브랜드 전략 AI입니다. 반드시 유효한 JSON만 반환하세요. 마크다운 볼드(**) 사용 금지.',
           },
-          {
-            role: 'user',
-            content: prompt
-          }
+          { role: 'user', content: synthPrompt },
         ],
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
       })
 
       const rawJson = aiResponse.choices[0].message.content
@@ -876,25 +898,28 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
         return {
           success: true as const,
           brandProfile: {
-            name: parsed.name || '알 수 없음',
+            name: parsed.name || signals.brandName || '알 수 없음',
             industry: parsed.industry || '온라인 스토어',
             targetAudience: parsed.targetAudience || '대중 고객',
             toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
-            mainColor: parsed.mainColor || '#b94718',
+            mainColor: parsed.mainColor || '#0066ff',
             forbiddenWords: parsed.forbiddenWords || '',
             ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기',
             brandDna: buildBrandDnaFromProfile({
-              name: parsed.name || 'Unknown brand',
-              industry: parsed.industry || 'Online store',
-              targetAudience: parsed.targetAudience || 'Target customers',
-              toneOfVoice: parsed.toneOfVoice || 'Friendly and clear',
-              mainColor: parsed.mainColor || '#b94718',
+              name: parsed.name || signals.brandName || '알 수 없음',
+              industry: parsed.industry || '온라인 스토어',
+              targetAudience: parsed.targetAudience || '대중 고객',
+              toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
+              mainColor: parsed.mainColor || '#0066ff',
               ctaStyle: parsed.ctaStyle || '',
+              brandDescription: parsed.brandDescription,
               sourceText: collected.sourceText,
               parsed,
             })
           },
-          markdownReport: removeMarkdownBold(parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.')
+          markdownReport: removeMarkdownBold(
+            `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
+          ),
         }
       } else {
         throw new Error('AI 분석 실패: 응답이 비어있습니다.')

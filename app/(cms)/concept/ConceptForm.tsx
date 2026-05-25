@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ArrowRight, CheckCircle2, Globe, Loader2, Palette, Save, Sparkles } from 'lucide-react'
 import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
+import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
 
 interface BrandData {
   id: string
@@ -58,7 +59,22 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   const [forbiddenWords, setForbiddenWords] = useState(existingBrand?.forbiddenWords || '')
   const [ctaStyle, setCtaStyle] = useState(existingBrand?.ctaStyle || '')
   const [brandDna, setBrandDna] = useState(existingBrand?.brandDna || '')
+  const [brandDescription, setBrandDescription] = useState(
+    () => parseBrandDna(existingBrand?.brandDna).brandDescription
+  )
   const [visualMood, setVisualMood] = useState('minimal')
+
+  // Keep brandDescription in sync when brandDna changes externally (after analysis)
+  const updateBrandDna = (newDna: string) => {
+    setBrandDna(newDna)
+    setBrandDescription(parseBrandDna(newDna).brandDescription)
+  }
+
+  const handleBrandDescriptionChange = (desc: string) => {
+    setBrandDescription(desc)
+    const parsed = parseBrandDna(brandDna)
+    setBrandDna(stringifyBrandDna({ ...parsed, brandDescription: desc }))
+  }
 
   // UI state
   const [isSaving, setIsSaving] = useState(false)
@@ -97,7 +113,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         setMainColor(p.mainColor)
         setForbiddenWords(p.forbiddenWords)
         setCtaStyle(p.ctaStyle)
-        setBrandDna(p.brandDna || '')
+        updateBrandDna(p.brandDna || '')
 
         // Auto-save brand
         const saved = await saveBrandAction(brandId, {
@@ -297,8 +313,8 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         <Section title="브랜드 설명">
           <label className="mb-1.5 block text-xs font-medium text-[#52525b]">Brand Description</label>
           <textarea
-            value={brandDna}
-            onChange={(e) => setBrandDna(e.target.value)}
+            value={brandDescription}
+            onChange={(e) => handleBrandDescriptionChange(e.target.value)}
             placeholder="브랜드의 핵심 가치, 차별점, 스토리를 간략히 작성하세요."
             rows={4}
             className="w-full resize-none rounded-lg border border-[#e4e4e7] bg-white px-3.5 py-2.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"

@@ -1,4 +1,5 @@
 export interface BrandDna {
+  brandDescription: string
   coreProducts: string[]
   valueProposition: string
   customerPainPoints: string[]
@@ -10,6 +11,7 @@ export interface BrandDna {
 }
 
 export const EMPTY_BRAND_DNA: BrandDna = {
+  brandDescription: '',
   coreProducts: [],
   valueProposition: '',
   customerPainPoints: [],
@@ -35,6 +37,7 @@ export function stringifyBrandDna(value: Partial<BrandDna>) {
 
 export function normalizeBrandDna(value: Partial<BrandDna>): BrandDna {
   return {
+    brandDescription: normalizeText(value.brandDescription),
     coreProducts: normalizeList(value.coreProducts),
     valueProposition: normalizeText(value.valueProposition),
     customerPainPoints: normalizeList(value.customerPainPoints),
@@ -53,22 +56,28 @@ export function buildBrandDnaFromProfile(input: {
   toneOfVoice: string
   mainColor: string
   ctaStyle: string
+  brandDescription?: string
   sourceText?: string
   parsed?: Record<string, unknown>
 }) {
   const parsed = input.parsed || {}
   const sourceWords = extractKeywords(input.sourceText || '')
+  const valueProposition = readString(parsed.valueProposition) || `${input.name}은(는) ${input.targetAudience}을 위한 ${input.industry} 브랜드입니다.`
+  const brandDescription = input.brandDescription
+    || readString(parsed.brandDescription)
+    || valueProposition
   return stringifyBrandDna({
+    brandDescription,
     coreProducts: toStringList(parsed.coreProducts).concat(sourceWords.products).slice(0, 6),
-    valueProposition: readString(parsed.valueProposition) || `${input.name} serves ${input.targetAudience} through ${input.industry}.`,
+    valueProposition,
     customerPainPoints: toStringList(parsed.customerPainPoints).concat(sourceWords.pains).slice(0, 6),
     differentiators: toStringList(parsed.differentiators).concat(sourceWords.differentiators).slice(0, 6),
-    visualMood: readString(parsed.visualMood) || `${input.toneOfVoice}, brand color ${input.mainColor}, realistic product-adjacent editorial photography`,
+    visualMood: readString(parsed.visualMood) || `${input.toneOfVoice}, 브랜드 컬러 ${input.mainColor}, 감성적 제품 사진`,
     contentPillars: toStringList(parsed.contentPillars).concat([
-      'product benefit education',
-      'customer problem and solution',
-      'brand trust and proof',
-      'purchase or inquiry CTA',
+      '제품 혜택 교육',
+      '고객 문제와 해결',
+      '브랜드 신뢰와 증거',
+      '구매 유도 CTA',
     ]).slice(0, 6),
     brandKeywords: toStringList(parsed.brandKeywords).concat([
       input.name,
@@ -76,9 +85,9 @@ export function buildBrandDnaFromProfile(input: {
       input.targetAudience,
     ]).concat(sourceWords.keywords).slice(0, 10),
     avoidVisuals: toStringList(parsed.avoidVisuals).concat([
-      'generic stock photo',
-      'unrelated abstract background',
-      'fake text in image',
+      '일반 스톡 사진',
+      '관련 없는 추상 배경',
+      '이미지 속 가짜 텍스트',
     ]).slice(0, 6),
   })
 }
@@ -86,14 +95,15 @@ export function buildBrandDnaFromProfile(input: {
 export function formatBrandDnaForPrompt(value?: string | null) {
   const dna = parseBrandDna(value)
   return [
-    `Core products/services: ${dna.coreProducts.join(', ') || 'unknown'}`,
-    `Value proposition: ${dna.valueProposition || 'unknown'}`,
-    `Customer pains: ${dna.customerPainPoints.join(', ') || 'unknown'}`,
-    `Differentiators: ${dna.differentiators.join(', ') || 'unknown'}`,
-    `Visual mood: ${dna.visualMood || 'unknown'}`,
-    `Content pillars: ${dna.contentPillars.join(', ') || 'unknown'}`,
-    `Mandatory brand keywords: ${dna.brandKeywords.join(', ') || 'unknown'}`,
-    `Avoid visuals: ${dna.avoidVisuals.join(', ') || 'unknown'}`,
+    `브랜드 설명: ${dna.brandDescription || dna.valueProposition || 'unknown'}`,
+    `핵심 제품/서비스: ${dna.coreProducts.join(', ') || 'unknown'}`,
+    `가치 제안: ${dna.valueProposition || 'unknown'}`,
+    `고객 페인포인트: ${dna.customerPainPoints.join(', ') || 'unknown'}`,
+    `차별점: ${dna.differentiators.join(', ') || 'unknown'}`,
+    `비주얼 무드: ${dna.visualMood || 'unknown'}`,
+    `콘텐츠 필러: ${dna.contentPillars.join(', ') || 'unknown'}`,
+    `브랜드 키워드: ${dna.brandKeywords.join(', ') || 'unknown'}`,
+    `피해야 할 비주얼: ${dna.avoidVisuals.join(', ') || 'unknown'}`,
   ].join('\n')
 }
 

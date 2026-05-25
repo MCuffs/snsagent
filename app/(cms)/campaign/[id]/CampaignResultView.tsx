@@ -135,6 +135,8 @@ export default function CampaignResultView({
   const [regeneratingStyle, setRegeneratingStyle] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
+  const [selectedFont, setSelectedFont] = useState<'sans' | 'serif'>('sans')
+  const [textColor, setTextColor] = useState<string>('#ffffff')
 
   let agentReportData: AgentReport | null = null
   if (campaign.agentReport) {
@@ -197,7 +199,13 @@ export default function CampaignResultView({
     setMessage(null)
 
     try {
-      const result = await rerenderMediaSlideAction(activeSlide.id, headline, body)
+      const fontFamily = selectedFont === 'serif'
+        ? 'Georgia, Times New Roman, Pretendard, serif'
+        : 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif'
+      const result = await rerenderMediaSlideAction(activeSlide.id, headline, body, {
+        fontFamily,
+        textColor,
+      })
       if (!result.success) {
         setMessage({ type: 'error', text: result.error || '슬라이드 재렌더링에 실패했습니다.' })
         return
@@ -459,6 +467,61 @@ export default function CampaignResultView({
                 </div>
 
                 <div className="space-y-4">
+                  {/* Font selector */}
+                  <div>
+                    <label className="mb-2 block text-xs font-black text-[#4a4039]">폰트</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'sans' as const, label: 'Pretendard', hint: '기본 고딕체' },
+                        { key: 'serif' as const, label: 'Georgia', hint: '세리프 서체' },
+                      ].map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => setSelectedFont(f.key)}
+                          className={`rounded-[6px] border py-2.5 text-left px-3 transition ${
+                            selectedFont === f.key
+                              ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
+                              : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
+                          }`}
+                        >
+                          <p className="text-xs font-black">{f.label}</p>
+                          <p className="text-[10px] opacity-60">{f.hint}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Text color selector */}
+                  <div>
+                    <label className="mb-2 block text-xs font-black text-[#4a4039]">텍스트 색상</label>
+                    <div className="flex items-center gap-2">
+                      {[
+                        { value: '#ffffff', label: '화이트' },
+                        { value: '#111111', label: '다크' },
+                        { value: brand.mainColor, label: '브랜드' },
+                      ].map((c) => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          title={c.label}
+                          onClick={() => setTextColor(c.value)}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
+                            textColor === c.value ? 'border-[#ff4f0a] scale-110' : 'border-[#e8dfd4] hover:border-[#ffb08a]'
+                          }`}
+                          style={{ backgroundColor: c.value }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={textColor}
+                        onChange={(e) => setTextColor(e.target.value)}
+                        title="커스텀 색상"
+                        className="h-9 w-9 cursor-pointer rounded-full border-2 border-[#e8dfd4] p-0.5 hover:border-[#ffb08a]"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label htmlFor="headline" className="mb-2 block text-xs font-black text-[#4a4039]">
                       헤드라인

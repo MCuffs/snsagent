@@ -18,6 +18,8 @@ export interface RenderMediaCardInput {
   source?: string
   pageNumber?: number
   totalPages?: number
+  fontOverride?: string
+  textColorOverride?: string
 }
 
 export async function renderMediaCard(input: RenderMediaCardInput) {
@@ -29,9 +31,11 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const sourceHandle = normalizeInstagramHandle(input.source || 'shuffla')
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
   const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
-  const fontFam = fontFamily(input.layout.typographyStyle)
-  const textColor = input.layout.overlayStyle === 'none' ? '#ffffff' : input.overlay.textColor
-  const secondaryTextColor = input.layout.overlayStyle === 'none' ? 'rgba(255,255,255,0.78)' : input.overlay.secondaryTextColor
+  const fontFam = input.fontOverride ?? fontFamily(input.layout.typographyStyle)
+  const textColor = input.textColorOverride ?? (input.layout.overlayStyle === 'none' ? '#ffffff' : input.overlay.textColor)
+  const secondaryTextColor = input.textColorOverride
+    ? `${input.textColorOverride}cc`
+    : (input.layout.overlayStyle === 'none' ? 'rgba(255,255,255,0.78)' : input.overlay.secondaryTextColor)
   const headlineLineGap = input.layout.spacingRules?.headlineLineGap || 1.08
   const bodyLineGap = input.layout.spacingRules?.bodyLineGap || 1.42
   const badgeToHeadlineGap = input.layout.spacingRules?.badgeToHeadlineGap || 24
