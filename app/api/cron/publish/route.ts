@@ -14,25 +14,31 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCron(request: NextRequest) {
-  // 1. Cron Secret Verification
+  // 1. Cron Secret Verification — always required
   const systemSecret = process.env.CRON_SECRET
-  if (systemSecret) {
-    const authHeader = request.headers.get('authorization')
-    const querySecret = request.nextUrl.searchParams.get('secret')
-    
-    let providedSecret = ''
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      providedSecret = authHeader.substring(7)
-    } else if (querySecret) {
-      providedSecret = querySecret
-    }
+  if (!systemSecret) {
+    console.error('[Cron] CRON_SECRET env var is not set — refusing to run')
+    return NextResponse.json(
+      { success: false, error: 'Cron secret not configured on this server.' },
+      { status: 500 }
+    )
+  }
 
-    if (providedSecret !== systemSecret) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized. Invalid secret key.' },
-        { status: 401 }
-      )
-    }
+  const authHeader = request.headers.get('authorization')
+  const querySecret = request.nextUrl.searchParams.get('secret')
+
+  let providedSecret = ''
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    providedSecret = authHeader.substring(7)
+  } else if (querySecret) {
+    providedSecret = querySecret
+  }
+
+  if (providedSecret !== systemSecret) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized. Invalid secret key.' },
+      { status: 401 }
+    )
   }
 
   try {

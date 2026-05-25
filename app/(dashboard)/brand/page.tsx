@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { getSessionUser } from '../../actions'
 import { checkBrandCountLimit } from '../../../lib/limits'
 import { dbService } from '../../../lib/db-service'
@@ -11,7 +12,7 @@ export default async function BrandSettingsPage({
   searchParams: Promise<{ start?: string }>
 }) {
   const user = await getSessionUser()
-  if (!user) return null
+  if (!user) redirect('/login')
 
   const params = await searchParams
   const brands = await dbService.getBrands(user.id)

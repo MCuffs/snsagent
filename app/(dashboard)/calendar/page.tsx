@@ -34,7 +34,7 @@ export default async function ContentCalendarPage() {
             <Sparkles className="h-4 w-4" />
             카드뉴스 만들기
           </Link>
-          <Link href="/dashboard" className="btn-secondary px-5">
+          <Link href="/brand" className="btn-secondary px-5">
             <Download className="h-4 w-4" />
             작업대 보기
           </Link>
