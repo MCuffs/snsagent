@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Check,
@@ -8,13 +8,18 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  ImagePlus,
   Loader2,
   RefreshCw,
+  Save,
   Sparkles,
   Type,
 } from 'lucide-react'
 import {
   rerenderMediaSlideAction,
+  fastRerenderTextAction,
+  saveSlideTextAction,
+  replaceBackgroundAction,
   updatePostDetailsAction,
   regenerateCampaignImagesAction,
 } from '../../../actions'
@@ -129,6 +134,10 @@ export default function CampaignResultView({
   const [caption, setCaption] = useState(post.caption)
   const [hashtags, setHashtags] = useState(post.hashtags)
   const [rerendering, setRerendering] = useState(false)
+  const [savingText, setSavingText] = useState(false)
+  const [fastRendering, setFastRendering] = useState(false)
+  const [replacingBg, setReplacingBg] = useState(false)
+  const bgFileInputRef = useRef<HTMLInputElement>(null)
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [selectedStyle, setSelectedStyle] = useState('photo')
@@ -213,12 +222,7 @@ export default function CampaignResultView({
 
       const updatedSlides = slides.map((slide) =>
         slide.id === activeSlide.id
-          ? {
-              ...slide,
-              headline,
-              body,
-              imageUrl: result.slide.imageUrl,
-            }
+          ? { ...slide, headline, body, imageUrl: result.slide.imageUrl }
           : slide
       )
       setSlides(updatedSlides)
@@ -227,6 +231,89 @@ export default function CampaignResultView({
       setMessage({ type: 'error', text: getErrorMessage(error, '슬라이드 재렌더링 중 오류가 발생했습니다.') })
     } finally {
       setRerendering(false)
+    }
+  }
+
+  const saveText = async () => {
+    if (!activeSlide) return
+    setSavingText(true)
+    setMessage(null)
+    try {
+      const result = await saveSlideTextAction(activeSlide.id, headline, body)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '저장에 실패했습니다.' })
+        return
+      }
+      const updatedSlides = slides.map((slide) =>
+        slide.id === activeSlide.id ? { ...slide, headline, body } : slide
+      )
+      setSlides(updatedSlides)
+      setMessage({ type: 'success', text: '텍스트를 저장했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '저장 중 오류가 발생했습니다.') })
+    } finally {
+      setSavingText(false)
+    }
+  }
+
+  const fastRerenderText = async () => {
+    if (!activeSlide) return
+    setFastRendering(true)
+    setMessage(null)
+    try {
+      const fontFamily = selectedFont === 'serif'
+        ? 'Georgia, Times New Roman, Pretendard, serif'
+        : 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif'
+      const result = await fastRerenderTextAction(activeSlide.id, headline, body, { fontFamily, textColor })
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '렌더링에 실패했습니다.' })
+        return
+      }
+      const updatedSlides = slides.map((slide) =>
+        slide.id === activeSlide.id
+          ? { ...slide, headline, body, imageUrl: result.slide.imageUrl }
+          : slide
+      )
+      setSlides(updatedSlides)
+      setMessage({ type: 'success', text: '텍스트를 렌더링했습니다. (~3초)' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '렌더링 중 오류가 발생했습니다.') })
+    } finally {
+      setFastRendering(false)
+    }
+  }
+
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !activeSlide) return
+    setReplacingBg(true)
+    setMessage(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+      const uploadData = await uploadRes.json() as { url?: string; error?: string }
+      if (!uploadRes.ok || !uploadData.url) {
+        setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
+        return
+      }
+      const result = await replaceBackgroundAction(activeSlide.id, uploadData.url)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || '배경 교체에 실패했습니다.' })
+        return
+      }
+      const updatedSlides = slides.map((slide) =>
+        slide.id === activeSlide.id
+          ? { ...slide, imageUrl: result.slide.imageUrl }
+          : slide
+      )
+      setSlides(updatedSlides)
+      setMessage({ type: 'success', text: '배경 이미지를 교체했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '배경 교체 중 오류가 발생했습니다.') })
+    } finally {
+      setReplacingBg(false)
+      if (bgFileInputRef.current) bgFileInputRef.current.value = ''
     }
   }
 
@@ -545,14 +632,50 @@ export default function CampaignResultView({
                       className="field resize-none px-4 py-3 text-base leading-7"
                     />
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveText}
+                      disabled={savingText || fastRendering || rerendering || replacingBg}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-white py-2.5 text-xs font-bold text-[#4a4039] transition hover:border-[#ffb08a] disabled:opacity-40"
+                    >
+                      {savingText ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={fastRerenderText}
+                      disabled={savingText || fastRendering || rerendering || replacingBg}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-[#ff4f0a]/5 py-2.5 text-xs font-bold text-[#ff4f0a] transition hover:bg-[#ff4f0a]/10 disabled:opacity-40"
+                    >
+                      {fastRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      렌더 적용
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => bgFileInputRef.current?.click()}
+                      disabled={savingText || fastRendering || rerendering || replacingBg}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-white py-2.5 text-xs font-bold text-[#4a4039] transition hover:border-[#ffb08a] disabled:opacity-40"
+                    >
+                      {replacingBg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+                      배경 교체
+                    </button>
+                    <input
+                      ref={bgFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleBackgroundUpload}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={rerenderSlide}
-                    disabled={rerendering}
+                    disabled={rerendering || fastRendering || savingText || replacingBg}
                     className="btn-primary w-full rounded-[8px]"
                   >
-                    {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    이 카드 다시 렌더링
+                    {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    전체 재생성 (AI 배경 포함)
                   </button>
                 </div>
               </div>

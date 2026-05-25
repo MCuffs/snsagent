@@ -291,6 +291,133 @@ export async function rerenderMediaSlideAction(
   }
 }
 
+// Save text only — no rerender, instant
+export async function saveSlideTextAction(slideId: string, headline: string, body: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
+    const slide = await dbService.updateSlideContent(slideId, headline, body, existingSlide.imageUrl)
+    return { success: true as const, slide }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '슬라이드 저장에 실패했습니다.'))
+  }
+}
+
+// Fast text-only rerender — reuse existing imageUrl as background, skip DALL-E
+export async function fastRerenderTextAction(
+  slideId: string,
+  headline: string,
+  body: string,
+  options?: { fontFamily?: string; textColor?: string }
+) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+    if (!existingSlide.imageUrl) return failed('배경 이미지가 없습니다.')
+
+    const brand = await dbService.getBrand(existingSlide.campaign.brandId)
+    const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
+    const source = account?.username || brand?.name || 'instaagent'
+    const layout = LAYOUT_DEFINITIONS[inferLayoutType(existingSlide.designPrompt)]
+    const typography = planTypography({
+      headline,
+      body,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      layout,
+    })
+    const harness = applyMediaCardHarness({
+      layout,
+      typography,
+      slideNumber: existingSlide.slideNumber,
+      totalSlides: existingSlide.campaign.slideCount,
+    })
+
+    const imageUrl = await renderMediaCard({
+      id: `fast-rerender-${Date.now()}-${existingSlide.slideNumber}`,
+      layout: harness.layout,
+      typography: harness.typography,
+      overlay: harness.overlay,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      headline,
+      body,
+      backgroundImageUrl: existingSlide.imageUrl,
+      source,
+      pageNumber: existingSlide.slideNumber,
+      totalPages: existingSlide.campaign.slideCount,
+      fontOverride: options?.fontFamily,
+      textColorOverride: options?.textColor,
+    })
+
+    const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
+    return { success: true as const, slide }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '빠른 재렌더링에 실패했습니다.'))
+  }
+}
+
+// Replace background — upload URL provided, rerender SVG with new background
+export async function replaceBackgroundAction(
+  slideId: string,
+  backgroundUrl: string,
+  options?: { fontFamily?: string; textColor?: string }
+) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
+    const brand = await dbService.getBrand(existingSlide.campaign.brandId)
+    const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
+    const source = account?.username || brand?.name || 'instaagent'
+    const layout = LAYOUT_DEFINITIONS[inferLayoutType(existingSlide.designPrompt)]
+    const typography = planTypography({
+      headline: existingSlide.headline,
+      body: existingSlide.body,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      layout,
+    })
+    const harness = applyMediaCardHarness({
+      layout,
+      typography,
+      slideNumber: existingSlide.slideNumber,
+      totalSlides: existingSlide.campaign.slideCount,
+    })
+
+    const imageUrl = await renderMediaCard({
+      id: `bg-replace-${Date.now()}-${existingSlide.slideNumber}`,
+      layout: harness.layout,
+      typography: harness.typography,
+      overlay: harness.overlay,
+      category: existingSlide.campaign.keyBenefits || '카드뉴스',
+      headline: existingSlide.headline,
+      body: existingSlide.body,
+      backgroundImageUrl: backgroundUrl,
+      source,
+      pageNumber: existingSlide.slideNumber,
+      totalPages: existingSlide.campaign.slideCount,
+      fontOverride: options?.fontFamily,
+      textColorOverride: options?.textColor,
+    })
+
+    const slide = await dbService.updateSlideContent(slideId, existingSlide.headline, existingSlide.body, imageUrl)
+    return { success: true as const, slide }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '배경 교체에 실패했습니다.'))
+  }
+}
+
 // Update post caption & hashtags
 export async function updatePostDetailsAction(postId: string, caption: string, hashtags: string) {
   const user = await getSessionUser()
