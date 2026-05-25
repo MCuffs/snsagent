@@ -14,6 +14,9 @@ export interface User {
   email: string
   name: string | null
   plan: string // FREE, STARTER, PRO, AGENCY
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  stripeSubscriptionStatus: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -249,6 +252,44 @@ export const dbService = {
       return db.users[userIndex]
     }
     throw new Error('User not found')
+  },
+
+  async updateUserStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
+    if (!isMock()) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { stripeCustomerId },
+      })
+    }
+  },
+
+  async updateUserStripe(userId: string, data: {
+    stripeCustomerId?: string | null
+    stripeSubscriptionId?: string | null
+    stripeSubscriptionStatus?: string | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      await prisma.user.update({
+        where: { id: userId },
+        data,
+      })
+    } else {
+      const db = initMockDb()
+      const userIndex = db.users.findIndex(u => u.id === userId)
+      if (userIndex !== -1 && data.plan) {
+        db.users[userIndex].plan = data.plan
+        db.users[userIndex].updatedAt = new Date()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {
+    if (!isMock()) {
+      return prisma.user.findUnique({ where: { stripeCustomerId } })
+    }
+    return null
   },
 
   // Brand operations

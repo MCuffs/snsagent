@@ -82,59 +82,59 @@ export default async function LoginPage({
               Google로 계속하기
             </Link>
 
-            <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
-              <div className="h-px flex-1 bg-[#e8dfd4]" />
-              또는
-              <div className="h-px flex-1 bg-[#e8dfd4]" />
-            </div>
-
-            <form action={handleSubmit} className="space-y-5">
-              <div>
-                <label htmlFor="email" className="mb-2 block text-sm font-black">
-                  이메일 *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="name@company.com"
-                    required
-                    className="field h-14 pl-11 pr-4 text-base"
-                  />
+            {process.env.NODE_ENV !== 'production' && (
+              <>
+                <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
+                  <div className="h-px flex-1 bg-[#e8dfd4]" />
+                  또는
+                  <div className="h-px flex-1 bg-[#e8dfd4]" />
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="name" className="mb-2 block text-sm font-black">
-                  이름 또는 브랜드명
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="예: Daily Mocha"
-                  className="field h-14 px-4 text-base"
-                />
-              </div>
+                <form action={handleSubmit} className="space-y-5">
+                  <div>
+                    <label htmlFor="email" className="mb-2 block text-sm font-black">
+                      이메일 *
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="name@company.com"
+                        required
+                        className="field h-14 pl-11 pr-4 text-base"
+                      />
+                    </div>
+                  </div>
 
-              <p className="text-sm leading-6 text-[#4a4039]">
-                이메일 로그인은 로컬 테스트용입니다. 실제 운영에서는 Google 로그인을 기본 진입 방식으로 사용합니다.
-              </p>
+                  <div>
+                    <label htmlFor="name" className="mb-2 block text-sm font-black">
+                      이름 또는 브랜드명
+                    </label>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      placeholder="예: Daily Mocha"
+                      className="field h-14 px-4 text-base"
+                    />
+                  </div>
 
-              <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
-                이메일로 시작하기
-                <ArrowRight className="h-5 w-5" />
-              </button>
-            </form>
+                  <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
+                    이메일로 시작하기
+                    <ArrowRight className="h-5 w-5" />
+                  </button>
+                </form>
 
-            <form action={handleDemoLogin} className="mt-4">
-              <button type="submit" className="btn-secondary w-full rounded-[5px]">
-                <ShieldCheck className="h-4 w-4 text-[#ff4f0a]" />
-                데모 계정으로 입장
-              </button>
-            </form>
+                <form action={handleDemoLogin} className="mt-4">
+                  <button type="submit" className="btn-secondary w-full rounded-[5px]">
+                    <ShieldCheck className="h-4 w-4 text-[#ff4f0a]" />
+                    데모 계정으로 입장
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </section>

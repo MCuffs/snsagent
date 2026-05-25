@@ -2,37 +2,70 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2 } from 'lucide-react'
-import { changeUserPlanAction } from '../../actions'
+import { Check, Loader2, ExternalLink } from 'lucide-react'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 
 interface PricingClientViewProps {
   currentPlan: string
   plansList: SubscriptionPlan[]
+  hasSubscription: boolean
 }
 
 function formatLimit(limit: number) {
   return limit >= 9999 ? '무제한' : `${limit}개`
 }
 
-export default function PricingClientView({ currentPlan, plansList }: PricingClientViewProps) {
+export default function PricingClientView({ currentPlan, plansList, hasSubscription }: PricingClientViewProps) {
   const router = useRouter()
   const [processingPlan, setProcessingPlan] = useState<SubscriptionPlan | null>(null)
+  const [openingPortal, setOpeningPortal] = useState(false)
   const [error, setError] = useState('')
 
-  const changePlan = async (plan: SubscriptionPlan) => {
+  const startCheckout = async (plan: SubscriptionPlan) => {
+    if (plan === 'FREE') return
     setProcessingPlan(plan)
     setError('')
-    const result = await changeUserPlanAction(plan)
 
-    if (!result.success) {
-      setError(result.error || '플랜 변경에 실패했습니다.')
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json() as { url?: string; error?: string }
+
+      if (!res.ok || !data.url) {
+        setError(data.error || '결제 페이지를 열 수 없습니다.')
+        setProcessingPlan(null)
+        return
+      }
+
+      window.location.href = data.url
+    } catch {
+      setError('네트워크 오류가 발생했습니다.')
       setProcessingPlan(null)
-      return
     }
+  }
 
-    router.refresh()
-    setProcessingPlan(null)
+  const openPortal = async () => {
+    setOpeningPortal(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = await res.json() as { url?: string; error?: string }
+
+      if (!res.ok || !data.url) {
+        setError(data.error || '구독 관리 페이지를 열 수 없습니다.')
+        setOpeningPortal(false)
+        return
+      }
+
+      window.location.href = data.url
+    } catch {
+      setError('네트워크 오류가 발생했습니다.')
+      setOpeningPortal(false)
+    }
   }
 
   return (
@@ -43,11 +76,27 @@ export default function PricingClientView({ currentPlan, plansList }: PricingCli
         </div>
       )}
 
+      {hasSubscription && (
+        <div className="flex items-center justify-between rounded-lg border border-[#ece9e0] bg-[#faf8f4] px-5 py-4">
+          <p className="text-sm font-bold text-[#5d584f]">구독 중인 플랜을 변경하거나 취소하려면 구독 관리 포털을 이용하세요.</p>
+          <button
+            type="button"
+            disabled={openingPortal}
+            onClick={openPortal}
+            className="btn-secondary flex-shrink-0 ml-4"
+          >
+            {openingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+            구독 관리
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
           const isProcessing = processingPlan === planKey
+          const isFree = planKey === 'FREE'
 
           return (
             <article
@@ -76,12 +125,12 @@ export default function PricingClientView({ currentPlan, plansList }: PricingCli
 
               <button
                 type="button"
-                disabled={isCurrentPlan || Boolean(processingPlan)}
-                onClick={() => changePlan(planKey)}
-                className={isCurrentPlan ? 'btn-secondary mt-6 w-full opacity-60' : 'btn-primary mt-6 w-full'}
+                disabled={isCurrentPlan || Boolean(processingPlan) || openingPortal || isFree}
+                onClick={() => startCheckout(planKey)}
+                className={isCurrentPlan || isFree ? 'btn-secondary mt-6 w-full opacity-60' : 'btn-primary mt-6 w-full'}
               >
                 {isProcessing && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isCurrentPlan ? '사용 중' : '플랜 적용'}
+                {isCurrentPlan ? '사용 중' : isFree ? '기본 플랜' : '업그레이드'}
               </button>
             </article>
           )
