@@ -21,13 +21,13 @@ export default async function CampaignDetailsPage({
   // Fetch Campaign
   const campaign = await dbService.getCampaign(id)
   if (!campaign || campaign.userId !== user.id) {
-    redirect('/brand')
+    redirect('/works')
   }
 
   // Fetch Brand
   const brand = await dbService.getBrand(campaign.brandId)
   if (!brand) {
-    redirect('/brand')
+    redirect('/works')
   }
 
   // Fetch associated Post
@@ -35,7 +35,7 @@ export default async function CampaignDetailsPage({
   const post = posts.find(p => p.campaignId === campaign.id)
 
   if (!post) {
-    redirect('/brand')
+    redirect('/works')
   }
 
   // Enforce SaaS pricing rules

@@ -135,8 +135,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
           }
 
           setCurrentBrandId(saved.brand.id)
-          router.push('/campaign/new')
-          return
+          router.push('/generate')
         }
 
         setFormSuccess('AI 분석이 완료되었습니다. 내용을 확인한 뒤 저장하기를 눌러 브랜드 정보를 저장하세요.')
@@ -173,7 +172,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         setCurrentBrandId(res.brand.id)
         setFormSuccess('브랜드 정보가 저장되었습니다.')
         if (shouldGoToCampaign) {
-          router.push('/campaign/new')
+          router.push('/generate')
         } else {
           router.refresh()
         }

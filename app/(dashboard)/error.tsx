@@ -33,7 +33,7 @@ export default function DashboardError({
           다시 시도
         </button>
         <Link
-          href="/brand"
+          href="/concept"
           className="inline-flex items-center gap-2 rounded-full bg-[#1f1512] px-4 py-2 text-sm font-black text-white hover:bg-[#352521] transition"
         >
           홈으로

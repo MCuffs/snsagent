@@ -20,7 +20,7 @@ export default async function PricingPage({
 
   const brands = await dbService.getBrands(user.id)
   if (brands.length === 0) {
-    redirect('/brand')
+    redirect('/concept')
   }
 
   const params = searchParams ? await searchParams : {}

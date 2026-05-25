@@ -98,6 +98,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
               </button>
             </form>
           </div>
+          <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
         </div>
       </aside>
 

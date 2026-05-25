@@ -16,5 +16,5 @@ export async function GET(request: Request) {
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE_NAME, uniqueEmail, sessionCookieOptions())
 
-  return NextResponse.redirect(new URL('/brand?start=1', request.url))
+  return NextResponse.redirect(new URL('/concept', request.url))
 }
