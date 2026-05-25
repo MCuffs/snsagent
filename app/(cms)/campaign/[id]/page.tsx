@@ -12,38 +12,24 @@ export default async function CampaignDetailsPage({
   params: Promise<{ id: string }>
 }) {
   const user = await getSessionUser()
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { id } = await params
 
-  // Fetch Campaign
   const campaign = await dbService.getCampaign(id)
-  if (!campaign || campaign.userId !== user.id) {
-    redirect('/works')
-  }
+  if (!campaign || campaign.userId !== user.id) redirect('/works')
 
-  // Fetch Brand
   const brand = await dbService.getBrand(campaign.brandId)
-  if (!brand) {
-    redirect('/works')
-  }
+  if (!brand) redirect('/works')
 
-  // Fetch associated Post
   const posts = await dbService.getPosts(user.id)
   const post = posts.find(p => p.campaignId === campaign.id)
+  if (!post) redirect('/works')
 
-  if (!post) {
-    redirect('/works')
-  }
-
-  // Enforce SaaS pricing rules
   const userPlan = (user.plan || 'FREE') as SubscriptionPlan
   const planConfig = PRICING_PLANS[userPlan]
   const hasWatermark = planConfig.hasWatermark
 
-  // Format objects for client serialization
   const serializedCampaign = {
     id: campaign.id,
     title: campaign.title,

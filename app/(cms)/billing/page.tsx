@@ -14,20 +14,15 @@ export default async function PricingPage({
   searchParams?: Promise<{ success?: string; canceled?: string }>
 }) {
   const user = await getSessionUser()
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const brands = await dbService.getBrands(user.id)
-  if (brands.length === 0) {
-    redirect('/concept')
-  }
+  if (brands.length === 0) redirect('/concept')
 
   const params = searchParams ? await searchParams : {}
   const plansList = Object.keys(PRICING_PLANS) as SubscriptionPlan[]
   const hasSubscription = Boolean(user.paypalSubscriptionId)
 
-  // Filter out undefined plan IDs for client
   const paypalPlanIds: Record<string, string> = {}
   for (const [key, val] of Object.entries(PAYPAL_PLAN_IDS)) {
     if (val) paypalPlanIds[key] = val
@@ -36,26 +31,25 @@ export default async function PricingPage({
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
       <div className="mb-8">
-        <p className="eyebrow">Billing</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Billing</p>
         <div className="mt-3 flex items-start gap-3">
-          <CreditCard className="mt-1 h-6 w-6 text-[#b94718]" />
+          <CreditCard className="mt-1 h-5 w-5 text-[#0066ff]" />
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-neutral-950">요금제</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6f6a61]">
-              플랜을 업그레이드하면 더 많은 캠페인과 고급 기능을 사용할 수 있습니다.
+            <h1 className="text-2xl font-bold tracking-tight text-[#111111]">요금제</h1>
+            <p className="mt-1.5 text-sm text-[#52525b]">
+              플랜을 업그레이드하면 더 많은 카드뉴스와 고급 기능을 사용할 수 있습니다.
             </p>
           </div>
         </div>
       </div>
 
       {params.success && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-5 py-4 text-sm font-bold text-green-800">
+        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
           결제가 완료되었습니다. 플랜이 업그레이드되었습니다.
         </div>
       )}
-
       {params.canceled && (
-        <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 px-5 py-4 text-sm font-bold text-yellow-800">
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-800">
           결제가 취소되었습니다.
         </div>
       )}
