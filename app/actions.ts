@@ -4,8 +4,12 @@ import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
 import { schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
-import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey } from '../lib/env'
+import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGeminiApiKey, isConfiguredGeminiKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi } from '../lib/env'
 import { OpenAI } from 'openai'
+import { analyzeBrandWithGemini } from '../lib/gemini'
+import { analyzeBrandWithGroq } from '../lib/groq'
+import { analyzeBrandWithPerplexity, analyzeNaverStoreWithPerplexity } from '../lib/perplexity'
+import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from '../lib/naver-shopping'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageProvider } from '../src/lib/ai/providers'
@@ -802,11 +806,55 @@ export async function analyzeBrandWebsiteAction(url: string) {
 
   let targetUrl = url
   const isSmartStore = url.includes('smartstore.naver.com')
-  if (isSmartStore && !url.includes('m.smartstore.naver.com')) {
-    targetUrl = url.replace('smartstore.naver.com', 'm.smartstore.naver.com')
-  }
+  const shopId = isSmartStore ? extractSmartStoreId(url) : null
 
-  const shopId = isSmartStore ? extractSmartStoreShopId(targetUrl) : null
+  // ── 네이버 스마트스토어 전용 경로 ──────────────────────────────────────────
+  if (isSmartStore && shopId) {
+    const naverClientId = getNaverClientId()
+    const naverClientSecret = getNaverClientSecret()
+    const perplexityKey = getPerplexityApiKey()
+    const hasNaverApi = isConfiguredNaverApi(naverClientId, naverClientSecret)
+    const hasPerplexity = isConfiguredPerplexityKey(perplexityKey)
+
+    if (hasNaverApi && hasPerplexity) {
+      try {
+        console.log(`[SmartStore] 네이버 API + Perplexity로 분석: ${shopId}`)
+        const storeData = await fetchNaverStoreProducts(naverClientId, naverClientSecret, shopId)
+        const storeContext = buildStoreContext(storeData)
+        const parsed = await analyzeNaverStoreWithPerplexity(perplexityKey, shopId, storeContext) as Record<string, unknown>
+        return {
+          success: true as const,
+          brandProfile: {
+            name: String(parsed.name || storeData.storeName || shopId),
+            industry: String(parsed.industry || '온라인 스토어'),
+            targetAudience: String(parsed.targetAudience || ''),
+            toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
+            mainColor: String(parsed.mainColor || '#b94718'),
+            forbiddenWords: String(parsed.forbiddenWords || ''),
+            ctaStyle: String(parsed.ctaStyle || '스토어에서 확인하기'),
+            brandDna: buildBrandDnaFromProfile({
+              name: String(parsed.name || shopId),
+              industry: String(parsed.industry || '온라인 스토어'),
+              targetAudience: String(parsed.targetAudience || ''),
+              toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
+              mainColor: String(parsed.mainColor || '#b94718'),
+              ctaStyle: String(parsed.ctaStyle || ''),
+              parsed,
+            }),
+          },
+          markdownReport: removeMarkdownBold(String(parsed.markdownReport || `# ${parsed.name} 브랜드 분석\n\n네이버 스마트스토어 API 기반 분석 완료.`)),
+        }
+      } catch (e) {
+        console.error('[SmartStore] 네이버 API 분석 실패, 일반 경로로 폴백:', e)
+        // 실패 시 아래 일반 경로로 계속 진행
+      }
+    } else {
+      const missing = []
+      if (!hasNaverApi) missing.push('NAVER_CLIENT_ID / NAVER_CLIENT_SECRET')
+      if (!hasPerplexity) missing.push('PERPLEXITY_API_KEY')
+      console.warn(`[SmartStore] API 키 미설정 (${missing.join(', ')}), 일반 경로로 폴백`)
+    }
+  }
 
   try {
     console.log(`Collecting brand URL context: ${targetUrl}`)
@@ -814,14 +862,35 @@ export async function analyzeBrandWebsiteAction(url: string) {
     const cleanedText = collected.promptContext
     console.log(`Brand URL collection complete: ${collected.finalUrl} | ${collected.diagnostics.join(', ')}`)
 
-    const apiKey = process.env.OPENAI_API_KEY
-    const useRealAI = isConfiguredOpenAIKey(apiKey)
+    const perplexityKey = getPerplexityApiKey()
+    const groqKey = getGroqApiKey()
+    const geminiKey = getGeminiApiKey()
+    const openaiKey = process.env.OPENAI_API_KEY
+    const usePerplexity = isConfiguredPerplexityKey(perplexityKey)
+    const useGroq = !usePerplexity && isConfiguredGroqKey(groqKey)
+    const useGemini = !usePerplexity && !useGroq && isConfiguredGeminiKey(geminiKey)
+    const useOpenAI = !usePerplexity && !useGroq && !useGemini && isConfiguredOpenAIKey(openaiKey)
 
-    if (useRealAI) {
-      const openai = new OpenAI({ apiKey })
+    if (usePerplexity || useGroq || useGemini || useOpenAI) {
+      let parsed: Record<string, unknown>
 
-      // ── HARNESS: STAGE 1 — extract key signals (cheap, fast) ──────────────
-      const signalPrompt = `당신은 한국 디지털 마케팅 전문가입니다. 아래 웹사이트 스크랩 데이터에서 브랜드 분석에 필요한 핵심 신호를 추출하세요.
+      if (usePerplexity) {
+        // Perplexity는 URL을 직접 방문하므로 원본 URL을 넘김
+        console.log('Using Perplexity sonar-pro for brand analysis')
+        parsed = await analyzeBrandWithPerplexity(perplexityKey, targetUrl)
+      } else if (useGroq) {
+        console.log('Using Groq (Llama 3.3 70B) for brand analysis')
+        parsed = await analyzeBrandWithGroq(groqKey, cleanedText)
+      } else if (useGemini) {
+        console.log('Using Gemini 1.5 Flash for brand analysis')
+        parsed = await analyzeBrandWithGemini(geminiKey, cleanedText)
+      } else {
+        // GPT-4o 2단계 harness (신호 추출 → 전체 합성)
+        console.log('Using GPT-4o 2-stage harness for brand analysis')
+        const openai = new OpenAI({ apiKey: openaiKey })
+
+        // STAGE 1: 핵심 신호 추출 (gpt-4o-mini, 빠르고 저렴)
+        const signalPrompt = `당신은 한국 디지털 마케팅 전문가입니다. 아래 웹사이트 스크랩 데이터에서 브랜드 분석에 필요한 핵심 신호를 추출하세요.
 
 [스크랩 데이터]
 ${cleanedText.slice(0, 6000)}
@@ -837,18 +906,17 @@ ${cleanedText.slice(0, 6000)}
   "uniqueSellingPoints": ["차별화 포인트 최대 3개"],
   "categoryKeywords": ["업종 관련 키워드 최대 5개"]
 }`
+        const signalResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: signalPrompt }],
+          response_format: { type: 'json_object' },
+          temperature: 0,
+          max_tokens: 600,
+        })
+        const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
 
-      const signalResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: signalPrompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0,
-        max_tokens: 600,
-      })
-      const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
-
-      // ── HARNESS: STAGE 2 — full brand profile synthesis ──────────────────
-      const synthPrompt = `당신은 한국 SNS 카드뉴스 전문 브랜드 전략가입니다.
+        // STAGE 2: 전체 브랜드 프로필 합성 (gpt-4o)
+        const synthPrompt = `당신은 한국 SNS 카드뉴스 전문 브랜드 전략가입니다.
 아래 1차 신호 분석 결과와 원본 데이터를 기반으로 완전한 브랜드 프로필과 콘텐츠 DNA를 생성하세요.
 
 [1차 신호 분석 결과]
@@ -866,67 +934,62 @@ ${cleanedText.slice(0, 5000)}
   · "친근하고 명확한 톤" · "전문적이고 신뢰감 있는 톤" · "젊고 경쾌한 톤" · "고급스럽고 차분한 톤"
 - mainColor: 브랜드 아이덴티티에 맞는 HEX 코드. 너무 밝거나(#ffffff 계열) 너무 어두운(#000000 계열) 극단값 금지
 - forbiddenWords: 이 업종에서 남용/스팸으로 여겨지는 표현 2~4개, 쉼표 구분
-- ctaStyle: 인스타그램에서 실제 사용할 짧은 CTA 문구 (예: 프로필 링크에서 주문하기)
-- brandDescription: 이 브랜드를 처음 보는 사람에게 설명하는 한국어 2~3문장 소개. 핵심 가치와 차별점 포함
+- ctaStyle: 인스타그램에서 실제 사용할 짧은 CTA 문구
+- brandDescription: 브랜드를 처음 보는 사람에게 설명하는 한국어 2~3문장 소개
 - coreProducts: 실제 판매/제공하는 구체적 상품명/서비스명 (최대 5개)
 - valueProposition: 브랜드가 고객에게 제공하는 핵심 약속 (1문장)
 - customerPainPoints: 이 브랜드가 해결하는 고객 고민 (최대 4개)
 - differentiators: 경쟁사 대비 구체적 차별점 (최대 4개)
-- visualMood: 카드뉴스 이미지 방향 (예: "깔끔한 화이트 배경에 제품 클로즈업, 자연광, 미니멀")
+- visualMood: 카드뉴스 이미지 방향
 - contentPillars: 인스타그램 콘텐츠 주제 축 (최대 5개)
 - brandKeywords: AI 카드뉴스 생성 시 반드시 반영할 키워드 (최대 8개)
 - avoidVisuals: 이 브랜드에 어울리지 않는 비주얼 스타일 (최대 4개)
 
 JSON 형식으로만 응답하세요:`
+        const aiResponse = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: '당신은 한국 브랜드 전략 AI입니다. 반드시 유효한 JSON만 반환하세요. 마크다운 볼드(**) 사용 금지.' },
+            { role: 'user', content: synthPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+        })
+        const rawJson = aiResponse.choices[0].message.content
+        if (!rawJson) throw new Error('AI 분석 실패: 응답이 비어있습니다.')
+        parsed = JSON.parse(rawJson)
+        // GPT-4o는 markdownReport를 별도 생성해 붙임
+        parsed.markdownReport = `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
+      }
 
-      const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: '당신은 한국 브랜드 전략 AI입니다. 반드시 유효한 JSON만 반환하세요. 마크다운 볼드(**) 사용 금지.',
-          },
-          { role: 'user', content: synthPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      })
-
-      const rawJson = aiResponse.choices[0].message.content
-      if (rawJson) {
-        const parsed = JSON.parse(rawJson)
+      if (parsed) {
         return {
           success: true as const,
           brandProfile: {
-            name: parsed.name || signals.brandName || '알 수 없음',
-            industry: parsed.industry || '온라인 스토어',
-            targetAudience: parsed.targetAudience || '대중 고객',
-            toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
-            mainColor: parsed.mainColor || '#0066ff',
-            forbiddenWords: parsed.forbiddenWords || '',
-            ctaStyle: parsed.ctaStyle || '프로필 링크에서 확인하기',
+            name: String(parsed.name || '알 수 없음'),
+            industry: String(parsed.industry || '온라인 스토어'),
+            targetAudience: String(parsed.targetAudience || '대중 고객'),
+            toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
+            mainColor: String(parsed.mainColor || '#b94718'),
+            forbiddenWords: String(parsed.forbiddenWords || ''),
+            ctaStyle: String(parsed.ctaStyle || '프로필 링크에서 확인하기'),
             brandDna: buildBrandDnaFromProfile({
-              name: parsed.name || signals.brandName || '알 수 없음',
-              industry: parsed.industry || '온라인 스토어',
-              targetAudience: parsed.targetAudience || '대중 고객',
-              toneOfVoice: parsed.toneOfVoice || '친근하고 명확한 톤',
-              mainColor: parsed.mainColor || '#0066ff',
-              ctaStyle: parsed.ctaStyle || '',
-              brandDescription: parsed.brandDescription,
+              name: String(parsed.name || 'Unknown brand'),
+              industry: String(parsed.industry || 'Online store'),
+              targetAudience: String(parsed.targetAudience || 'Target customers'),
+              toneOfVoice: String(parsed.toneOfVoice || 'Friendly and clear'),
+              mainColor: String(parsed.mainColor || '#b94718'),
+              ctaStyle: String(parsed.ctaStyle || ''),
               sourceText: collected.sourceText,
               parsed,
             })
           },
-          markdownReport: removeMarkdownBold(
-            `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
-          ),
+          markdownReport: removeMarkdownBold(String(parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.'))
         }
-      } else {
-        throw new Error('AI 분석 실패: 응답이 비어있습니다.')
       }
 
     } else {
-      console.log('Using Mock Brand Website Analyzer (OpenAI key not configured)')
+      console.log('Using Mock Brand Website Analyzer (no AI key configured — set GEMINI_API_KEY in .env)')
       await new Promise(resolve => setTimeout(resolve, 2000)) // Simulation delay
 
       if (isSmartStore && shopId) {

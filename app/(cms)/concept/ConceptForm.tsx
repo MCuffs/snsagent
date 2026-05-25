@@ -80,6 +80,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [analysisReport, setAnalysisReport] = useState<string | null>(null)
 
   useEffect(() => {
     if (isAnalyzing) {
@@ -99,12 +100,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
 
     try {
       const res = await analyzeBrandWebsiteAction(url)
-      if (!res.success) {
-        setError(res.error || 'AI 브랜드 분석에 실패했습니다.')
+      if (!res || !res.success) {
+        setError(('error' in (res ?? {})) ? (res as { error: string }).error : 'AI 브랜드 분석에 실패했습니다.')
         setIsAnalyzing(false)
         return
       }
-      if (res.brandProfile) {
+      if (res.success && res.brandProfile) {
         const p = res.brandProfile
         setName(p.name)
         setIndustry(p.industry)
@@ -115,23 +116,9 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         setCtaStyle(p.ctaStyle)
         updateBrandDna(p.brandDna || '')
 
-        // Auto-save brand
-        const saved = await saveBrandAction(brandId, {
-          name: p.name,
-          industry: p.industry,
-          targetAudience: p.targetAudience,
-          toneOfVoice: p.toneOfVoice,
-          mainColor: p.mainColor,
-          forbiddenWords: p.forbiddenWords,
-          ctaStyle: p.ctaStyle,
-          brandDna: p.brandDna,
-          websiteUrl: url,
-        })
-        if (saved.success) {
-          setBrandId(saved.brand.id)
-          setPhase('profile')
-        } else {
-          setError(saved.error || '저장 실패')
+        // 분석 결과 리포트 저장 (자동 저장 제거 — 사용자가 확인 후 저장 버튼 클릭)
+        if (res.markdownReport) {
+          setAnalysisReport(res.markdownReport)
         }
       }
     } catch {
@@ -237,7 +224,48 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             </button>
           </form>
 
-          {existingBrand && (
+          {/* 분석 완료 후 결과 + 저장 버튼 */}
+          {analysisReport && !isAnalyzing && (
+            <div className="mt-4 space-y-4">
+              <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e4e4e7] bg-white">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <span className="text-xs font-semibold text-[#111111]">AI 브랜드 분석 완료</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto p-4 text-xs leading-relaxed text-[#52525b] whitespace-pre-wrap">
+                  {analysisReport}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsSaving(true)
+                  setError(null)
+                  const saved = await saveBrandAction(brandId, {
+                    name, industry, targetAudience, toneOfVoice,
+                    mainColor, forbiddenWords, ctaStyle,
+                    brandDna: brandDna || null,
+                    websiteUrl: url,
+                  })
+                  setIsSaving(false)
+                  if (saved.success) {
+                    setBrandId(saved.brand.id)
+                    setPhase('profile')
+                  } else {
+                    setError(saved.error || '저장 실패')
+                  }
+                }}
+                disabled={isSaving}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0066ff] text-sm font-semibold text-white transition hover:bg-[#0052cc] disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                브랜드 저장하고 계속하기
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {existingBrand && !analysisReport && (
             <button
               type="button"
               onClick={() => setPhase('profile')}
