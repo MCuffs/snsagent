@@ -622,6 +622,34 @@ function removeMarkdownBold(text: string): string {
   return text.replace(/\*\*/g, '')
 }
 
+function readAiText(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function readRecommendedKeyContent(value: unknown, fallback: string) {
+  if (typeof value === 'string' && value.trim()) return value
+
+  const slideValues = Array.isArray(value)
+    ? value
+    : typeof value === 'object' && value !== null && 'slides' in value && Array.isArray(value.slides)
+      ? value.slides
+      : []
+
+  const lines = slideValues
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (typeof item !== 'object' || item === null) return ''
+
+      const slide = item as Record<string, unknown>
+      const headline = readAiText(slide.headline ?? slide.title, '')
+      const body = readAiText(slide.body ?? slide.content ?? slide.description, '')
+      return [headline, body].filter(Boolean).join(': ')
+    })
+    .filter(Boolean)
+
+  return lines.length > 0 ? lines.join('\n') : fallback
+}
+
 function extractSmartStoreShopId(urlStr: string): string | null {
   try {
     const parsedUrl = new URL(urlStr)
@@ -1178,18 +1206,21 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 
       const rawJson = aiResponse.choices[0].message.content
       if (rawJson) {
-        const parsed = JSON.parse(rawJson)
+        const parsed = JSON.parse(rawJson) as Record<string, unknown>
+        const fallbackTitle = `[${brand.name}] ${topic}`
+        const fallbackContent = `- 핵심가치 소개: ${topic} 관련 브랜드 스토리\n- 주요 특징 안내: 스토어만의 강점`
+        const recommendedSlideCount = Number(parsed.slideCount)
         return {
           success: true as const,
           recommendation: {
-            contentType: parsed.contentType || '신상품 홍보',
-            category: parsed.category || '기타',
-            tone: parsed.tone || '감성적이고 따뜻하게',
-            title: removeMarkdownBold(parsed.title || `[${brand.name}] ${topic}`),
-            keyContent: removeMarkdownBold(parsed.keyContent || `- 핵심가치 소개: ${topic} 관련 브랜드 스토리\n- 주요 특징 안내: 스토어만의 강점`),
-            visualHint: parsed.visualHint || `minimalist design matching brand color ${brand.mainColor}`,
-            source: parsed.source || brand.name,
-            slideCount: Number(parsed.slideCount) || 7
+            contentType: readAiText(parsed.contentType, '신상품 홍보'),
+            category: readAiText(parsed.category, '기타'),
+            tone: readAiText(parsed.tone, '감성적이고 따뜻하게'),
+            title: removeMarkdownBold(readAiText(parsed.title, fallbackTitle)),
+            keyContent: removeMarkdownBold(readRecommendedKeyContent(parsed.keyContent, fallbackContent)),
+            visualHint: readAiText(parsed.visualHint, `minimalist design matching brand color ${brand.mainColor}`),
+            source: readAiText(parsed.source, brand.name),
+            slideCount: [5, 7, 10].includes(recommendedSlideCount) ? recommendedSlideCount : 7
           }
         }
       } else {
