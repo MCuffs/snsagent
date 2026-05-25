@@ -69,3 +69,46 @@ export function isConfiguredOpenAIKey(apiKey: string | undefined) {
   const normalized = apiKey.trim()
   return normalized.length > 0 && normalized !== 'your-openai-api-key-here'
 }
+
+export function getGeminiApiKey() {
+  return readEnv('GEMINI_API_KEY')
+}
+
+export function isConfiguredGeminiKey(apiKey: string | undefined) {
+  if (!apiKey) return false
+  const normalized = apiKey.trim()
+  return normalized.length > 0 && normalized !== 'your-gemini-api-key-here'
+}
+
+export function getGroqApiKey() {
+  return readEnv('GROQ_API_KEY')
+}
+
+export function isConfiguredGroqKey(apiKey: string | undefined) {
+  if (!apiKey) return false
+  const normalized = apiKey.trim()
+  return normalized.length > 0 && normalized !== 'your-groq-api-key-here'
+}
+
+export function getPerplexityApiKey() {
+  return readEnv('PERPLEXITY_API_KEY')
+}
+
+export function isConfiguredPerplexityKey(apiKey: string | undefined) {
+  if (!apiKey) return false
+  const normalized = apiKey.trim()
+  return normalized.length > 0 && normalized !== 'your-perplexity-api-key-here'
+}
+
+export function getNaverClientId() {
+  return readEnv('NAVER_CLIENT_ID')
+}
+
+export function getNaverClientSecret() {
+  return readEnv('NAVER_CLIENT_SECRET')
+}
+
+export function isConfiguredNaverApi(clientId: string | undefined, clientSecret: string | undefined) {
+  return !!(clientId && clientId.trim() && clientId !== 'your-naver-client-id-here'
+    && clientSecret && clientSecret.trim() && clientSecret !== 'your-naver-client-secret-here')
+}
