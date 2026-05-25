@@ -13,6 +13,7 @@
     "@prisma/client": "^5.22.0",
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/blob": "^2.4.0",
+    "framer-motion": "^12.40.0",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "openai": "^6.38.0",

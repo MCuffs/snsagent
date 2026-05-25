@@ -77,10 +77,10 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
             <Link
               key={item.id}
               href={`/campaign/${item.id}`}
-              className="group overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition hover:border-[#a1a1aa] hover:shadow-sm"
+              className="group overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#a1a1aa] hover:shadow-md"
             >
               {/* Thumbnail */}
-              <div className="relative aspect-square w-full overflow-hidden bg-[#f4f4f5]">
+              <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#f4f4f5]">
                 {item.thumbnail ? (
                   <Image
                     src={item.thumbnail}
