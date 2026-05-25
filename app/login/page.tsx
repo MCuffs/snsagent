@@ -73,6 +73,7 @@ export default async function LoginPage({
 
             <Link
               href="/api/auth/google/start"
+              prefetch={false}
               className="mb-7 flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-lg font-black transition hover:bg-[#fff8f0]"
             >
               <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-base font-black text-[#4285f4]">
