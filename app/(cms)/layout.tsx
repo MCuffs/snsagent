@@ -27,7 +27,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#111111]">
               <span className="h-1.5 w-3 rounded-full bg-white" />
             </span>
-            <span className="text-[15px] font-bold tracking-tight text-[#111111]">Typova</span>
+            <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
           </Link>
         </div>
 
