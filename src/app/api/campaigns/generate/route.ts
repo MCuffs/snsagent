@@ -92,6 +92,7 @@ export async function POST(request: Request) {
         keyContent: enrichedKeyContent,
         tone: body.tone || '감성적이고 따뜻하게',
         contentType: body.contentType || '신상품 홍보',
+        objective: body.objective,
         slideCount: normalizeSlideCount(body.slideCount),
         source,
         visualHint: body.visualHint,

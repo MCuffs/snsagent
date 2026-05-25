@@ -164,7 +164,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           topic: readyParams.topic,
           category: brand.industry,
           title: `${readyParams.topic} 카드뉴스`,
-          keyContent: `${readyParams.topic} — ${readyParams.objective}`,
+          keyContent: readyParams.topic,
           tone: brand.toneOfVoice || '감성적이고 따뜻하게',
           contentType: readyParams.contentType,
           slideCount: readyParams.slideCount,

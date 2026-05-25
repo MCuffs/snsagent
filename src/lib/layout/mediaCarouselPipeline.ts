@@ -10,6 +10,8 @@ import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
+import { getLLMClient } from '../ai/llmClient'
+import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -36,6 +38,7 @@ export interface MediaCarouselInput {
   keyContent: string
   tone: string
   contentType: string
+  objective?: string
   slideCount: number
   source?: string
   visualHint?: string
@@ -84,7 +87,11 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
-  const plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
+  let plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
+
+  // LLM copy generation — replaces rule-based placeholder copy with AI-written slide text
+  plannedSlides = await generateMediaSlideCopies(input, plannedSlides)
+
   const brandHarnessPrompt = buildBrandHarnessPrompt({
     brandName: input.brandName,
     brandIndustry: input.brandIndustry,
@@ -314,6 +321,69 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     hashtags: buildHashtags(input),
     qualityCheck,
   }
+}
+
+async function generateMediaSlideCopies(input: MediaCarouselInput, slides: MediaSlidePlan[]): Promise<MediaSlidePlan[]> {
+  const client = getLLMClient()
+
+  const slideDescriptions = slides
+    .map(s => `슬라이드 ${s.slideNumber} [${s.role}]`)
+    .join('\n')
+
+  const brandDnaSection = input.brandDna
+    ? `\n브랜드 DNA (카피에 반드시 반영):\n${formatBrandDnaForPrompt(input.brandDna)}\n`
+    : ''
+
+  const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
+
+브랜드 정보:
+- 브랜드명: ${input.brandName}
+- 업종: ${input.brandIndustry || '미지정'}
+- 톤앤매너: ${input.brandToneOfVoice || '전문적이고 신뢰감 있게'}
+- 금지어: ${input.brandForbiddenWords || '없음'}
+${brandDnaSection}
+콘텐츠 기획:
+- 주제(상품): ${input.topic}
+- 캠페인 목표: ${input.objective || input.contentType}
+- 콘텐츠 유형: ${input.contentType}
+- 비주얼 스타일: ${input.visualHint || 'dark-editorial'}
+
+슬라이드 구성:
+${slideDescriptions}
+
+규칙:
+- headline: 20자 이하, 강렬하고 구체적 (공백 포함)
+- body: 58자 이하, 핵심 메시지 전달 (공백 포함)
+- hook 슬라이드: 독자의 시선을 즉시 잡는 강렬한 한 줄
+- save-cta / summary 슬라이드: 저장·팔로우를 유도하는 행동 촉구 문구
+- 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
+- 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요
+- 모든 카피는 한국어로 작성
+
+JSON 응답 형식:
+{
+  "slides": [
+    { "slideNumber": 1, "headline": "...", "body": "..." }
+  ]
+}`
+
+  const result = await client.generateJson<{ slides: Array<{ slideNumber: number; headline: string; body: string }> }>(
+    'media slide copy generation',
+    prompt,
+    () => ({ slides: slides.map(s => ({ slideNumber: s.slideNumber, headline: s.headline, body: s.body })) })
+  )
+
+  const copyMap = new Map(result.slides.map(s => [s.slideNumber, s]))
+
+  return slides.map(slide => {
+    const generated = copyMap.get(slide.slideNumber)
+    if (!generated?.headline) return slide
+    return {
+      ...slide,
+      headline: generated.headline.trim().slice(0, 34),
+      body: generated.body?.trim().slice(0, 64) || slide.body,
+    }
+  })
 }
 
 function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayoutType: LayoutType): MediaSlidePlan[] {
