@@ -109,9 +109,7 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
               </div>
 
               <div className="space-y-3 border-y border-[#ece9e0] py-5 text-sm">
-                <Feature>월 캠페인 {formatLimit(plan.monthlyCampaignLimit)}</Feature>
-                <Feature>브랜드 {formatLimit(plan.brandLimit)}</Feature>
-                <Feature>{plan.canSchedule ? '예약 발행 가능' : '수동 발행'}</Feature>
+                <Feature>월 카드뉴스 {formatLimit(plan.monthlyCardLimit)} 생성</Feature>
                 <Feature>{plan.hasWatermark ? '워터마크 포함' : '워터마크 없음'}</Feature>
               </div>
 

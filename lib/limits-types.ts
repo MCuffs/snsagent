@@ -1,6 +1,6 @@
-export type SubscriptionPlan = 'FREE' | 'STARTER' | 'PRO' | 'AGENCY'
+export type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
 
-export const SUBSCRIPTION_PLANS = ['FREE', 'STARTER', 'PRO', 'AGENCY'] as const
+export const SUBSCRIPTION_PLANS = ['FREE', 'LITE', 'PRO', 'UNLIMITED'] as const
 
 export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
   return SUBSCRIPTION_PLANS.includes(plan as SubscriptionPlan)
@@ -8,9 +8,7 @@ export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
 
 export interface PlanFeature {
   name: string
-  monthlyCampaignLimit: number
-  brandLimit: number
-  canSchedule: boolean
+  monthlyCardLimit: number
   hasWatermark: boolean
   description: string
   price: string
@@ -19,38 +17,38 @@ export interface PlanFeature {
 export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
     name: 'Free',
-    monthlyCampaignLimit: 5,
-    brandLimit: 1,
-    canSchedule: false,
+    monthlyCardLimit: 5,
     hasWatermark: true,
-    description: '데모와 초기 검증을 위한 기본 플랜',
+    description: '무료로 시작해 Shuffla를 경험해보세요',
     price: '무료',
   },
-  STARTER: {
-    name: 'Starter',
-    monthlyCampaignLimit: 30,
-    brandLimit: 1,
-    canSchedule: true,
+  LITE: {
+    name: 'Lite',
+    monthlyCardLimit: 30,
     hasWatermark: false,
     description: '1인 브랜드와 소상공인을 위한 운영 플랜',
-    price: '월 29,000원',
+    price: '월 19,000원',
   },
   PRO: {
     name: 'Pro',
-    monthlyCampaignLimit: 150,
-    brandLimit: 5,
-    canSchedule: true,
+    monthlyCardLimit: 100,
     hasWatermark: false,
-    description: '여러 캠페인을 반복 운영하는 성장형 플랜',
-    price: '월 79,000원',
+    description: '적극적으로 콘텐츠를 운영하는 마케터 플랜',
+    price: '월 49,000원',
   },
-  AGENCY: {
-    name: 'Agency',
-    monthlyCampaignLimit: 9999,
-    brandLimit: 9999,
-    canSchedule: true,
+  UNLIMITED: {
+    name: 'Unlimited',
+    monthlyCardLimit: 9999,
     hasWatermark: false,
-    description: '다수 브랜드를 관리하는 팀과 대행사용 플랜',
-    price: '월 199,000원',
+    description: '횟수 제한 없이 자유롭게 생성하는 프리미엄 플랜',
+    price: '월 99,000원',
   },
+}
+
+// Fallback for legacy plan values stored in DB (STARTER → LITE, AGENCY → UNLIMITED)
+export function normalizePlan(plan: string): SubscriptionPlan {
+  if (plan === 'STARTER') return 'LITE'
+  if (plan === 'AGENCY') return 'UNLIMITED'
+  if (isSubscriptionPlan(plan)) return plan
+  return 'FREE'
 }

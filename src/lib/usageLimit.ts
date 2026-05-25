@@ -1,10 +1,10 @@
 import { dbService } from '../../lib/db-service'
-import { PRICING_PLANS, type SubscriptionPlan } from '../../lib/limits-types'
+import { PRICING_PLANS, normalizePlan } from '../../lib/limits-types'
 
 export async function checkMonthlyCampaignUsage(userId: string) {
   const user = await dbService.getUser(userId)
-  const plan = (user?.plan || 'FREE') as SubscriptionPlan
-  const limit = PRICING_PLANS[plan].monthlyCampaignLimit
+  const plan = normalizePlan(user?.plan || 'FREE')
+  const limit = PRICING_PLANS[plan].monthlyCardLimit
   const campaigns = await dbService.getCampaigns(userId)
 
   const startOfMonth = new Date()

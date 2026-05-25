@@ -76,9 +76,9 @@ export async function verifyWebhookSignature(body: string, headers: Record<strin
 
 // PayPal billing plan IDs — set in env (NEXT_PUBLIC_ so client can read them)
 export const PAYPAL_PLAN_IDS: Record<string, string | undefined> = {
-  STARTER: process.env.NEXT_PUBLIC_PAYPAL_PLAN_STARTER,
+  LITE: process.env.NEXT_PUBLIC_PAYPAL_PLAN_LITE,
   PRO: process.env.NEXT_PUBLIC_PAYPAL_PLAN_PRO,
-  AGENCY: process.env.NEXT_PUBLIC_PAYPAL_PLAN_AGENCY,
+  UNLIMITED: process.env.NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED,
 }
 
 export function planFromPayPalPlanId(planId: string): string | null {

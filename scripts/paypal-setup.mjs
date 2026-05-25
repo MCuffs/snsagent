@@ -57,9 +57,9 @@ async function api(token, method, path, body) {
 }
 
 const PLANS = [
-  { key: 'STARTER', name: 'Shuffla Starter', description: '1인 브랜드와 소상공인을 위한 플랜', amount: '21.00', currency: 'USD' },
-  { key: 'PRO',     name: 'Shuffla Pro',     description: '성장하는 브랜드를 위한 고급 플랜',       amount: '57.00', currency: 'USD' },
-  { key: 'AGENCY',  name: 'Shuffla Agency',  description: '다수 브랜드를 관리하는 팀과 대행사용 플랜', amount: '145.00', currency: 'USD' },
+  { key: 'LITE',      name: 'Shuffla Lite',      description: '1인 브랜드와 소상공인을 위한 플랜',    amount: '14.00', currency: 'USD' },
+  { key: 'PRO',       name: 'Shuffla Pro',        description: '적극적으로 콘텐츠를 운영하는 마케터 플랜', amount: '36.00', currency: 'USD' },
+  { key: 'UNLIMITED', name: 'Shuffla Unlimited',  description: '횟수 제한 없이 자유롭게 생성하는 플랜',  amount: '73.00', currency: 'USD' },
 ]
 
 async function main() {
@@ -133,9 +133,9 @@ async function main() {
     PAYPAL_CLIENT_SECRET: CLIENT_SECRET,
     PAYPAL_WEBHOOK_ID: webhook.id,
     NEXT_PUBLIC_PAYPAL_CLIENT_ID: CLIENT_ID,
-    NEXT_PUBLIC_PAYPAL_PLAN_STARTER: planIds.STARTER,
+    NEXT_PUBLIC_PAYPAL_PLAN_LITE: planIds.LITE,
     NEXT_PUBLIC_PAYPAL_PLAN_PRO: planIds.PRO,
-    NEXT_PUBLIC_PAYPAL_PLAN_AGENCY: planIds.AGENCY,
+    NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED: planIds.UNLIMITED,
     ...(SANDBOX ? { PAYPAL_SANDBOX: 'true' } : {}),
   }
 
