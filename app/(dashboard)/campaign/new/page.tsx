@@ -11,8 +11,8 @@ export default async function NewCampaignPage() {
   if (!user) redirect('/login')
 
   const brands = await dbService.getBrands(user.id)
-  if (brands.length === 0) {
-    redirect('/brand')
+  if (brands.length === 0 || !brands[0].websiteUrl) {
+    redirect('/brand?start=1')
   }
 
   return (

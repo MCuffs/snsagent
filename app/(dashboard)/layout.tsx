@@ -30,7 +30,7 @@ export default async function DashboardLayout({
   }
 
   const brands = await dbService.getBrands(user.id)
-  const hasBrand = brands.length > 0
+  const hasBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
   const activeBrandName = brands[0]?.name || '브랜드 미설정'
 
   return (
