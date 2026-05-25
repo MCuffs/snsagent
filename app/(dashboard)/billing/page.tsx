@@ -3,6 +3,7 @@ import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../actions'
 import { dbService } from '../../../lib/db-service'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits'
+import { PAYPAL_PLAN_IDS } from '../../../lib/paypal'
 import PricingClientView from './PricingClientView'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,13 @@ export default async function PricingPage({
 
   const params = searchParams ? await searchParams : {}
   const plansList = Object.keys(PRICING_PLANS) as SubscriptionPlan[]
-  const hasSubscription = Boolean(user.stripeSubscriptionId)
+  const hasSubscription = Boolean(user.paypalSubscriptionId)
+
+  // Filter out undefined plan IDs for client
+  const paypalPlanIds: Record<string, string> = {}
+  for (const [key, val] of Object.entries(PAYPAL_PLAN_IDS)) {
+    if (val) paypalPlanIds[key] = val
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
@@ -53,7 +60,13 @@ export default async function PricingPage({
         </div>
       )}
 
-      <PricingClientView currentPlan={user.plan} plansList={plansList} hasSubscription={hasSubscription} />
+      <PricingClientView
+        currentPlan={user.plan}
+        plansList={plansList}
+        hasSubscription={hasSubscription}
+        paypalClientId={process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? ''}
+        paypalPlanIds={paypalPlanIds}
+      />
     </div>
   )
 }

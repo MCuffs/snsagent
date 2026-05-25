@@ -1,70 +1,62 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2, ExternalLink } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
+import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 
 interface PricingClientViewProps {
   currentPlan: string
   plansList: SubscriptionPlan[]
   hasSubscription: boolean
+  paypalClientId: string
+  paypalPlanIds: Record<string, string>
 }
 
 function formatLimit(limit: number) {
   return limit >= 9999 ? '무제한' : `${limit}개`
 }
 
-export default function PricingClientView({ currentPlan, plansList, hasSubscription }: PricingClientViewProps) {
-  const router = useRouter()
-  const [processingPlan, setProcessingPlan] = useState<SubscriptionPlan | null>(null)
-  const [openingPortal, setOpeningPortal] = useState(false)
-  const [error, setError] = useState('')
-
-  const startCheckout = async (plan: SubscriptionPlan) => {
-    if (plan === 'FREE') return
-    setProcessingPlan(plan)
-    setError('')
-
-    try {
-      const res = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
-      })
-      const data = await res.json() as { url?: string; error?: string }
-
-      if (!res.ok || !data.url) {
-        setError(data.error || '결제 페이지를 열 수 없습니다.')
-        setProcessingPlan(null)
-        return
-      }
-
-      window.location.href = data.url
-    } catch {
-      setError('네트워크 오류가 발생했습니다.')
-      setProcessingPlan(null)
-    }
+export default function PricingClientView(props: PricingClientViewProps) {
+  if (!props.paypalClientId) {
+    return <PricingGrid {...props} />
   }
 
-  const openPortal = async () => {
-    setOpeningPortal(true)
-    setError('')
+  return (
+    <PayPalScriptProvider
+      options={{
+        clientId: props.paypalClientId,
+        vault: true,
+        intent: 'subscription',
+        components: 'buttons',
+      }}
+    >
+      <PricingGrid {...props} />
+    </PayPalScriptProvider>
+  )
+}
 
+function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }: PricingClientViewProps) {
+  const router = useRouter()
+  const [error, setError] = useState('')
+  const [canceling, setCanceling] = useState(false)
+
+  const cancelSubscription = async () => {
+    if (!confirm('구독을 취소하면 현재 결제 기간이 끝난 뒤 FREE 플랜으로 전환됩니다. 계속하시겠습니까?')) return
+    setCanceling(true)
     try {
-      const res = await fetch('/api/stripe/portal', { method: 'POST' })
-      const data = await res.json() as { url?: string; error?: string }
-
-      if (!res.ok || !data.url) {
-        setError(data.error || '구독 관리 페이지를 열 수 없습니다.')
-        setOpeningPortal(false)
-        return
+      const res = await fetch('/api/paypal/cancel', { method: 'POST' })
+      const data = await res.json() as { error?: string }
+      if (!res.ok) {
+        setError(data.error || '구독 취소에 실패했습니다.')
+      } else {
+        router.refresh()
       }
-
-      window.location.href = data.url
     } catch {
       setError('네트워크 오류가 발생했습니다.')
-      setOpeningPortal(false)
+    } finally {
+      setCanceling(false)
     }
   }
 
@@ -78,15 +70,15 @@ export default function PricingClientView({ currentPlan, plansList, hasSubscript
 
       {hasSubscription && (
         <div className="flex items-center justify-between rounded-lg border border-[#ece9e0] bg-[#faf8f4] px-5 py-4">
-          <p className="text-sm font-bold text-[#5d584f]">구독 중인 플랜을 변경하거나 취소하려면 구독 관리 포털을 이용하세요.</p>
+          <p className="text-sm font-bold text-[#5d584f]">구독 중입니다. 취소하면 현재 기간 만료 후 FREE로 전환됩니다.</p>
           <button
             type="button"
-            disabled={openingPortal}
-            onClick={openPortal}
+            disabled={canceling}
+            onClick={cancelSubscription}
             className="btn-secondary flex-shrink-0 ml-4"
           >
-            {openingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            구독 관리
+            {canceling ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+            구독 취소
           </button>
         </div>
       )}
@@ -95,8 +87,8 @@ export default function PricingClientView({ currentPlan, plansList, hasSubscript
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
-          const isProcessing = processingPlan === planKey
           const isFree = planKey === 'FREE'
+          const planId = paypalPlanIds[planKey]
 
           return (
             <article
@@ -123,20 +115,91 @@ export default function PricingClientView({ currentPlan, plansList, hasSubscript
                 <Feature>{plan.hasWatermark ? '워터마크 포함' : '워터마크 없음'}</Feature>
               </div>
 
-              <button
-                type="button"
-                disabled={isCurrentPlan || Boolean(processingPlan) || openingPortal || isFree}
-                onClick={() => startCheckout(planKey)}
-                className={isCurrentPlan || isFree ? 'btn-secondary mt-6 w-full opacity-60' : 'btn-primary mt-6 w-full'}
-              >
-                {isProcessing && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isCurrentPlan ? '사용 중' : isFree ? '기본 플랜' : '업그레이드'}
-              </button>
+              <div className="mt-6">
+                {isFree || isCurrentPlan ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="btn-secondary w-full opacity-60"
+                  >
+                    {isCurrentPlan ? '사용 중' : '기본 플랜'}
+                  </button>
+                ) : planId ? (
+                  <PayPalSubscribeButton
+                    planId={planId}
+                    planKey={planKey}
+                    onSuccess={() => router.refresh()}
+                    onError={setError}
+                  />
+                ) : (
+                  <button type="button" disabled className="btn-primary w-full opacity-40">
+                    준비 중
+                  </button>
+                )}
+              </div>
             </article>
           )
         })}
       </div>
     </div>
+  )
+}
+
+function PayPalSubscribeButton({
+  planId,
+  planKey,
+  onSuccess,
+  onError,
+}: {
+  planId: string
+  planKey: string
+  onSuccess: () => void
+  onError: (msg: string) => void
+}) {
+  const [{ isPending }] = usePayPalScriptReducer()
+
+  const createSubscription = useCallback(
+    (_data: Record<string, unknown>, actions: { subscription: { create: (o: object) => Promise<string> } }) =>
+      actions.subscription.create({ plan_id: planId }),
+    [planId],
+  )
+
+  const onApprove = useCallback(
+    async (data: { subscriptionID?: string | null }) => {
+      try {
+        const res = await fetch('/api/paypal/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscriptionId: data.subscriptionID, plan: planKey }),
+        })
+        const json = await res.json() as { error?: string }
+        if (!res.ok) {
+          onError(json.error || '구독 활성화에 실패했습니다.')
+        } else {
+          onSuccess()
+        }
+      } catch {
+        onError('네트워크 오류가 발생했습니다.')
+      }
+    },
+    [planKey, onSuccess, onError],
+  )
+
+  if (isPending) {
+    return (
+      <div className="flex h-10 items-center justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-[#b94718]" />
+      </div>
+    )
+  }
+
+  return (
+    <PayPalButtons
+      style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
+      createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
+      onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
+      onError={() => onError('PayPal 결제 중 오류가 발생했습니다.')}
+    />
   )
 }
 
