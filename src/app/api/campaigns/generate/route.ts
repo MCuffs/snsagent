@@ -6,6 +6,7 @@ import { generateCarouselCampaign } from '../../../../lib/carousel/pipeline'
 import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types'
 import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipeline'
 import { checkMonthlyCampaignUsage } from '../../../../lib/usageLimit'
+import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
 
 export const runtime = 'nodejs'
 
@@ -26,6 +27,7 @@ interface GenerateCampaignRequest {
   contentType?: string
   visualHint?: string
   source?: string
+  productUrl?: string
 }
 
 export async function POST(request: Request) {
@@ -61,6 +63,19 @@ export async function POST(request: Request) {
     if (body.campaignType === 'media') {
       const account = await dbService.getInstagramAccount(user.id, brand.id)
       const source = body.source || account?.username || brand.name
+
+      // Scrape product URL if provided and append to keyContent for AI context
+      let enrichedKeyContent = body.keyContent!
+      if (body.productUrl) {
+        try {
+          const productContext = await collectBrandUrlContext(body.productUrl)
+          const productSummary = productContext.sourceText.slice(0, 2000)
+          enrichedKeyContent = `${enrichedKeyContent}\n\n[상품 페이지 정보]\n${productSummary}`
+        } catch {
+          // scraping failed — continue without it
+        }
+      }
+
       const result = await generateMediaCarousel({
         userId: user.id,
         brandId: brand.id,
@@ -74,7 +89,7 @@ export async function POST(request: Request) {
         topic: body.topic!,
         category: body.category!,
         title: body.title!,
-        keyContent: body.keyContent!,
+        keyContent: enrichedKeyContent,
         tone: body.tone || '감성적이고 따뜻하게',
         contentType: body.contentType || '신상품 홍보',
         slideCount: normalizeSlideCount(body.slideCount),

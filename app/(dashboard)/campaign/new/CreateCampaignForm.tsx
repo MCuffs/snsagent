@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2, Sparkles, Sliders, Wand2, ImagePlus, X } from 'lucide-react'
+import { ArrowRight, Globe, Loader2, Sparkles, Sliders, Wand2, ImagePlus, X } from 'lucide-react'
 import { recommendCampaignAction } from '../../../../app/actions'
 
 interface Brand {
@@ -73,6 +73,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const [targetCustomer, setTargetCustomer] = useState('')
   const [keyMessage, setKeyMessage] = useState('')
   const [productFeature, setProductFeature] = useState('')
+  const [productUrl, setProductUrl] = useState('')
 
   // Reference image upload
   const [imagePreviews, setImagePreviews] = useState<UploadPreview[]>([])
@@ -228,6 +229,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
       source: string
       slideCount: number
       productImageUrls?: string[]
+      productUrl?: string
     } = {
         campaignType: 'media',
         brandId,
@@ -240,6 +242,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
         visualHint,
         source,
         slideCount,
+        productUrl: productUrl || undefined,
       }
 
       // In Easy Mode, fetch AI recommendations behind the scenes first
@@ -266,6 +269,7 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               source: rec.source,
               slideCount: rec.slideCount,
               productImageUrls: uploadedUrls,
+              productUrl: productUrl || undefined,
             }
           } else {
             throw new Error('AI 자동 기획 추천 데이터가 올바르지 않습니다.')
@@ -471,6 +475,24 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               </div>
             </div>
 
+            {/* Product URL */}
+            <div>
+              <p className="mb-2 text-xs font-black text-[#4a4039]">
+                상품 페이지 URL{' '}
+                <span className="font-normal text-[#a59b91]">(선택 — AI가 상품 정보를 직접 스크랩하여 카드뉴스에 반영합니다)</span>
+              </p>
+              <div className="relative">
+                <Globe className="absolute left-3.5 top-3 h-4 w-4 text-[#a59b91]" />
+                <input
+                  type="url"
+                  value={productUrl}
+                  onChange={e => setProductUrl(e.target.value)}
+                  placeholder="https://smartstore.naver.com/..."
+                  className="field h-11 pl-10 pr-3 text-sm"
+                />
+              </div>
+            </div>
+
             {/* Reference image upload */}
             <div>
               <p className="mb-3 text-xs font-black text-[#4a4039]">
@@ -633,6 +655,23 @@ export default function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 placeholder="예: 스토어 브랜드명 또는 웹사이트 주소"
                 glow={showGlow}
               />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-black text-[#4a4039]">
+                상품 페이지 URL{' '}
+                <span className="font-normal text-[#a59b91]">(선택 — AI가 상품 정보를 직접 스크랩하여 카드뉴스에 반영합니다)</span>
+              </p>
+              <div className="relative">
+                <Globe className="absolute left-3.5 top-3 h-4 w-4 text-[#a59b91]" />
+                <input
+                  type="url"
+                  value={productUrl}
+                  onChange={e => setProductUrl(e.target.value)}
+                  placeholder="https://smartstore.naver.com/..."
+                  className="field h-11 pl-10 pr-3 text-sm"
+                />
+              </div>
             </div>
 
             <div>

@@ -30,6 +30,7 @@ export default async function BrandSettingsPage({
         forbiddenWords: existingBrand.forbiddenWords,
         ctaStyle: existingBrand.ctaStyle,
         brandDna: existingBrand.brandDna,
+        websiteUrl: existingBrand.websiteUrl,
       }
     : null
 

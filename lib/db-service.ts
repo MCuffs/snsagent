@@ -30,6 +30,7 @@ export interface Brand {
   mainColor: string
   forbiddenWords: string
   ctaStyle: string
+  websiteUrl?: string | null
   brandDna?: string | null
   createdAt: Date
   updatedAt: Date

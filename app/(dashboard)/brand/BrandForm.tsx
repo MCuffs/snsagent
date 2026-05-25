@@ -19,6 +19,7 @@ interface BrandData {
   forbiddenWords: string
   ctaStyle: string
   brandDna?: string | null
+  websiteUrl?: string | null
 }
 
 interface BrandFormProps {
@@ -43,6 +44,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
   const [forbiddenWords, setForbiddenWords] = useState(existingBrand?.forbiddenWords || '')
   const [ctaStyle, setCtaStyle] = useState(existingBrand?.ctaStyle || '')
   const [brandDna, setBrandDna] = useState(existingBrand?.brandDna || null)
+  const [websiteUrl, setWebsiteUrl] = useState(existingBrand?.websiteUrl || '')
 
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -126,7 +128,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         setTimeout(() => setHighlightFields(false), 3000)
 
         if (isOnboarding) {
-          const saved = await saveBrandAction(currentBrandId, analyzedBrand)
+          const saved = await saveBrandAction(currentBrandId, { ...analyzedBrand, websiteUrl: url })
           if (!saved.success) {
             setFormError(saved.error || '분석된 브랜드 정보를 저장하지 못했습니다.')
             return
@@ -164,6 +166,7 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
         forbiddenWords,
         ctaStyle,
         brandDna,
+        websiteUrl: websiteUrl || null,
       })
 
       if (res.success) {
@@ -588,6 +591,27 @@ export default function BrandForm({ existingBrand, limitAllowed, limitCount, use
               ))}
             </datalist>
           </div>
+        </div>
+
+        {/* Forbidden Words */}
+        <div className="mt-6">
+          <label htmlFor="websiteUrl" className="mb-2 block text-xs font-bold text-[#5d584f]">
+            메인 웹사이트 URL <span className="text-[#b94718]">*</span>
+          </label>
+          <div className="relative">
+            <Globe className="absolute left-3.5 top-3.5 h-4 w-4 text-[#8a8479]" />
+            <input
+              id="websiteUrl"
+              type="url"
+              placeholder="https://example.com"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              className={`field h-11 pl-10 pr-3 w-full transition-all duration-500 ${
+                highlightFields ? 'border-emerald-500 ring-2 ring-emerald-100 bg-emerald-50/20' : 'border-[#dedbd2]'
+              }`}
+            />
+          </div>
+          <p className="mt-2 text-xs text-[#6f6a61]">카드뉴스 생성 시 브랜드 컨텍스트로 활용됩니다. 반드시 입력해 주세요.</p>
         </div>
 
         {/* Forbidden Words */}

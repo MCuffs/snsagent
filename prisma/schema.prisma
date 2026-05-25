@@ -34,6 +34,7 @@ model Brand {
   mainColor      String
   forbiddenWords String
   ctaStyle       String
+  websiteUrl     String?
   brandDna       String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt

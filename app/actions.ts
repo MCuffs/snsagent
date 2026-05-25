@@ -126,6 +126,7 @@ export async function saveBrandAction(brandId: string | null, data: {
   forbiddenWords: string
   ctaStyle: string
   brandDna?: string | null
+  websiteUrl?: string | null
 }) {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
