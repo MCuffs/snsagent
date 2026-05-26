@@ -2,6 +2,7 @@ import { OpenAI } from 'openai'
 import { isConfiguredOpenAIKey } from '../../../../lib/env'
 import type { ImageProvider } from '../imageProvider'
 import { MockImageProvider } from './mockImageProvider'
+import { uploadGeneratedAsset } from '../../storage/upload'
 
 const NO_TEXT_IMAGE_INSTRUCTIONS = [
   'BACKGROUND IMAGE ONLY.',
@@ -56,7 +57,8 @@ export class OpenAIImageProvider implements ImageProvider {
         if (image?.b64_json) {
           return { imageUrl: `data:image/png;base64,${image.b64_json}` }
         }
-        return { imageUrl: image?.url || '' }
+        const persistedUrl = await persistImageUrl(image?.url)
+        return { imageUrl: persistedUrl }
       }
 
       const response = await this.openai.images.generate({
@@ -66,7 +68,8 @@ export class OpenAIImageProvider implements ImageProvider {
         n: 1,
       })
 
-      return { imageUrl: response.data?.[0]?.url || '' }
+      const persistedUrl = await persistImageUrl(response.data?.[0]?.url)
+      return { imageUrl: persistedUrl }
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : String(err)
 
@@ -133,7 +136,29 @@ export class OpenAIImageProvider implements ImageProvider {
     if (image?.b64_json) {
       return { imageUrl: `data:image/png;base64,${image.b64_json}` }
     }
-    return { imageUrl: image?.url || '' }
+    const persistedUrl = await persistImageUrl(image?.url)
+    return { imageUrl: persistedUrl }
+  }
+}
+
+async function persistImageUrl(url: string | undefined): Promise<string> {
+  if (!url || url.startsWith('data:')) return url || ''
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return url
+    const arrayBuffer = await res.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const contentType = res.headers.get('content-type') || 'image/png'
+    const ext = contentType.split('/')[1]?.split('+')[0] || 'png'
+    const fileName = `dalle-bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    return await uploadGeneratedAsset({
+      fileName,
+      content: buffer,
+      contentType: contentType as any,
+    })
+  } catch (err) {
+    console.error('[OpenAIImageProvider] Failed to persist image:', err)
+    return url
   }
 }
 
