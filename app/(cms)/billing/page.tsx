@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
-import { getSessionUser } from '../../actions'
+import { getSessionUser } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../lib/limits-types'
 import { PAYPAL_PLAN_IDS } from '../../../lib/paypal'

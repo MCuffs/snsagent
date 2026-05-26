@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSessionUser } from '../../../actions'
+import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
 import { PRICING_PLANS } from '../../../../lib/limits'
 import { normalizePlan } from '../../../../lib/limits-types'
