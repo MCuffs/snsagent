@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createSessionToken, GOOGLE_OAUTH_STATE_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, normalizeSessionEmail, SESSION_COOKIE_NAME, sessionCookieOptions } from '../../../../../lib/auth/session'
 import { dbService } from '../../../../../lib/db-service'
 import { exchangeGoogleCode, fetchGoogleUserInfo } from '../../../../../lib/google/oauth'
+import { saveErrorLog } from '../../../../../lib/errorLogger'
 
 export const runtime = 'nodejs'
 
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
     return response
   } catch (err) {
     console.error('Google OAuth callback failed:', err)
+    await saveErrorLog(null, 'google_oauth_callback', err)
     return NextResponse.redirect(new URL('/login?error=google_oauth_failed', request.url))
   }
 }
