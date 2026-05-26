@@ -16,6 +16,8 @@ export interface User {
   plan: string // FREE, LITE, PRO, UNLIMITED
   paypalSubscriptionId: string | null
   paypalSubscriptionStatus: string | null
+  naverpayRecurrentId: string | null
+  naverpaySubscriptionStatus: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -255,6 +257,8 @@ export const dbService = {
         plan: 'FREE',
         paypalSubscriptionId: null,
         paypalSubscriptionStatus: null,
+        naverpayRecurrentId: null,
+        naverpaySubscriptionStatus: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -308,6 +312,29 @@ export const dbService = {
         if (data.plan !== undefined) db.users[userIndex].plan = data.plan
         if (data.paypalSubscriptionId !== undefined) db.users[userIndex].paypalSubscriptionId = data.paypalSubscriptionId
         if (data.paypalSubscriptionStatus !== undefined) db.users[userIndex].paypalSubscriptionStatus = data.paypalSubscriptionStatus
+        db.users[userIndex].updatedAt = new Date()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async updateUserNaverPay(userId: string, data: {
+    naverpayRecurrentId?: string | null
+    naverpaySubscriptionStatus?: string | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      await prisma.user.update({
+        where: { id: userId },
+        data,
+      })
+    } else {
+      const db = initMockDb()
+      const userIndex = db.users.findIndex(u => u.id === userId)
+      if (userIndex !== -1) {
+        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        if (data.naverpayRecurrentId !== undefined) db.users[userIndex].naverpayRecurrentId = data.naverpayRecurrentId
+        if (data.naverpaySubscriptionStatus !== undefined) db.users[userIndex].naverpaySubscriptionStatus = data.naverpaySubscriptionStatus
         db.users[userIndex].updatedAt = new Date()
         writeMockDb(db)
       }

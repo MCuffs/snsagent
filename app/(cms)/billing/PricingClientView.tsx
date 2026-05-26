@@ -1,10 +1,32 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2, X } from 'lucide-react'
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
+
+declare global {
+  interface Window {
+    Naver?: {
+      Pay: {
+        create: (config: {
+          mode: 'development' | 'production'
+          payType: 'recurrent'
+          clientId: string
+          chainId: string
+        }) => {
+          open: (options: {
+            productCode: string
+            productName: string
+            totalPayAmount: number
+            returnUrl: string
+          }) => void
+        }
+      }
+    }
+  }
+}
 
 interface PricingClientViewProps {
   currentPlan: string
@@ -12,6 +34,10 @@ interface PricingClientViewProps {
   hasSubscription: boolean
   paypalClientId: string
   paypalPlanIds: Record<string, string>
+  naverpayClientId: string
+  naverpayChainId: string
+  naverpaySubscriptionStatus?: string | null
+  naverpayRecurrentId?: string | null
 }
 
 function formatLimit(limit: number) {
@@ -37,16 +63,37 @@ export default function PricingClientView(props: PricingClientViewProps) {
   )
 }
 
-function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }: PricingClientViewProps) {
+function PricingGrid({
+  currentPlan,
+  plansList,
+  hasSubscription,
+  paypalPlanIds,
+  naverpayClientId,
+  naverpayChainId,
+  naverpaySubscriptionStatus,
+  naverpayRecurrentId,
+}: PricingClientViewProps) {
   const router = useRouter()
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
+
+  // Load Naver Pay SDK Script dynamically
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.src = 'https://nsp.pay.naver.com/sdk/js/naverpay.min.js'
+    script.async = true
+    document.body.appendChild(script)
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [])
 
   const cancelSubscription = async () => {
     if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
     setCanceling(true)
     try {
-      const res = await fetch('/api/paypal/cancel', { method: 'POST' })
+      const endpoint = naverpayRecurrentId ? '/api/payments/naverpay/cancel' : '/api/paypal/cancel'
+      const res = await fetch(endpoint, { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
         setError(data.error || '구독 취소에 실패했습니다.')
@@ -58,6 +105,45 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
     } finally {
       setCanceling(false)
     }
+  }
+
+  const handleNaverPay = (planKey: string) => {
+    if (!window.Naver?.Pay) {
+      setError('네이버페이 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    const isSandbox = process.env.NEXT_PUBLIC_NAVERPAY_SANDBOX !== 'false'
+    const mode = isSandbox ? 'development' : 'production'
+
+    const oPay = window.Naver.Pay.create({
+      payType: 'recurrent',
+      mode,
+      clientId: naverpayClientId,
+      chainId: naverpayChainId,
+    })
+
+    const prices: Record<string, number> = {
+      LITE: 3000,
+      PRO: 19000,
+      UNLIMITED: 45000,
+    }
+
+    const names: Record<string, string> = {
+      LITE: 'Single (LITE)',
+      PRO: 'Creator (PRO)',
+      UNLIMITED: 'Studio (UNLIMITED)',
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const returnUrl = `${appUrl}/api/payments/naverpay/callback?plan=${planKey}`
+
+    oPay.open({
+      productCode: planKey,
+      productName: `Shuffla ${names[planKey]} 정기구독`,
+      totalPayAmount: prices[planKey],
+      returnUrl,
+    })
   }
 
   return (
@@ -132,16 +218,35 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
                   <button type="button" disabled className="btn-secondary w-full opacity-60">
                     현재 구독 취소 후 선택
                   </button>
-                ) : planId ? (
-                  <PayPalSubscribeButton
-                    planId={planId}
-                    onSuccess={() => router.refresh()}
-                    onError={setError}
-                  />
                 ) : (
-                  <button type="button" disabled className="btn-primary w-full opacity-40">
-                    준비 중
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleNaverPay(planKey)}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#03C75A] hover:bg-[#02b14f] text-white py-2 text-sm font-black transition-all shadow-sm hover:shadow active:scale-[0.98]"
+                    >
+                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M16.2 3H7.8C5.2 3 3 5.2 3 7.8v8.4C3 18.8 5.2 21 7.8 21h8.4c2.6 0 4.8-2.2 4.8-4.8V7.8C21 5.2 18.8 3 16.2 3zm-2.4 12.3l-3.2-4.9v4.9H8.4V8.7h2.2l3.2 4.9V8.7h2.2v6.6h-2.2z" />
+                      </svg>
+                      네이버페이 정기결제
+                    </button>
+                    
+                    {planId && (
+                      <div className="relative flex py-1 items-center">
+                        <div className="flex-grow border-t border-[#ece9e0]"></div>
+                        <span className="flex-shrink mx-3 text-[10px] font-bold text-[#6f6a61] uppercase">또는 해외 카드</span>
+                        <div className="flex-grow border-t border-[#ece9e0]"></div>
+                      </div>
+                    )}
+
+                    {planId && (
+                      <PayPalSubscribeButton
+                        planId={planId}
+                        onSuccess={() => router.refresh()}
+                        onError={setError}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             </article>

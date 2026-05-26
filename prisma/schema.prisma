@@ -15,6 +15,8 @@ model User {
   plan                     String            @default("FREE") // FREE, LITE, PRO, UNLIMITED
   paypalSubscriptionId     String?           @unique
   paypalSubscriptionStatus String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
+  naverpayRecurrentId      String?           @unique
+  naverpaySubscriptionStatus String? // ACTIVE, CANCELLED
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   brands                   Brand[]

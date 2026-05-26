@@ -21,7 +21,7 @@ export default async function PricingPage({
 
   const params = searchParams ? await searchParams : {}
   const plansList = PAID_SUBSCRIPTION_PLANS
-  const hasSubscription = Boolean(user.paypalSubscriptionId)
+  const hasSubscription = Boolean(user.paypalSubscriptionId || user.naverpayRecurrentId)
 
   const paypalPlanIds: Record<string, string> = {}
   for (const [key, val] of Object.entries(PAYPAL_PLAN_IDS)) {
@@ -60,6 +60,10 @@ export default async function PricingPage({
         hasSubscription={hasSubscription}
         paypalClientId={(process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()}
         paypalPlanIds={paypalPlanIds}
+        naverpayClientId={(process.env.NEXT_PUBLIC_NAVERPAY_CLIENT_ID || 'dQPaTGkl7UD9gyUVttF3').trim()}
+        naverpayChainId={(process.env.NEXT_PUBLIC_NAVERPAY_CHAIN_ID || 'TDZSUHBoVGRFS2l').trim()}
+        naverpaySubscriptionStatus={user.naverpaySubscriptionStatus}
+        naverpayRecurrentId={user.naverpayRecurrentId}
       />
     </div>
   )
