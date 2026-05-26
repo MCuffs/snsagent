@@ -29,6 +29,19 @@ export async function generateDesignPrompts(
   })
 }
 
+function inferSubject(topic: string, category: string): string {
+  const text = `${topic} ${category}`.toLowerCase()
+  if (text.includes('bag') || text.includes('백') || text.includes('가방')) return 'a premium designer bag'
+  if (text.includes('shoe') || text.includes('슈즈') || text.includes('스니커즈') || text.includes('신발')) return 'designer shoes'
+  if (text.includes('cosmetic') || text.includes('세럼') || text.includes('크림') || text.includes('화장품') || text.includes('skin') || text.includes('뷰티') || text.includes('토너') || text.includes('앰플')) return 'a premium skincare cosmetic bottle'
+  if (text.includes('coffee') || text.includes('커피') || text.includes('카페') || text.includes('원두')) return 'a cup of coffee'
+  if (text.includes('chair') || text.includes('의자') || text.includes('furniture') || text.includes('가구')) return 'minimalist designer furniture'
+  if (text.includes('tumbler') || text.includes('텀블러') || text.includes('보틀') || text.includes('컵')) return 'a sleek minimalist tumbler'
+  if (text.includes('clothing') || text.includes('의류') || text.includes('옷') || text.includes('패션') || text.includes('shirt') || text.includes('아우터')) return 'modern editorial clothing'
+  
+  return 'a premium lifestyle object'
+}
+
 function buildBackgroundPrompt(
   role: string,
   copy: SlideCopy,
@@ -40,6 +53,8 @@ function buildBackgroundPrompt(
   const avoidClause = avoidVisuals.length
     ? avoidVisuals.map(v => `no ${v}`).join(', ')
     : ''
+
+  const subject = inferSubject(input.productName, brand.industry)
 
   const base = [
     'Korean Instagram card news style',
@@ -53,8 +68,8 @@ function buildBackgroundPrompt(
     'clean empty negative space for app-rendered overlay later',
   ].filter(Boolean)
 
-  const productContext = `product: ${input.productName}`
-  const industryContext = `industry: ${brand.industry}`
+  const productContext = `subject: ${subject}`
+  const industryContext = `scene inspired by ${brand.industry}`
 
   switch (role) {
     case 'hook':

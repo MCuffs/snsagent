@@ -4,7 +4,12 @@ import { SubscriptionPlan, PlanFeature, PRICING_PLANS, normalizePlan } from './l
 export type { SubscriptionPlan, PlanFeature }
 export { PRICING_PLANS }
 
-const SUPER_USER_EMAIL = 'alstnwjd0424@gmail.com'
+const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com']
+
+function isSuperUser(email?: string | null): boolean {
+  if (!email) return false
+  return SUPER_USER_EMAILS.includes(email.toLowerCase())
+}
 
 /**
  * Checks if user is allowed to generate a new card news this month
@@ -21,7 +26,7 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
     c => new Date(c.createdAt).getTime() >= startOfMonth.getTime()
   )
 
-  if (user?.email === SUPER_USER_EMAIL) {
+  if (isSuperUser(user?.email)) {
     return {
       allowed: true,
       current: monthlyCampaigns.length,
@@ -46,7 +51,7 @@ export async function checkBrandCountLimit(userId: string): Promise<{ allowed: b
   const user = await dbService.getUser(userId)
   const brands = await dbService.getBrands(userId)
 
-  if (user?.email === SUPER_USER_EMAIL) {
+  if (isSuperUser(user?.email)) {
     return {
       allowed: true,
       current: brands.length,
@@ -66,7 +71,7 @@ export async function checkBrandCountLimit(userId: string): Promise<{ allowed: b
  */
 export async function hasWatermark(userId: string): Promise<boolean> {
   const user = await dbService.getUser(userId)
-  if (user?.email === SUPER_USER_EMAIL) {
+  if (isSuperUser(user?.email)) {
     return false
   }
 

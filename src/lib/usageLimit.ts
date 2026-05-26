@@ -1,7 +1,12 @@
 import { dbService } from '../../lib/db-service'
 import { PRICING_PLANS, normalizePlan } from '../../lib/limits-types'
 
-const SUPER_USER_EMAIL = 'alstnwjd0424@gmail.com'
+const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com']
+
+function isSuperUser(email?: string | null): boolean {
+  if (!email) return false
+  return SUPER_USER_EMAILS.includes(email.toLowerCase())
+}
 
 export async function checkMonthlyCampaignUsage(userId: string) {
   const user = await dbService.getUser(userId)
@@ -13,7 +18,7 @@ export async function checkMonthlyCampaignUsage(userId: string) {
 
   const current = campaigns.filter(campaign => campaign.createdAt >= startOfMonth).length
 
-  if (user?.email === SUPER_USER_EMAIL) {
+  if (isSuperUser(user?.email)) {
     return {
       allowed: true,
       current,

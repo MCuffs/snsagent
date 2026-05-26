@@ -41,7 +41,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
     typographyPreset: 'cinematic-headline',
     overlay: {
       preset: 'netflix-dark',
-      darkness: 42,
+      darkness: 100,
       vignette: 35,
       blur: 0,
       grain: 8,
