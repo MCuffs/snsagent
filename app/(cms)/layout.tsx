@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BookOpen, CreditCard, Grid3X3, LogOut, Zap } from 'lucide-react'
-import { getSessionUser } from '../actions'
-import { dbService } from '../../lib/db-service'
+import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
 
 const navItems = [
   { href: '/concept', label: 'Concept', icon: BookOpen, desc: '브랜드 프로필' },
@@ -14,7 +13,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const brands = await dbService.getBrands(user.id)
+  const brands = await getCachedBrands(user.id)
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
 
   return (

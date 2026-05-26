@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSessionUser } from '../../actions'
-import { dbService } from '../../../lib/db-service'
+import { getSessionUser, getCachedBrands } from '../../../lib/auth/user'
 import ConceptForm from './ConceptForm'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +8,7 @@ export default async function ConceptPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const brands = await dbService.getBrands(user.id)
+  const brands = await getCachedBrands(user.id)
   const existingBrand = brands[0] || null
 
   const serializedBrand = existingBrand

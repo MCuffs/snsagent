@@ -208,6 +208,25 @@ export const dbService = {
     return db.users.find(u => u.id === userId) || null
   },
 
+  async getUserByEmail(email: string): Promise<User | null> {
+    if (!isMock()) {
+      try {
+        return await prisma.user.findUnique({
+          where: { email },
+        })
+      } catch (err) {
+        console.warn('Prisma getUserByEmail failed, falling back to mock database', err)
+        await saveErrorLog(null, 'getUserByEmail', err, { email })
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    return db.users.find(u => u.email === email) || null
+  },
+
   async getOrCreateUser(email: string, name?: string): Promise<User> {
     if (!isMock()) {
       try {

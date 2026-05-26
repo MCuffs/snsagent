@@ -76,7 +76,7 @@ export async function getSessionUser(): Promise<User | null> {
   if (!email) return null
   
   try {
-    return await dbService.getOrCreateUser(email)
+    return await dbService.getUserByEmail(email)
   } catch (e) {
     console.error('Failed to get session user:', e)
     return null
