@@ -9,18 +9,18 @@ generator client {
 }
 
 model User {
-  id                     String            @id @default(uuid())
-  email                  String            @unique
-  name                   String?
-  plan                      String  @default("FREE") // FREE, LITE, PRO, UNLIMITED
-  paypalSubscriptionId      String? @unique
-  paypalSubscriptionStatus  String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  brands                 Brand[]
-  campaigns              Campaign[]
-  posts                  Post[]
-  instagramAccount       InstagramAccount?
+  id                       String            @id @default(uuid())
+  email                    String            @unique
+  name                     String?
+  plan                     String            @default("FREE") // FREE, LITE, PRO, UNLIMITED
+  paypalSubscriptionId     String?           @unique
+  paypalSubscriptionStatus String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  brands                   Brand[]
+  campaigns                Campaign[]
+  posts                    Post[]
+  instagramAccount         InstagramAccount?
 }
 
 model Brand {
@@ -44,42 +44,46 @@ model Brand {
 }
 
 model InstagramAccount {
-  id                    String   @id @default(uuid())
-  userId                String   @unique
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  brandId               String   @unique
-  brand                 Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  instagramAccountId    String
-  accessTokenEncrypted  String
-  facebookPageId        String?
+  id                       String    @id @default(uuid())
+  userId                   String    @unique
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId                  String    @unique
+  brand                    Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  instagramAccountId       String
+  accessTokenEncrypted     String
+  facebookPageId           String?
   pageAccessTokenEncrypted String?
-  tokenExpiresAt        DateTime?
-  username              String?
-  profilePictureUrl     String?
-  connectionMethod      String   @default("manual") // oauth, manual, mock
-  status                String   @default("DISCONNECTED") // CONNECTED, DISCONNECTED
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  tokenExpiresAt           DateTime?
+  username                 String?
+  profilePictureUrl        String?
+  connectionMethod         String    @default("manual") // oauth, manual, mock
+  status                   String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 }
 
 model Campaign {
-  id                 String          @id @default(uuid())
-  userId             String
-  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  brandId            String
-  brand              Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  title              String
-  productName        String
-  productDescription String
-  keyBenefits        String
-  objective          String
-  slideCount         Int
-  status             String          @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
-  agentReport        String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  slides             CarouselSlide[]
-  posts              Post[]
+  id                         String          @id @default(uuid())
+  userId                     String
+  user                       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId                    String
+  brand                      Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  title                      String
+  productName                String
+  productDescription         String
+  keyBenefits                String
+  objective                  String
+  slideCount                 Int
+  status                     String          @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
+  agentReport                String?
+  imageModel                 String?
+  initialImageCount          Int             @default(0)
+  regenerationImageCount     Int             @default(0)
+  lastRegenerationImageModel String?
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  slides                     CarouselSlide[]
+  posts                      Post[]
 }
 
 model CarouselSlide {
@@ -104,7 +108,7 @@ model Post {
   brandId          String
   brand            Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   caption          String
-  hashtags         String   // Comma-separated or space-separated
+  hashtags         String // Comma-separated or space-separated
   scheduledAt      DateTime
   instagramMediaId String?
   status           String   @default("draft") // draft, pending_approval, scheduled, posted, failed
@@ -118,6 +122,6 @@ model ErrorLog {
   actionName   String
   errorMessage String
   errorStack   String?
-  contextData  String?  // JSON stringified context
+  contextData  String? // JSON stringified context
   createdAt    DateTime @default(now())
 }

@@ -236,3 +236,20 @@ This file records meaningful development work, fixes, verification commands, and
 - `git diff --check` passed.
 - `npm run lint` passed.
 - `npm run build` passed with Next.js `16.2.6`; static generation completed for 20 pages.
+
+## 2026-05-26 KST - Creator Usage Expansion and Unit Economics Controls
+
+### Changes
+- Changed Creator from 월 19,000원/10회 to 월 19,000원/20회 across plan limits, pricing UI, billing UI, documentation, and PayPal setup definitions.
+- Fixed the billable CMS OpenAI image path to `gpt-image-1` at `1024x1024` low quality for a stable pricing baseline.
+- Added campaign image accounting fields for the initial model/image count and AI background regeneration usage.
+- Limited included AI background regeneration to one full-campaign equivalent: a campaign with N slides can consume at most N AI background regeneration images, through either individual or full-style regeneration.
+- Added `UNIT_ECONOMICS.md`, `scripts/migrate-image-usage.mjs`, and `scripts/paypal-update-creator-plan.mjs`.
+
+### Operational Note
+- The Creator charge remains KRW 19,000, so an existing PayPal plan requires a description update rather than a price change. This workspace has no PayPal credentials configured, so the remote PayPal PATCH must run in the deployment credential environment.
+- PayPal's Korean merchant fee table lists international commercial payments as 4.40% plus a fixed fee but does not list a KRW fixed-fee value. KRW plan acceptance and final unit economics require sandbox or live transaction confirmation.
+
+### Frontend Follow-up
+- Routed public `Google Login` calls to action directly to `/api/auth/google/start` while retaining `/login` for OAuth errors and local development entry.
+- Aligned all public pricing cards with the included per-campaign AI background regeneration allowance.

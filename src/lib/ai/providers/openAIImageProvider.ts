@@ -11,11 +11,13 @@ const NO_TEXT_IMAGE_INSTRUCTIONS = [
   'If the scene contains signs, books, screens, packaging, newspapers, menus, labels, or billboards, keep them blank, blurred, cropped away, or turned from the camera.',
 ].join(' ')
 
+export const ACTIVE_OPENAI_IMAGE_MODEL = 'gpt-image-1'
+
 export class OpenAIImageProvider implements ImageProvider {
   private openai: OpenAI
   private model: string
 
-  constructor(apiKey = process.env.OPENAI_API_KEY, model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2') {
+  constructor(apiKey = process.env.OPENAI_API_KEY, model = ACTIVE_OPENAI_IMAGE_MODEL) {
     if (!isConfiguredOpenAIKey(apiKey)) {
       throw new Error('OPENAI_API_KEY is not configured.')
     }

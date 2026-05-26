@@ -35,8 +35,10 @@
 
 ```mermaid
 flowchart LR
-    Landing["/"] --> Login["/login"]
-    Login --> Concept["/concept"]
+    Landing["/"] --> GoogleStart["/api/auth/google/start"]
+    GoogleStart --> GoogleCallback["/api/auth/google/callback"]
+    GoogleCallback --> Concept["/concept"]
+    Login["/login (오류/개발 진입)"] --> Concept
     Concept --> Generate["/generate"]
     Generate --> Result["/campaign/[id]"]
     Result --> Works["/works"]
@@ -55,7 +57,7 @@ sequenceDiagram
     participant G as Google OAuth
     participant D as DB Service
 
-    U->>A: /login 에서 Google 로그인 시작
+    U->>A: 공개 Google Login CTA 클릭
     A->>G: /api/auth/google/start
     G->>A: /api/auth/google/callback
     A->>D: 사용자 조회 또는 생성
@@ -150,7 +152,7 @@ erDiagram
 | --- | --- |
 | `User` | 로그인 사용자, 플랜, PayPal 구독 상태 |
 | `Brand` | 브랜드 분석 결과 및 생성 기준 정보 |
-| `Campaign` | 카드뉴스 생성 단위와 상태 |
+| `Campaign` | 카드뉴스 생성 단위와 상태, 사용 이미지 모델 및 AI 재생성 이미지 수 |
 | `CarouselSlide` | 각 슬라이드 카피 및 이미지 |
 | `Post` | Instagram 게시 캡션, 예약 시간, 게시 상태 |
 | `InstagramAccount` | Meta 연동 계정 및 암호화 토큰 |
@@ -183,7 +185,9 @@ sequenceDiagram
 | PayPal 클라이언트 | `lib/paypal.ts` |
 | 요금제 제한 | `lib/limits.ts` |
 
-구독 활성화 시 내부 플랜은 PayPal 구독의 검증된 `plan_id`를 기준으로 결정된다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 19,000원/10회), Studio(월 45,000원/30회)다. 현재 취소 정책은 즉시 이용권 없음 상태 전환이며 결제 화면의 안내도 같은 정책을 표시한다.
+구독 활성화 시 내부 플랜은 PayPal 구독의 검증된 `plan_id`를 기준으로 결정된다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 19,000원/20회), Studio(월 45,000원/30회)다. 현재 취소 정책은 즉시 이용권 없음 상태 전환이며 결제 화면의 안내도 같은 정책을 표시한다.
+
+AI 이미지 원가는 캠페인 단위로 통제한다. 활성 CMS OpenAI 이미지 모델은 `gpt-image-1`로 고정하며, `Campaign.imageModel`, `initialImageCount`, `regenerationImageCount`, `lastRegenerationImageModel`에 생성 사용량을 저장한다. 결과 화면의 AI 배경 재생성은 최초 슬라이드 수와 같은 이미지 크레딧까지만 서버에서 원자적으로 예약해 허용한다.
 
 ## 9. Instagram 게시 구조
 
@@ -213,7 +217,7 @@ flowchart LR
 | --- | --- |
 | 인증 | HMAC 서명 세션 적용됨; OAuth state와 키 운영 검증 지속 |
 | 외부 URL 수집 | SSRF/redirect/크기 방어 적용됨; 운영 관측 지속 |
-| AI 생성 | 주요 배열 응답 fallback 적용됨; 공통 스키마, 생성 시간 및 비용 보완 |
+| AI 생성 | 주요 배열 응답 fallback 및 이미지 재생성 상한/수량 기록 적용됨; 실제 청구 토큰·생성 시간 관측 보완 |
 | 업로드 | MIME/파일 크기/요청당 4장 적용됨; 사용자 쿼터와 속도 제한 보완 |
 | 결제 | PayPal 플랜 검증 적용됨; webhook 멱등성과 sandbox E2E 보완 |
 | 게시 | Instagram 연결 UI, 예약 게시 재시도 및 실패 알림 |

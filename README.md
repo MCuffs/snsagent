@@ -12,6 +12,7 @@ Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하
 | `SYSTEM_ARCHITECTURE.md` | 현재 라우트와 서비스 구조 |
 | `DEVELOPMENT_LOG.md` | 날짜별 주요 개발 이력과 검증 기록 |
 | `LAYERS.md` | 코드 책임 분리 및 확장 규칙 |
+| `UNIT_ECONOMICS.md` | Creator 가격 정책의 수수료·VAT·AI 원가 분석 |
 
 ## 현재 제공 범위
 
@@ -23,7 +24,7 @@ Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하
 | 카드뉴스 생성 | `/generate`, `app/api/agents/generate`, `POST /api/campaigns/generate` | 유료 이용권의 월 횟수 내 대화형 생성 및 렌더링 구현됨 |
 | 결과/편집 | `/campaign/[id]` | 텍스트/스타일/배경 교체/다운로드 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
-| 구독 | `/billing`, `app/api/paypal/*` | Single 3,000원/1회, Creator 19,000원/10회, Studio 45,000원/30회 및 서버 검증 구현됨 |
+| 구독 | `/billing`, `app/api/paypal/*` | Single 3,000원/1회, Creator 19,000원/20회, Studio 45,000원/30회 및 서버 검증 구현됨 |
 | Instagram 발행 | `app/api/auth/meta/*`, `app/api/cron/publish`, Server Actions | 백엔드 코드 유지, 사용자 흐름은 추후 개발 예정 |
 
 현재 CMS 메뉴는 `Concept`, `Generate`, `Works`이며, 결제 화면은 사이드바의 요금제 링크에서 접근합니다. 과거 `/brand`, `/campaign/new`, `/instagram` 기반 안내는 현재 사용자 화면 구조가 아닙니다.
@@ -57,14 +58,15 @@ Google Login
 - `/generate`에서 상품 참고 이미지를 최대 4장 업로드해 생성 요청의 `productImageUrls`로 전달할 수 있습니다.
 - 생성 진입점은 `POST /api/campaigns/generate`이며, 현재 CMS 흐름은 `src/lib/layout/mediaCarouselPipeline.ts`의 미디어 파이프라인을 사용합니다.
 - 미디어 파이프라인은 LLM 카피 생성, 규칙 기반 Agent 보정, 레이아웃/타이포그래피 계산, 이미지 생성, SVG/PNG 렌더링, 품질 로그 저장을 수행합니다.
-- 결과 화면은 슬라이드 문구 저장, 폰트/색상 적용 재렌더링, 스타일 재생성, 캡션 저장, 개별/전체 다운로드 기능을 포함합니다.
+- 결과 화면은 슬라이드 문구 저장, 폰트/색상 적용 재렌더링, 제한된 AI 배경 재생성, 캡션 저장, 개별/전체 다운로드 기능을 포함합니다.
+- 생성 캠페인은 사용 이미지 모델, 최초 이미지 수, AI 배경 재생성 이미지 수를 저장하며 AI 배경 재생성은 최초 슬라이드 수만큼의 포함 크레딧으로 제한됩니다.
 
 `src/lib/carousel/pipeline.ts`의 commerce 파이프라인도 남아 있으며 API의 비-`media` 입력에서 사용할 수 있으나, 현재 CMS 주 흐름은 미디어 파이프라인입니다.
 
 ### 결제와 후속 범위
 
 - 내부 `FREE` 상태는 로그인 직후 또는 취소 후의 이용권 없음 상태이며 생성 한도는 0회입니다.
-- 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 19,000원 10회, `UNLIMITED`/Studio 월 45,000원 30회로 매핑됩니다.
+- 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 19,000원 20회, `UNLIMITED`/Studio 월 45,000원 30회로 매핑됩니다.
 - PayPal 구독 생성, 활성화, 취소, webhook 라우트가 존재하며, 활성화는 PayPal에서 조회한 `plan_id`를 내부 플랜으로 매핑합니다.
 - Meta OAuth, Instagram Graph API 클라이언트, cron 발행 라우트는 존재합니다.
 - 현재 CMS에는 Instagram 계정 연결/예약 발행 화면이 없으므로 발행 기능은 사용자 흐름으로 완료되지 않았습니다.
@@ -76,7 +78,7 @@ Google Login
 1. Instagram 계정 연결/예약 게시 UI는 이번 범위에서 제외되어 추후 개발 예정입니다.
 2. 업로드는 파일당 크기 및 요청당 4장 제한을 적용하지만, 사용자별 저장 쿼터와 속도 제한은 남아 있습니다.
 3. 운영 DB fail-closed, 마이그레이션/백업 정책을 확정해야 합니다.
-4. 새 KRW 요금제에 맞는 PayPal plan ID를 생성·설정하고 sandbox E2E를 수행해야 합니다.
+4. PayPal KRW 플랜의 실제 고정 수수료·환전·세금을 확인하고 sandbox E2E를 수행해야 합니다.
 5. 외부 인증/이미지 공급자를 사용한 E2E와 `npm audit` moderate 2건 검토가 남아 있습니다.
 
 ## 로컬 실행
@@ -95,7 +97,7 @@ npm run dev
 | --- | --- |
 | `DATABASE_URL`, `DIRECT_URL` | PostgreSQL/Prisma 연결 |
 | `DATABASE_MOCK_FALLBACK` | 로컬 JSON DB fallback 허용 여부 |
-| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `IMAGE_PROVIDER` | Agent, 카피, 이미지 생성 |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `IMAGE_PROVIDER` | Agent, 카피, 이미지 생성 (`gpt-image-1` 원가 기준 고정) |
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `PERPLEXITY_API_KEY` | 브랜드 분석 공급자 |
 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 스토어 상품 보조 수집 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth |

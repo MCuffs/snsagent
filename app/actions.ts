@@ -12,7 +12,7 @@ import { analyzeBrandWithPerplexity, analyzeNaverStoreWithPerplexity } from '../
 import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from '../lib/naver-shopping'
 import { isSubscriptionPlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
-import { getPipelineImageProvider } from '../src/lib/ai/providers'
+import { getPipelineImageModel, getPipelineImageProvider } from '../src/lib/ai/providers'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
@@ -260,6 +260,15 @@ export async function rerenderMediaSlideAction(
     if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
     if (existingSlide.campaign.userId !== user.id) return forbidden()
 
+    const regenerationUsage = await dbService.reserveRegenerationImages(
+      existingSlide.campaign.id,
+      1,
+      getPipelineImageModel(),
+    )
+    if (!regenerationUsage.allowed) {
+      return failed(`포함된 AI 배경 재생성 크레딧을 모두 사용했습니다. (${regenerationUsage.used}/${regenerationUsage.limit}장)`)
+    }
+
     const brand = await dbService.getBrand(existingSlide.campaign.brandId)
     const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
     const source = account?.username || brand?.name || 'instaagent'
@@ -298,7 +307,7 @@ export async function rerenderMediaSlideAction(
     })
 
     const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
-    return { success: true as const, slide }
+    return { success: true as const, slide, regenerationUsage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 재렌더링에 실패했습니다.'))
   }
@@ -577,6 +586,15 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
   const keyword = styleKeywords[styleName] || styleKeywords.photo
 
   try {
+    const regenerationUsage = await dbService.reserveRegenerationImages(
+      campaign.id,
+      campaign.slides.length,
+      getPipelineImageModel(),
+    )
+    if (!regenerationUsage.allowed) {
+      return failed(`전체 스타일 재생성에는 ${campaign.slides.length}장의 AI 배경 크레딧이 필요합니다. 남은 크레딧이 부족합니다. (${Math.max(regenerationUsage.limit - regenerationUsage.used, 0)}장 남음)`)
+    }
+
     const provider = getPipelineImageProvider()
     const updatedSlides = await Promise.all(
       campaign.slides.map(async (slide) => {
@@ -629,7 +647,11 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
       })
     )
 
-    return { success: true as const, slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber) }
+    return {
+      success: true as const,
+      slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber),
+      regenerationUsage,
+    }
   } catch (err: unknown) {
     console.error('Failed to regenerate style images:', err)
     return failed(getErrorMessage(err, '이미지 스타일 일괄 재생성에 실패했습니다.'))

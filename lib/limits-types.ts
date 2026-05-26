@@ -32,9 +32,9 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   },
   PRO: {
     name: 'Creator',
-    monthlyCardLimit: 10,
+    monthlyCardLimit: 20,
     hasWatermark: false,
-    description: '매주 콘텐츠를 제작하는 브랜드 운영 플랜',
+    description: '평일마다 콘텐츠를 제작하는 브랜드 운영 플랜',
     price: '월 19,000원',
   },
   UNLIMITED: {

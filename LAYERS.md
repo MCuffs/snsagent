@@ -171,7 +171,7 @@ type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
 interface PlanFeature { name, monthlyCardLimit, hasWatermark, description, price }
 ```
 
-`FREE`는 생성 권한 없는 내부 상태이고, 유료 표시명/한도는 `LITE`=Single 1회, `PRO`=Creator 10회, `UNLIMITED`=Studio 30회로 유지한다.
+`FREE`는 생성 권한 없는 내부 상태이고, 유료 표시명/한도는 `LITE`=Single 1회, `PRO`=Creator 20회, `UNLIMITED`=Studio 30회로 유지한다. 각 캠페인의 AI 배경 재생성은 최초 슬라이드 수와 동일한 이미지 크레딧 1회분으로 제한하며 사용량은 `Campaign`에 기록한다.
 
 ### 허용
 - L10 (`dbService`) 조회 — 규칙 판정에 필요한 데이터 읽기
@@ -644,10 +644,11 @@ isConfiguredOpenAIKey(apiKey)
 2. **구현됨** HMAC 서명 세션, PayPal `plan_id` 검증, CMS 참고 이미지/배경 업로드/생성 이동 경로 수정
 3. **구현됨** URL 수집 SSRF 방어와 주요 AI 배열 응답 fallback 보강
 4. **구현됨** 공개 UI의 Google Login CTA 및 Single/Creator/Studio 유료 플랜과 내부 생성 한도 정합성 반영
-5. **예정** 업로드 쿼터/속도 제한, 운영 DB fail-closed, 새 PayPal plan ID 설정과 외부 서비스 E2E
-6. **예정** `lib/ai/brandAnalyzer.ts` 및 Agent service 추출 (L2→L6 정리)
-7. **추후 범위** L9 Instagram Distribution UI 복구, 재시도 로직, Cron 배포 설정
-8. **장기** L5 Agent의 QualityGuard → 실패 시 재생성 트리거 구현
+5. **구현됨** Creator 20회 조정, `gpt-image-1` 비용 기준 고정, 캠페인별 AI 배경 재생성 1회분 제한과 이미지 수 기록
+6. **예정** 업로드 쿼터/속도 제한, 운영 DB fail-closed, PayPal KRW 실수수료 확인과 외부 서비스 E2E
+7. **예정** `lib/ai/brandAnalyzer.ts` 및 Agent service 추출 (L2→L6 정리)
+8. **추후 범위** L9 Instagram Distribution UI 복구, 재시도 로직, Cron 배포 설정
+9. **장기** L5 Agent의 QualityGuard → 실패 시 재생성 트리거 구현
 
 ---
 

@@ -120,11 +120,13 @@ export class MockImageProvider implements ImageProvider {
 /**
  * OpenAIImageProvider integrates with the OpenAI image API to generate images.
  */
+const ACTIVE_OPENAI_IMAGE_MODEL = 'gpt-image-1'
+
 export class OpenAIImageProvider implements ImageProvider {
   private openai: OpenAI
   private model: string
 
-  constructor(apiKey = process.env.OPENAI_API_KEY, model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1') {
+  constructor(apiKey = process.env.OPENAI_API_KEY, model = ACTIVE_OPENAI_IMAGE_MODEL) {
     if (!isConfiguredOpenAIKey(apiKey)) {
       throw new Error('OpenAI API Key is missing for OpenAIImageProvider')
     }

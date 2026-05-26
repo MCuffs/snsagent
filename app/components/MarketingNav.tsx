@@ -17,12 +17,12 @@ export function MarketingNav() {
                     <Link href="/pricing" className="hover:text-[#0a0a0a] transition-colors">요금제</Link>
                     <Link href="/blog" className="hover:text-[#0a0a0a] transition-colors">블로그</Link>
                 </nav>
-                <Link
-                    href="/login"
+                <a
+                    href="/api/auth/google/start"
                     className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#0a0a0a] px-4 text-[13px] font-bold text-white transition-all hover:bg-[#1a1a1a] hover:-translate-y-[1px]"
                 >
                     Google Login
-                </Link>
+                </a>
             </div>
         </header>
     )

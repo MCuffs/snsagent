@@ -1,6 +1,6 @@
 import { dbService } from '../../../lib/db-service'
 import { MockImageProvider } from '../ai/providers/mockImageProvider'
-import { getPipelineImageProvider } from '../ai/providers'
+import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { generateCaption } from './captionEngine'
 import { generateSlideCopies } from './copyEngine'
 import { generateDesignPrompts } from './designPromptEngine'
@@ -247,6 +247,8 @@ export async function generateCarouselCampaign(params: {
         objective: params.campaignInput.objective,
         slideCount: slides.length,
         agentReport: JSON.stringify(agentReport), // Save agent report to DB
+        imageModel: getPipelineImageModel(),
+        initialImageCount: slides.length,
       },
       slides.map(slide => ({
         slideNumber: slide.slideNumber,

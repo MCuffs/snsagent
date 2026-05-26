@@ -43,6 +43,10 @@ interface Campaign {
   objective: string
   slideCount: number
   status: string
+  imageModel: string | null
+  initialImageCount: number
+  regenerationImageCount: number
+  lastRegenerationImageModel: string | null
   slides: Slide[]
   agentReport?: string | null
 }
@@ -140,6 +144,7 @@ export default function CampaignResultView({
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [selectedStyle, setSelectedStyle] = useState('photo')
   const [regeneratingStyle, setRegeneratingStyle] = useState(false)
+  const [regenerationImageCount, setRegenerationImageCount] = useState(campaign.regenerationImageCount)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
   const [selectedFont, setSelectedFont] = useState<'sans' | 'serif'>('sans')
@@ -157,6 +162,7 @@ export default function CampaignResultView({
   const activeSlide = slides[activeSlideIndex]
   const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
   const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
+  const remainingRegenerationImages = Math.max(campaign.slideCount - regenerationImageCount, 0)
 
   const selectSlide = (index: number) => {
     setActiveSlideIndex(index)
@@ -192,6 +198,7 @@ export default function CampaignResultView({
         setHeadline(updated[activeSlideIndex].headline)
         setBody(updated[activeSlideIndex].body)
       }
+      setRegenerationImageCount(result.regenerationUsage.used)
       setMessage({ type: 'success', text: '전체 카드 스타일을 다시 생성했습니다.' })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '스타일 재생성 중 오류가 발생했습니다.') })
@@ -224,6 +231,7 @@ export default function CampaignResultView({
           : slide
       )
       setSlides(updatedSlides)
+      setRegenerationImageCount(result.regenerationUsage.used)
       setMessage({ type: 'success', text: `${activeSlide.slideNumber}번 카드를 다시 렌더링했습니다.` })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '슬라이드 재렌더링 중 오류가 발생했습니다.') })
@@ -523,15 +531,18 @@ export default function CampaignResultView({
                     </button>
                   ))}
                 </div>
+                <p className="mb-4 rounded-[6px] bg-[#faf8f4] px-3 py-2 text-xs font-bold text-[#746a62]">
+                  포함 AI 배경 재생성 크레딧: {remainingRegenerationImages}/{campaign.slideCount}장 남음
+                </p>
 
                 <button
                   type="button"
                   onClick={handleRegenerateStyle}
-                  disabled={regeneratingStyle}
+                  disabled={regeneratingStyle || remainingRegenerationImages < campaign.slideCount}
                   className="btn-primary w-full rounded-[8px]"
                 >
                   {regeneratingStyle ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  스타일 다시 만들기
+                  스타일 다시 만들기 ({campaign.slideCount}장 사용)
                 </button>
               </div>
 
@@ -549,6 +560,7 @@ export default function CampaignResultView({
                   <Meta label="layout" value={layoutLabel} />
                   <Meta label="brand" value={brand.name} />
                   <Meta label="plan" value={planName} />
+                  <Meta label="AI credits" value={`${remainingRegenerationImages}/${campaign.slideCount}`} />
                 </div>
 
                 <div className="space-y-4">
@@ -669,11 +681,11 @@ export default function CampaignResultView({
                   <button
                     type="button"
                     onClick={rerenderSlide}
-                    disabled={rerendering || fastRendering || savingText || replacingBg}
+                    disabled={rerendering || fastRendering || savingText || replacingBg || remainingRegenerationImages < 1}
                     className="btn-primary w-full rounded-[8px]"
                   >
                     {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    전체 재생성 (AI 배경 포함)
+                    현재 카드 AI 배경 재생성 (1장 사용)
                   </button>
                 </div>
               </div>

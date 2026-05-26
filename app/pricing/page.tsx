@@ -1,7 +1,6 @@
 import { MarketingNav } from '../components/MarketingNav'
 import { MarketingFooter } from '../components/MarketingFooter'
 import { Check, ArrowRight } from 'lucide-react'
-import Link from 'next/link'
 import { PRICING_PLANS } from '../../lib/limits-types'
 
 export const metadata = {
@@ -17,7 +16,7 @@ const plans = [
         period: '',
         desc: PRICING_PLANS.LITE.description,
         cta: 'Google Login',
-        features: ['월 1회 카드뉴스 생성', '브랜드 URL 분석', 'AI 문구·이미지 생성', '결과 편집 및 다운로드'],
+        features: ['월 1회 카드뉴스 생성', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
         highlight: false,
     },
     {
@@ -28,10 +27,11 @@ const plans = [
         desc: PRICING_PLANS.PRO.description,
         cta: 'Google Login',
         features: [
-            '월 10회 카드뉴스 생성',
+            '월 20회 카드뉴스 생성',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
             'AI 문구·이미지 생성',
+            '캠페인별 AI 배경 재생성 1회분',
             '결과 편집 및 다운로드',
         ],
         highlight: true,
@@ -48,6 +48,7 @@ const plans = [
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
             'AI 문구·이미지 생성',
+            '캠페인별 AI 배경 재생성 1회분',
             '결과 편집 및 다운로드',
         ],
         highlight: false,
@@ -61,7 +62,7 @@ const faqs = [
     },
     {
         q: 'AI가 만든 카드뉴스를 직접 수정할 수 있나요?',
-        a: '네. 생성된 헤드라인과 본문, 문안 메모를 편집하고 이미지 스타일 또는 배경을 다시 적용한 뒤 다운로드할 수 있습니다.',
+        a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있고, 캠페인마다 최초 슬라이드 수만큼 AI 배경 재생성 크레딧이 포함됩니다. 업로드한 배경 교체와 텍스트 렌더 적용은 이 크레딧을 사용하지 않습니다.',
     },
     {
         q: '브랜드가 여러 개인 경우에도 사용할 수 있나요?',
@@ -69,7 +70,7 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '현재 플랜 차이는 매월 생성 가능한 카드뉴스 수입니다. 실제 사용 빈도에 맞춰 Single, Creator, Studio 중 선택할 수 있습니다.',
+        a: '월간 생성 가능 횟수가 다릅니다. Creator는 평일 운영을 위한 월 20회 생성 플랜이며, 모든 생성 건에는 카드 장수 기준 AI 배경 재생성 1회분이 포함됩니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
@@ -86,10 +87,11 @@ const faqs = [
 ]
 
 const compareFeatures = [
-    { feature: '월 카드뉴스 생성 수', single: '1회', creator: '10회', studio: '30회' },
+    { feature: '월 카드뉴스 생성 수', single: '1회', creator: '20회', studio: '30회' },
     { feature: '브랜드 URL 분석', single: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', single: '✓', creator: '✓', studio: '✓' },
     { feature: '상품 참고 이미지 입력', single: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
+    { feature: 'AI 배경 재생성', single: '1회분', creator: '1회분/건', studio: '1회분/건' },
     { feature: '결과 편집 및 다운로드', single: '✓', creator: '✓', studio: '✓' },
 ]
 
@@ -150,8 +152,8 @@ export default function PricingPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <Link
-                                        href="/login"
+                                    <a
+                                        href="/api/auth/google/start"
                                         className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
                                             plan.highlight
                                                 ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
@@ -159,7 +161,7 @@ export default function PricingPage() {
                                         }`}
                                     >
                                         {plan.cta}
-                                    </Link>
+                                    </a>
                                     <ul className="mt-7 space-y-3">
                                         {plan.features.map((feature, idx) => (
                                             <li key={idx} className="flex items-start gap-2.5 text-[13.5px]">

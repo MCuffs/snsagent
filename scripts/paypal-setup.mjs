@@ -58,7 +58,7 @@ async function api(token, method, path, body) {
 
 const PLANS = [
   { key: 'LITE',      name: 'Shuffla Single',  description: '월 1회 카드뉴스 생성 플랜',  amount: '3000', currency: 'KRW' },
-  { key: 'PRO',       name: 'Shuffla Creator', description: '월 10회 카드뉴스 생성 플랜', amount: '19000', currency: 'KRW' },
+  { key: 'PRO',       name: 'Shuffla Creator', description: '월 20회 카드뉴스 생성, 캠페인별 AI 배경 재생성 1회분 포함', amount: '19000', currency: 'KRW' },
   { key: 'UNLIMITED', name: 'Shuffla Studio',  description: '월 30회 카드뉴스 생성 플랜', amount: '45000', currency: 'KRW' },
 ]
 

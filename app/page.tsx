@@ -1,5 +1,4 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { ArrowRight, ArrowUpRight, FolderOpen, ImagePlus, Sparkles, Wand2 } from 'lucide-react'
 import { MarketingNav } from './components/MarketingNav'
 import { MarketingFooter } from './components/MarketingFooter'
@@ -82,13 +81,13 @@ export default function LandingPage() {
               참고 이미지를 더하고 편집한 결과물을 다운로드할 수 있습니다.
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/login"
+              <a
+                href="/api/auth/google/start"
                 className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0a0a0a] px-7 text-[15px] font-bold text-white transition-all hover:bg-[#1a1a1a] hover:-translate-y-[1px] shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
               >
                 Google Login
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
               <a
                 href="#how-it-works"
                 className="inline-flex h-12 items-center gap-2 rounded-full border border-black/[0.08] bg-white px-7 text-[15px] font-bold text-[#0a0a0a] transition-all hover:border-black/20"
@@ -226,12 +225,12 @@ export default function LandingPage() {
               <p className="mx-auto mt-6 max-w-lg text-[16px] leading-[1.6] text-[#0a0a0a]/75">
                 로그인 후 브랜드를 설정하고 주제를 입력하면 AI가 카드뉴스를 완성합니다.
               </p>
-              <Link
-                href="/login"
+              <a
+                href="/api/auth/google/start"
                 className="mt-10 inline-flex h-13 items-center gap-2 rounded-full bg-[#0a0a0a] px-8 py-3.5 text-[16px] font-bold text-white hover:bg-[#1a1a1a] hover:-translate-y-[1px] transition-all"
               >
                 Google Login <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
           </div>
         </div>

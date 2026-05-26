@@ -39,6 +39,10 @@ export default async function CampaignDetailsPage({
     objective: campaign.objective,
     slideCount: campaign.slideCount,
     status: campaign.status,
+    imageModel: campaign.imageModel,
+    initialImageCount: campaign.initialImageCount,
+    regenerationImageCount: campaign.regenerationImageCount,
+    lastRegenerationImageModel: campaign.lastRegenerationImageModel,
     slides: campaign.slides.map(s => ({
       id: s.id,
       slideNumber: s.slideNumber,

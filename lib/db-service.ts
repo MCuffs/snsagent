@@ -65,6 +65,10 @@ export interface Campaign {
   slideCount: number
   status: string // draft, generated, pending_approval, scheduled, posted, failed
   agentReport?: string | null
+  imageModel: string | null
+  initialImageCount: number
+  regenerationImageCount: number
+  lastRegenerationImageModel: string | null
   createdAt: Date
   updatedAt: Date
   slides?: CarouselSlide[]
@@ -122,6 +126,18 @@ interface StoredMockDatabase {
   posts?: StoredPost[]
 }
 
+function hydrateCampaign(campaign: StoredCampaign | Campaign): Campaign {
+  return {
+    ...campaign,
+    imageModel: campaign.imageModel ?? null,
+    initialImageCount: campaign.initialImageCount ?? 0,
+    regenerationImageCount: campaign.regenerationImageCount ?? 0,
+    lastRegenerationImageModel: campaign.lastRegenerationImageModel ?? null,
+    createdAt: new Date(campaign.createdAt),
+    updatedAt: new Date(campaign.updatedAt),
+  }
+}
+
 function initMockDb(): MockDatabase {
   if (!fs.existsSync(path.dirname(DB_FILE_PATH))) {
     fs.mkdirSync(path.dirname(DB_FILE_PATH), { recursive: true })
@@ -135,7 +151,7 @@ function initMockDb(): MockDatabase {
         users: (parsed.users || []).map((u) => ({ ...u, createdAt: new Date(u.createdAt), updatedAt: new Date(u.updatedAt) })),
         brands: (parsed.brands || []).map((b) => ({ ...b, createdAt: new Date(b.createdAt), updatedAt: new Date(b.updatedAt) })),
         instagramAccounts: (parsed.instagramAccounts || []).map((ia) => ({ ...ia, tokenExpiresAt: ia.tokenExpiresAt ? new Date(ia.tokenExpiresAt) : null, createdAt: new Date(ia.createdAt), updatedAt: new Date(ia.updatedAt) })),
-        campaigns: (parsed.campaigns || []).map((c) => ({ ...c, createdAt: new Date(c.createdAt), updatedAt: new Date(c.updatedAt) })),
+        campaigns: (parsed.campaigns || []).map(hydrateCampaign),
         slides: (parsed.slides || []).map((s) => ({ ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) })),
         posts: (parsed.posts || []).map((p) => ({ ...p, scheduledAt: new Date(p.scheduledAt), createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })),
       }
@@ -615,7 +631,17 @@ export const dbService = {
   async createCampaign(
     userId: string,
     brandId: string,
-    campaignData: { title: string; productName: string; productDescription: string; keyBenefits: string; objective: string; slideCount: number; agentReport?: string | null },
+    campaignData: {
+      title: string
+      productName: string
+      productDescription: string
+      keyBenefits: string
+      objective: string
+      slideCount: number
+      agentReport?: string | null
+      imageModel?: string | null
+      initialImageCount?: number
+    },
     slides: { slideNumber: number; headline: string; body: string; designPrompt: string; imageUrl?: string | null }[]
   ): Promise<Campaign> {
     if (!isMock()) {
@@ -658,6 +684,10 @@ export const dbService = {
       brandId,
       ...campaignData,
       status: 'generated',
+      imageModel: campaignData.imageModel ?? null,
+      initialImageCount: campaignData.initialImageCount ?? 0,
+      regenerationImageCount: 0,
+      lastRegenerationImageModel: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -751,6 +781,61 @@ export const dbService = {
       ...c,
       slides: db.slides.filter(s => s.campaignId === c.id).sort((a, b) => a.slideNumber - b.slideNumber),
     }))
+  },
+
+  async reserveRegenerationImages(
+    campaignId: string,
+    requestedImages: number,
+    imageModel: string,
+  ): Promise<{ allowed: boolean; used: number; limit: number }> {
+    if (requestedImages < 1) throw new Error('requestedImages must be positive')
+
+    if (!isMock() && !campaignId.startsWith('c-')) {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: campaignId },
+        select: { slideCount: true, regenerationImageCount: true },
+      })
+      if (!campaign) throw new Error('Campaign not found')
+
+      const maxUsedBeforeReservation = campaign.slideCount - requestedImages
+      if (maxUsedBeforeReservation < 0) {
+        return { allowed: false, used: campaign.regenerationImageCount, limit: campaign.slideCount }
+      }
+
+      const reserved = await prisma.campaign.updateMany({
+        where: {
+          id: campaignId,
+          regenerationImageCount: { lte: maxUsedBeforeReservation },
+        },
+        data: {
+          regenerationImageCount: { increment: requestedImages },
+          lastRegenerationImageModel: imageModel,
+        },
+      })
+      const refreshed = await prisma.campaign.findUniqueOrThrow({
+        where: { id: campaignId },
+        select: { slideCount: true, regenerationImageCount: true },
+      })
+      return {
+        allowed: reserved.count === 1,
+        used: refreshed.regenerationImageCount,
+        limit: refreshed.slideCount,
+      }
+    }
+
+    const db = initMockDb()
+    const idx = db.campaigns.findIndex(c => c.id === campaignId)
+    if (idx === -1) throw new Error('Campaign not found')
+    const campaign = db.campaigns[idx]
+    const limit = campaign.slideCount
+    if (campaign.regenerationImageCount + requestedImages > limit) {
+      return { allowed: false, used: campaign.regenerationImageCount, limit }
+    }
+    campaign.regenerationImageCount += requestedImages
+    campaign.lastRegenerationImageModel = imageModel
+    campaign.updatedAt = new Date()
+    writeMockDb(db)
+    return { allowed: true, used: campaign.regenerationImageCount, limit }
   },
 
   async updateCampaignStatus(campaignId: string, status: string): Promise<Campaign> {

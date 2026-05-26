@@ -1,6 +1,6 @@
 import { dbService } from '../../../lib/db-service'
 import type { ImageProvider } from '../ai/imageProvider'
-import { getPipelineImageProvider } from '../ai/providers'
+import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
@@ -286,6 +286,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       objective: `${input.contentType} / ${input.tone}`,
       slideCount: slides.length,
       agentReport: JSON.stringify(agentReport), // Save agent report to DB
+      imageModel: getPipelineImageModel(),
+      initialImageCount: slides.length,
     },
     slides.map(slide => ({
       slideNumber: slide.slideNumber,

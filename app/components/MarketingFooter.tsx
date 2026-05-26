@@ -16,12 +16,12 @@ export function MarketingFooter() {
                             <p className="text-[15px] text-white/70 leading-relaxed mb-8 max-w-sm">
                                 AI가 브랜드를 분석하고, 카드뉴스를 생성하고, 원하는 결과물로 편집할 수 있게 돕습니다.
                             </p>
-                            <Link
-                                href="/login"
+                            <a
+                                href="/api/auth/google/start"
                                 className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0a0a0a] hover:bg-white/90 transition-colors"
                             >
                                 Google Login
-                            </Link>
+                            </a>
                         </div>
                         <div className="md:col-span-2 md:col-start-7">
                             <h4 className="font-bold mb-5 text-[12px] text-white uppercase tracking-[0.12em]">제품</h4>
