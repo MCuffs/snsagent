@@ -393,7 +393,7 @@ export default function CampaignResultView({
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <section className="space-y-5">
           <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-5 shadow-[0_24px_70px_rgba(31,21,18,0.18)]">
-            {activeSlide && <EditorialCanvas slideId={activeSlide.id} />}
+            {activeSlide && <EditorialCanvas slideId={activeSlide.id} fallbackImageUrl={activeSlide.imageUrl} />}
 
             <div className="mt-5 flex items-center justify-between">
               <button

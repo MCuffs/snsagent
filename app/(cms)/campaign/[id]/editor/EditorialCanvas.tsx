@@ -8,16 +8,19 @@ import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/t
 
 const SCALE = 0.5
 
-export function EditorialCanvas({ slideId }: { slideId: string }) {
+export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string; fallbackImageUrl?: string | null }) {
   const document = useEditorialStore(state => state.documents[slideId])
   const selectedLayerId = useEditorialStore(state => state.selectedLayerId)
   const selectLayer = useEditorialStore(state => state.selectLayer)
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const [guides, setGuides] = useState<{ x?: number; y?: number }>({})
+  const [failedBackgroundUrl, setFailedBackgroundUrl] = useState<string | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
   if (!document) return <div className="aspect-[4/5] bg-[#111318]" />
   const background = document.layers.find(layer => layer.type === 'background')
+  const backgroundFailed = Boolean(background?.imageUrl && failedBackgroundUrl === background.imageUrl)
+  const backgroundSource = backgroundFailed && fallbackImageUrl ? fallbackImageUrl : background?.imageUrl
   const overlay = document.overlay
   const elements = document.layers
     .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
@@ -40,12 +43,14 @@ export function EditorialCanvas({ slideId }: { slideId: string }) {
         ref={stageRef}
         className="relative mx-auto h-[675px] w-[540px] max-w-full overflow-hidden rounded-[8px] bg-[#090a0d] shadow-[0_32px_90px_rgba(0,0,0,0.48)]"
       >
-        {background?.visible && background.imageUrl && (
+        {background?.visible && backgroundSource && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={background.imageUrl}
+            src={backgroundSource}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            draggable={false}
+            onError={() => background.imageUrl && setFailedBackgroundUrl(background.imageUrl)}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
             style={{
               opacity: background.opacity / 100,
               filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
@@ -53,7 +58,7 @@ export function EditorialCanvas({ slideId }: { slideId: string }) {
           />
         )}
         <div
-          className="absolute inset-0"
+          className="pointer-events-none absolute inset-0"
           style={{
             opacity: (document.layers.find(layer => layer.type === 'overlay')?.opacity ?? 100) / 100,
             background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
@@ -61,6 +66,11 @@ export function EditorialCanvas({ slideId }: { slideId: string }) {
           }}
         />
         <div className="pointer-events-none absolute inset-[36px] border border-dashed border-white/10" />
+        {backgroundFailed && fallbackImageUrl && (
+          <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/80">
+            저장된 결과 이미지로 미리보기 중
+          </div>
+        )}
         {guides.x !== undefined && <div className="pointer-events-none absolute bottom-0 top-0 w-px bg-[#29c5ff]" style={{ left: guides.x * SCALE }} />}
         {guides.y !== undefined && <div className="pointer-events-none absolute left-0 right-0 h-px bg-[#29c5ff]" style={{ top: guides.y * SCALE }} />}
         {elements.map(layer => (
