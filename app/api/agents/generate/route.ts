@@ -29,8 +29,6 @@ interface GenerateParams {
   hookDirection?: string
   recommendedCta?: string
   reasonForStyle?: string
-  expectedGoal?: string
-  saveProbability?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
 }
 
@@ -77,6 +75,8 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
 - **마크다운 서식 절대 사용 금지**: **별표(\`**\` 또는 \`*\`), 샵(\`#\`)을 이용한 타이틀 구성 등 마크다운 스타일은 사용자가 읽기에 불필요한 AI 기계음 느낌을 줍니다. **어떠한 강조 기호도 사용하지 말고**, 오직 일반 텍텍스트, 평이한 문장, 그리고 자연스러운 단락 구분(줄바꿈)만을 활용하십시오. 필요 시 대시(\`-\`) 또는 일반 번호를 사용한 목록 형태로만 깔끔하게 나열하십시오.
 - 당신은 단순 질문을 던지는 설문 시스템이 아닙니다. 사용자의 한두 단어 입력만으로도 브랜드를 대표할 수 있는 매력적인 기획안과 레이아웃(비주얼 스타일), 콘텐츠 구조를 "스스로 생각해서 먼저 제안"합니다.
 - 이미 제안된 기획안에 대해 사용자가 피드백(예: "더 밝게 해줘", "5장으로 수정해줘")을 준다면, 그 피드백을 수용하여 비주얼 스타일, 슬라이드 수 등을 수정하고 기획안을 즉시 업데이트해 주어야 합니다.
+- message는 채팅창에서 편하게 읽히도록 세 문단, 총 220자 이내로 작성하십시오. 콘셉트 해석, 슬라이드 흐름 요약, 생성 여부 확인 질문만 담으십시오.
+- 성과 증가율, 저장 확률 등 확인할 근거가 없는 수치나 예측 지표는 message와 params 어디에도 작성하지 마십시오.
 
 ## 추천안 설정 가이드
 1. visualHint (비주얼 스타일): 다음 중 하나만 제안
@@ -93,7 +93,7 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
 ## 응답 형식 (반드시 JSON)
 주제나 URL이 제공되어 기획안을 추천할 수 있을 때:
 {
-  "message": "PYEARCHIVE 브랜드 특유의 미니멀하면서도 감도 높은 분위기를 강조하기 위한 기획서입니다. \n\n이번 가방 신제품은 디테일을 최소화한 정제된 실루엣이 특징이므로, 여백의 미가 드러나는 차분한 톤앤매너로 잡았습니다. \n\n기획안 요약:\n- 기획 목적: 소장(저장) 가치를 극대화하여 자연스러운 팔로우 유도\n- 추천 스타일: 차분한 감성의 에디토리얼 레이아웃\n- 슬라이드 구성: 첫 장에서 일상의 여백을 완성해 주는 가치 제안으로 시선을 끌고, 디테일한 무드컷과 수납력을 단계적으로 보여준 뒤 소장 가치를 알리는 흐름\n\n이 기획 방향으로 카드뉴스를 생성해 볼까요? 혹시 슬라이드 수나 디자인 스타일 등에 대한 조율이 필요하시다면 말씀해 주세요.",
+  "message": "PYEARCHIVE의 정돈된 감성을 살려, 여백과 제품 실루엣이 돋보이는 에디토리얼 카드뉴스로 제안합니다.\n\n첫 장에서 일상의 질서를 이야기하고, 디테일과 수납 장면을 거쳐 컬렉션 탐색으로 이어갑니다.\n\n이 방향으로 카드뉴스를 생성할까요?",
   "ready": true,
   "params": {
     "topic": "상품/주제 이름 (예: PYE Essential Bag 001)",
@@ -107,8 +107,6 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
     "hookDirection": "일상의 무질서 속에서 균형을 잡는 에센셜 라이프 제안",
     "recommendedCta": "상세 스토어 이동 및 컬렉션 라인업 탐색 유도",
     "reasonForStyle": "해당 브랜드의 시그니처 정돈감을 극대화하기 위해 여백이 돋보이는 dark-editorial 스타일을 기획했습니다.",
-    "expectedGoal": "타겟 도달 범위 확장 및 공유/저장 지표 30% 증가",
-    "saveProbability": "92%", // 숫자 및 퍼센트로 입력 (예: 92%, 85%)
     "structurePreview": [
       { "slideNumber": 1, "role": "Hook", "description": "일상의 질서를 완성하는 파이 에센셜 백 소개" },
       { "slideNumber": 2, "role": "Context", "description": "불필요한 짐은 덜어내고 꼭 필요한 것만 정돈하는 생활" },
@@ -206,8 +204,6 @@ export async function POST(request: Request) {
           hookDirection: '기본 타이틀 제공',
           recommendedCta: '프로필 링크 확인',
           reasonForStyle: '기본 에디토리얼 설정 적용',
-          expectedGoal: '브랜드 인지도 상승',
-          saveProbability: '80%',
           structurePreview: [
             { slideNumber: 1, role: 'Hook', description: '제품 소개 메인 헤드라인' },
             { slideNumber: 2, role: 'Detail', description: '디테일 정보' },

@@ -9,7 +9,6 @@ import {
   Sparkles, 
   Send, 
   X, 
-  Bookmark, 
   Target, 
   Compass, 
   Layers,
@@ -41,6 +40,8 @@ interface DisplayMessage {
   id: string
   role: 'ai' | 'user'
   content: string
+  revealedContent: string
+  isTyping: boolean
 }
 
 interface GenerateParams {
@@ -55,8 +56,6 @@ interface GenerateParams {
   hookDirection?: string
   recommendedCta?: string
   reasonForStyle?: string
-  expectedGoal?: string
-  saveProbability?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
 }
 
@@ -72,11 +71,16 @@ let msgCounter = 0
 function mkId() { return `m-${++msgCounter}` }
 
 function aiDisplay(content: string): DisplayMessage {
-  return { id: mkId(), role: 'ai', content }
+  return { id: mkId(), role: 'ai', content, revealedContent: '', isTyping: true }
 }
 
 function userDisplay(content: string): DisplayMessage {
-  return { id: mkId(), role: 'user', content }
+  return { id: mkId(), role: 'user', content, revealedContent: content, isTyping: false }
+}
+
+function compactSlidePreview(slides: NonNullable<GenerateParams['structurePreview']>) {
+  if (slides.length <= 4) return slides
+  return [...slides.slice(0, 3), slides[slides.length - 1]]
 }
 
 function buildCardCopyContext(params: GenerateParams) {
@@ -155,7 +159,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isWaiting, setIsWaiting] = useState(true)
+  const [isRevealingMessage, setIsRevealingMessage] = useState(false)
   const [readyParams, setReadyParams] = useState<GenerateParams | null>(null)
+  const [briefingStage, setBriefingStage] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -164,6 +170,8 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const typingTimerRef = useRef<number | null>(null)
+  const briefingTimersRef = useRef<number[]>([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -177,6 +185,69 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     return () => { if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current) }
   }, [generating])
 
+  const clearTypingTimer = useCallback(() => {
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
+  }, [])
+
+  const clearBriefingTimers = useCallback(() => {
+    briefingTimersRef.current.forEach(timer => window.clearTimeout(timer))
+    briefingTimersRef.current = []
+  }, [])
+
+  const revealBriefing = useCallback((params?: GenerateParams) => {
+    clearBriefingTimers()
+    if (!params) return
+
+    setReadyParams(params)
+    setBriefingStage(1)
+    briefingTimersRef.current = [
+      window.setTimeout(() => setBriefingStage(2), 420),
+      window.setTimeout(() => setBriefingStage(3), 900),
+    ]
+  }, [clearBriefingTimers])
+
+  const appendAiMessage = useCallback((content: string, params?: GenerateParams) => {
+    clearTypingTimer()
+    const message = aiDisplay(content)
+    let cursor = 0
+
+    setDisplayMessages(prev => [...prev, message])
+    setIsRevealingMessage(true)
+
+    const revealNext = () => {
+      const step = content.length > 220 ? 3 : 2
+      cursor = Math.min(content.length, cursor + step)
+
+      setDisplayMessages(prev => prev.map(item => (
+        item.id === message.id
+          ? { ...item, revealedContent: content.slice(0, cursor), isTyping: cursor < content.length }
+          : item
+      )))
+
+      if (cursor < content.length) {
+        const lastChar = content[cursor - 1]
+        const delay = /[.!?。！？\n]/.test(lastChar) ? 90 : 18
+        typingTimerRef.current = window.setTimeout(revealNext, delay)
+        return
+      }
+
+      typingTimerRef.current = null
+      setIsRevealingMessage(false)
+      revealBriefing(params)
+      window.setTimeout(() => inputRef.current?.focus(), 50)
+    }
+
+    typingTimerRef.current = window.setTimeout(revealNext, 100)
+  }, [clearTypingTimer, revealBriefing])
+
+  useEffect(() => () => {
+    clearTypingTimer()
+    clearBriefingTimers()
+  }, [clearBriefingTimers, clearTypingTimer])
+
   const callAgent = useCallback(async (history: ChatMessage[]) => {
     setIsWaiting(true)
     try {
@@ -188,28 +259,21 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; error?: string }
 
       if (data.error) {
-        setDisplayMessages(prev => [...prev, aiDisplay('오류가 발생했습니다. 다시 시도해주세요.')])
+        appendAiMessage('요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
         return
       }
 
       const msg = data.message || '다시 시도해주세요.'
-      setDisplayMessages(prev => [...prev, aiDisplay(msg)])
+      appendAiMessage(msg, data.ready && data.params ? data.params : undefined)
 
       const assistantHistory: ChatMessage = { role: 'assistant', content: msg }
       setChatHistory(prev => [...prev, assistantHistory])
-
-      if (data.ready && data.params) {
-        setReadyParams(data.params)
-      } else {
-        setReadyParams(null)
-      }
     } catch {
-      setDisplayMessages(prev => [...prev, aiDisplay('서버 오류가 발생했습니다. 다시 시도해주세요.')])
+      appendAiMessage('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setIsWaiting(false)
-      setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [brand.id])
+  }, [appendAiMessage, brand.id])
 
   // Load the initial Agent greeting
   useEffect(() => {
@@ -224,22 +288,22 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const data = await res.json() as { message?: string; error?: string }
         if (!active) return
         const msg = data.error ? '오류가 발생했습니다. 다시 시도해주세요.' : (data.message || '다시 시도해주세요.')
-        setDisplayMessages([aiDisplay(msg)])
+        appendAiMessage(msg)
         setChatHistory([{ role: 'assistant', content: msg }])
       } catch {
-        if (active) setDisplayMessages([aiDisplay('서버 오류가 발생했습니다. 다시 시도해주세요.')])
+        if (active) appendAiMessage('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
       } finally {
         if (active) setIsWaiting(false)
       }
     }
     void loadGreeting()
     return () => { active = false }
-  }, [brand.id])
+  }, [appendAiMessage, brand.id])
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
     const text = input.trim()
-    if (!text || isWaiting) return
+    if (!text || isWaiting || isRevealingMessage) return
 
     const userMsg: ChatMessage = { role: 'user', content: text }
     const newHistory = [...chatHistory, userMsg]
@@ -248,6 +312,8 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     setChatHistory(newHistory)
     setInput('')
     setReadyParams(null)
+    setBriefingStage(0)
+    clearBriefingTimers()
 
     await callAgent(newHistory)
   }
@@ -395,7 +461,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 custom-scrollbar" aria-live="polite">
           {/* Initial loading skeleton */}
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
@@ -416,10 +482,10 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
             {displayMessages.map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={smoothTransition}
+                transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`flex max-w-[85%] flex-col gap-2.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -435,7 +501,10 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                         : 'rounded-tl-sm bg-[#FDFBF7] text-[#2C1E1A] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)]'
                     }`}
                   >
-                    {msg.content}
+                    {msg.role === 'ai' ? msg.revealedContent : msg.content}
+                    {msg.role === 'ai' && msg.isTyping && (
+                      <span className="ml-0.5 inline-block h-[1em] w-px align-middle bg-[#B88E76] animate-pulse" />
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -532,13 +601,13 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={readyParams ? "피드백을 적어 상세 기획을 조율해보세요 (예: 글자 크기 살짝 줄여서...)" : "소개할 상품명이나 홍보할 주제를 말씀해 주세요..."}
-              disabled={isWaiting}
+              disabled={isWaiting || isRevealingMessage}
               className="h-12 flex-1 rounded-2xl border border-[#E6DFD5] bg-white px-4 text-sm text-[#2C1E1A] placeholder-[#C2B5AA] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/5 disabled:opacity-50 font-bold transition-all"
               autoFocus
             />
             <button
               type="submit"
-              disabled={!input.trim() || isWaiting}
+              disabled={!input.trim() || isWaiting || isRevealingMessage}
               className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] text-white transition-all hover:to-[#7E5E4A] hover:shadow-[0_4px_12px_rgba(158,125,104,0.2)] disabled:opacity-30 active:scale-95 shadow-sm"
             >
               <Send className="h-4 w-4" />
@@ -604,83 +673,56 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 <span className="text-[11px] text-[#8C7E7A] font-bold">슬라이드 분량</span>
                 <span className="text-xs font-bold text-[#5C4E4B]">{readyParams.slideCount}장 구성</span>
               </div>
+              <div className="rounded-xl bg-[#F8F4EE] px-3 py-3">
+                <span className="block text-[10px] font-bold text-[#A69282] mb-1">이번 콘텐츠의 목표</span>
+                <p className="text-xs font-semibold leading-5 text-[#5C4E4B]">{readyParams.objective}</p>
+              </div>
             </motion.div>
 
-            {/* 2. Reasoning Cards */}
-            <motion.div variants={itemVariants} className="space-y-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                <Target className="h-3.5 w-3.5 text-[#B88E76]" /> AI 전략분석 및 추론
-              </h4>
-
-              {readyParams.brandAnalysis && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-[#8C7E7A]">브랜드 감성 분석 결과</span>
-                  <p className="text-xs leading-5 text-[#5C4E4B] bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-3.5 font-medium shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
-                    {readyParams.brandAnalysis}
-                  </p>
-                </div>
-              )}
-
-              {readyParams.targetEmotion && (
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
-                    <span className="block text-[9px] font-bold text-[#A69282] mb-1">타겟 자극 감정</span>
-                    <span className="text-xs font-black text-[#C68D6A]">{readyParams.targetEmotion}</span>
+            <AnimatePresence>
+              {briefingStage >= 2 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
+                  className="space-y-4"
+                >
+                  <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-[#B88E76]" /> 핵심 카피 방향
+                  </h4>
+                  <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-4 space-y-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
+                    {readyParams.hookDirection && (
+                      <div>
+                        <span className="block text-[9px] font-bold text-[#A69282]">첫 장 후크</span>
+                        <p className="text-xs font-bold text-[#2C1E1A] mt-1 leading-5">{readyParams.hookDirection}</p>
+                      </div>
+                    )}
+                    {readyParams.recommendedCta && (
+                      <div className="border-t border-[#F5EFE6] pt-3">
+                        <span className="block text-[9px] font-bold text-[#A69282]">마지막 행동 제안</span>
+                        <p className="text-xs font-bold text-[#C68D6A] mt-1">{readyParams.recommendedCta}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
-                    <span className="block text-[9px] font-bold text-[#A69282] mb-1">예상 퍼포먼스</span>
-                    <span className="text-xs font-black text-[#5C4E4B] truncate block">{readyParams.expectedGoal || '브랜드 확장'}</span>
-                  </div>
-                </div>
+                </motion.div>
               )}
-
-              {readyParams.saveProbability && (
-                <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-4 space-y-2.5 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#5C4E4B] flex items-center gap-1">
-                      <Bookmark className="h-3.5 w-3.5 text-[#B88E76]" /> 유저 저장 유도 확률
-                    </span>
-                    <span className="font-black text-[#C68D6A]">{readyParams.saveProbability}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-[#F2EAE1] rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-[#E6B392] to-[#C89474] rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: readyParams.saveProbability.includes('%') ? readyParams.saveProbability : '85%' }}
-                      transition={{ duration: 1.2, ease: [0.19, 1, 0.22, 1], delay: 0.25 }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {(readyParams.hookDirection || readyParams.recommendedCta) && (
-                <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-4 space-y-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
-                  {readyParams.hookDirection && (
-                    <div>
-                      <span className="block text-[9px] font-bold text-[#A69282]">첫 장 카피(후크) 방향</span>
-                      <p className="text-xs font-bold text-[#2C1E1A] mt-1 leading-5">{readyParams.hookDirection}</p>
-                    </div>
-                  )}
-                  {readyParams.recommendedCta && (
-                    <div className="border-t border-[#F5EFE6] pt-3">
-                      <span className="block text-[9px] font-bold text-[#A69282]">추천 최종 유도(CTA)</span>
-                      <p className="text-xs font-bold text-[#C68D6A] mt-1">{readyParams.recommendedCta}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
+            </AnimatePresence>
 
             {/* 3. Slide Flow Preview */}
-            {readyParams.structurePreview && readyParams.structurePreview.length > 0 && (
-              <motion.div variants={itemVariants} className="space-y-4 pt-2">
+            {briefingStage >= 3 && readyParams.structurePreview && readyParams.structurePreview.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
+                className="space-y-4 pt-2"
+              >
                 <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" /> 슬라이드 기획 프리뷰
+                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" /> 주요 슬라이드 흐름
                 </h4>
                 <div className="relative border-l border-dashed border-[#E5DDD3] pl-5 ml-2.5 space-y-5">
-                  {readyParams.structurePreview.map((slide, idx) => (
+                  {compactSlidePreview(readyParams.structurePreview).map((slide, idx) => (
                     <motion.div 
-                      key={idx} 
+                      key={slide.slideNumber}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1], delay: idx * 0.08 + 0.3 }}
@@ -696,6 +738,11 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                     </motion.div>
                   ))}
                 </div>
+                {readyParams.structurePreview.length > 4 && (
+                  <p className="pl-2 text-[10px] font-bold text-[#A69282]">
+                    중간 전개 {readyParams.structurePreview.length - 4}개는 생성 후 편집 화면에서 조정할 수 있습니다.
+                  </p>
+                )}
               </motion.div>
             )}
           </motion.div>
