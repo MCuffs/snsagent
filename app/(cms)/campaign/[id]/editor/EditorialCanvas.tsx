@@ -20,10 +20,11 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   if (!document) return <div className="aspect-[4/5] bg-[#111318]" />
   const background = document.layers.find(layer => layer.type === 'background')
   const backgroundFailed = Boolean(background?.imageUrl && failedBackgroundUrl === background.imageUrl)
-  const backgroundSource = backgroundFailed && fallbackImageUrl ? fallbackImageUrl : background?.imageUrl
+  const showingRenderedPreview = Boolean(fallbackImageUrl && (!background?.imageUrl || backgroundFailed))
+  const backgroundSource = showingRenderedPreview ? fallbackImageUrl : background?.imageUrl
   const overlay = document.overlay
-  const elements = backgroundFailed
-    ? [] // Prevent duplicate text rendering when showing the baked final preview image
+  const elements = showingRenderedPreview
+    ? [] // The final preview already includes copy; never stack editable copy over it.
     : document.layers
         .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
         .sort((a, b) => a.zIndex - b.zIndex)
@@ -59,16 +60,18 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
             }}
           />
         )}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            opacity: (document.layers.find(layer => layer.type === 'overlay')?.opacity ?? 100) / 100,
-            background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
-            mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
-          }}
-        />
+        {!showingRenderedPreview && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              opacity: (document.layers.find(layer => layer.type === 'overlay')?.opacity ?? 100) / 100,
+              background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
+              mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
+            }}
+          />
+        )}
         <div className="pointer-events-none absolute inset-[36px] border border-dashed border-white/10" />
-        {backgroundFailed && fallbackImageUrl && (
+        {showingRenderedPreview && (
           <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/80">
             저장된 결과 이미지로 미리보기 중
           </div>
@@ -118,6 +121,20 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 }
 
 function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; selected: boolean; onText: (text: string) => void }) {
+  if (layer.imageUrl) {
+    return (
+      <>
+        {selected && <Pencil className="absolute -right-5 -top-5 h-4 w-4 text-[#29c5ff]" />}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={layer.imageUrl}
+          alt=""
+          draggable={false}
+          className="pointer-events-none h-full w-full select-none object-contain"
+        />
+      </>
+    )
+  }
   return (
     <>
       {selected && <Pencil className="absolute -right-5 -top-5 h-4 w-4 text-[#29c5ff]" />}

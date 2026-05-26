@@ -17,10 +17,12 @@ import {
   regenerateEditorialBackgroundAction,
   rewriteEditorialCopyAction,
   exportEditorialSlideAction,
+  resetSlideEditorDocumentAction,
   updatePostDetailsAction,
 } from '../../../actions'
 import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
 import { applyBrandStyleMemory, parseEditorialDocument } from '../../../../src/lib/editor/document'
+import type { EditorialLayer } from '../../../../src/lib/editor/types'
 import { EditorialCanvas } from './editor/EditorialCanvas'
 import { EditorialInspector } from './editor/EditorialInspector'
 import { useEditorialStore } from './editor/useEditorialStore'
@@ -142,6 +144,7 @@ export default function CampaignResultView({
   const [hashtags, setHashtags] = useState(post.hashtags)
   const [editorBusy, setEditorBusy] = useState(false)
   const bgFileInputRef = useRef<HTMLInputElement>(null)
+  const imgFileInputRef = useRef<HTMLInputElement>(null)
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -153,6 +156,7 @@ export default function CampaignResultView({
   const initializeEditor = useEditorialStore(state => state.initialize)
   const activateSlide = useEditorialStore(state => state.activate)
   const updateDocument = useEditorialStore(state => state.updateDocument)
+  const addLayer = useEditorialStore(state => state.addLayer)
   const markSaved = useEditorialStore(state => state.markSaved)
 
   let agentReportData: AgentReport | null = null
@@ -287,6 +291,49 @@ export default function CampaignResultView({
     }
   }
 
+  const handleImageStickerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !activeSlide || !activeDocument) return
+    setEditorBusy(true)
+    setMessage(null)
+    try {
+      const formData = new FormData()
+      formData.append('files', file)
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+      const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
+      const imageUrl = uploadData.urls?.[0]
+      if (!uploadRes.ok || !imageUrl) {
+        setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
+        return
+      }
+      const newLayer: EditorialLayer = {
+        id: `img-${Date.now()}`,
+        type: 'sticker',
+        name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지',
+        visible: true,
+        locked: false,
+        opacity: 100,
+        zIndex: 80,
+        x: 340,
+        y: 475,
+        width: 400,
+        height: 400,
+        scale: 1,
+        rotation: 0,
+        blur: 0,
+        shadow: 0,
+        imageUrl,
+      }
+      addLayer(activeSlide.id, newLayer)
+      setMessage({ type: 'success', text: '이미지를 레이어로 추가했습니다. 캔버스에서 위치를 조정하세요.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '이미지 업로드 중 오류가 발생했습니다.') })
+    } finally {
+      setEditorBusy(false)
+      if (imgFileInputRef.current) imgFileInputRef.current.value = ''
+    }
+  }
+
   const saveCaption = async () => {
     setSavingCaption(true)
     setMessage(null)
@@ -355,6 +402,22 @@ export default function CampaignResultView({
       setMessage({ type: 'error', text: getErrorMessage(error, 'ZIP 내보내기에 실패했습니다.') })
     } finally {
       setDownloadingAll(false)
+    }
+  }
+
+  const resetEditor = async () => {
+    if (!activeSlide) return
+    setEditorBusy(true)
+    setMessage(null)
+    try {
+      const result = await resetSlideEditorDocumentAction(activeSlide.id)
+      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      applyServerSlide(result.slide as Slide, parseEditorialDocument(null, result.slide as Slide))
+      setMessage({ type: 'success', text: '슬라이드 편집 정보를 초기화했습니다. 기본값(어둡기 100 등)으로 재설정되었습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '초기화 중 오류가 발생했습니다.') })
+    } finally {
+      setEditorBusy(false)
     }
   }
 
@@ -487,10 +550,20 @@ export default function CampaignResultView({
                     onBackgroundVariation={regenerateBackground}
                     onRewrite={rewriteCopy}
                     onUpload={() => bgFileInputRef.current?.click()}
+                    onImageUpload={() => imgFileInputRef.current?.click()}
                   />
+                  <button
+                    type="button"
+                    disabled={editorBusy}
+                    onClick={resetEditor}
+                    className="mt-2 w-full rounded-md border border-[#e8dfd4] py-2 text-xs font-bold text-[#9a8d82] hover:border-red-300 hover:text-red-500 disabled:opacity-40"
+                  >
+                    편집 초기화 (기본값으로 재설정)
+                  </button>
                 </>
               )}
               <input ref={bgFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
+              <input ref={imgFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageStickerUpload} />
 
               <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
                 <div className="mb-5 flex items-center justify-between">

@@ -30,6 +30,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
   const role = seed.slideNumber === 1 ? 'hook' : 'editorial-detail'
   const fontPreset = toFontPreset(seed.fontPreset)
   const textColor = validColor(seed.textColor, '#ffffff')
+  const backgroundImageUrl = resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
 
   return {
     version: 1,
@@ -51,7 +52,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       colorFilter: '#17121f',
     },
     layers: [
-      layer('background', '배경 이미지', 0, { imageUrl: seed.backgroundImageUrl || undefined, locked: true }),
+      layer('background', '배경 이미지', 0, { imageUrl: backgroundImageUrl, locked: true }),
       layer('overlay', '시네마틱 오버레이', 10, { locked: true }),
       layer('watermark', 'Shuffla 워터마크', 20, {
         text: 'SHUFFLA / EDITORIAL',
@@ -127,15 +128,37 @@ export function parseEditorialDocument(raw: string | null | undefined, seed: Sli
     const fallback = createEditorialDocument(seed)
     if (!Array.isArray(input.layers)) return fallback
     const doc = normalizeDocument({ ...fallback, ...input, layers: input.layers })
-    if (seed.backgroundImageUrl) {
-      doc.layers = doc.layers.map(layer =>
-        layer.type === 'background' ? { ...layer, imageUrl: seed.backgroundImageUrl } : layer
-      )
-    }
+    const documentBackground = layerByType(doc, 'background')?.imageUrl
+    // Prefer the URL already in the document (user upload / latest edit) over the stale seed value.
+    // Fall back to the seed only if the document has no URL or its URL is a composite asset.
+    const backgroundImageUrl =
+      resolveEditableBackgroundImageUrl(documentBackground, seed.imageUrl) ??
+      resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
+    doc.layers = doc.layers.map(layer =>
+      layer.type === 'background' ? { ...layer, imageUrl: backgroundImageUrl } : layer
+    )
     return doc
   } catch {
     return createEditorialDocument(seed)
   }
+}
+
+// A rendered slide already contains copy. It cannot be used as a source layer in the editor.
+export function resolveEditableBackgroundImageUrl(candidate?: string | null, finalImageUrl?: string | null) {
+  if (!candidate) return undefined
+  if (finalImageUrl && candidate === finalImageUrl) return undefined
+
+  const normalized = candidate.toLowerCase()
+  const compositeAssetPatterns = [
+    /(?:^|[/\\])media-card-/,
+    /(?:^|[/\\])(?:fast-rerender|bg-replace|export)-/,
+    /(?:^|[/\\])editorial(?:-bg)?-/,
+    /(?:^|[/\\])cg-[^/\\]+-slide-\d+/,
+  ]
+
+  return compositeAssetPatterns.some(pattern => pattern.test(normalized))
+    ? undefined
+    : candidate
 }
 
 export function normalizeDocument(input: EditorialDocument): EditorialDocument {
@@ -152,6 +175,11 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
   for (const missing of fallback.layers) {
     if (!sanitized.some(layerItem => layerItem.type === missing.type)) sanitized.push(missing)
   }
+
+  // Preserve user-added image layers: sticker type with a non-default id and imageUrl
+  const userImageLayers = input.layers
+    .filter(candidate => candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string')
+    .map(candidate => normalizeUserImageLayer(candidate))
 
   return {
     ...fallback,
@@ -172,8 +200,29 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
       bloom: number(input.overlay?.bloom, 0, 100, fallback.overlay.bloom),
       colorFilter: validColor(input.overlay?.colorFilter, fallback.overlay.colorFilter),
     },
-    layers: sanitized.sort((a, b) => a.zIndex - b.zIndex),
+    layers: [...sanitized, ...userImageLayers].sort((a, b) => a.zIndex - b.zIndex),
     updatedAt: new Date().toISOString(),
+  }
+}
+
+function normalizeUserImageLayer(candidate: EditorialLayer): EditorialLayer {
+  return {
+    id: typeof candidate.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(candidate.id) ? candidate.id : `img-${Date.now()}`,
+    type: 'sticker',
+    name: typeof candidate.name === 'string' ? candidate.name.slice(0, 40) : '이미지',
+    visible: candidate.visible !== false,
+    locked: false,
+    opacity: number(candidate.opacity, 0, 100, 100),
+    zIndex: number(candidate.zIndex, 0, 1000, 75),
+    x: number(candidate.x, 0, 1080, 100),
+    y: number(candidate.y, 0, 1350, 200),
+    width: number(candidate.width, 16, 1080, 400),
+    height: number(candidate.height, 16, 1350, 400),
+    scale: number(candidate.scale, 0.25, 4, 1),
+    rotation: number(candidate.rotation, -180, 180, 0),
+    blur: number(candidate.blur, 0, 40, 0),
+    shadow: number(candidate.shadow, 0, 60, 0),
+    imageUrl: typeof candidate.imageUrl === 'string' ? candidate.imageUrl.slice(0, 4096) : null,
   }
 }
 
@@ -193,7 +242,8 @@ export function applyBrandStyleMemory(document: EditorialDocument, rawPreference
     return normalizeDocument({
       ...document,
       typographyPreset: preferences.typographyPreset || document.typographyPreset,
-      overlay: { ...document.overlay, ...preferences.overlay },
+      // New slides always start fully darkened; stored style memory must not lower the default.
+      overlay: { ...document.overlay, ...preferences.overlay, darkness: 100 },
       layers: document.layers.map(layerItem => {
         if (layerItem.type === 'title') return { ...layerItem, ...preferences.titleStyle, text: layerItem.text }
         if (layerItem.type === 'subtitle') return { ...layerItem, ...preferences.subtitleStyle, text: layerItem.text }

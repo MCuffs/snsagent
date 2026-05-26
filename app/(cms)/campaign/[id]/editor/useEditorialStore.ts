@@ -20,6 +20,8 @@ interface EditorialState {
   selectLayer: (layerId: string | null) => void
   updateDocument: (slideId: string, update: (document: EditorialDocument) => EditorialDocument) => void
   updateLayer: (slideId: string, layerId: string, update: Partial<EditorialLayer>) => void
+  addLayer: (slideId: string, layer: EditorialLayer) => void
+  removeLayer: (slideId: string, layerId: string) => void
   reorderLayer: (slideId: string, layerId: string, direction: -1 | 1) => void
   markSaved: (slideId: string) => void
   undo: (slideId: string) => void
@@ -69,6 +71,29 @@ export const useEditorialStore = create<EditorialState>((set) => ({
         ...state.histories,
         [slideId]: { past: [...history.past.slice(-39), current], future: [] },
       },
+      dirtySlides: { ...state.dirtySlides, [slideId]: true },
+    }
+  }),
+  addLayer: (slideId, layer) => set((state) => {
+    const current = state.documents[slideId]
+    if (!current) return state
+    const maxZ = current.layers.reduce((m, l) => Math.max(m, l.zIndex), 0)
+    const next = normalizeDocument({ ...current, layers: [...current.layers, { ...layer, zIndex: maxZ + 5 }] })
+    const history = state.histories[slideId] || { past: [], future: [] }
+    return {
+      documents: { ...state.documents, [slideId]: next },
+      histories: { ...state.histories, [slideId]: { past: [...history.past.slice(-39), current], future: [] } },
+      dirtySlides: { ...state.dirtySlides, [slideId]: true },
+    }
+  }),
+  removeLayer: (slideId, layerId) => set((state) => {
+    const current = state.documents[slideId]
+    if (!current) return state
+    const next = normalizeDocument({ ...current, layers: current.layers.filter(l => l.id !== layerId) })
+    const history = state.histories[slideId] || { past: [], future: [] }
+    return {
+      documents: { ...state.documents, [slideId]: next },
+      histories: { ...state.histories, [slideId]: { past: [...history.past.slice(-39), current], future: [] } },
       dirtySlides: { ...state.dirtySlides, [slideId]: true },
     }
   }),

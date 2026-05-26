@@ -17,7 +17,7 @@ import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTyp
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
-import { layerByType, parseEditorialDocument, serializeBrandStyleMemory } from '../src/lib/editor/document'
+import { layerByType, parseEditorialDocument, resolveEditableBackgroundImageUrl, serializeBrandStyleMemory } from '../src/lib/editor/document'
 import { renderEditorialDocument } from '../src/lib/editor/renderer'
 import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
@@ -26,6 +26,18 @@ import { collectBrandUrlContext } from '../lib/brand-url-collector'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
+}
+
+// When a document's background layer lost its URL (e.g. composite was filtered), inject the
+// slide's stored clean background URL so the render doesn't produce a text-only image.
+function withBackgroundFallback(document: EditorialDocument, fallbackUrl: string | null | undefined): EditorialDocument {
+  if (!fallbackUrl || layerByType(document, 'background')?.imageUrl) return document
+  return {
+    ...document,
+    layers: document.layers.map(layer =>
+      layer.type === 'background' ? { ...layer, imageUrl: fallbackUrl } : layer,
+    ),
+  }
 }
 
 function forbidden() {
@@ -342,7 +354,12 @@ export async function rerenderMediaSlideAction(
       textColorOverride: options?.textColor,
     })
 
-    const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
+    const slide = await dbService.updateSlideCustomization(slideId, {
+      headline,
+      body,
+      imageUrl,
+      backgroundImageUrl: background.imageUrl,
+    })
     return { success: true as const, slide, regenerationUsage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 재렌더링에 실패했습니다.'))
@@ -379,9 +396,10 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
 
     const document = parseEditorialDocument(rawDocument, slideEditorSeed(existingSlide))
     const { headline, body } = documentText(document)
-    const backgroundImageUrl = layerByType(document, 'background')?.imageUrl || existingSlide.backgroundImageUrl
+    const backgroundImageUrl = layerByType(document, 'background')?.imageUrl || null
+    const renderDoc = renderOutput ? withBackgroundFallback(document, existingSlide.backgroundImageUrl) : document
     const imageUrl = renderOutput
-      ? await renderEditorialDocument(`editorial-${Date.now()}-${existingSlide.slideNumber}`, document)
+      ? await renderEditorialDocument(`editorial-${Date.now()}-${existingSlide.slideNumber}`, renderDoc)
       : existingSlide.imageUrl
 
     const slide = await dbService.updateSlideCustomization(slideId, {
@@ -499,10 +517,27 @@ export async function exportEditorialSlideAction(
     if (!slide) return failed('슬라이드를 찾을 수 없습니다.')
     if (slide.campaign.userId !== user.id) return forbidden()
     const document = parseEditorialDocument(rawDocument, slideEditorSeed(slide))
-    const url = await renderEditorialDocument(`export-${Date.now()}-${slide.slideNumber}`, document, { format, scale })
+    const renderDoc = withBackgroundFallback(document, slide.backgroundImageUrl)
+    const url = await renderEditorialDocument(`export-${Date.now()}-${slide.slideNumber}`, renderDoc, { format, scale })
     return { success: true as const, url }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '내보내기 렌더링에 실패했습니다.'))
+  }
+}
+
+// Wipes the stored editorDocument for a slide so it re-initialises from fresh defaults
+// on next load (darkness: 100, current clean background, etc.).
+export async function resetSlideEditorDocumentAction(slideId: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+  try {
+    const slide = await dbService.getSlide(slideId)
+    if (!slide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (slide.campaign.userId !== user.id) return forbidden()
+    const updated = await dbService.updateSlideCustomization(slideId, { editorDocument: null })
+    return { success: true as const, slide: updated }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '슬라이드 초기화에 실패했습니다.'))
   }
 }
 
@@ -521,7 +556,7 @@ function localCopyRewrite(headline: string, body: string, intent: string) {
   }
 }
 
-// Fast text-only rerender — reuse existing imageUrl as background, skip DALL-E
+// Fast text-only rerender reuses only the original clean background, never a rendered slide.
 export async function fastRerenderTextAction(
   slideId: string,
   headline: string,
@@ -535,7 +570,8 @@ export async function fastRerenderTextAction(
     const existingSlide = await dbService.getSlide(slideId)
     if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
     if (existingSlide.campaign.userId !== user.id) return forbidden()
-    if (!existingSlide.imageUrl) return failed('배경 이미지가 없습니다.')
+    const backgroundImageUrl = resolveEditableBackgroundImageUrl(existingSlide.backgroundImageUrl, existingSlide.imageUrl)
+    if (!backgroundImageUrl) return failed('편집 가능한 원본 배경이 없습니다. 배경을 다시 생성하거나 업로드해 주세요.')
 
     const brand = await dbService.getBrand(existingSlide.campaign.brandId)
     const account = await dbService.getInstagramAccount(user.id, existingSlide.campaign.brandId)
@@ -562,7 +598,7 @@ export async function fastRerenderTextAction(
       category: existingSlide.campaign.keyBenefits || '카드뉴스',
       headline,
       body,
-      backgroundImageUrl: existingSlide.imageUrl,
+      backgroundImageUrl,
       source,
       pageNumber: existingSlide.slideNumber,
       totalPages: existingSlide.campaign.slideCount,
@@ -570,7 +606,12 @@ export async function fastRerenderTextAction(
       textColorOverride: options?.textColor,
     })
 
-    const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
+    const slide = await dbService.updateSlideCustomization(slideId, {
+      headline,
+      body,
+      imageUrl,
+      backgroundImageUrl,
+    })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '빠른 재렌더링에 실패했습니다.'))
@@ -608,6 +649,9 @@ export async function replaceBackgroundAction(
       totalSlides: existingSlide.campaign.slideCount,
     })
 
+    const cleanBackgroundUrl = resolveEditableBackgroundImageUrl(backgroundUrl, existingSlide.imageUrl)
+    if (!cleanBackgroundUrl) return failed('완성된 카드 이미지는 배경으로 사용할 수 없습니다.')
+
     const imageUrl = await renderMediaCard({
       id: `bg-replace-${Date.now()}-${existingSlide.slideNumber}`,
       layout: harness.layout,
@@ -616,7 +660,7 @@ export async function replaceBackgroundAction(
       category: existingSlide.campaign.keyBenefits || '카드뉴스',
       headline: existingSlide.headline,
       body: existingSlide.body,
-      backgroundImageUrl: backgroundUrl,
+      backgroundImageUrl: cleanBackgroundUrl,
       source,
       pageNumber: existingSlide.slideNumber,
       totalPages: existingSlide.campaign.slideCount,
@@ -624,7 +668,12 @@ export async function replaceBackgroundAction(
       textColorOverride: options?.textColor,
     })
 
-    const slide = await dbService.updateSlideContent(slideId, existingSlide.headline, existingSlide.body, imageUrl)
+    const slide = await dbService.updateSlideCustomization(slideId, {
+      headline: existingSlide.headline,
+      body: existingSlide.body,
+      imageUrl,
+      backgroundImageUrl: cleanBackgroundUrl,
+    })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '배경 교체에 실패했습니다.'))
@@ -821,7 +870,12 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
         })
 
         // Save to DB
-        const updated = await dbService.updateSlideContent(slide.id, slide.headline, slide.body, finalImageUrl)
+        const updated = await dbService.updateSlideCustomization(slide.id, {
+          headline: slide.headline,
+          body: slide.body,
+          imageUrl: finalImageUrl,
+          backgroundImageUrl: imgResult.imageUrl,
+        })
         
         // Return matching format
         return {

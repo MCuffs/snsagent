@@ -14,7 +14,17 @@ export async function renderEditorialDocument(
   const document = normalizeDocument(rawDocument)
   const background = layerByType(document, 'background')
   const backgroundData = await toImageDataUri(background?.imageUrl || '')
-  const svg = buildSvg(document, backgroundData)
+
+  // Pre-fetch image data for user-added sticker layers so renderLayer stays sync
+  const stickerImageData = new Map<string, string>()
+  for (const layer of document.layers) {
+    if (layer.type === 'sticker' && layer.id !== 'sticker' && layer.imageUrl) {
+      const data = await toImageDataUri(layer.imageUrl)
+      if (data) stickerImageData.set(layer.id, data)
+    }
+  }
+
+  const svg = buildSvg(document, backgroundData, stickerImageData)
   const format = options.format || 'png'
   const png = renderSvgToPng(svg, options.scale || 1)
   const content = format === 'jpg' ? await sharp(png).jpeg({ quality: 94, mozjpeg: true }).toBuffer() : png
@@ -25,9 +35,9 @@ export async function renderEditorialDocument(
   })
 }
 
-function buildSvg(document: EditorialDocument, backgroundData: string) {
+function buildSvg(document: EditorialDocument, backgroundData: string, stickerImageData: Map<string, string> = new Map()) {
   const visible = document.layers.filter(layer => layer.visible).sort((a, b) => a.zIndex - b.zIndex)
-  const content = visible.map(layer => renderLayer(layer, document, backgroundData)).join('\n')
+  const content = visible.map(layer => renderLayer(layer, document, backgroundData, stickerImageData)).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
   <defs>
@@ -42,7 +52,7 @@ function buildSvg(document: EditorialDocument, backgroundData: string) {
 </svg>`
 }
 
-function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgroundData: string) {
+function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgroundData: string, stickerImageData: Map<string, string> = new Map()) {
   const opacity = layer.opacity / 100
   if (layer.type === 'background') {
     const source = backgroundData || layer.imageUrl || ''
@@ -51,6 +61,14 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
   }
   if (layer.type === 'overlay') {
     return `<rect width="1080" height="1350" fill="url(#editor-darkness)" opacity="${opacity}"/><rect width="1080" height="1350" fill="url(#editor-vignette)" opacity="${opacity}"/><rect width="1080" height="1350" filter="url(#editor-grain)" opacity="${document.overlay.grain / 180}"/>`
+  }
+  if (layer.type === 'sticker' && layer.id !== 'sticker') {
+    const imageData = stickerImageData.get(layer.id)
+    if (!imageData) return ''
+    const cx = layer.x + layer.width / 2
+    const cy = layer.y + layer.height / 2
+    const scale = layer.scale || 1
+    return `<image href="${escapeXml(imageData)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}" transform="rotate(${layer.rotation || 0} ${cx} ${cy}) scale(${scale} ${scale} ${cx} ${cy})"/>`
   }
   if (!layer.text) return ''
   const fontFamily = fontFamilyForPreset(layer.fontPreset)

@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { ImageIcon, Redo2, Save, Sparkles, Type, Undo2, Upload } from 'lucide-react'
+import { Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset, TypographyPreset } from '../../../../../src/lib/editor/types'
 
-type EditorTab = 'text' | 'background' | 'overlay'
+type EditorTab = 'text' | 'background' | 'overlay' | 'image'
 
 interface Props {
   slideId: string
@@ -15,11 +15,11 @@ interface Props {
   onBackgroundVariation: (type: 'same-style' | 'stronger-mood' | 'brighter-background') => void
   onRewrite: (intent: string) => void
   onUpload: () => void
+  onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroundVariation, onRewrite, onUpload }: Props) {
+export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroundVariation, onRewrite, onUpload, onImageUpload }: Props) {
   const document = useEditorialStore(state => state.documents[slideId])
-  const selectedId = useEditorialStore(state => state.selectedLayerId)
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const updateDocument = useEditorialStore(state => state.updateDocument)
@@ -54,10 +54,11 @@ export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroun
         </div>
       </header>
 
-      <nav className="grid grid-cols-3 border-b border-[#f0e8de] p-2">
+      <nav className="grid grid-cols-4 border-b border-[#f0e8de] p-2">
         <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label="글자" />
         <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label="배경" />
         <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label="오버레이" />
+        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label="이미지" />
       </nav>
 
       <div className="p-4">
@@ -84,6 +85,9 @@ export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroun
             onOverlay={preset => updateDocument(slideId, value => applyOverlayPreset(value, preset))}
             onOverlayValue={(key, value) => updateDocument(slideId, current => ({ ...current, overlay: { ...current.overlay, [key]: value } }))}
           />
+        )}
+        {tab === 'image' && (
+          <ImagePanel slideId={slideId} document={document} busy={busy} onUpload={onImageUpload} />
         )}
       </div>
     </div>
@@ -220,6 +224,57 @@ function BackgroundPanel({ busy, credits, onUpload, onVariation }: { busy: boole
   )
 }
 
+function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; document: EditorialDocument; busy: boolean; onUpload: () => void }) {
+  const updateLayer = useEditorialStore(state => state.updateLayer)
+  const removeLayer = useEditorialStore(state => state.removeLayer)
+  const imageLayers = document.layers.filter(l => l.type === 'sticker' && l.id !== 'sticker' && l.imageUrl)
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
+        <p>이미지를 레이어로 추가합니다. 캔버스에서 드래그해 위치를 조정할 수 있습니다.</p>
+      </div>
+      <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
+        <Upload className="h-4 w-4" /> 이미지 추가
+      </button>
+      {imageLayers.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-[#746a62]">추가된 이미지 레이어</p>
+          {imageLayers.map(layer => (
+            <div key={layer.id} className="rounded-lg border border-[#e8dfd4] p-3 space-y-3">
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={layer.imageUrl!} alt="" className="h-12 w-12 flex-shrink-0 rounded object-cover border border-[#e8dfd4]" />
+                <p className="flex-1 min-w-0 truncate text-xs font-bold text-[#1f1512]">{layer.name}</p>
+                <button
+                  type="button"
+                  aria-label={layer.visible ? '레이어 숨기기' : '레이어 표시'}
+                  onClick={() => updateLayer(slideId, layer.id, { visible: !layer.visible })}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]"
+                >
+                  {layer.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  aria-label="레이어 삭제"
+                  onClick={() => removeLayer(slideId, layer.id)}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <RangeControl label="불투명도" value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
+            </div>
+          ))}
+        </div>
+      )}
+      {imageLayers.length === 0 && (
+        <p className="py-4 text-center text-xs text-[#9a8d82]">추가된 이미지가 없습니다</p>
+      )}
+    </div>
+  )
+}
+
 function applyTypographyPreset(document: EditorialDocument, preset: TypographyPreset) {
   const styles: Record<TypographyPreset, { title: Partial<EditorialLayer>; subtitle: Partial<EditorialLayer> }> = {
     'cinematic-headline': { title: { fontPreset: 'pretendard', fontSize: 72, fontWeight: 800, tracking: -2, lineHeight: 1.06 }, subtitle: { fontSize: 27, tracking: 0 } },
@@ -235,12 +290,12 @@ function applyTypographyPreset(document: EditorialDocument, preset: TypographyPr
 
 function applyOverlayPreset(document: EditorialDocument, preset: OverlayPreset) {
   const settings: Record<OverlayPreset, Partial<typeof document.overlay>> = {
-    'netflix-dark': { darkness: 60, vignette: 55, contrast: 112, grain: 10, colorFilter: '#170e10' },
-    'luxury-editorial': { darkness: 38, vignette: 30, contrast: 104, grain: 6, colorFilter: '#2b241e' },
-    noir: { darkness: 72, vignette: 70, contrast: 126, grain: 22, colorFilter: '#090909' },
-    dreamy: { darkness: 22, vignette: 18, contrast: 92, grain: 4, glow: 28, bloom: 25, colorFilter: '#493b58' },
-    'instagram-magazine': { darkness: 34, vignette: 26, contrast: 106, grain: 12, colorFilter: '#342326' },
-    'modern-korean-media': { darkness: 48, vignette: 34, contrast: 112, grain: 8, colorFilter: '#121b27' },
+    'netflix-dark': { darkness: 100, vignette: 55, contrast: 112, grain: 10, colorFilter: '#170e10' },
+    'luxury-editorial': { darkness: 100, vignette: 30, contrast: 104, grain: 6, colorFilter: '#2b241e' },
+    noir: { darkness: 100, vignette: 70, contrast: 126, grain: 22, colorFilter: '#090909' },
+    dreamy: { darkness: 100, vignette: 18, contrast: 92, grain: 4, glow: 28, bloom: 25, colorFilter: '#493b58' },
+    'instagram-magazine': { darkness: 100, vignette: 26, contrast: 106, grain: 12, colorFilter: '#342326' },
+    'modern-korean-media': { darkness: 100, vignette: 34, contrast: 112, grain: 8, colorFilter: '#121b27' },
   }
   return { ...document, overlay: { ...document.overlay, ...settings[preset], preset } }
 }
