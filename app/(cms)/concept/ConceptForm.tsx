@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useTab } from '../TabContext'
 import { AlertCircle, ArrowRight, CheckCircle2, Globe, Loader2, MessageCircle, Save, Send, Sparkles, X } from 'lucide-react'
 import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
 import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
@@ -40,7 +40,7 @@ const analyzeSteps = [
 ]
 
 export default function ConceptForm({ existingBrand }: ConceptFormProps) {
-  const router = useRouter()
+  const { setActiveTab } = useTab()
   const [phase, setPhase] = useState<'url' | 'profile'>(
     existingBrand?.websiteUrl ? 'profile' : 'url'
   )
@@ -521,7 +521,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
           {brandId && (
             <button
               type="button"
-              onClick={() => router.push('/concept?tab=generate')}
+              onClick={() => setActiveTab('generate')}
               className="flex h-11 items-center gap-2 rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#a1a1aa] hover:bg-[#fafafa]"
             >
               카드뉴스 생성하기

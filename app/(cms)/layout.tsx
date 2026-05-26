@@ -1,13 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BookOpen, CreditCard, Grid3X3, LogOut, Zap } from 'lucide-react'
+import { CreditCard, LogOut } from 'lucide-react'
 import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
-
-const navItems = [
-  { href: '/concept', label: 'Concept', icon: BookOpen, desc: '브랜드 프로필' },
-  { href: '/concept?tab=generate', label: 'Generate', icon: Zap, desc: '카드뉴스 생성' },
-  { href: '/concept?tab=works', label: 'Works', icon: Grid3X3, desc: '작업 히스토리' },
-]
+import { TabProvider } from './TabContext'
+import SidebarNav from './SidebarNav'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser()
@@ -17,53 +13,22 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white text-[#111111]">
-      {/* Sidebar */}
-      <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e4e4e7] bg-[#fafafa] lg:flex">
-        {/* Logo */}
-        <div className="flex h-[60px] items-center border-b border-[#e4e4e7] px-5">
-          <Link href="/concept" className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#111111]">
-              <span className="h-1.5 w-3 rounded-full bg-white" />
-            </span>
-            <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
-          </Link>
-        </div>
+    <TabProvider>
+      <div className="flex h-screen overflow-hidden bg-white text-[#111111]">
+        {/* Sidebar */}
+        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e4e4e7] bg-[#fafafa] lg:flex">
+          {/* Logo */}
+          <div className="flex h-[60px] items-center border-b border-[#e4e4e7] px-5">
+            <Link href="/concept" className="flex items-center gap-2.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#111111]">
+                <span className="h-1.5 w-3 rounded-full bg-white" />
+              </span>
+              <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
+            </Link>
+          </div>
 
-        {/* Nav */}
-        <nav className="flex-1 space-y-0.5 px-2 py-3">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const disabled = !hasCompleteBrand && item.href !== '/concept'
-            if (disabled) {
-              return (
-                <span
-                  key={item.href}
-                  className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm opacity-30"
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="font-medium leading-none">{item.label}</p>
-                    <p className="mt-0.5 text-[11px] text-[#71717a]">{item.desc}</p>
-                  </div>
-                </span>
-              )
-            }
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[#52525b] transition-colors hover:bg-[#f0f0f0] hover:text-[#111111]"
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <div>
-                  <p className="font-medium leading-none">{item.label}</p>
-                  <p className="mt-0.5 text-[11px] text-[#71717a]">{item.desc}</p>
-                </div>
-              </Link>
-            )
-          })}
-        </nav>
+          {/* Nav */}
+          <SidebarNav hasCompleteBrand={hasCompleteBrand} />
 
         {/* User + Plan */}
         <div className="border-t border-[#e4e4e7] p-3 space-y-1.5">
@@ -108,5 +73,6 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         </div>
       </main>
     </div>
+  </TabProvider>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
@@ -28,8 +28,7 @@ interface DashboardContainerProps {
 }
 
 export default function DashboardContainer({ existingBrand, campaigns }: DashboardContainerProps) {
-  const searchParams = useSearchParams()
-  const tab = searchParams.get('tab') || 'concept'
+  const { activeTab: tab } = useTab()
 
   const hasCompleteBrand = existingBrand && Boolean(existingBrand.websiteUrl)
   const activeTab = (!hasCompleteBrand && tab !== 'concept') ? 'concept' : tab

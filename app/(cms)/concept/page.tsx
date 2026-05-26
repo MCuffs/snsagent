@@ -15,7 +15,15 @@ function DashboardFallback() {
   )
 }
 
-export default async function ConceptPage() {
+export default function ConceptPage() {
+  return (
+    <Suspense fallback={<DashboardFallback />}>
+      <DashboardDataLoader />
+    </Suspense>
+  )
+}
+
+async function DashboardDataLoader() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
@@ -49,9 +57,5 @@ export default async function ConceptPage() {
     thumbnail: c.slides?.[0]?.imageUrl ?? null,
   }))
 
-  return (
-    <Suspense fallback={<DashboardFallback />}>
-      <DashboardContainer existingBrand={serializedBrand} campaigns={serializedCampaigns} />
-    </Suspense>
-  )
+  return <DashboardContainer existingBrand={serializedBrand} campaigns={serializedCampaigns} />
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowRight, Clock, ImageOff } from 'lucide-react'
+import { useTab } from '../TabContext'
 
 interface WorkItem {
   id: string
@@ -30,6 +31,7 @@ function formatDate(iso: string) {
 }
 
 export default function WorksGrid({ campaigns }: WorksGridProps) {
+  const { setActiveTab } = useTab()
   if (campaigns.length === 0) {
     return (
       <div className="flex min-h-full flex-col items-center justify-center px-6 py-24">
@@ -41,6 +43,10 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
           <p className="mt-2 text-sm text-[#71717a]">첫 번째 카드뉴스를 생성해보세요.</p>
           <Link
             href="/concept?tab=generate"
+            onClick={(e) => {
+              e.preventDefault()
+              setActiveTab('generate')
+            }}
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#333333]"
           >
             카드뉴스 생성하기
@@ -61,6 +67,10 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
         </div>
         <Link
           href="/concept?tab=generate"
+          onClick={(e) => {
+            e.preventDefault()
+            setActiveTab('generate')
+          }}
           className="flex items-center gap-1.5 rounded-lg bg-[#111111] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#333333]"
         >
           새로 만들기
