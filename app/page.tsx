@@ -1,12 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, ArrowUpRight, Calendar, Send, Sparkles, Wand2 } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, FolderOpen, ImagePlus, Sparkles, Wand2 } from 'lucide-react'
 import { MarketingNav } from './components/MarketingNav'
 import { MarketingFooter } from './components/MarketingFooter'
 
 export const metadata = {
   title: 'Shuffla — AI 카드뉴스 자동화',
-  description: '브랜드 정보만 입력하면 AI가 카드뉴스를 만들고 인스타그램에 자동 발행합니다.',
+  description: '브랜드 정보와 참고 이미지를 바탕으로 AI 카드뉴스를 생성하고 편집합니다.',
 }
 
 const showcaseImages = [
@@ -29,15 +29,15 @@ const features = [
     color: 'from-[#1c7ed6] to-[#339af0]',
   },
   {
-    icon: Send,
-    title: 'Instagram 자동 발행',
-    desc: '계정 한 번 연결하면 승인된 카드뉴스가 예약 시간에 자동으로 게시됩니다.',
+    icon: ImagePlus,
+    title: '참고 이미지 활용',
+    desc: '상품 참고 이미지를 최대 4장 추가해 브랜드와 제품에 맞는 결과물을 생성합니다.',
     color: 'from-[#0a0a0a] to-[#404040]',
   },
   {
-    icon: Calendar,
-    title: '캘린더 콘텐츠 관리',
-    desc: '예약된 게시물을 한 화면에서 보고, 발행 전 수정·재예약·삭제가 가능합니다.',
+    icon: FolderOpen,
+    title: '편집과 작업 보관함',
+    desc: '결과 화면에서 문구와 배경을 다듬고, 작업 목록에서 생성 결과를 다시 확인합니다.',
     color: 'from-[#7950f2] to-[#9775fa]',
   },
 ]
@@ -45,13 +45,13 @@ const features = [
 const steps = [
   { n: '01', title: '브랜드 설정', desc: 'URL이나 몇 가지 질문으로 브랜드 프로필 한 번에 완성' },
   { n: '02', title: '카드뉴스 생성', desc: '주제 입력 → AI가 슬라이드·문구·이미지 자동 생성' },
-  { n: '03', title: '검토 & 발행', desc: '확인 후 승인하면 예약된 시간에 자동으로 인스타 게시' },
+  { n: '03', title: '편집 & 다운로드', desc: '문구와 이미지를 보완한 뒤 필요한 결과물을 내려받기' },
 ]
 
 const stats = [
-  { value: '5분', label: '카드뉴스 1세트 제작 시간' },
-  { value: '90%', label: '반복 작업 시간 절감' },
-  { value: '24/7', label: '예약 자동 발행' },
+  { value: '3단계', label: '브랜드 설정부터 다운로드까지' },
+  { value: 'AI', label: '문구와 이미지 생성 지원' },
+  { value: '4장', label: '상품 참고 이미지 입력' },
 ]
 
 export default function LandingPage() {
@@ -71,22 +71,22 @@ export default function LandingPage() {
               AI 카드뉴스 자동화 플랫폼 · Beta 오픈
             </div>
             <h1 className="mt-7 text-[44px] font-black leading-[1.05] tracking-[-0.045em] text-[#0a0a0a] md:text-[68px]">
-              인스타그램 카드뉴스,<br />
+              브랜드 카드뉴스,<br />
               <span className="relative inline-block">
-                <span className="relative z-10">AI가 만들고 올립니다</span>
+                <span className="relative z-10">AI로 만들고 다듬습니다</span>
                 <span className="absolute -bottom-1 left-0 right-0 h-3 bg-[#ff6b35]/25 -z-0" />
               </span>
             </h1>
             <p className="mx-auto mt-7 max-w-xl text-[17px] leading-[1.6] text-[#525252]">
               브랜드 정보만 입력하면 AI가 슬라이드를 구성하고,<br className="hidden md:inline" />
-              검토 후 승인하면 인스타그램으로 자동 발행됩니다.
+              참고 이미지를 더하고 편집한 결과물을 다운로드할 수 있습니다.
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
               <Link
                 href="/login"
                 className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0a0a0a] px-7 text-[15px] font-bold text-white transition-all hover:bg-[#1a1a1a] hover:-translate-y-[1px] shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
               >
-                무료로 시작하기
+                Google Login
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
@@ -96,7 +96,7 @@ export default function LandingPage() {
                 작동 방식 보기
               </a>
             </div>
-            <p className="mt-5 text-[13px] text-[#8a8a8a]">신용카드 불필요 · 무료 플랜 제공</p>
+            <p className="mt-5 text-[13px] text-[#8a8a8a]">Google 계정으로 로그인 · 이용권은 월 3,000원부터</p>
           </div>
 
           {/* Hero visual */}
@@ -151,7 +151,7 @@ export default function LandingPage() {
           <div className="max-w-2xl mb-16 lg:mb-20">
             <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#ff6b35]">Features</p>
             <h2 className="mt-5 text-[36px] md:text-[48px] font-black leading-[1.08] tracking-[-0.04em] text-[#0a0a0a]">
-              기획부터 발행까지,<br />하나의 워크플로우로
+              기획부터 다운로드까지,<br />하나의 워크플로우로
             </h2>
             <p className="mt-5 text-[17px] leading-[1.6] text-[#525252]">
               디자이너·기획자·운영자 따로 둘 필요 없이 Shuffla 하나로 모든 카드뉴스 작업을 처리합니다.
@@ -230,7 +230,7 @@ export default function LandingPage() {
                 href="/login"
                 className="mt-10 inline-flex h-13 items-center gap-2 rounded-full bg-[#0a0a0a] px-8 py-3.5 text-[16px] font-bold text-white hover:bg-[#1a1a1a] hover:-translate-y-[1px] transition-all"
               >
-                무료로 시작하기 <ArrowRight className="h-4 w-4" />
+                Google Login <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

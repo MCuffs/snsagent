@@ -12,7 +12,7 @@ model User {
   id                     String            @id @default(uuid())
   email                  String            @unique
   name                   String?
-  plan                      String  @default("FREE") // FREE, STARTER, PRO, AGENCY
+  plan                      String  @default("FREE") // FREE, LITE, PRO, UNLIMITED
   paypalSubscriptionId      String? @unique
   paypalSubscriptionStatus  String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
   createdAt              DateTime          @default(now())

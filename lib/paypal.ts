@@ -30,7 +30,7 @@ export async function getSubscription(subscriptionId: string) {
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`PayPal subscription fetch error: ${res.status}`)
-  return res.json() as Promise<{ id: string; status: string; subscriber?: { payer_id?: string } }>
+  return res.json() as Promise<{ id: string; status: string; plan_id?: string; subscriber?: { payer_id?: string } }>
 }
 
 export async function cancelSubscription(subscriptionId: string, reason = '사용자 요청') {
@@ -75,15 +75,15 @@ export async function verifyWebhookSignature(body: string, headers: Record<strin
 }
 
 // PayPal billing plan IDs — set in env (NEXT_PUBLIC_ so client can read them)
-export const PAYPAL_PLAN_IDS: Record<string, string | undefined> = {
+export const PAYPAL_PLAN_IDS: Record<'LITE' | 'PRO' | 'UNLIMITED', string | undefined> = {
   LITE: process.env.NEXT_PUBLIC_PAYPAL_PLAN_LITE,
   PRO: process.env.NEXT_PUBLIC_PAYPAL_PLAN_PRO,
   UNLIMITED: process.env.NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED,
 }
 
-export function planFromPayPalPlanId(planId: string): string | null {
-  for (const [plan, id] of Object.entries(PAYPAL_PLAN_IDS)) {
-    if (id === planId) return plan
+export function planFromPayPalPlanId(planId: string): 'LITE' | 'PRO' | 'UNLIMITED' | null {
+  for (const plan of ['LITE', 'PRO', 'UNLIMITED'] as const) {
+    if (PAYPAL_PLAN_IDS[plan] === planId) return plan
   }
   return null
 }

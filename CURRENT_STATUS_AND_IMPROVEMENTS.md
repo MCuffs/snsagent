@@ -1,7 +1,10 @@
 # Shuffla 개발 현황 및 개선 사항
 
-기준일: 2026-05-25 (KST)
+기준일: 2026-05-26 (KST)
 기준 브랜치: `main`
+기준 소스 커밋: `c19c7d2` 이후 작업 트리 반영 기준
+
+이 문서는 현재 구현 단계와 운영 전 보완 항목의 기준 문서다. Instagram 계정 연결 및 게시 사용자 흐름은 이번 우선 개발 범위에서 제외하며 추후 개발 대상으로 둔다.
 
 ## 1. 현재 구현 현황
 
@@ -9,101 +12,110 @@
 
 | 영역 | 현재 구현 | 상태 |
 | --- | --- | --- |
-| 랜딩/가격 안내 | `/`, `/pricing` | 구현됨 |
-| 로그인 | `/login`, Google OAuth API | 구현됨, 세션 보안 개선 필요 |
-| 브랜드 콘셉트 | `/concept` | 구현됨 |
-| 카드뉴스 생성 | `/generate`, `POST /api/campaigns/generate` | 구현됨, 생성 안정성 검증 필요 |
-| 생성 결과/편집 | `/campaign/[id]` | 부분 구현, 배경 교체 오류 있음 |
+| 랜딩/가격 안내 | `/`, `/pricing`, `/blog` | 구현됨 |
+| 로그인 | `/login`, Google OAuth API | Google OAuth 및 HMAC 서명 세션 구현됨 |
+| 브랜드 콘셉트 | `/concept` | URL 분석, 저장, 대화형 수정 구현됨 |
+| 카드뉴스 생성 | `/generate`, `POST /api/campaigns/generate` | 이용권 한도 내 참고 이미지 최대 4장 포함 생성 구현됨 |
+| 생성 결과/편집 | `/campaign/[id]` | 문구/스타일/배경 교체/다운로드 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
-| 결제 | `/billing`, PayPal API/Webhook | 부분 구현, 권한 검증 오류 있음 |
-| Instagram 연동/게시 | 서버 API와 Action 존재 | 화면 경로 연결 미완료 |
+| 결제 | `/billing`, PayPal API/Webhook | Single/Creator/Studio 가격 및 서버 검증 기반 활성화 구현됨 |
+| Instagram 연동/게시 | 서버 API와 Action 존재 | UI 흐름은 추후 개발 예정, 이번 범위 제외 |
 
 ### 핵심 백엔드 기능
 
 | 기능 | 주요 구현 위치 | 상태 |
 | --- | --- | --- |
-| 사용자/브랜드/캠페인/게시물 저장 | `lib/db-service.ts`, `prisma/schema.prisma` | 구현됨, mock fallback 정책 점검 필요 |
-| 카드뉴스 생성 파이프라인 | `src/lib/layout/mediaCarouselPipeline.ts` | 구현 및 변경 중 |
-| 이미지 렌더링/업로드 | `src/lib/layout/renderer.ts`, `app/api/upload/route.ts` | 부분 구현 |
-| Google 인증 | `app/api/auth/google/*` | OAuth 구현됨, 앱 세션 강화 필요 |
-| Meta OAuth/게시 | `app/api/auth/meta/*`, `lib/instagram/client.ts` | 백엔드 구현됨, UI 미연결 |
-| PayPal 구독 | `app/api/paypal/*`, `lib/paypal.ts` | 구현됨, 서버 검증 보완 필수 |
+| 사용자/브랜드/캠페인/게시물 저장 | `lib/db-service.ts`, `prisma/schema.prisma` | 구현됨, 운영 DB 정책 보완 필요 |
+| 카드뉴스 생성 파이프라인 | `src/lib/layout/mediaCarouselPipeline.ts`, `src/lib/carousel/*` | 구현됨, 주요 배열 응답 fallback 보강 |
+| 이미지 렌더링/업로드 | `src/lib/layout/renderer.ts`, `app/api/upload/route.ts` | 구현됨, 쿼터/속도 제한 보완 필요 |
+| 대화형 Agent API | `app/api/agents/brand/route.ts`, `app/api/agents/generate/route.ts` | 구현됨, 외부 공급자 E2E 필요 |
+| URL/참고 이미지 입력 경계 | `lib/brand-url-collector.ts`, `src/lib/ai/providers/openAIImageProvider.ts` | SSRF 및 신뢰 URL 검증 반영 |
+| Google 인증 | `app/api/auth/google/*`, `lib/auth/session.ts` | OAuth와 서명 세션 구현됨 |
+| PayPal 구독 | `app/api/paypal/*`, `lib/paypal.ts` | `plan_id` 서버 매핑 구현됨 |
+| Meta OAuth/게시 | `app/api/auth/meta/*`, `lib/instagram/client.ts` | 백엔드 유지, 제품 흐름은 보류 |
 
-## 2. 현재 기대 흐름과 실제 상태
+## 2. 완료된 점
 
-목표 사용자 흐름은 다음과 같다.
+### 기존 구현 범위
+
+| 범위 | 완료된 구현 | 확인 위치 |
+| --- | --- | --- |
+| 브랜드 온보딩 | URL 입력, 분석 결과 편집/저장, Brand DNA 저장, 대화형 프로필 수정 | `app/(cms)/concept/*`, `app/api/agents/brand/route.ts`, `lib/brand-dna.ts` |
+| 생성 UX | AI 대화로 생성 조건 수집 후 미디어 생성 API 호출 | `app/(cms)/generate/*`, `app/api/agents/generate/route.ts` |
+| 생성 파이프라인 | LLM 카피, Agent 보정, 레이아웃/렌더링, 품질 로그 저장 | `src/lib/layout/*`, `src/lib/carousel/agents.ts` |
+| 결과 조회/편집 | 결과 미리보기, 문구/캡션 저장, 폰트/색상/스타일 변경, 다운로드 | `app/(cms)/campaign/[id]/*`, `app/actions.ts` |
+| 결제 기반 코드 | 이용권 없음 상태와 3개 유료 요금제, PayPal 생성/활성화/취소/webhook | `lib/limits-types.ts`, `app/(cms)/billing/*`, `app/api/paypal/*` |
+
+### 이번 우선 개발로 완료한 사항
+
+| 우선도 | 완료 항목 | 구현 결과 |
+| --- | --- | --- |
+| P0 | 세션 위조 차단 | 이메일 원문 쿠키 대신 `SESSION_SECRET` 기반 HMAC 서명 토큰을 검증하고 레거시 쿠키를 제거한다. 운영 환경의 개발용 이메일 로그인도 차단한다. |
+| P0 | PayPal 권한 검증 | 활성화 API가 클라이언트 플랜 값을 받지 않고 PayPal 구독의 `plan_id`만 내부 플랜으로 매핑한다. 직접 유료 플랜 변경 Action도 차단한다. |
+| P1 | 참고 이미지 생성 연결 | `/generate`에서 상품 이미지 최대 4장을 업로드하고 생성 API에 전달한다. |
+| P1 | 배경 교체 정상화 | 결과 화면과 업로드 API의 `files`/`urls` 계약을 통일했다. |
+| P1 | 잘못된 새 생성 경로 수정 | 결과 화면에서 새 생성을 `/generate`로 이동시킨다. |
+| P1 | 결제 취소 안내 일치 | 취소 시 내부 `FREE` 전환을 UI에서는 즉시 “이용권 없음”으로 안내한다. |
+| P1 | 레거시 플랜 호환 | billing/result 페이지에서 저장된 과거 플랜 값을 `normalizePlan()`으로 처리한다. |
+| P2 | 외부 URL 요청 방어 | URL 수집에 프로토콜/사설 IP/DNS/redirect/응답 크기 제한을 추가하고, 참고 이미지 fetch는 신뢰 업로드 URL로 제한한다. |
+| P2 | 생성 응답 안정성 | media 및 commerce 생성 흐름에서 모델 배열 응답 누락 시 fallback을 사용하도록 방어했다. |
+| P2 | 로컬 PayPal 재현성 | mock DB가 구독 ID, 상태, 플랜을 저장/조회하도록 계약을 맞췄다. |
+| P1 | 프론트 제공 범위/가격 정합성 | 자동 게시 및 무료 생성 안내를 제거하고 `Google Login`, Single 3,000원/1회, Creator 19,000원/10회, Studio 45,000원/30회로 UI·한도·PayPal 설정 스크립트를 통일했다. |
+
+현재 연결된 주요 사용자 흐름은 다음과 같다.
 
 ```text
-로그인 -> URL/브랜드 입력 -> 참고 이미지 포함 생성 설정 -> 카드뉴스 생성
-      -> 결과 편집/다운로드 -> 필요 시 게시 또는 결제
+Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
+             -> /generate 대화 및 참고 이미지 선택
+             -> 카드뉴스 생성 -> /campaign/[id] 편집/다운로드
+             -> /works 재조회
 ```
 
-현재 상태:
+## 3. 보완할 점
 
-| 단계 | 확인 결과 |
+### 운영 전 필요한 항목
+
+| 우선도 | 항목 | 영향 | 필요한 조치 |
+| --- | --- | --- | --- |
+| P1 | 업로드 운영 제한 미완료 | 저장 비용 및 오남용 위험 | 사용자별 용량 쿼터, 요청 속도 제한, 만료/정리 정책 추가 |
+| P1 | 운영 DB 장애 정책 미확정 | fallback 동작 시 데이터 신뢰성 저하 | production fail-closed 강제, 마이그레이션/백업 절차 검증 |
+| P1 | 외부 서비스 E2E 미수행 | OAuth/결제/이미지 공급자 실환경 회귀 미확인 | 테스트 계정과 sandbox로 로그인-생성-편집-결제 E2E 수행 |
+| P2 | webhook 운영 강건성 검증 | 결제 상태 중복/지연 이벤트 대응 불명확 | PayPal 이벤트 멱등성 및 재처리 시나리오 테스트 |
+| P2 | AI 응답 검증 확대 | 비정상 모델 응답의 일부 경로 실패 가능 | 공통 런타임 스키마와 관측/비용 지표 추가 |
+| P2 | 의존성 감사 경고 | moderate 취약점 2건 보고됨 | 영향 범위 분석 후 호환 가능한 의존성 업데이트 |
+| P1 | 새 결제 플랜 운영 설정 필요 | 기존 PayPal plan ID는 새 KRW 가격과 다를 수 있음 | `scripts/paypal-setup.mjs`로 새 plan ID를 생성해 환경변수 갱신하고 sandbox 검증 |
+
+### 추후 개발 범위
+
+| 항목 | 현재 상태 | 결정 |
+| --- | --- | --- |
+| Instagram 계정 연결 UI | Meta OAuth/게시 백엔드는 있으나 CMS 화면과 리다이렉트 대상 `/instagram`이 없음 | 사용자 요청에 따라 이번 개발에서 제외하고 추후 제품 흐름으로 구현 |
+| Instagram 예약 게시 운영 UX | cron/API 기반 코드는 있으나 사용자 접근/실패 처리 화면 없음 | Instagram 흐름 재개 시 함께 설계 및 검증 |
+
+## 4. 정책 결정 사항
+
+| 주제 | 현재 결정 |
 | --- | --- |
-| 로그인 후 브랜드/URL 입력 이동 | `/concept` 이동 구조는 존재함 |
-| URL 기반 생성 | UI 및 API 연결은 존재함 |
-| 참고 이미지 업로드 기반 생성 | API 입력 여지는 있으나 `/generate` 화면 연결이 없음 |
-| 이미지 생성 완료 후 결과 화면 | 구현됨 |
-| 결과 화면 배경 이미지 교체 | 업로드 API 계약 불일치로 동작 불가 |
-| 게시/예약 흐름 | Action과 API는 남아 있으나 CMS 화면에서 접근 불가 |
-
-## 3. 즉시 처리해야 할 문제
-
-### P0 - 배포 차단
-
-| 항목 | 영향 | 관련 파일 | 필요한 조치 |
-| --- | --- | --- | --- |
-| 이메일 문자열 쿠키를 세션으로 신뢰 | 타 사용자 계정 위조 가능 | `lib/auth/session.ts`, `app/actions.ts` | 서명 세션 또는 서버 저장 세션으로 교체 |
-| PayPal 플랜을 클라이언트 요청값으로 반영 | 저가 구독으로 상위 권한 획득 가능 | `app/api/paypal/activate/route.ts`, `lib/paypal.ts` | PayPal `plan_id`와 내부 플랜 매핑을 서버에서 검증 |
-
-### P1 - 핵심 사용자 흐름 장애
-
-| 항목 | 영향 | 관련 파일 | 필요한 조치 |
-| --- | --- | --- | --- |
-| 참고 이미지 생성 UI 부재 | 요구 기능을 사용할 수 없음 | `app/(cms)/generate/GenerateForm.tsx` | 파일 업로드와 `productImageUrls` 전송 연결 |
-| 배경 이미지 교체 업로드 계약 불일치 | 결과 편집 실패 | `app/(cms)/campaign/[id]/CampaignResultView.tsx`, `app/api/upload/route.ts` | 요청 키와 응답 타입 통일 |
-| 새 생성 버튼이 `/campaign/new`로 이동 | 결과 화면에서 404 발생 | `app/(cms)/campaign/[id]/CampaignResultView.tsx` | `/generate`로 변경 |
-| Instagram OAuth 리다이렉트 대상 화면 없음 | Instagram 연결 완료 불가 | `app/api/auth/meta/*`, `app/(cms)/layout.tsx` | CMS 내 설정/연동 화면 복구 또는 경로 변경 |
-| 결제 취소 시 즉시 FREE 처리 | UI 안내와 과금 권한 불일치 | `app/api/paypal/cancel/route.ts`, `app/(cms)/billing/PricingClientView.tsx` | 기간 종료 기반 취소 정책 구현 |
-
-### P2 - 안정성 및 운영 보완
-
-| 항목 | 영향 | 필요한 조치 |
-| --- | --- | --- |
-| 사용자 입력 URL을 서버에서 직접 fetch | SSRF 위험 | 사설/루프백/메타데이터 주소 차단 및 허용 정책 도입 |
-| 무료 플랜 워터마크 미적용 | 과금 기능 우회 | 다운로드/렌더링 출력에 워터마크 적용 |
-| DB 오류 시 mock fallback 가능 | 운영 데이터 유실처럼 보이는 장애 | 운영에서는 fail-closed 정책 강제 |
-| 업로드 수량/쿼터 제한 없음 | 저장소 비용 및 오남용 위험 | 파일 수, 총 용량, 속도 제한 추가 |
-| 기존 플랜 값 호환성 미보장 | 결과 페이지 렌더링 실패 가능 | 플랜 정규화 적용 및 마이그레이션 |
-
-## 4. 이번 커밋에 포함된 진행 중 개발분
-
-이번 문서화 커밋에는 다음 생성 파이프라인 변경도 포함된다.
-
-| 파일 | 변경 내용 | 검토 필요 사항 |
-| --- | --- | --- |
-| `app/(cms)/generate/GenerateForm.tsx` | 생성 입력의 `keyContent` 구성 변경 | 생성 결과 회귀 테스트 필요 |
-| `src/app/api/campaigns/generate/route.ts` | `objective`를 파이프라인에 전달 | 저장/렌더링 결과 확인 필요 |
-| `src/lib/layout/mediaCarouselPipeline.ts` | LLM 기반 슬라이드 카피 생성 추가 | 응답 스키마 검증, 실패 fallback, 지연/비용 측정 필요 |
-
-특히 `result.slides`가 배열인지 확인하지 않고 사용하는 경로는 모델 응답 이상 시 전체 생성 실패로 이어질 수 있으므로 보완 후 운영 검증이 필요하다.
+| 유료 권한 부여 | PayPal에서 조회한 구독 `plan_id`만 신뢰한다. |
+| 가격 정책 | 내부 `FREE`는 생성 권한 없는 상태다. 유료 플랜은 Single 월 3,000원/1회, Creator 월 19,000원/10회, Studio 월 45,000원/30회다. |
+| 구독 취소 | 현재 데이터 모델 범위에서는 취소 시 즉시 내부 `FREE`(이용권 없음)로 전환하며 UI에도 동일하게 안내한다. 결제 기간 종료 유지가 필요하면 billing period 필드를 먼저 추가한다. |
+| 개발 로그인 | 테스트 로그인은 비운영 환경에서만 허용한다. |
+| Instagram | 서버 코드 유지, UI/게시 흐름 구현은 차기 범위로 분리한다. |
 
 ## 5. 검증 현황
 
 | 검증 | 결과 | 비고 |
 | --- | --- | --- |
-| `npm run build` | 통과 | 오래된 `.next` 캐시 제거 후 통과 |
-| `npm run lint` | 실패 | `GenerateForm.tsx` Hook 규칙 오류, `app/actions.ts` `prefer-const` 오류 등 |
-| 로그인부터 생성 완료 E2E | 미검증 | 인증 보안 및 참고 이미지 UI 보완 후 수행 필요 |
-| 참고 이미지 생성 E2E | 불가 | 현재 생성 UI 미연결 |
-| 결제 권한 E2E | 보류 | PayPal 서버 검증 보완 필요 |
+| `npm ci` | 통과 | 2026-05-26, `npm audit` moderate 2건 보고 |
+| `npm run lint` | 통과 | 2026-05-26, 우선 수정 반영 후 재실행 |
+| `npm run build` | 통과 | 2026-05-26, Next.js 16.2.6 빌드 및 라우트 생성 성공 |
+| 로그인-생성-편집 E2E | 미검증 | 실 OAuth/AI/Blob 환경 구성 후 확인 필요 |
+| PayPal sandbox E2E | 미검증 | `plan_id` 매핑과 취소/웹훅 시나리오 확인 필요 |
+| Instagram E2E | 범위 제외 | 추후 개발 재개 시 수행 |
 
-## 6. 권장 개발 순서
+## 6. 이후 개발 순서
 
-1. 세션 인증과 PayPal 플랜 검증을 먼저 수정한다.
-2. 참고 이미지 업로드 생성, 배경 이미지 교체, 잘못된 이동 경로를 수정한다.
-3. Instagram 설정/게시 UI를 CMS 경로에 다시 연결한다.
-4. URL fetch 방어, 워터마크, 업로드 제한, DB fail-closed 정책을 적용한다.
-5. lint를 통과시키고 로그인, URL 생성, 참고 이미지 생성, 편집, 결제, 게시의 E2E 검증을 수행한다.
+1. 업로드 쿼터/속도 제한과 운영 DB fail-closed를 구현한다.
+2. 새 KRW PayPal 플랜 ID를 설정하고 Google OAuth, 생성 공급자, Blob, PayPal sandbox를 포함한 핵심 E2E를 수행한다.
+3. webhook 강건성과 AI 응답 공통 스키마 검증, 의존성 감사 경고를 정리한다.
+4. Instagram 흐름은 별도 제품 범위가 확정된 뒤 연결 UI와 게시 운영 UX를 함께 구현한다.

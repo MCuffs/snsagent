@@ -21,7 +21,7 @@ export function MarketingNav() {
                     href="/login"
                     className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#0a0a0a] px-4 text-[13px] font-bold text-white transition-all hover:bg-[#1a1a1a] hover:-translate-y-[1px]"
                 >
-                    무료로 시작하기
+                    Google Login
                 </Link>
             </div>
         </header>

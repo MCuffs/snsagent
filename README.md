@@ -1,153 +1,110 @@
 # Shuffla (AI Card News Studio SaaS MVP)
 
-Shuffla는 마케팅 대행사나 디자이너를 고용하기 힘든 소상공인, 스마트스토어 판매자, 로컬 비즈니스 대표님들을 위한 **AI 카드뉴스 제작 스튜디오 SaaS**입니다.
-본 리포지토리는 MVP 검증 및 데모 판매가 가능한 완벽한 수준의 풀스택 구현체입니다.
+Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하고 편집하는 SaaS MVP입니다.
 
----
+현재 구현은 제품 검증용 단계입니다. 랜딩, Google Login, 브랜드 분석, 참고 이미지 기반 카드뉴스 생성, 결과 편집, 작업 목록, PayPal 결제 연동이 연결되어 있으며 세션 서명과 결제 플랜 서버 검증도 반영되었습니다. 공개 화면은 현재 구현된 생성·편집·다운로드 흐름만 안내하고, Instagram 사용자 흐름은 추후 개발 범위입니다.
 
-## 주요 기능 (MVP)
+## 문서 기준
 
-1. **브랜드 컨셉 커스터마이징**: 브랜드 고유 톤앤매너, 타겟 고객, 브랜드 메인 컬러, 금지어, CTA 스타일 등을 입력하고 관리합니다.
-2. **AI 카드뉴스 기획 & 비주얼 초안 빌더**:
-   - 상품 정보와 목적을 기반으로 OpenAI GPT-4o를 이용해 모바일 최적화 기획(Hook, 본문 카피, 일러스트 디자인 프롬프트)을 생성합니다.
-   - OpenAI 이미지 모델(`gpt-image-1`, 또는 Mock 이미지 공급자)을 연동하여 카드뉴스 슬라이드별 배경 이미지를 자동 렌더링합니다.
-3. **실시간 모바일 시안 검토 및 카피 편집**: 생성된 카드뉴스를 넘겨보며 타이포그래피 카피를 직접 수정하고 즉시 뷰어에서 반영합니다.
-4. **인스타그램 예약 발행 및 스케줄러**:
-   - 승인 기반 워크플로우(Human-in-the-loop)를 지원하여 승인 완료된 피드만 예약 시간에 자동 업로드합니다.
-   - Meta Instagram Graph API 규격의 연동을 모조리 구현했으며, 토큰 보안을 위해 서버 사이드에서 암호화 처리합니다.
-   - 로컬 테스트 편의를 위해 `INSTAGRAM_MOCK_MODE`를 제공하여 Meta API 키 발급이 없는 상태에서도 시뮬레이션 동작을 검증할 수 있습니다.
-5. **SaaS 요금제 한도 관리 및 스위처**: 요금제 등급(Free, Starter, Pro, Agency)에 따라 예약 업로드 권한, 한도 체크 및 이미지 워터마크 표시 처리가 내장되어 있습니다.
+| 문서 | 용도 |
+| --- | --- |
+| `CURRENT_STATUS_AND_IMPROVEMENTS.md` | 현재 구현 완료 범위, 장애, 우선순위의 기준 문서 |
+| `SYSTEM_ARCHITECTURE.md` | 현재 라우트와 서비스 구조 |
+| `DEVELOPMENT_LOG.md` | 날짜별 주요 개발 이력과 검증 기록 |
+| `LAYERS.md` | 코드 책임 분리 및 확장 규칙 |
 
----
+## 현재 제공 범위
 
-## 기술 스택
+| 영역 | 경로/모듈 | 상태 |
+| --- | --- | --- |
+| 마케팅 화면 | `/`, `/pricing`, `/blog` | 구현됨 |
+| 인증 | `/login`, `app/api/auth/google/*` | Google OAuth 및 HMAC 서명 세션 구현됨 |
+| 브랜드 콘셉트 | `/concept`, `app/api/agents/brand` | URL 분석, 프로필 저장, 대화형 수정 구현됨 |
+| 카드뉴스 생성 | `/generate`, `app/api/agents/generate`, `POST /api/campaigns/generate` | 유료 이용권의 월 횟수 내 대화형 생성 및 렌더링 구현됨 |
+| 결과/편집 | `/campaign/[id]` | 텍스트/스타일/배경 교체/다운로드 구현됨 |
+| 작업 목록 | `/works` | 구현됨 |
+| 구독 | `/billing`, `app/api/paypal/*` | Single 3,000원/1회, Creator 19,000원/10회, Studio 45,000원/30회 및 서버 검증 구현됨 |
+| Instagram 발행 | `app/api/auth/meta/*`, `app/api/cron/publish`, Server Actions | 백엔드 코드 유지, 사용자 흐름은 추후 개발 예정 |
 
-- **Frontend**: Next.js App Router, TypeScript, Tailwind CSS (Tailwind CSS v4), Lucide React
-- **Backend / Database**: Next.js Server Actions, PostgreSQL, Prisma ORM
-- **Database Fallback**: PostgreSQL 인프라 구축 없이 즉각 데모를 실행해볼 수 있도록, 파일 기반 로컬 모의 DB (`prisma/db.json`) 자동 대체 시스템이 내장되어 있습니다.
+현재 CMS 메뉴는 `Concept`, `Generate`, `Works`이며, 결제 화면은 사이드바의 요금제 링크에서 접근합니다. 과거 `/brand`, `/campaign/new`, `/instagram` 기반 안내는 현재 사용자 화면 구조가 아닙니다.
 
----
+## 사용자 흐름
 
-## 시작 방법
+```text
+Google Login
+  -> /concept 에서 브랜드 URL 분석 및 프로필 저장
+  -> /billing 에서 카드뉴스 이용권 구독
+  -> /generate 에서 AI와 생성 조건 대화
+  -> 카드뉴스 생성
+  -> /campaign/[id] 에서 문구/스타일 편집 및 다운로드
+  -> /works 에서 결과 재조회
+```
 
-### 1. 의존성 패키지 설치
-프로젝트 루트 경로에서 패키지를 설치합니다:
+`/generate`와 `/works`는 저장된 브랜드에 `websiteUrl`이 있어야 접근할 수 있습니다.
+
+## 주요 구현
+
+### 브랜드 분석
+
+- `app/actions.ts`의 `analyzeBrandWebsiteAction()`이 URL 콘텐츠 수집과 브랜드 프로필 생성을 수행합니다.
+- `lib/perplexity.ts`, `lib/gemini.ts`, `lib/groq.ts`, `lib/naver-shopping.ts`가 공급자별 분석과 네이버 스토어 보조 수집을 담당합니다.
+- `app/api/agents/brand/route.ts`는 저장된 브랜드를 바탕으로 대화형 필드 수정을 제안합니다.
+- Brand DNA는 `lib/brand-dna.ts`에 직렬화되어 생성 프롬프트에 전달됩니다.
+
+### 카드뉴스 생성 및 편집
+
+- `/generate`는 `app/api/agents/generate/route.ts`를 호출해 주제, 스타일, 목적, 슬라이드 수, 선택 상품 URL을 대화로 수집합니다.
+- `/generate`에서 상품 참고 이미지를 최대 4장 업로드해 생성 요청의 `productImageUrls`로 전달할 수 있습니다.
+- 생성 진입점은 `POST /api/campaigns/generate`이며, 현재 CMS 흐름은 `src/lib/layout/mediaCarouselPipeline.ts`의 미디어 파이프라인을 사용합니다.
+- 미디어 파이프라인은 LLM 카피 생성, 규칙 기반 Agent 보정, 레이아웃/타이포그래피 계산, 이미지 생성, SVG/PNG 렌더링, 품질 로그 저장을 수행합니다.
+- 결과 화면은 슬라이드 문구 저장, 폰트/색상 적용 재렌더링, 스타일 재생성, 캡션 저장, 개별/전체 다운로드 기능을 포함합니다.
+
+`src/lib/carousel/pipeline.ts`의 commerce 파이프라인도 남아 있으며 API의 비-`media` 입력에서 사용할 수 있으나, 현재 CMS 주 흐름은 미디어 파이프라인입니다.
+
+### 결제와 후속 범위
+
+- 내부 `FREE` 상태는 로그인 직후 또는 취소 후의 이용권 없음 상태이며 생성 한도는 0회입니다.
+- 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 19,000원 10회, `UNLIMITED`/Studio 월 45,000원 30회로 매핑됩니다.
+- PayPal 구독 생성, 활성화, 취소, webhook 라우트가 존재하며, 활성화는 PayPal에서 조회한 `plan_id`를 내부 플랜으로 매핑합니다.
+- Meta OAuth, Instagram Graph API 클라이언트, cron 발행 라우트는 존재합니다.
+- 현재 CMS에는 Instagram 계정 연결/예약 발행 화면이 없으므로 발행 기능은 사용자 흐름으로 완료되지 않았습니다.
+
+## 알려진 주요 제한
+
+운영 전에 해결하거나 범위를 결정해야 할 핵심 항목은 다음과 같습니다. 전체 목록과 우선순위는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`를 기준으로 합니다.
+
+1. Instagram 계정 연결/예약 게시 UI는 이번 범위에서 제외되어 추후 개발 예정입니다.
+2. 업로드는 파일당 크기 및 요청당 4장 제한을 적용하지만, 사용자별 저장 쿼터와 속도 제한은 남아 있습니다.
+3. 운영 DB fail-closed, 마이그레이션/백업 정책을 확정해야 합니다.
+4. 새 KRW 요금제에 맞는 PayPal plan ID를 생성·설정하고 sandbox E2E를 수행해야 합니다.
+5. 외부 인증/이미지 공급자를 사용한 E2E와 `npm audit` moderate 2건 검토가 남아 있습니다.
+
+## 로컬 실행
+
 ```bash
 npm install
-```
-
-### 2. 환경변수 설정
-`.env.example` 파일을 복사하여 `.env` 파일을 생성합니다:
-```bash
 cp .env.example .env
-```
-
-`.env` 설정 옵션:
-- `DATABASE_URL`: PostgreSQL 데이터베이스 주소.
-- `DATABASE_MOCK_FALLBACK`: `true`로 설정 시, 데이터베이스가 없는 환경에서도 로컬 JSON 파일 DB(`prisma/db.json`)로 즉시 로그인 및 CRUD 테스트가 실행됩니다 (데모 기본값).
-- `OPENAI_API_KEY`: 실제 OpenAI 텍스트 및 이미지 생성을 검증하고 싶다면 키값을 대입하세요. 비워두거나 기본값일 경우, 고품질 장르별 미리 정의된 시안으로 AI 생성이 진행됩니다.
-- `IMAGE_PROVIDER`: 카드뉴스 배경 이미지 공급자입니다. `mock`, `openai`, `bytedance` 중 하나를 사용합니다.
-- `BYTEDANCE_API_KEY`: ByteDance 이미지 모델 연동 준비용 키입니다. 현재는 인터페이스와 TODO provider만 준비되어 있습니다.
-- `INSTAGRAM_MOCK_MODE`: `true`로 설정 시, Meta API 토큰이 가짜거나 없어도 인스타그램 연동 성공 및 가상 예약/업로드 동작이 활성화됩니다.
-- `INSTAGRAM_ACCOUNT_ID`, `INSTAGRAM_ACCESS_TOKEN`: 로컬 데모 빠른 연동과 운영 Meta API 연동에 사용하는 계정 ID와 토큰입니다.
-- `META_APP_ID`, `META_APP_SECRET`, `META_API_VERSION`: 실제 Instagram Business 계정을 OAuth로 빠르게 연결하기 위한 Meta App 설정입니다.
-- `NEXT_PUBLIC_APP_URL`: Meta OAuth callback URL 생성에 사용하는 서비스 기본 URL입니다. 로컬 기본값은 `http://localhost:3000`입니다.
-
-### 3. 로컬 서버 구동
-개발 모드로 Next.js 앱을 실행합니다:
-```bash
 npm run dev
 ```
-로컬 접속 주소: `http://localhost:3000`
 
----
+기본 접속 주소는 `http://localhost:3000`입니다.
 
-## 핵심 모듈 및 교체 가이드
+주요 환경변수:
 
-### 0. 카드뉴스 생성 백엔드 파이프라인
-카드뉴스 생성은 단일 LLM 호출이 아니라 단계형 파이프라인으로 동작합니다. 진입점은 `POST /api/campaigns/generate`이며 실제 구현은 `src/lib/carousel/pipeline.ts`에 있습니다.
+| 변수 | 용도 |
+| --- | --- |
+| `DATABASE_URL`, `DIRECT_URL` | PostgreSQL/Prisma 연결 |
+| `DATABASE_MOCK_FALLBACK` | 로컬 JSON DB fallback 허용 여부 |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `IMAGE_PROVIDER` | Agent, 카피, 이미지 생성 |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `PERPLEXITY_API_KEY` | 브랜드 분석 공급자 |
+| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 스토어 상품 보조 수집 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth |
+| `SESSION_SECRET` | HMAC 세션 토큰 서명 키, 운영 환경에서 32자 이상 필요 |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_PLAN_*` | PayPal 구독 |
+| `META_APP_ID`, `META_APP_SECRET`, `INSTAGRAM_TOKEN_ENCRYPTION_KEY` | Meta/Instagram 연동 |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 업로드 |
+| `CRON_SECRET` | 예약 게시 실행 보호 |
 
-순서:
-1. `strategyEngine.generateStrategy()`로 콘텐츠 전략을 정합니다.
-2. `hookEngine.generateHooks()`와 `selectBestHook()`로 첫 장 Hook을 고릅니다.
-3. `structureEngine.generateStructure()`로 슬라이드 역할을 구성합니다.
-4. `copyEngine.generateSlideCopies()`로 슬라이드별 카피를 만듭니다.
-5. `designPromptEngine.generateDesignPrompts()`로 텍스트 없는 배경 이미지 프롬프트를 만듭니다.
-6. `ImageProvider`가 배경 이미지를 생성합니다.
-7. `renderer.renderSlide()`가 텍스트를 별도 오버레이로 합성합니다.
-8. `captionEngine.generateCaption()`이 캡션과 해시태그를 만듭니다.
-9. `qualityCheckEngine.runQualityCheck()`가 슬라이드 수, 문구 길이, 금지어, 이미지 URL, CTA를 검수합니다.
-10. Campaign, CarouselSlide, Post를 저장합니다.
+## 검증
 
-이미지 모델은 `src/lib/ai/imageProvider.ts` 인터페이스 뒤에 숨겨져 있으며 `mock`, `openai`, `bytedance` provider를 교체할 수 있습니다. 현재 renderer는 서버에서 SVG 템플릿 파일을 생성해 `/generated/carousel/*` URL을 반환하며, 추후 Sharp/Puppeteer 기반 PNG renderer로 교체할 수 있도록 독립 모듈로 분리되어 있습니다.
-
-API 요청 예시:
-```bash
-curl -X POST http://localhost:3000/api/campaigns/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "brandId": "brand-id",
-    "productName": "생활 정리함",
-    "productDescription": "작은 공간을 깔끔하게 정리하는 수납 상품",
-    "keyBenefits": "공간 절약, 쉬운 설치, 깔끔한 디자인",
-    "objective": "구매 전환",
-    "slideCount": 5,
-    "productImageUrls": []
-  }'
-```
-
-### 1. 인스타그램 API 연동 방식
-로컬 데모에서는 `/instagram` 화면의 **1초 만에 데모 계정 연결** 버튼으로 Meta 개발자 설정 없이 연결 상태를 만들 수 있습니다. `INSTAGRAM_MOCK_MODE=true`일 때만 노출되며, `.env`의 `INSTAGRAM_ACCOUNT_ID`, `INSTAGRAM_ACCESS_TOKEN` 값이 서버에서 암호화되어 저장됩니다.
-
-운영 환경에서는 같은 화면의 **Instagram으로 실제 연결** 버튼을 권장합니다. 이 버튼은 Meta OAuth로 이동해 권한 승인 후 Facebook Page에 연결된 Instagram Business 계정을 자동으로 찾아 저장합니다. 수동 입력 폼은 OAuth를 사용할 수 없는 예외 상황을 위한 고급 옵션입니다.
-
-Meta OAuth 빠른 연결 준비:
-1. Meta Developer Console에서 앱을 만들고 Facebook Login / Instagram Graph API 권한을 설정합니다.
-2. OAuth redirect URI에 `{NEXT_PUBLIC_APP_URL}/api/auth/meta/callback`을 등록합니다.
-3. `.env`에 `META_APP_ID`, `META_APP_SECRET`, `NEXT_PUBLIC_APP_URL`을 설정합니다.
-4. 테스트 계정은 Instagram Business 또는 Creator 계정이어야 하며 Facebook Page에 연결되어 있어야 합니다.
-
-인스타그램 업로드는 Meta Graph API를 기반으로 3단계 트랜잭션으로 진행됩니다:
-- **1단계**: [lib/instagram/client.ts](file:///Users/jeongminsu/Downloads/SNS%20AI%20Agent/lib/instagram/client.ts) 의 `createMediaContainer` 함수를 통해 업로드할 슬라이드 이미지와 캐러셀 플래그(`is_carousel_item=true`)를 Meta 서버에 임시 업로드하여 컨테이너 ID들을 획득합니다.
-- **2단계**: `createCarouselContainer` 함수에 획득한 슬라이드 컨테이너 ID 배열과 피드 캡션을 묶어서 전달하여 최종 캐러셀 배포 컨테이너 ID를 만듭니다.
-- **3단계**: `publishMedia` 함수로 캐러셀 컨테이너를 최종 배포(게시)합니다.
-- *참고*: Instagram Graph API는 자체 스케줄 인자를 API로 제공하지 않으므로, 미래 시간 예약 시에는 DB 상태를 `scheduled`로 둔 후 크론 스케줄러(Cron Job)가 백그라운드에서 예약 시간에 게시 함수를 트리거하도록 동작해야 합니다.
-
-### 2. ByteDance 이미지 모델(Doubao 등) 교체 방법
-현재 카드뉴스 배경 이미지는 [lib/ai/imageProvider.ts](file:///Users/jeongminsu/Downloads/SNS%20AI%20Agent/lib/ai/imageProvider.ts) 인터페이스에 맞춰 추상화되어 있습니다. 추후 ByteDance 모델로 변경하려면 다음 순서를 따르십시오.
-
-1. **ByteDance SDK 및 API Credentials 확보**
-2. **ByteDanceImageProvider 클래스 완성**
-   ```typescript
-   export class ByteDanceImageProvider implements ImageProvider {
-     async generateImage(prompt: string): Promise<{ imageUrl: string }> {
-       // 1. API 호출 정보 빌드
-       const response = await fetch("https://open.volcengineapi.com/api/v1/image/generate", {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "Authorization": `Bearer ${process.env.BYTEDANCE_API_KEY}`
-         },
-         body: JSON.stringify({
-           model: "doubao-image-v2",
-           prompt: prompt,
-           width: 1024,
-           height: 1024
-         })
-       });
-       const data = await response.json();
-       return { imageUrl: data.data[0].url };
-     }
-   }
-   ```
-3. **팩토리 함수 스위칭**
-   [lib/ai/imageProvider.ts](file:///Users/jeongminsu/Downloads/SNS%20AI%20Agent/lib/ai/imageProvider.ts) 의 `getImageProvider` 함수에서 ByteDanceProvider 인스턴스를 리턴하도록 코드를 변경합니다.
-
----
-
-## SaaS 확장 로드맵
-
-1. **Stripe / Toss Payments 결제 연동**: 요금제 스위처 페이지에 실제 결제 승인 게이트웨이를 연결하여 정기 구독 결제 구현.
-2. **인스타그램 실제 크론 스케줄러**: Vercel Cron 또는 Node-Cron을 도입하여 매분 `scheduled` 상태 중 현재 시각에 도달한 포스트를 실제 업로드하는 배치 파이프라인 가동.
-3. **카드뉴스 에디터 고도화**: 타이포 외에도 폰트 종류, 텍스트 배치 좌표 조정 기능 및 브랜드 워터마크 오버레이 실제 이미지 렌더링 서버(Canvas API/Puppeteer) 연동.
-4. **성과 피드백 루프**: 게시 완료된 피드의 좋아요, 댓글, 도달수 성과 지표(Graph API Insights)를 수집하여 AI 기획 시 성과가 좋았던 컨셉 비중을 자동 증가시키는 피드백 AI 마케팅 시스템 구축.
+문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run lint`와 `npm run build`는 통과했으며, 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.

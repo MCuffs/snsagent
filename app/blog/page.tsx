@@ -20,8 +20,8 @@ const featured = {
     category: '공지사항',
     tagClass: 'bg-[#fff4e6] text-[#ff6b35]',
     date: '2026.05.20',
-    title: 'Shuffla 정식 오픈 안내',
-    desc: 'AI로 인스타그램 카드뉴스를 자동 제작·발행하는 Shuffla가 정식 서비스를 시작합니다. 오픈 기념 무료 크레딧 5,000개를 지금 받아가세요.',
+    title: 'Shuffla 카드뉴스 스튜디오 안내',
+    desc: '브랜드 분석부터 AI 카드뉴스 생성, 편집, 다운로드까지 연결된 Shuffla의 현재 기능을 소개합니다.',
     readTime: '3분 읽기',
 }
 
@@ -39,15 +39,15 @@ const posts = [
         tagClass: 'bg-[#e7f5ff] text-[#1c7ed6]',
         date: '2026.05.20',
         title: '어떤 주제가 카드뉴스에 잘 맞나요?',
-        desc: '뉴스 요약, 꿀팁 정리, 순위, 비교 분석 등 인스타그램에서 반응이 좋은 카드뉴스 주제 유형을 소개합니다.',
+        desc: '뉴스 요약, 꿀팁 정리, 순위, 비교 분석 등 카드뉴스에 잘 맞는 주제 유형을 소개합니다.',
         readTime: '4분 읽기',
     },
     {
         category: '이용 가이드',
         tagClass: 'bg-[#e7f5ff] text-[#1c7ed6]',
         date: '2026.05.20',
-        title: 'Instagram 계정 연결하는 방법',
-        desc: '비즈니스 계정으로 전환하고 Shuffla에 연결하는 방법을 스크린샷과 함께 안내합니다.',
+        title: '상품 참고 이미지로 생성 품질 높이기',
+        desc: '상품 이미지를 추가해 카드뉴스의 비주얼 방향을 더 구체적으로 전달하는 방법을 안내합니다.',
         readTime: '3분 읽기',
     },
     {
@@ -62,8 +62,8 @@ const posts = [
         category: '자주 묻는 질문',
         tagClass: 'bg-[#eefbf0] text-[#2f9e44]',
         date: '2026.05.20',
-        title: '결제 및 크레딧 FAQ',
-        desc: '크레딧 충전 방법, 플랜 변경, 환불 정책 등 결제와 관련된 자주 묻는 질문을 모았습니다.',
+        title: '요금제 및 결제 FAQ',
+        desc: '월 생성 횟수별 플랜 선택, 구독 변경, 환불 정책 등 결제 관련 질문을 모았습니다.',
         readTime: '4분 읽기',
     },
     {
@@ -79,7 +79,7 @@ const posts = [
 const guides = [
     { title: '브랜드 설정 마스터하기', duration: '2:47', accent: 'from-[#ff6b35] to-[#f7931e]' },
     { title: '카드뉴스 9:22분 만에 만들기', duration: '9:22', accent: 'from-[#1c7ed6] to-[#339af0]' },
-    { title: 'Instagram 자동 발행 설정', duration: '4:07', accent: 'from-[#7950f2] to-[#9775fa]' },
+    { title: '결과 화면 편집과 다운로드', duration: '4:07', accent: 'from-[#7950f2] to-[#9775fa]' },
     { title: 'AI 프롬프트 잘 쓰는 법', duration: '4:07', accent: 'from-[#2f9e44] to-[#51cf66]' },
 ]
 

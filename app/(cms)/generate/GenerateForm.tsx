@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, Sparkles, Send } from 'lucide-react'
+import { ArrowRight, ImagePlus, Sparkles, Send, X } from 'lucide-react'
 
 interface Brand {
   id: string
@@ -66,12 +66,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [isWaiting, setIsWaiting] = useState(false)
+  const [isWaiting, setIsWaiting] = useState(true)
   const [readyParams, setReadyParams] = useState<GenerateParams | null>(null)
   const [generating, setGenerating] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [initialized, setInitialized] = useState(false)
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([])
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -82,26 +82,14 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   }, [displayMessages])
 
   useEffect(() => {
-    if (generating) {
-      loadingIntervalRef.current = setInterval(() => {
-        setLoadingStep(prev => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev))
-      }, 4000)
-    } else {
-      if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current)
-      if (!generating) setLoadingStep(0)
-    }
+    if (!generating) return
+    loadingIntervalRef.current = setInterval(() => {
+      setLoadingStep(prev => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev))
+    }, 4000)
     return () => { if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current) }
   }, [generating])
 
-  // On mount: fire empty message to agent to get greeting
-  useEffect(() => {
-    if (initialized) return
-    setInitialized(true)
-    callAgent([])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const callAgent = async (history: ChatMessage[]) => {
+  const callAgent = useCallback(async (history: ChatMessage[]) => {
     setIsWaiting(true)
     try {
       const res = await fetch('/api/agents/generate', {
@@ -131,7 +119,32 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       setIsWaiting(false)
       inputRef.current?.focus()
     }
-  }
+  }, [brand.id])
+
+  // Load the initial Agent greeting without synchronously mutating state in an effect.
+  useEffect(() => {
+    let active = true
+    const loadGreeting = async () => {
+      try {
+        const res = await fetch('/api/agents/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [], brandId: brand.id }),
+        })
+        const data = await res.json() as { message?: string; error?: string }
+        if (!active) return
+        const msg = data.error ? '오류가 발생했습니다. 다시 시도해주세요.' : (data.message || '다시 시도해주세요.')
+        setDisplayMessages([aiDisplay(msg)])
+        setChatHistory([{ role: 'assistant', content: msg }])
+      } catch {
+        if (active) setDisplayMessages([aiDisplay('서버 오류가 발생했습니다. 다시 시도해주세요.')])
+      } finally {
+        if (active) setIsWaiting(false)
+      }
+    }
+    void loadGreeting()
+    return () => { active = false }
+  }, [brand.id])
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -151,10 +164,25 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
   const handleGenerate = async () => {
     if (!readyParams) return
+    setLoadingStep(0)
     setGenerating(true)
     setError(null)
 
     try {
+      let productImageUrls: string[] = []
+      if (referenceFiles.length > 0) {
+        const formData = new FormData()
+        referenceFiles.forEach(file => formData.append('files', file))
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+        const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
+        if (!uploadRes.ok || !uploadData.urls?.length) {
+          setError(uploadData.error || '참고 이미지 업로드에 실패했습니다.')
+          setGenerating(false)
+          return
+        }
+        productImageUrls = uploadData.urls
+      }
+
       const res = await fetch('/api/campaigns/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,6 +199,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           productUrl: readyParams.productUrl || undefined,
           visualHint: readyParams.visualHint,
           objective: readyParams.objective,
+          productImageUrls,
         }),
       })
 
@@ -186,6 +215,17 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       setError('서버 통신 중 오류가 발생했습니다.')
       setGenerating(false)
     }
+  }
+
+  const selectReferenceFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (files.length > 4) {
+      setError('참고 이미지는 최대 4장까지 선택할 수 있습니다.')
+      return
+    }
+    setReferenceFiles(files)
+    setError(null)
   }
 
   // ── Generating overlay ──────────────────────────────────────────
@@ -311,6 +351,33 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                     {error}
                   </div>
                 )}
+                <div className="rounded-xl border border-[#e4e4e7] bg-[#fafafa] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-[#52525b]">상품 참고 이미지 (선택, 최대 4장)</p>
+                    <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e4e4e7] bg-white px-3 py-1.5 text-xs font-semibold text-[#111111] transition hover:border-[#0066ff]">
+                      <ImagePlus className="h-3.5 w-3.5" />
+                      선택
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
+                    </label>
+                  </div>
+                  {referenceFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {referenceFiles.map((file) => (
+                        <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs text-[#52525b]">
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setReferenceFiles(current => current.filter(item => item !== file))}
+                            className="rounded p-1 text-[#71717a] hover:bg-[#e4e4e7]"
+                            aria-label={`${file.name} 제거`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleGenerate}
@@ -363,6 +430,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           <BriefRow label="콘텐츠" value={readyParams?.contentType ?? ''} />
           <BriefRow label="비주얼" value={readyParams?.visualHint ?? ''} />
           <BriefRow label="슬라이드" value={readyParams?.slideCount ? `${readyParams.slideCount}장` : ''} />
+          <BriefRow label="참고 이미지" value={referenceFiles.length ? `${referenceFiles.length}장` : ''} />
           <BriefRow
             label="URL"
             value={

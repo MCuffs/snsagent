@@ -1,6 +1,7 @@
 export type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
 
 export const SUBSCRIPTION_PLANS = ['FREE', 'LITE', 'PRO', 'UNLIMITED'] as const
+export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['LITE', 'PRO', 'UNLIMITED']
 
 export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
   return SUBSCRIPTION_PLANS.includes(plan as SubscriptionPlan)
@@ -16,32 +17,32 @@ export interface PlanFeature {
 
 export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
-    name: 'Free',
-    monthlyCardLimit: 5,
+    name: 'No Pass',
+    monthlyCardLimit: 0,
     hasWatermark: true,
-    description: '무료로 시작해 Shuffla를 경험해보세요',
-    price: '무료',
+    description: 'Google Login 후 이용권을 선택하세요',
+    price: '이용권 없음',
   },
   LITE: {
-    name: 'Lite',
-    monthlyCardLimit: 30,
+    name: 'Single',
+    monthlyCardLimit: 1,
     hasWatermark: false,
-    description: '1인 브랜드와 소상공인을 위한 운영 플랜',
-    price: '월 19,000원',
+    description: '한 번의 캠페인을 부담 없이 제작하는 입문 플랜',
+    price: '월 3,000원',
   },
   PRO: {
-    name: 'Pro',
-    monthlyCardLimit: 100,
+    name: 'Creator',
+    monthlyCardLimit: 10,
     hasWatermark: false,
-    description: '적극적으로 콘텐츠를 운영하는 마케터 플랜',
-    price: '월 49,000원',
+    description: '매주 콘텐츠를 제작하는 브랜드 운영 플랜',
+    price: '월 19,000원',
   },
   UNLIMITED: {
-    name: 'Unlimited',
-    monthlyCardLimit: 9999,
+    name: 'Studio',
+    monthlyCardLimit: 30,
     hasWatermark: false,
-    description: '횟수 제한 없이 자유롭게 생성하는 프리미엄 플랜',
-    price: '월 99,000원',
+    description: '다수 캠페인을 운영하는 팀용 제작 플랜',
+    price: '월 45,000원',
   },
 }
 

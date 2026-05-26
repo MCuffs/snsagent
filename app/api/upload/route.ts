@@ -17,6 +17,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '파일이 없습니다.' }, { status: 400 })
     }
 
+    if (files.length > 4) {
+      return NextResponse.json({ error: '이미지는 한 번에 최대 4개까지 업로드할 수 있습니다.' }, { status: 400 })
+    }
+
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     const maxSize = 10 * 1024 * 1024 // 10MB
 
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
         const dir = path.join(process.cwd(), 'public', 'uploads')
         fs.mkdirSync(dir, { recursive: true })
         fs.writeFileSync(path.join(dir, fileName), buffer)
-        urls.push(`/uploads/${fileName}`)
+        urls.push(new URL(`/uploads/${fileName}`, request.url).toString())
       }
     }
 

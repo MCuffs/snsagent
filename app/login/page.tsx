@@ -79,7 +79,7 @@ export default async function LoginPage({
               <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-base font-black text-[#4285f4]">
                 G
               </span>
-              Google로 계속하기
+              Google Login
             </Link>
 
             {process.env.NODE_ENV !== 'production' && (

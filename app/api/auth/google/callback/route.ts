@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { GOOGLE_OAUTH_STATE_COOKIE_NAME, normalizeSessionEmail, SESSION_COOKIE_NAME, sessionCookieOptions } from '../../../../../lib/auth/session'
+import { createSessionToken, GOOGLE_OAUTH_STATE_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, normalizeSessionEmail, SESSION_COOKIE_NAME, sessionCookieOptions } from '../../../../../lib/auth/session'
 import { dbService } from '../../../../../lib/db-service'
 import { exchangeGoogleCode, fetchGoogleUserInfo } from '../../../../../lib/google/oauth'
 
@@ -34,7 +34,8 @@ export async function GET(request: Request) {
 
     const response = NextResponse.redirect(new URL('/concept', request.url))
     response.cookies.delete(GOOGLE_OAUTH_STATE_COOKIE_NAME)
-    response.cookies.set(SESSION_COOKIE_NAME, email, sessionCookieOptions())
+    response.cookies.set(SESSION_COOKIE_NAME, createSessionToken(email), sessionCookieOptions())
+    response.cookies.delete(LEGACY_SESSION_COOKIE_NAME)
 
     return response
   } catch (err) {

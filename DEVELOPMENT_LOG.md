@@ -112,3 +112,127 @@ This file records meaningful development work, fixes, verification commands, and
 - `npx prisma generate`
 - `npm run lint`
 - `npm run build`
+
+## 2026-05-22 KST
+
+### Summary
+- Introduced URL-driven brand profiling and expanded the media-card rendering system.
+- Added the first AI-assisted simplified campaign generation workflow and scheduler corrections.
+
+### Changes
+- Added website/store URL scraping and AI brand profile generation, including Naver Smartstore fallback handling.
+- Connected generated brand profiles to campaign creation.
+- Added and refined the media carousel layout stack: layout definitions, typography, overlay rendering, reference pattern analysis, and quality checks.
+- Added the 10 editorial layout configurations used by the media pipeline.
+- Fixed relative generated-image URL conversion for Instagram scheduler and cron publishing.
+- Continued landing and dashboard visual iteration.
+
+### Git History
+- `fda0b25` URL-based AI brand profiler
+- `4cc28cf` Naver Smartstore fallback handling
+- `1aafd59` simplified AI-assisted generator
+- `0736457` Korean editorial rendering engine
+- `64faa8b` enhanced carousel engines and campaign data
+
+## 2026-05-23 to 2026-05-24 KST
+
+### Summary
+- Stabilized brand save and rendering behavior.
+- Added multi-agent quality reporting and expanded error logging around generation.
+
+### Changes
+- Wired `OPENAI_BASE_URL` through AI clients and addressed missing-brand paths.
+- Fixed brand upsert/save feedback and renderer issues involving Korean typography, line breaks, and clipped titles.
+- Added carousel agents and persisted `agentReport` data on generated campaigns.
+- Expanded action/API error logging and protected ownership-sensitive paths.
+
+### Git History
+- `8f74769` brand-not-found fixes and AI base URL wiring
+- `b03712b` renderer whitespace and clipping fixes
+- `dc8122d` multi-agent system and error logging hooks
+- `df9c531` brand limit error handling
+
+## 2026-05-25 KST
+
+### Summary
+- Replaced the previous dashboard experience with the Shuffla CMS flow.
+- Added conversational Agent UX, expanded brand analysis providers, and implemented PayPal subscription plumbing.
+
+### Changes
+- Redesigned marketing pages and added `/pricing`, `/blog`, and the current Shuffla visual identity.
+- Added Brand DNA persistence, brand URL/product context, reference image upload API, and image/storage improvements.
+- Implemented PayPal subscription UI, activate/cancel/webhook API routes, schema support, and setup/migration scripts after a short-lived Stripe implementation was replaced.
+- Changed plans to `FREE`, `LITE`, `PRO`, `UNLIMITED` with card-news generation count limits.
+- Added the CMS routes `/concept`, `/generate`, `/works`, `/billing`, and `/campaign/[id]`; removed the earlier `(dashboard)` screen group.
+- Added Perplexity, Groq, Gemini, and Naver integrations to brand analysis.
+- Added `/api/agents/brand` and `/api/agents/generate` for conversational brand refinement and generation setup.
+- Added result-screen editing improvements including font/color controls, faster text rerendering, style regeneration, and Agent activity display.
+
+### Git History
+- `ca0b87a` PayPal integration replacing Stripe
+- `a8f0d32`, `bf2a1d6` CMS route introduction and dashboard removal
+- `e125736` current plan model
+- `610abc9` expanded brand analysis providers
+- `0e62ba9` conversational Agent UX
+
+### Known Follow-up Identified
+- The CMS migration removed the Instagram settings page while Meta OAuth callbacks still redirect to `/instagram`.
+- The result-screen background replacement and new-campaign navigation need route/API contract fixes.
+- Authentication session integrity and PayPal plan authorization remain production blockers.
+
+## 2026-05-26 KST
+
+### Summary
+- Recorded the current architecture, implementation status, and improvement priorities.
+
+### Changes
+- Added `CURRENT_STATUS_AND_IMPROVEMENTS.md` and `SYSTEM_ARCHITECTURE.md`.
+- Recorded the active media pipeline changes: objective forwarding and LLM-generated slide copy in `mediaCarouselPipeline`.
+- Reconciled `README.md` and `LAYERS.md` with the active CMS routes, PayPal implementation, current plan model, and unconnected Instagram UI.
+- Expanded the status document to distinguish connected implementation from production-readiness work.
+- Expanded `.env.example` with current analysis providers, PayPal, Prisma direct URL, OpenAI base URL, and cron configuration keys.
+
+### Verification
+- `npm ci` completed; npm reported 2 moderate vulnerabilities.
+- `npm run build` passed with Next.js `16.2.6`; build output listed the CMS, Agent, PayPal, and publishing API routes.
+- `npm run lint` failed with four existing errors: three in `app/(cms)/generate/GenerateForm.tsx` and one `prefer-const` issue in `app/actions.ts`; three unused-symbol warnings were also reported.
+
+### Git History
+- `c19c7d2` current system status and architecture
+
+## 2026-05-26 KST - Priority Remediation
+
+### Scope
+- Addressed the highest-risk authentication, subscription authorization, and connected CMS flow issues.
+- Kept the Instagram account connection and publishing UI outside this implementation scope for later development.
+
+### Changes
+- Replaced the trusted email cookie with an HMAC-signed session token using `SESSION_SECRET`, removed legacy cookies on sign-in/sign-out, and blocked development email login in production.
+- Changed PayPal activation to derive the internal plan only from the verified subscription `plan_id`, blocked direct paid-plan assignment, and aligned the cancellation UI with the current immediate `FREE` transition policy.
+- Connected up to four product reference image uploads from `/generate`, corrected the result-screen background replacement upload contract, and routed new generation requests to `/generate`.
+- Normalized legacy saved plan values in billing/result pages and completed mock PayPal subscription persistence for local verification.
+- Hardened external URL collection against private-address/redirect/oversized-response SSRF cases and limited image-provider reference fetches to trusted uploaded URLs.
+- Added fallback guards for missing AI array fields in the media and commerce carousel generation paths.
+- Updated the status, architecture, layering, README, and environment setup documents to match the implemented behavior and deferred Instagram scope.
+
+### Verification
+- `npm run lint` passed after remediation.
+- `npm run build` passed with Next.js `16.2.6`.
+- `npm ci` continues to report 2 moderate audit findings for follow-up dependency review.
+
+## 2026-05-26 KST - Frontend and Pricing Alignment
+
+### Changes
+- Replaced marketing `무료로 시작하기` calls to action with `Google Login` and changed landing claims to the implemented generate, edit, and download workflow.
+- Removed Instagram connection and automatic publishing claims from public marketing, pricing, blog, and CMS-visible status text; backend integration code remains deferred for a later product scope.
+- Replaced the exposed pricing tiers with Single (월 3,000원/1회), Creator (월 19,000원/10회), and Studio (월 45,000원/30회).
+- Changed internal `FREE` to an entitlement-free state used before purchase or after cancellation, and synchronized CMS limits and PayPal KRW setup definitions with the displayed prices.
+- Removed unimplemented watermark messaging from the result and billing screens and prevented users with an active subscription from selecting another PayPal subscription before cancellation.
+
+### Operational Note
+- Existing PayPal plan IDs do not acquire new prices automatically. Deployment must run `scripts/paypal-setup.mjs` for the KRW plans and replace `NEXT_PUBLIC_PAYPAL_PLAN_*` values before selling the new tiers.
+
+### Verification
+- `git diff --check` passed.
+- `npm run lint` passed.
+- `npm run build` passed with Next.js `16.2.6`; static generation completed for 20 pages.

@@ -72,7 +72,9 @@ JSON 응답 형식:
     })
   )
 
-  return result.hooks
+  const generatedHooks = Array.isArray(result?.hooks) ? result.hooks : []
+
+  return generatedHooks
     .map(hook => ({ ...hook, text: fitTwentyChars(hook.text) }))
     .sort((a, b) => b.score - a.score)
 }

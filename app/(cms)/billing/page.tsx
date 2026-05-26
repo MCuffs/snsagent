@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../actions'
 import { dbService } from '../../../lib/db-service'
-import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits'
+import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../lib/limits-types'
 import { PAYPAL_PLAN_IDS } from '../../../lib/paypal'
 import PricingClientView from './PricingClientView'
 
@@ -20,7 +20,7 @@ export default async function PricingPage({
   if (brands.length === 0) redirect('/concept')
 
   const params = searchParams ? await searchParams : {}
-  const plansList = Object.keys(PRICING_PLANS) as SubscriptionPlan[]
+  const plansList = PAID_SUBSCRIPTION_PLANS
   const hasSubscription = Boolean(user.paypalSubscriptionId)
 
   const paypalPlanIds: Record<string, string> = {}
@@ -37,7 +37,7 @@ export default async function PricingPage({
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[#111111]">요금제</h1>
             <p className="mt-1.5 text-sm text-[#52525b]">
-              플랜을 업그레이드하면 더 많은 카드뉴스와 고급 기능을 사용할 수 있습니다.
+              월 3,000원 1회부터 제작 빈도에 맞는 카드뉴스 이용권을 선택하세요.
             </p>
           </div>
         </div>
@@ -55,7 +55,7 @@ export default async function PricingPage({
       )}
 
       <PricingClientView
-        currentPlan={user.plan}
+        currentPlan={normalizePlan(user.plan)}
         plansList={plansList}
         hasSubscription={hasSubscription}
         paypalClientId={process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? ''}

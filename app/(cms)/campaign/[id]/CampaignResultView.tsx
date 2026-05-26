@@ -64,8 +64,7 @@ interface CampaignResultViewProps {
   campaign: Campaign
   post: Post
   brand: Brand
-  userPlan: string
-  hasWatermark: boolean
+  planName: string
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -123,8 +122,7 @@ export default function CampaignResultView({
   campaign,
   post,
   brand,
-  userPlan,
-  hasWatermark,
+  planName,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
@@ -290,14 +288,15 @@ export default function CampaignResultView({
     setMessage(null)
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('files', file)
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      const uploadData = await uploadRes.json() as { url?: string; error?: string }
-      if (!uploadRes.ok || !uploadData.url) {
+      const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
+      const backgroundUrl = uploadData.urls?.[0]
+      if (!uploadRes.ok || !backgroundUrl) {
         setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
         return
       }
-      const result = await replaceBackgroundAction(activeSlide.id, uploadData.url)
+      const result = await replaceBackgroundAction(activeSlide.id, backgroundUrl)
       if (!result.success) {
         setMessage({ type: 'error', text: result.error || '배경 교체에 실패했습니다.' })
         return
@@ -381,7 +380,7 @@ export default function CampaignResultView({
             {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             전체 다운로드
           </button>
-          <button type="button" onClick={() => router.push('/campaign/new')} className="btn-secondary px-5">
+          <button type="button" onClick={() => router.push('/generate')} className="btn-secondary px-5">
             <RefreshCw className="h-4 w-4" />
             새 카드뉴스 만들기
           </button>
@@ -549,8 +548,7 @@ export default function CampaignResultView({
                   <Meta label="role" value={roleLabel} />
                   <Meta label="layout" value={layoutLabel} />
                   <Meta label="brand" value={brand.name} />
-                  <Meta label="plan" value={userPlan} />
-                  <Meta label="watermark" value={hasWatermark ? 'on' : 'off'} />
+                  <Meta label="plan" value={planName} />
                 </div>
 
                 <div className="space-y-4">
@@ -684,7 +682,7 @@ export default function CampaignResultView({
                 <div className="mb-5 flex items-center justify-between">
                   <div>
                     <p className="eyebrow">Caption</p>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">게시글 문안 메모</h2>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">콘텐츠 문안 메모</h2>
                   </div>
                   <Check className="h-5 w-5 text-[#ff4f0a]" />
                 </div>
@@ -723,7 +721,7 @@ export default function CampaignResultView({
                         </div>
                         <p className="mt-1 text-[11px] font-bold text-[#746a62]">
                           {agentReportData.status === 'passed'
-                            ? '✅ 품질 기준 통과 (발행 권장)'
+                            ? '✅ 품질 기준 통과 (사용 권장)'
                             : '⚠️ 일부 조정 권장 (needs_review)'}
                         </p>
                       </div>

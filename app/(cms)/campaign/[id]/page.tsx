@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
-import { PRICING_PLANS, SubscriptionPlan } from '../../../../lib/limits'
+import { PRICING_PLANS } from '../../../../lib/limits'
+import { normalizePlan } from '../../../../lib/limits-types'
 import CampaignResultView from './CampaignResultView'
 
 export const dynamic = 'force-dynamic'
@@ -26,9 +27,8 @@ export default async function CampaignDetailsPage({
   const post = posts.find(p => p.campaignId === campaign.id)
   if (!post) redirect('/works')
 
-  const userPlan = (user.plan || 'FREE') as SubscriptionPlan
-  const planConfig = PRICING_PLANS[userPlan]
-  const hasWatermark = planConfig.hasWatermark
+  const userPlan = normalizePlan(user.plan || 'FREE')
+  const planName = PRICING_PLANS[userPlan].name
 
   const serializedCampaign = {
     id: campaign.id,
@@ -67,8 +67,7 @@ export default async function CampaignDetailsPage({
       campaign={serializedCampaign}
       post={serializedPost}
       brand={serializedBrand}
-      userPlan={userPlan}
-      hasWatermark={hasWatermark}
+      planName={planName}
     />
   )
 }

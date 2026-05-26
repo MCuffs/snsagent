@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ArrowRight, Bot, CheckCircle2, Globe, Loader2, MessageCircle, Palette, Save, Send, Sparkles, X } from 'lucide-react'
+import { AlertCircle, ArrowRight, CheckCircle2, Globe, Loader2, MessageCircle, Save, Send, Sparkles, X } from 'lucide-react'
 import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
 import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
 import { motion, AnimatePresence } from 'framer-motion'

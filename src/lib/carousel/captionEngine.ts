@@ -49,7 +49,8 @@ JSON 응답 형식:
     () => buildFallbackCaption(brand, input, strategy, selectedHook)
   )
 
-  const hashtags = result.hashtags
+  const generatedHashtags = Array.isArray(result?.hashtags) ? result.hashtags : []
+  const hashtags = generatedHashtags
     .map(tag => (tag.startsWith('#') ? tag : `#${tag}`))
     .filter(tag => tag.length > 1)
     .slice(0, 15)

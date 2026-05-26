@@ -13,7 +13,7 @@ export interface User {
   id: string
   email: string
   name: string | null
-  plan: string // FREE, STARTER, PRO, AGENCY
+  plan: string // FREE, LITE, PRO, UNLIMITED
   paypalSubscriptionId: string | null
   paypalSubscriptionStatus: string | null
   createdAt: Date
@@ -269,8 +269,10 @@ export const dbService = {
     } else {
       const db = initMockDb()
       const userIndex = db.users.findIndex(u => u.id === userId)
-      if (userIndex !== -1 && data.plan) {
-        db.users[userIndex].plan = data.plan
+      if (userIndex !== -1) {
+        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        if (data.paypalSubscriptionId !== undefined) db.users[userIndex].paypalSubscriptionId = data.paypalSubscriptionId
+        if (data.paypalSubscriptionStatus !== undefined) db.users[userIndex].paypalSubscriptionStatus = data.paypalSubscriptionStatus
         db.users[userIndex].updatedAt = new Date()
         writeMockDb(db)
       }
@@ -281,7 +283,8 @@ export const dbService = {
     if (!isMock()) {
       return prisma.user.findUnique({ where: { paypalSubscriptionId } })
     }
-    return null
+    const db = initMockDb()
+    return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
   },
 
   // Brand operations

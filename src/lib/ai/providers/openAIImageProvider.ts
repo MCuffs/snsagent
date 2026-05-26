@@ -103,6 +103,9 @@ export class OpenAIImageProvider implements ImageProvider {
   ): Promise<{ imageUrl: string }> {
     const imageFiles = await Promise.all(
       refUrls.slice(0, 4).map(async (url, i) => {
+        if (!isTrustedUploadedReference(url)) {
+          throw new Error('Reference image must be an uploaded Shuffla asset.')
+        }
         const res = await fetch(url)
         if (!res.ok) throw new Error(`Reference image fetch failed: ${url}`)
         const arrayBuffer = await res.arrayBuffer()
@@ -129,5 +132,19 @@ export class OpenAIImageProvider implements ImageProvider {
       return { imageUrl: `data:image/png;base64,${image.b64_json}` }
     }
     return { imageUrl: image?.url || '' }
+  }
+}
+
+function isTrustedUploadedReference(value: string) {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+    if (url.hostname.endsWith('.public.blob.vercel-storage.com')) return true
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000'
+    const appOrigin = new URL(appUrl).origin
+    return url.origin === appOrigin && url.pathname.startsWith('/uploads/')
+  } catch {
+    return false
   }
 }

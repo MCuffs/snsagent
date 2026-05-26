@@ -64,6 +64,20 @@ export function getTokenEncryptionSecret() {
   return 'shuffla-local-development-token-key'
 }
 
+export function getSessionSigningSecret() {
+  const secret = readEnv('SESSION_SECRET') || readEnv('AUTH_SECRET')
+
+  if (secret && secret !== 'replace-with-a-long-random-secret' && secret.length >= 32) {
+    return secret
+  }
+
+  if (isProduction()) {
+    throw new Error('SESSION_SECRET must be set to a strong secret in production.')
+  }
+
+  return 'shuffla-local-development-session-signing-key'
+}
+
 export function isConfiguredOpenAIKey(apiKey: string | undefined) {
   if (!apiKey) return false
   const normalized = apiKey.trim()

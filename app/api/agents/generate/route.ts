@@ -72,7 +72,7 @@ ${dnaText}
 
 ## 비주얼 힌트 선택 가이드
 - dark-editorial: 무게감 있는 에디토리얼, 저장형 콘텐츠에 최적
-- trend-feed: 트렌디한 인스타 피드, 구매 전환에 최적
+- trend-feed: 트렌디한 소셜 피드, 구매 전환에 최적
 - community-style: 커뮤니티 감성, 팔로워 유입에 최적
 - minimal-clean: 깔끔한 미니멀, 정보형 콘텐츠에 최적
 - breaking-news: 뉴스형 강렬함, 이슈/프로모션에 최적

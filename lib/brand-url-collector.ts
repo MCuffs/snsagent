@@ -1,3 +1,6 @@
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
+
 export interface BrandUrlCollection {
   requestedUrl: string
   finalUrl: string
@@ -16,6 +19,8 @@ const USER_AGENTS = {
   desktop: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   mobile: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1',
 }
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+const MAX_REDIRECTS = 4
 
 export async function collectBrandUrlContext(url: string, options?: { isNaverStore?: boolean }): Promise<BrandUrlCollection> {
   const candidates = buildUrlCandidates(url, options?.isNaverStore)
@@ -31,7 +36,7 @@ export async function collectBrandUrlContext(url: string, options?: { isNaverSto
         continue
       }
 
-      const html = await response.text()
+      const html = await readResponseText(response)
       const extracted = extractBrandSignals(html, response.url || candidate.url)
       if (extracted.sourceText.length < 50) {
         lastError = new Error('Not enough readable text')
@@ -125,24 +130,119 @@ function buildUrlCandidates(url: string, isNaverStore?: boolean): FetchCandidate
 }
 
 async function fetchHtml(url: string, isNaverStore?: boolean) {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 12000)
-  try {
-    return await fetch(url, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Referer: isNaverStore ? 'https://m.search.naver.com/' : new URL(url).origin,
-        'User-Agent': isNaverStore ? USER_AGENTS.mobile : USER_AGENTS.desktop,
-      },
-    })
-  } finally {
-    clearTimeout(timeoutId)
+  let currentUrl = url
+
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    const validatedUrl = await validateExternalUrl(currentUrl)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
+    try {
+      const response = await fetch(validatedUrl, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          Referer: isNaverStore ? 'https://m.search.naver.com/' : validatedUrl.origin,
+          'User-Agent': isNaverStore ? USER_AGENTS.mobile : USER_AGENTS.desktop,
+        },
+      })
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location')
+        if (!location) return response
+        currentUrl = new URL(location, validatedUrl).toString()
+        continue
+      }
+      return response
+    } finally {
+      clearTimeout(timeoutId)
+    }
   }
+
+  throw new Error('리다이렉트 횟수가 허용 범위를 초과했습니다.')
+}
+
+async function validateExternalUrl(value: string) {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error('유효한 URL이 아닙니다.')
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('HTTP 또는 HTTPS 주소만 사용할 수 있습니다.')
+  }
+  if (url.username || url.password) {
+    throw new Error('인증 정보가 포함된 URL은 사용할 수 없습니다.')
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '')
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+    throw new Error('내부 네트워크 주소는 사용할 수 없습니다.')
+  }
+
+  const addresses = isIP(hostname)
+    ? [hostname]
+    : (await lookup(hostname, { all: true, verbatim: true })).map(result => result.address)
+  if (addresses.some(isPrivateAddress)) {
+    throw new Error('내부 네트워크 주소는 사용할 수 없습니다.')
+  }
+
+  return url
+}
+
+function isPrivateAddress(address: string) {
+  const normalized = address.toLowerCase()
+  if (normalized.includes(':')) {
+    if (normalized === '::' || normalized === '::1') return true
+    if (normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:')) return true
+    if (normalized.startsWith('::ffff:')) return isPrivateAddress(normalized.slice(7))
+    return false
+  }
+
+  const parts = normalized.split('.').map(Number)
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part))) return true
+  const [first, second] = parts
+  return first === 0
+    || first === 10
+    || first === 127
+    || (first === 169 && second === 254)
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || first >= 224
+}
+
+async function readResponseText(response: Response) {
+  const declaredLength = Number(response.headers.get('content-length') || '0')
+  if (declaredLength > MAX_RESPONSE_BYTES) {
+    throw new Error('페이지 응답 크기가 허용 범위를 초과했습니다.')
+  }
+  if (!response.body) return ''
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+  const reader = response.body.getReader()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_RESPONSE_BYTES) {
+      await reader.cancel()
+      throw new Error('페이지 응답 크기가 허용 범위를 초과했습니다.')
+    }
+    chunks.push(value)
+  }
+
+  const output = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(output)
 }
 
 function extractMetadata(html: string) {

@@ -373,7 +373,8 @@ JSON 응답 형식:
     () => ({ slides: slides.map(s => ({ slideNumber: s.slideNumber, headline: s.headline, body: s.body })) })
   )
 
-  const copyMap = new Map(result.slides.map(s => [s.slideNumber, s]))
+  const generatedSlides = Array.isArray(result?.slides) ? result.slides : []
+  const copyMap = new Map(generatedSlides.map(s => [s.slideNumber, s]))
 
   return slides.map(slide => {
     const generated = copyMap.get(slide.slideNumber)

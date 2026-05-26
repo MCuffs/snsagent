@@ -68,7 +68,8 @@ JSON 응답 형식:
     })
   )
 
-  const slidesMap = new Map(result.slides.map(s => [s.slideNumber, s]))
+  const generatedSlides = Array.isArray(result?.slides) ? result.slides : []
+  const slidesMap = new Map(generatedSlides.map(s => [s.slideNumber, s]))
 
   return structure.slides
     .map(slide => {

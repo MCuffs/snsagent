@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  L1  PRESENTATION          app/(dashboard)/*, app/login/            │
+│  L1  PRESENTATION          app/(cms)/*, app/login/, marketing pages │
 ├─────────────────────────────────────────────────────────────────────┤
 │  L2  APPLICATION           app/actions.ts, app/api/**               │
 ├──────────────────────┬──────────────────────────────────────────────┤
@@ -48,23 +48,25 @@
 
 ### 소속 파일
 ```
-app/(dashboard)/brand/BrandForm.tsx
-app/(dashboard)/brand/page.tsx
-app/(dashboard)/calendar/CalendarView.tsx
-app/(dashboard)/calendar/page.tsx
-app/(dashboard)/campaign/new/CreateCampaignForm.tsx
-app/(dashboard)/campaign/new/page.tsx
-app/(dashboard)/campaign/[id]/CampaignResultView.tsx
-app/(dashboard)/campaign/[id]/page.tsx
-app/(dashboard)/dashboard/page.tsx
-app/(dashboard)/instagram/page.tsx
-app/(dashboard)/layout.tsx
-app/(dashboard)/pricing/PricingClientView.tsx
-app/(dashboard)/pricing/page.tsx
+app/(cms)/concept/ConceptForm.tsx
+app/(cms)/concept/page.tsx
+app/(cms)/generate/GenerateForm.tsx
+app/(cms)/generate/page.tsx
+app/(cms)/works/WorksGrid.tsx
+app/(cms)/works/page.tsx
+app/(cms)/campaign/[id]/CampaignResultView.tsx
+app/(cms)/campaign/[id]/page.tsx
+app/(cms)/billing/PricingClientView.tsx
+app/(cms)/billing/page.tsx
+app/(cms)/layout.tsx
 app/components/InstagramIcon.tsx
+app/components/MarketingFooter.tsx
+app/components/MarketingNav.tsx
 app/layout.tsx
 app/login/page.tsx
 app/page.tsx
+app/pricing/page.tsx
+app/blog/page.tsx
 app/globals.css
 ```
 
@@ -81,7 +83,7 @@ app/globals.css
 - 비즈니스 로직 포함 (유효성 검사 이상의 로직)
 
 ### 확장 규칙
-새 페이지 → `app/(dashboard)/[feature]/page.tsx` + 필요시 `[feature]/[Component].tsx`
+새 인증 후 페이지 → `app/(cms)/[feature]/page.tsx` + 필요시 `[feature]/[Component].tsx`
 새 공통 컴포넌트 → `app/components/[Component].tsx`
 
 ---
@@ -95,6 +97,9 @@ app/globals.css
 ```
 app/actions.ts                              ← Server Actions (UI에서 호출)
 src/app/api/campaigns/generate/route.ts    ← REST API (외부/클라이언트 호출)
+app/api/campaigns/generate/route.ts        ← 실제 App Router bridge
+app/api/agents/brand/route.ts              ← 대화형 브랜드 보정 API
+app/api/agents/generate/route.ts           ← 대화형 생성 조건 수집 API
 app/api/auth/google/callback/route.ts
 app/api/auth/google/start/route.ts
 app/api/auth/meta/callback/route.ts
@@ -102,6 +107,10 @@ app/api/auth/meta/start/route.ts
 app/api/auth/test-login/route.ts
 app/api/instagram/accounts/route.ts
 app/api/cron/publish/route.ts
+app/api/paypal/activate/route.ts
+app/api/paypal/cancel/route.ts
+app/api/paypal/webhook/route.ts
+app/api/upload/route.ts
 ```
 
 ### 허용
@@ -117,8 +126,8 @@ app/api/cron/publish/route.ts
 - 이미지 생성 로직 포함
 - 비즈니스 알고리즘 포함
 
-### 현재 위반 사항 ⚠️
-`app/actions.ts`의 `analyzeBrandWebsiteAction`, `recommendCampaignAction`에서 OpenAI SDK를 직접 사용 중.
+### 현재 위반 사항
+`app/actions.ts`의 `analyzeBrandWebsiteAction`, `recommendCampaignAction`과 `app/api/agents/*` 라우트에서 공급자 SDK 또는 LLM 호출을 직접 수행한다.
 → 향후 `lib/ai/brandAnalyzer.ts`, `lib/ai/campaignRecommender.ts`로 추출 예정 (L6 소속)
 
 ### 확장 규칙
@@ -136,7 +145,7 @@ app/api/cron/publish/route.ts
 ```
 lib/limits.ts              ← 플랜별 한도 실행 함수
 lib/limits-types.ts        ← SubscriptionPlan, PRICING_PLANS 정의
-lib/auth/session.ts        ← 세션 쿠키 관리
+lib/auth/session.ts        ← HMAC 서명 세션 토큰/쿠키 관리
 lib/brand-dna.ts           ← BrandDna 타입, parse/build/stringify
 lib/brand-url-collector.ts ← 브랜드 URL 스크래핑
 lib/env.ts                 ← 환경변수 접근자 (인프라 경계 추상화)
@@ -158,9 +167,11 @@ interface BrandDna {
 }
 
 // lib/limits-types.ts
-type SubscriptionPlan = 'FREE' | 'STARTER' | 'PRO' | 'AGENCY'
-interface PlanFeature { monthlyCampaignLimit, brandLimit, canSchedule, hasWatermark }
+type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
+interface PlanFeature { name, monthlyCardLimit, hasWatermark, description, price }
 ```
+
+`FREE`는 생성 권한 없는 내부 상태이고, 유료 표시명/한도는 `LITE`=Single 1회, `PRO`=Creator 10회, `UNLIMITED`=Studio 30회로 유지한다.
 
 ### 허용
 - L10 (`dbService`) 조회 — 규칙 판정에 필요한 데이터 읽기
@@ -459,7 +470,8 @@ approveAndScheduleCampaignAction (L2)
 ```
 
 ### 현재 한계 ⚠️
-- Cron이 자동 실행되려면 Vercel Cron 설정 필요 (현재 수동 트리거만 가능)
+- CMS에 Instagram 설정/연결/발행 화면이 없고, Meta OAuth callback의 `/instagram` 대상 라우트도 현재 존재하지 않음
+- Cron이 자동 실행되려면 배포 환경의 Cron 설정 필요
 - 재시도 로직 없음 — 발행 실패 시 `status=failed`로 영구 처리
 - 작업 큐 없음
 
@@ -489,7 +501,7 @@ BLOB_READ_WRITE_TOKEN 없음  → 로컬 public/generated/carousel/ (상대 경�
 
 ### DB 모델 요약
 ```
-User          id, email, name, plan (FREE|STARTER|PRO|AGENCY)
+User          id, email, name, plan (FREE|LITE|PRO|UNLIMITED), paypalSubscriptionId
 Brand         id, userId, name, industry, ..., brandDna (JSON string)
 InstagramAccount  id, userId, brandId, accessTokenEncrypted, status
 Campaign      id, userId, brandId, status (draft→generated→scheduled→posted)
@@ -558,9 +570,11 @@ isConfiguredOpenAIKey(apiKey)
 
 ## 데이터 흐름 다이어그램
 
-### A. 카드뉴스 생성 (Media Pipeline)
+### A. 카드뉴스 생성 (현재 CMS Media Pipeline)
 ```
-[L1] CreateCampaignForm 제출
+[L1] GenerateForm 대화 입력
+  → POST /api/agents/generate (생성 조건 수집)
+  → 사용자 생성 확정
   ↓
 [L2] POST /api/campaigns/generate
   → getSessionUser() [L3 auth]
@@ -587,10 +601,8 @@ isConfiguredOpenAIKey(apiKey)
 [L1] CampaignResultView 렌더링
 ```
 
-### B. 인스타그램 발행
+### B. 인스타그램 발행 (백엔드 경로만 존재, CMS UI 미연결)
 ```
-[L1] 승인 버튼 클릭
-  ↓
 [L2] approveAndScheduleCampaignAction()
   → campaign.slides[].imageUrl 수집
   → schedulePost() [L9]
@@ -600,16 +612,17 @@ isConfiguredOpenAIKey(apiKey)
 [L1] 상태 업데이트 표시
 ```
 
-### C. 브랜드 URL 분석
+### C. 브랜드 URL 분석 및 보정
 ```
 [L1] URL 입력
   ↓
 [L2] analyzeBrandWebsiteAction()
   → collectBrandUrlContext() [L3]
-  → OpenAI GPT-4o 직접 호출 ← ⚠️ L6 위반 (향후 개선)
+  → configured provider 분석 직접 호출 ← L6 분리 필요
   → buildBrandDnaFromProfile() [L3]
   ↓
-[L1] BrandForm 자동 채움
+[L1] ConceptForm 자동 채움/저장
+  → POST /api/agents/brand (선택적 대화 보정, 현재 L2에서 OpenAI 직접 호출)
 ```
 
 ---
@@ -619,18 +632,22 @@ isConfiguredOpenAIKey(apiKey)
 ### 현재 위반 (기술 부채)
 | 위치 | 위반 내용 | 심각도 | 개선 방향 |
 |------|-----------|--------|-----------|
-| `app/actions.ts:analyzeBrandWebsiteAction` | L2에서 OpenAI 직접 호출 | 중 | `lib/ai/brandAnalyzer.ts` (L6)로 추출 |
-| `app/actions.ts:recommendCampaignAction` | L2에서 OpenAI 직접 호출 | 중 | `lib/ai/campaignRecommender.ts` (L6)로 추출 |
+| `app/actions.ts:analyzeBrandWebsiteAction` | L2에서 분석 공급자 직접 호출 | 중 | `lib/ai/brandAnalyzer.ts` (L6)로 추출 |
+| `app/actions.ts:recommendCampaignAction` | L2에서 LLM 직접 호출 | 중 | `lib/ai/campaignRecommender.ts` (L6)로 추출 |
+| `app/api/agents/brand/route.ts`, `app/api/agents/generate/route.ts` | L2 route에서 OpenAI 직접 호출 | 중 | Agent service/provider 모듈로 추출 |
 | `src/lib/typography/typographyEngine.ts` | L8 중복 구현 | 하 | `src/lib/layout/typographyEngine.ts`로 통합 |
 | `lib/ai/generateCarousel.ts` | L7 레거시 파일 | 하 | `src/lib/ai/` 구조로 통합 |
 | `lib/db-service.ts:DB_FILE_PATH` | JSON 파일 DB 잔재 | 하 | 제거 |
 
 ### 우선 순위 개선 항목
-1. **완료** ✅ L10 Storage → Vercel Blob 교체
-2. **예정** `lib/ai/brandAnalyzer.ts` 추출 (L2→L6 정리)
-3. **예정** `lib/ai/campaignRecommender.ts` 추출 (L2→L6 정리)
-4. **예정** L9 Distribution 재시도 로직 + Vercel Cron 설정
-5. **장기** L5 Agent의 QualityGuard → 실패 시 재생성 트리거 구현
+1. **구현됨** L10 Storage에 Vercel Blob과 로컬 fallback 저장 경로 연결
+2. **구현됨** HMAC 서명 세션, PayPal `plan_id` 검증, CMS 참고 이미지/배경 업로드/생성 이동 경로 수정
+3. **구현됨** URL 수집 SSRF 방어와 주요 AI 배열 응답 fallback 보강
+4. **구현됨** 공개 UI의 Google Login CTA 및 Single/Creator/Studio 유료 플랜과 내부 생성 한도 정합성 반영
+5. **예정** 업로드 쿼터/속도 제한, 운영 DB fail-closed, 새 PayPal plan ID 설정과 외부 서비스 E2E
+6. **예정** `lib/ai/brandAnalyzer.ts` 및 Agent service 추출 (L2→L6 정리)
+7. **추후 범위** L9 Instagram Distribution UI 복구, 재시도 로직, Cron 배포 설정
+8. **장기** L5 Agent의 QualityGuard → 실패 시 재생성 트리거 구현
 
 ---
 

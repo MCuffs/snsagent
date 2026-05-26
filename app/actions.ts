@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
 import { schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
-import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGeminiApiKey, isConfiguredGeminiKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi } from '../lib/env'
+import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGeminiApiKey, isConfiguredGeminiKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi, isProduction } from '../lib/env'
 import { OpenAI } from 'openai'
 import { analyzeBrandWithGemini } from '../lib/gemini'
 import { analyzeBrandWithGroq } from '../lib/groq'
@@ -17,7 +17,7 @@ import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTyp
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
-import { normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
+import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
 
@@ -72,7 +72,7 @@ function withBrandDna<T extends {
 // Helper to get authenticated user from session cookies
 export async function getSessionUser(): Promise<User | null> {
   const cookieStore = await cookies()
-  const email = cookieStore.get(SESSION_COOKIE_NAME)?.value
+  const email = readSessionEmail(cookieStore.get(SESSION_COOKIE_NAME)?.value)
   if (!email) return null
   
   try {
@@ -85,14 +85,18 @@ export async function getSessionUser(): Promise<User | null> {
 
 // User Mock Login Action
 export async function loginAction(email: string, name?: string) {
+  if (isProduction()) {
+    return failed('운영 환경에서는 Google 로그인을 사용해 주세요.')
+  }
+
   if (!email || !email.includes('@')) {
     return failed('올바른 이메일 주소를 입력해주세요.')
   }
 
-  const normalizedEmail = normalizeSessionEmail(email)
-  const user = await dbService.getOrCreateUser(normalizedEmail, name)
+  const user = await dbService.getOrCreateUser(email.trim().toLowerCase(), name)
   const cookieStore = await cookies()
-  cookieStore.set(SESSION_COOKIE_NAME, normalizedEmail, sessionCookieOptions())
+  cookieStore.set(SESSION_COOKIE_NAME, createSessionToken(user.email), sessionCookieOptions())
+  cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
 
   return { success: true as const, user }
 }
@@ -101,6 +105,7 @@ export async function loginAction(email: string, name?: string) {
 export async function logoutAction() {
   const cookieStore = await cookies()
   cookieStore.delete(SESSION_COOKIE_NAME)
+  cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
   return { success: true as const }
 }
 
@@ -111,6 +116,10 @@ export async function changeUserPlanAction(plan: string) {
 
   if (!isSubscriptionPlan(plan)) {
     return failed('지원하지 않는 요금제입니다.')
+  }
+
+  if (plan !== 'FREE') {
+    return failed('유료 플랜 변경은 결제 승인 후에만 가능합니다.')
   }
 
   await dbService.updateUserPlan(user.id, plan)
@@ -789,24 +798,6 @@ function readRecommendedKeyContent(value: unknown, fallback: string) {
   return lines.length > 0 ? lines.join('\n') : fallback
 }
 
-function extractSmartStoreShopId(urlStr: string): string | null {
-  try {
-    const parsedUrl = new URL(urlStr)
-    const hostname = parsedUrl.hostname
-    if (hostname.includes('smartstore.naver.com')) {
-      const pathname = parsedUrl.pathname // e.g. "/hu100"
-      const segments = pathname.split('/').filter(Boolean)
-      if (segments.length > 0) {
-        return segments[0]
-      }
-    }
-  } catch {
-    const match = urlStr.match(/smartstore\.naver\.com\/([^/?#]+)/)
-    if (match) return match[1]
-  }
-  return null
-}
-
 function getGenericWebsiteFallback(url: string) {
   let host = 'brand'
   try {
@@ -880,7 +871,7 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
 * **브랜드 메시지**: "하루 100%의 완전한 휴식과 건강을 채우는 시간"
 * **권장 톤앤매너**: 차분하고 다정하며 정보전달력이 우수한 어조.
 
-## 3. SNS 인스타그램 추천 전략
+## 3. SNS 카드뉴스 콘텐츠 전략
 * **콘텐츠 포커스**:
   1. **웰빙 정보성 콘텐츠**: 면역력을 지키는 생활 습관, 친환경 제품 고르는 법 등 유용한 상식을 가독성 높은 카드뉴스로 연재.
   2. **일상 공감 & 휴식**: 힐링 감성을 담은 릴스 및 자연 친화적 피드 비주얼 구축.
@@ -912,7 +903,7 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
 * **핵심 타겟**: 모바일 쇼핑과 빠른 배송, 상세페이지의 직관적 정보를 신뢰하는 스마트 쇼퍼.
 * **브랜드 경쟁력**: 트렌디한 셀렉션과 친절하고 신속한 네이버 톡톡 응대력.
 
-## 3. SNS 인스타그램 추천 전략
+## 3. SNS 카드뉴스 콘텐츠 전략
 * **콘텐츠 포커스**:
   1. **실제 사용 후기**: 고객의 리얼 포토리뷰를 활용한 소셜 프루프(Social Proof) 카드뉴스 제작.
   2. **혜택 안내**: 알림받기 동의 쿠폰, 포인트 적립 이벤트 등 스마트스토어 연동 혜택 적극 홍보.
@@ -931,7 +922,7 @@ export async function analyzeBrandWebsiteAction(url: string) {
     return failed('올바른 URL 형식(http:// 또는 https://)을 입력해 주세요.')
   }
 
-  let targetUrl = url
+  const targetUrl = url
   const isSmartStore = url.includes('smartstore.naver.com')
   const shopId = isSmartStore ? extractSmartStoreId(url) : null
 
@@ -1061,14 +1052,14 @@ ${cleanedText.slice(0, 5000)}
   · "친근하고 명확한 톤" · "전문적이고 신뢰감 있는 톤" · "젊고 경쾌한 톤" · "고급스럽고 차분한 톤"
 - mainColor: 브랜드 아이덴티티에 맞는 HEX 코드. 너무 밝거나(#ffffff 계열) 너무 어두운(#000000 계열) 극단값 금지
 - forbiddenWords: 이 업종에서 남용/스팸으로 여겨지는 표현 2~4개, 쉼표 구분
-- ctaStyle: 인스타그램에서 실제 사용할 짧은 CTA 문구
+- ctaStyle: 콘텐츠에서 실제 사용할 짧은 CTA 문구
 - brandDescription: 브랜드를 처음 보는 사람에게 설명하는 한국어 2~3문장 소개
 - coreProducts: 실제 판매/제공하는 구체적 상품명/서비스명 (최대 5개)
 - valueProposition: 브랜드가 고객에게 제공하는 핵심 약속 (1문장)
 - customerPainPoints: 이 브랜드가 해결하는 고객 고민 (최대 4개)
 - differentiators: 경쟁사 대비 구체적 차별점 (최대 4개)
 - visualMood: 카드뉴스 이미지 방향
-- contentPillars: 인스타그램 콘텐츠 주제 축 (최대 5개)
+- contentPillars: SNS 카드뉴스 콘텐츠 주제 축 (최대 5개)
 - brandKeywords: AI 카드뉴스 생성 시 반드시 반영할 키워드 (최대 8개)
 - avoidVisuals: 이 브랜드에 어울리지 않는 비주얼 스타일 (최대 4개)
 
@@ -1197,7 +1188,7 @@ JSON 형식으로만 응답하세요:`
           toneOfVoice: '전문적이고 신뢰감 있는 톤',
           mainColor: '#4A5568',
           forbiddenWords: '세계 1등, 절대 깨지지 않는, 무한 기능',
-          ctaStyle: '프로필 링크에서 무료로 시작하기'
+          ctaStyle: '프로필 링크에서 자세히 알아보기'
         }
         typeLabel = 'AI 기반 업무 자동화 SaaS 솔루션'
         strengths = '반복 업무 90% 이상 절감 및 사용자 친화적 대시보드'
@@ -1216,13 +1207,13 @@ JSON 형식으로만 응답하세요:`
 ## 2. 브랜드 정체성 & 강점
 * 핵심 타겟: ${mockProfile.targetAudience}
 * 브랜드 경쟁력: ${strengths}
-* 권장 톤앤매너: ${mockProfile.toneOfVoice} (일관된 인스타그램 브랜딩에 도움을 줍니다)
+* 권장 톤앤매너: ${mockProfile.toneOfVoice} (일관된 콘텐츠 브랜딩에 도움을 줍니다)
 
-## 3. SNS 인스타그램 추천 전략
+## 3. SNS 카드뉴스 콘텐츠 전략
 * 콘텐츠 포커스:
   1. 정보성 콘텐츠 위주로 전문성과 신뢰도를 확보합니다.
-  2. 고객 피드백과 비포/애프터(혹은 후기)를 가공해 캐러셀 카드뉴스로 발행합니다.
-* 사용 지양 용어 (금칙어): \`${mockProfile.forbiddenWords}\` (인스타그램 가이드라인 준수 및 브랜드 신뢰 유지를 위해 사용을 삼가세요)
+  2. 고객 피드백과 비포/애프터(혹은 후기)를 가공해 캐러셀 카드뉴스로 구성합니다.
+* 사용 지양 용어 (금칙어): \`${mockProfile.forbiddenWords}\` (콘텐츠 신뢰 유지를 위해 사용을 삼가세요)
 * 피드 전환율 상승을 위한 CTA: \`${mockProfile.ctaStyle}\`
 `
 
@@ -1253,13 +1244,13 @@ We tried to scrape the user's Naver SmartStore but were blocked (HTTP 429/403 or
 However, we know the SmartStore shop ID is "${shopId}" and the URL is "${url}".
 ${hint}
 
-Based on this information, infer/predict a highly relevant brand profile and write a professional brand identity & Instagram marketing strategy report in Markdown.
+Based on this information, infer/predict a highly relevant brand profile and write a professional brand identity and social card-news content strategy report in Markdown.
 
 [Requirements]
 1. Since we couldn't scrape, predict the brand profile values based on the shop ID "${shopId}". For "hu100", match it to a Wellness/Healthy food/Eco-friendly curated lifestyle store. For other IDs, generate a plausible modern online store profile.
 2. The tone of voice must match one of: "친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤".
 3. The industry must fit '온라인 스토어'.
-4. Write a beautiful brand identity and Instagram marketing report in Markdown (under "markdownReport") in Korean.
+4. Write a beautiful brand identity and social card-news content strategy report in Markdown (under "markdownReport") in Korean.
 5. Emphasize in the report that this profile was generated via our smart shop-ID analysis fallback engine due to temporary carrier block, but is tailored for their store.
 6. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
 
@@ -1361,7 +1352,7 @@ export async function recommendCampaignAction(brandId: string, topic: string) {
       const openai = new OpenAI({ apiKey })
       const prompt = `
 You are an expert AI Marketing Planner.
-Based on the following brand profile and a raw topic/idea for an Instagram carousel campaign, generate optimized configuration values and slide content for the campaign.
+Based on the following brand profile and a raw topic/idea for a social card-news campaign, generate optimized configuration values and slide content for the campaign.
 
 [Brand Profile]
 - Brand Name: ${brand.name}
@@ -1388,7 +1379,7 @@ ${topic}
    - "title": A concise Korean archive-card headline (under 18 Korean chars, no emoji, no markdown bold, do not prepend brand name unless the topic explicitly asks for it).
    - "keyContent": Detailed copy for each slide. Write one line per slide. The number of lines must match "slideCount". Each line should contain a short headline and sub-content separated by ":". Use the brand's industry, target audience, tone of voice, forbidden words, CTA style, and Brand DNA. At least 70% of slides must mention or imply the Brand DNA's product/service, differentiator, customer pain, or value proposition. Do not include markdown bold syntax (**).
    - "visualHint": A premium archive-card background prompt. It must match the Brand DNA's core products, visual mood, differentiators, and avoidVisuals. It should not ask for text in the image. Prefer product/editorial photography, muted archive layout, and enough lower-left blank negative space for app-rendered copy.
-   - "source": Recommended brand label/watermark (e.g. brand website, or Instagram handle, or simply "${brand.name}")
+   - "source": Recommended brand label/watermark (e.g. brand website, brand handle, or simply "${brand.name}")
 3. CRITICAL: Do NOT use markdown bold syntax (** or ***) anywhere in the text. Keep all text plain and clean.
 4. Avoid forbidden words exactly: ${brand.forbiddenWords || 'None'}.
 
@@ -1620,7 +1611,7 @@ function buildBrandKeyContent(input: {
 
 function buildBrandVisualHint(industry: string, mainColor: string, toneOfVoice: string) {
   const context = `${industry} ${toneOfVoice}`.toLowerCase()
-  const base = 'Korean premium archive Instagram card photography, no generated text, no logo, no watermark, object centered in upper-middle, quiet lower-left typography space'
+  const base = 'Korean premium archive social card photography, no generated text, no logo, no watermark, object centered in upper-middle, quiet lower-left typography space'
 
   if (/패션|의류|리빙|스토어|셀렉|온라인|bag|가방/.test(context)) {
     return `${base}, product archive still life, soft off-white studio background, fabric texture, black object details, subtle brand color ${mainColor}`
@@ -1646,4 +1637,3 @@ function removeForbiddenTerms(value: string, forbiddenWords: string[]) {
     return text.replaceAll(word, '')
   }, value).replace(/\s{2,}/g, ' ').trim()
 }
-

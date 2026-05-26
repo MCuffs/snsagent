@@ -7,7 +7,7 @@
  * Add PAYPAL_SANDBOX=true to use the sandbox environment.
  *
  * What it does:
- *   1. Creates PayPal products + monthly billing plans for STARTER / PRO / AGENCY
+ *   1. Creates PayPal products + monthly billing plans for Single / Creator / Studio
  *   2. Registers a webhook endpoint for your domain
  *   3. Prints all Vercel env var commands to run
  */
@@ -57,9 +57,9 @@ async function api(token, method, path, body) {
 }
 
 const PLANS = [
-  { key: 'LITE',      name: 'Shuffla Lite',      description: '1인 브랜드와 소상공인을 위한 플랜',    amount: '14.00', currency: 'USD' },
-  { key: 'PRO',       name: 'Shuffla Pro',        description: '적극적으로 콘텐츠를 운영하는 마케터 플랜', amount: '36.00', currency: 'USD' },
-  { key: 'UNLIMITED', name: 'Shuffla Unlimited',  description: '횟수 제한 없이 자유롭게 생성하는 플랜',  amount: '73.00', currency: 'USD' },
+  { key: 'LITE',      name: 'Shuffla Single',  description: '월 1회 카드뉴스 생성 플랜',  amount: '3000', currency: 'KRW' },
+  { key: 'PRO',       name: 'Shuffla Creator', description: '월 10회 카드뉴스 생성 플랜', amount: '19000', currency: 'KRW' },
+  { key: 'UNLIMITED', name: 'Shuffla Studio',  description: '월 30회 카드뉴스 생성 플랜', amount: '45000', currency: 'KRW' },
 ]
 
 async function main() {

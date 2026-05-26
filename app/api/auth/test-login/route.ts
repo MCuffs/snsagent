@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { dbService } from '../../../../lib/db-service'
-import { normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../../../../lib/auth/session'
+import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../../../../lib/auth/session'
 
 export const runtime = 'nodejs'
 
@@ -14,7 +14,8 @@ export async function GET(request: Request) {
   await dbService.getOrCreateUser(uniqueEmail, 'Local Test User')
 
   const cookieStore = await cookies()
-  cookieStore.set(SESSION_COOKIE_NAME, uniqueEmail, sessionCookieOptions())
+  cookieStore.set(SESSION_COOKIE_NAME, createSessionToken(uniqueEmail), sessionCookieOptions())
+  cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
 
   return NextResponse.redirect(new URL('/concept', request.url))
 }

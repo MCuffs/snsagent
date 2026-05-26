@@ -15,7 +15,7 @@ interface PricingClientViewProps {
 }
 
 function formatLimit(limit: number) {
-  return limit >= 9999 ? '무제한' : `${limit}개`
+  return `${limit}회`
 }
 
 export default function PricingClientView(props: PricingClientViewProps) {
@@ -43,7 +43,7 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
   const [canceling, setCanceling] = useState(false)
 
   const cancelSubscription = async () => {
-    if (!confirm('구독을 취소하면 현재 결제 기간이 끝난 뒤 FREE 플랜으로 전환됩니다. 계속하시겠습니까?')) return
+    if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
     setCanceling(true)
     try {
       const res = await fetch('/api/paypal/cancel', { method: 'POST' })
@@ -70,7 +70,7 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
 
       {hasSubscription && (
         <div className="flex items-center justify-between rounded-lg border border-[#ece9e0] bg-[#faf8f4] px-5 py-4">
-          <p className="text-sm font-bold text-[#5d584f]">구독 중입니다. 취소하면 현재 기간 만료 후 FREE로 전환됩니다.</p>
+          <p className="text-sm font-bold text-[#5d584f]">구독 중입니다. 취소하면 즉시 이용권 없는 상태로 전환됩니다.</p>
           <button
             type="button"
             disabled={canceling}
@@ -83,11 +83,16 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {currentPlan === 'FREE' && (
+        <div className="rounded-lg border border-[#ece9e0] bg-white px-5 py-4 text-sm font-bold text-[#5d584f]">
+          현재 이용권이 없습니다. 카드뉴스를 생성하려면 아래 플랜을 선택하세요.
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
-          const isFree = planKey === 'FREE'
           const planId = paypalPlanIds[planKey]
 
           return (
@@ -110,22 +115,25 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
 
               <div className="space-y-3 border-y border-[#ece9e0] py-5 text-sm">
                 <Feature>월 카드뉴스 {formatLimit(plan.monthlyCardLimit)} 생성</Feature>
-                <Feature>{plan.hasWatermark ? '워터마크 포함' : '워터마크 없음'}</Feature>
+                <Feature>참고 이미지 입력 및 결과 편집</Feature>
               </div>
 
               <div className="mt-6">
-                {isFree || isCurrentPlan ? (
+                {isCurrentPlan ? (
                   <button
                     type="button"
                     disabled
                     className="btn-secondary w-full opacity-60"
                   >
-                    {isCurrentPlan ? '사용 중' : '기본 플랜'}
+                    사용 중
+                  </button>
+                ) : hasSubscription ? (
+                  <button type="button" disabled className="btn-secondary w-full opacity-60">
+                    현재 구독 취소 후 선택
                   </button>
                 ) : planId ? (
                   <PayPalSubscribeButton
                     planId={planId}
-                    planKey={planKey}
                     onSuccess={() => router.refresh()}
                     onError={setError}
                   />
@@ -145,12 +153,10 @@ function PricingGrid({ currentPlan, plansList, hasSubscription, paypalPlanIds }:
 
 function PayPalSubscribeButton({
   planId,
-  planKey,
   onSuccess,
   onError,
 }: {
   planId: string
-  planKey: string
   onSuccess: () => void
   onError: (msg: string) => void
 }) {
@@ -168,7 +174,7 @@ function PayPalSubscribeButton({
         const res = await fetch('/api/paypal/activate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscriptionId: data.subscriptionID, plan: planKey }),
+          body: JSON.stringify({ subscriptionId: data.subscriptionID }),
         })
         const json = await res.json() as { error?: string }
         if (!res.ok) {
@@ -180,7 +186,7 @@ function PayPalSubscribeButton({
         onError('네트워크 오류가 발생했습니다.')
       }
     },
-    [planKey, onSuccess, onError],
+    [onSuccess, onError],
   )
 
   if (isPending) {

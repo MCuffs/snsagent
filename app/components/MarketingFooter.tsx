@@ -14,13 +14,13 @@ export function MarketingFooter() {
                                 Shuffla
                             </Link>
                             <p className="text-[15px] text-white/70 leading-relaxed mb-8 max-w-sm">
-                                AI가 브랜드를 분석하고, 카드뉴스를 만들고, 인스타그램에 자동 발행합니다.
+                                AI가 브랜드를 분석하고, 카드뉴스를 생성하고, 원하는 결과물로 편집할 수 있게 돕습니다.
                             </p>
                             <Link
                                 href="/login"
                                 className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0a0a0a] hover:bg-white/90 transition-colors"
                             >
-                                무료로 시작하기
+                                Google Login
                             </Link>
                         </div>
                         <div className="md:col-span-2 md:col-start-7">
@@ -42,7 +42,7 @@ export function MarketingFooter() {
                         <div className="md:col-span-3">
                             <h4 className="font-bold mb-5 text-[12px] text-white uppercase tracking-[0.12em]">회사</h4>
                             <div className="text-[12px] text-white/50 leading-relaxed space-y-1">
-                                <p>(주)인스타에이전트</p>
+                                <p>Shuffla</p>
                                 <p>대표이사 : 홍길동</p>
                                 <p>사업자번호 : 123-45-67890</p>
                                 <p>서울특별시 강남구 테헤란로 123</p>
