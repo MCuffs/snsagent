@@ -70,7 +70,9 @@ export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemp
     'ignore any conflicting centered-title, vivid-gradient, poster, UI, or white-panel layout direction from the source prompt',
     `source visual context: ${prompt}`,
     'background image only',
-    'no generated text, no pseudo text, no typography, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no icons, no symbols',
+    'no text, no letters, no Korean text, no English text, no typography, no captions, no signs, no logo, no watermark, no UI text',
+    'empty area reserved for editable text overlay',
+    'no generated text, no pseudo text, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no icons, no symbols',
     'no signs, posters, menu boards, labels, book covers, newspaper headlines, package text, screen text, handwriting, or calligraphy',
   ].join(', ')
 }

@@ -1,6 +1,7 @@
 import { dbService } from '../../../lib/db-service'
 import { MockImageProvider } from '../ai/providers/mockImageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
+import { sanitizeImagePrompt } from '../ai/imageProvider'
 import { generateCaption } from './captionEngine'
 import { generateSlideCopies } from './copyEngine'
 import { generateDesignPrompts } from './designPromptEngine'
@@ -146,9 +147,10 @@ export async function generateCarouselCampaign(params: {
         throw new Error(`Design prompt missing for slide ${copy.slideNumber}`)
       }
 
+      const sanitizedPrompt = sanitizeImagePrompt(design.backgroundPrompt)
       let backgroundImageUrl = ''
       try {
-        const image = await imageProvider.generateImage(design.backgroundPrompt, {
+        const image = await imageProvider.generateImage(sanitizedPrompt, {
           size: '1024x1024',
           productImageUrls: params.campaignInput.productImageUrls,
         })
@@ -156,10 +158,13 @@ export async function generateCarouselCampaign(params: {
       } catch (error) {
         imageFallbackUsed = true
         log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
-        const fallbackImage = await new MockImageProvider().generateImage(`fallback ${design.backgroundPrompt}`)
+        const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
         backgroundImageUrl = fallbackImage.imageUrl
         console.error('[CarouselPipeline] Image generation error', error)
       }
+
+      // Sync sanitized prompt back to design object for renderer
+      design.backgroundPrompt = sanitizedPrompt
 
       const finalImageUrl = await renderSlide({
         campaignKey,
@@ -169,6 +174,9 @@ export async function generateCarouselCampaign(params: {
         backgroundImageUrl,
         showSlideNumber: true,
       })
+
+      // [DEBUG LOGGING]
+      console.log(`[DEBUG] Slide ${copy.slideNumber} - Background Prompt: "${sanitizedPrompt}" | Headline: "${copy.headline}" | Body: "${copy.body}" | Final Image URL: "${finalImageUrl}"`)
 
       // Sync background url to agent slides for diagnostics
       const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
@@ -180,7 +188,7 @@ export async function generateCarouselCampaign(params: {
         slideNumber: copy.slideNumber,
         headline: copy.headline,
         body: copy.body,
-        designPrompt: design.backgroundPrompt,
+        designPrompt: sanitizedPrompt,
         backgroundImageUrl,
         finalImageUrl,
       })

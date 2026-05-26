@@ -1,5 +1,6 @@
 import type { LayoutDefinition } from './layoutTypes'
 import type { TypographyPlan } from './typographyEngine'
+import { isPromptAllowed } from '../ai/imageProvider'
 
 export interface MediaCardQualityResult {
   passed: boolean
@@ -13,6 +14,7 @@ export function runMediaCardQualityCheck(params: {
   headline: string
   body: string
   backgroundImageUrl: string
+  designPrompt?: string
   harnessDiagnostics?: {
     score: number
     issues: string[]
@@ -21,6 +23,11 @@ export function runMediaCardQualityCheck(params: {
 }) {
   const issues: string[] = []
   const suggestions: string[] = []
+
+  if (params.designPrompt && !isPromptAllowed(params.designPrompt)) {
+    issues.push('배경 이미지 프롬프트에 비-부정형 텍스트 유도 키워드가 포함되어 있습니다.')
+    suggestions.push('프롬프트에서 제목, 본문 내용 또는 "text", "headline", "title" 등 텍스트 생성 유도 단어를 제외하고, "no text"와 같은 부정 지시어 컨텍스트만 사용하세요.')
+  }
 
   if (!params.backgroundImageUrl) {
     issues.push('배경 이미지 URL이 없습니다.')

@@ -205,8 +205,9 @@ function OverlayPanel({
 function BackgroundPanel({ busy, credits, onUpload, onVariation }: { busy: boolean; credits: number; onUpload: () => void; onVariation: Props['onBackgroundVariation'] }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
-        글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong>
+      <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
+        <p>글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong></p>
+        <p className="text-[10px] text-[#717b8f] font-semibold">※ 배경 이미지는 텍스트 없이 생성되고, 문구는 편집 가능한 레이어로만 올라갑니다.</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> 내 이미지로 교체

@@ -1,4 +1,5 @@
 import type { BrandProfile, CampaignInput, CaptionResult, GeneratedSlide, QualityCheckResult } from './types'
+import { isPromptAllowed } from '../ai/imageProvider'
 
 const EXAGGERATED = ['혁신적인', '최고의', '완벽한', '100% 보장', '무조건']
 
@@ -21,6 +22,11 @@ export async function runQualityCheck(params: {
     if (slide.body.length > 60) issues.push(`${slide.slideNumber}번 body가 60자를 초과했습니다.`)
     if (!slide.backgroundImageUrl) issues.push(`${slide.slideNumber}번 배경 이미지 URL이 비어 있습니다.`)
     if (!slide.finalImageUrl) issues.push(`${slide.slideNumber}번 최종 이미지 URL이 비어 있습니다.`)
+
+    if (slide.designPrompt && !isPromptAllowed(slide.designPrompt)) {
+      issues.push(`${slide.slideNumber}번 배경 이미지 프롬프트에 비-부정형 텍스트 유도 키워드가 포함되어 있습니다.`)
+      suggestions.push('프롬프트에서 제목, 본문 내용 또는 "text", "headline", "title" 등 텍스트 생성 유도 단어를 제외하고, "no text"와 같은 부정 지시어 컨텍스트만 사용하세요.')
+    }
 
     const text = `${slide.headline} ${slide.body}`
     for (const word of forbiddenWords) {

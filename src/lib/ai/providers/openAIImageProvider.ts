@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai'
 import { isConfiguredOpenAIKey } from '../../../../lib/env'
-import type { ImageProvider } from '../imageProvider'
+import { type ImageProvider, sanitizeImagePrompt } from '../imageProvider'
 import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
@@ -8,7 +8,9 @@ const NO_TEXT_IMAGE_INSTRUCTIONS = [
   'BACKGROUND IMAGE ONLY.',
   'Do not generate any readable or pseudo-readable text.',
   'No letters, Hangul, alphabet, numbers, captions, signs, labels, posters, menus, packaging text, logos, watermarks, UI, buttons, icons, typography, handwriting, calligraphy, brand marks, or symbols.',
+  'No Korean text, no English text, no typography, no captions, no signs, no logo, no watermark, no UI text.',
   'Leave clean empty negative space for application-rendered text later.',
+  'Empty area reserved for editable text overlay.',
   'If the scene contains signs, books, screens, packaging, newspapers, menus, labels, or billboards, keep them blank, blurred, cropped away, or turned from the camera.',
 ].join(' ')
 
@@ -31,7 +33,8 @@ export class OpenAIImageProvider implements ImageProvider {
     prompt: string,
     options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
-    const fullPrompt = `${prompt}. ${NO_TEXT_IMAGE_INSTRUCTIONS}`
+    const sanitizedPrompt = sanitizeImagePrompt(prompt)
+    const fullPrompt = `${sanitizedPrompt}. ${NO_TEXT_IMAGE_INSTRUCTIONS}`
     const size = '1024x1024'
     const refUrls = options?.productImageUrls?.filter(Boolean) ?? []
 

@@ -1,5 +1,5 @@
 import { dbService } from '../../../lib/db-service'
-import type { ImageProvider } from '../ai/imageProvider'
+import { type ImageProvider, sanitizeImagePrompt, isPromptAllowed } from '../ai/imageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
@@ -192,9 +192,11 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       brandDna: input.brandDna,
     })
 
+    const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
+
     let backgroundImageUrl = ''
     try {
-      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${visualDirection.prompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
+      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
         size: '1024x1024',
         productImageUrls: input.productImageUrls || [],
       })
@@ -203,7 +205,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       console.error('[MediaCarouselPipeline] Background image generation failed', err)
       hasFallbackImage = true
       // Use mock image fallback
-      const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${visualDirection.prompt}`)
+      const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
       backgroundImageUrl = fallbackImage.imageUrl
     }
 
@@ -220,12 +222,13 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       headline: slide.headline,
       body: slide.body,
       backgroundImageUrl,
+      designPrompt: `${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`,
       harnessDiagnostics: harness.diagnostics,
     })
     const slideQualityCheck = checkBrandFit({
       headline: slide.headline,
       body: slide.body,
-      designPrompt: visualDirection.prompt,
+      designPrompt: sanitizedVisualPrompt,
       brandDna: input.brandDna,
       qualityCheck: baseSlideQualityCheck,
     })
@@ -248,13 +251,16 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       totalPages: slideCount,
     })
 
+    // [DEBUG LOGGING]
+    console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
+
     slides.push({
       slideNumber: slide.slideNumber,
       role: slide.role as MediaSlideRole,
       layoutType: slide.layoutType as LayoutType,
       headline: slide.headline,
       body: slide.body,
-      designPrompt: visualDirection.prompt,
+      designPrompt: sanitizedVisualPrompt,
       backgroundImageUrl,
       finalImageUrl,
       qualityCheck: slideQualityCheck,
