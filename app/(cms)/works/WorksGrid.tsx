@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Clock, ImageOff } from 'lucide-react'
 
@@ -82,12 +81,10 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
               {/* Thumbnail */}
               <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#f4f4f5]">
                 {item.thumbnail ? (
-                  <Image
+                  <img
                     src={item.thumbnail}
                     alt={item.title}
-                    fill
-                    className="object-cover transition duration-300 group-hover:scale-105"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center">

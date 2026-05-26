@@ -45,7 +45,7 @@ export default async function ConceptPage() {
     id: c.id,
     title: c.title,
     status: c.status,
-    createdAt: c.createdAt.toISOString(),
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
     thumbnail: c.slides?.[0]?.imageUrl ?? null,
   }))
 
