@@ -4,6 +4,7 @@ import path from 'path'
 import { randomUUID } from 'crypto'
 import prisma from './db'
 import { saveErrorLog } from './errorLogger'
+import { getHistoryRetentionDays, getHistoryRetentionStatus } from './history-retention'
 
 const DB_FILE_PATH = process.env.VERCEL
   ? path.join(os.tmpdir(), 'shuffla-db.json')
@@ -82,6 +83,14 @@ export interface Campaign {
   createdAt: Date
   updatedAt: Date
   slides?: CarouselSlide[]
+}
+
+export interface CampaignSummary {
+  id: string
+  title: string
+  status: string
+  createdAt: Date
+  thumbnail: string | null
 }
 
 export interface CarouselSlide {
@@ -963,6 +972,127 @@ export const dbService = {
     }))
   },
 
+  async getCampaignSummaries(userId: string): Promise<CampaignSummary[]> {
+    if (!isMock()) {
+      try {
+        const campaigns = await prisma.campaign.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            slides: {
+              orderBy: { slideNumber: 'asc' },
+              take: 1,
+              select: { imageUrl: true },
+            },
+          },
+        })
+        return campaigns.map(campaign => ({
+          id: campaign.id,
+          title: campaign.title,
+          status: campaign.status,
+          createdAt: campaign.createdAt,
+          thumbnail: campaign.slides[0]?.imageUrl ?? null,
+        }))
+      } catch (err) {
+        console.warn('Prisma getCampaignSummaries failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    return db.campaigns
+      .filter(campaign => campaign.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(campaign => ({
+        id: campaign.id,
+        title: campaign.title,
+        status: campaign.status,
+        createdAt: campaign.createdAt,
+        thumbnail: db.slides
+          .filter(slide => slide.campaignId === campaign.id)
+          .sort((a, b) => a.slideNumber - b.slideNumber)[0]?.imageUrl ?? null,
+      }))
+  },
+
+  async deleteCampaign(userId: string, campaignId: string): Promise<boolean> {
+    if (!isMock() && !campaignId.startsWith('c-')) {
+      try {
+        const result = await prisma.campaign.deleteMany({ where: { id: campaignId, userId } })
+        return result.count > 0
+      } catch (err) {
+        console.warn('Prisma deleteCampaign failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    const exists = db.campaigns.some(campaign => campaign.id === campaignId && campaign.userId === userId)
+    if (!exists) return false
+    db.campaigns = db.campaigns.filter(campaign => campaign.id !== campaignId)
+    db.slides = db.slides.filter(slide => slide.campaignId !== campaignId)
+    db.posts = db.posts.filter(post => post.campaignId !== campaignId)
+    writeMockDb(db)
+    return true
+  },
+
+  async deleteExpiredCampaignsForUser(userId: string, plan: string, now = new Date()): Promise<number> {
+    if (!isMock()) {
+      try {
+        const expiresBefore = new Date(now.getTime() - getHistoryRetentionDays(plan) * 24 * 60 * 60 * 1000)
+        const result = await prisma.campaign.deleteMany({
+          where: { userId, createdAt: { lte: expiresBefore } },
+        })
+        return result.count
+      } catch (err) {
+        console.warn('Prisma deleteExpiredCampaignsForUser failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    const expiredIds = new Set(db.campaigns
+      .filter(campaign => campaign.userId === userId && getHistoryRetentionStatus(campaign.createdAt, plan, now).isExpired)
+      .map(campaign => campaign.id))
+    if (expiredIds.size === 0) return 0
+    db.campaigns = db.campaigns.filter(campaign => !expiredIds.has(campaign.id))
+    db.slides = db.slides.filter(slide => !expiredIds.has(slide.campaignId))
+    db.posts = db.posts.filter(post => !expiredIds.has(post.campaignId))
+    writeMockDb(db)
+    return expiredIds.size
+  },
+
+  async deleteExpiredCampaigns(now = new Date()): Promise<number> {
+    if (!isMock()) {
+      const users = await prisma.user.findMany({ select: { id: true, plan: true } })
+      const counts = await Promise.all(
+        users.map(user => this.deleteExpiredCampaignsForUser(user.id, user.plan, now)),
+      )
+      return counts.reduce((total, count) => total + count, 0)
+    }
+
+    const db = initMockDb()
+    const planByUserId = new Map(db.users.map(user => [user.id, user.plan]))
+    const expiredIds = new Set(db.campaigns
+      .filter(campaign => getHistoryRetentionStatus(campaign.createdAt, planByUserId.get(campaign.userId) || 'FREE', now).isExpired)
+      .map(campaign => campaign.id))
+    if (expiredIds.size === 0) return 0
+    db.campaigns = db.campaigns.filter(campaign => !expiredIds.has(campaign.id))
+    db.slides = db.slides.filter(slide => !expiredIds.has(slide.campaignId))
+    db.posts = db.posts.filter(post => !expiredIds.has(post.campaignId))
+    writeMockDb(db)
+    return expiredIds.size
+  },
+
   async reserveRegenerationImages(
     campaignId: string,
     requestedImages: number,
@@ -1140,6 +1270,22 @@ export const dbService = {
 
     const db = initMockDb()
     return db.posts.find(p => p.id === postId) || null
+  },
+
+  async getPostByCampaign(userId: string, campaignId: string): Promise<Post | null> {
+    if (!isMock() && !campaignId.startsWith('c-')) {
+      try {
+        return await prisma.post.findFirst({ where: { userId, campaignId } })
+      } catch (err) {
+        console.warn('Prisma getPostByCampaign failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    return db.posts.find(post => post.userId === userId && post.campaignId === campaignId) || null
   },
 
   async getPosts(userId: string): Promise<(Post & { campaign: Campaign; brand: Brand })[]> {

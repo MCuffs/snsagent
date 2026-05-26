@@ -10,6 +10,7 @@ export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
 export interface PlanFeature {
   name: string
   monthlyCardLimit: number
+  historyRetentionDays: number
   hasWatermark: boolean
   description: string
   price: string
@@ -19,6 +20,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
     name: 'No Pass',
     monthlyCardLimit: 0,
+    historyRetentionDays: 30,
     hasWatermark: true,
     description: 'Google Login 후 이용권을 선택하세요',
     price: '이용권 없음',
@@ -26,6 +28,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   LITE: {
     name: 'Single',
     monthlyCardLimit: 1,
+    historyRetentionDays: 30,
     hasWatermark: false,
     description: '한 번의 캠페인을 부담 없이 제작하는 입문 플랜',
     price: '월 3,000원',
@@ -33,6 +36,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   PRO: {
     name: 'Creator',
     monthlyCardLimit: 20,
+    historyRetentionDays: 90,
     hasWatermark: false,
     description: '평일마다 콘텐츠를 제작하는 브랜드 운영 플랜',
     price: '월 19,000원',
@@ -40,6 +44,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   UNLIMITED: {
     name: 'Studio',
     monthlyCardLimit: 30,
+    historyRetentionDays: 365,
     hasWatermark: false,
     description: '다수 캠페인을 운영하는 팀용 제작 플랜',
     price: '월 45,000원',

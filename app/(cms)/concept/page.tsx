@@ -2,6 +2,8 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getSessionUser, getCachedBrands } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
+import { getHistoryRetentionStatus } from '../../../lib/history-retention'
+import { normalizePlan, PRICING_PLANS } from '../../../lib/limits-types'
 import DashboardContainer from './DashboardContainer'
 import { Loader2 } from 'lucide-react'
 
@@ -27,9 +29,12 @@ async function DashboardDataLoader() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
+  const plan = normalizePlan(user.plan || 'FREE')
+  await dbService.deleteExpiredCampaignsForUser(user.id, plan)
+
   const [brands, campaigns] = await Promise.all([
     getCachedBrands(user.id),
-    dbService.getCampaigns(user.id),
+    dbService.getCampaignSummaries(user.id),
   ])
 
   const existingBrand = brands[0] || null
@@ -49,13 +54,27 @@ async function DashboardDataLoader() {
       }
     : null
 
-  const serializedCampaigns = campaigns.map((c) => ({
-    id: c.id,
-    title: c.title,
-    status: c.status,
-    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
-    thumbnail: c.slides?.[0]?.imageUrl ?? null,
-  }))
+  const serializedCampaigns = campaigns.map((campaign) => {
+    const retention = getHistoryRetentionStatus(campaign.createdAt, plan)
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      status: campaign.status,
+      createdAt: campaign.createdAt.toISOString(),
+      thumbnail: campaign.thumbnail,
+      expiresAt: retention.expiresAt.toISOString(),
+      daysUntilDeletion: retention.daysUntilDeletion,
+      expiresSoon: retention.expiresSoon,
+    }
+  })
 
-  return <DashboardContainer existingBrand={serializedBrand} campaigns={serializedCampaigns} />
+  return (
+    <DashboardContainer
+      existingBrand={serializedBrand}
+      campaigns={serializedCampaigns}
+      planName={PRICING_PLANS[plan].name}
+      retentionDays={PRICING_PLANS[plan].historyRetentionDays}
+      canUpgradeRetention={plan !== 'UNLIMITED'}
+    />
+  )
 }

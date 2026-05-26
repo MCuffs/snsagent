@@ -3,6 +3,7 @@ import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
 import { PRICING_PLANS } from '../../../../lib/limits'
 import { normalizePlan } from '../../../../lib/limits-types'
+import { getHistoryRetentionStatus } from '../../../../lib/history-retention'
 import CampaignResultView from './CampaignResultView'
 
 export const dynamic = 'force-dynamic'
@@ -18,16 +19,20 @@ export default async function CampaignDetailsPage({
   const { id } = await params
 
   const campaign = await dbService.getCampaign(id)
-  if (!campaign || campaign.userId !== user.id) redirect('/works')
-
-  const brand = await dbService.getBrand(campaign.brandId)
-  if (!brand) redirect('/works')
-
-  const posts = await dbService.getPosts(user.id)
-  const post = posts.find(p => p.campaignId === campaign.id)
-  if (!post) redirect('/works')
+  if (!campaign || campaign.userId !== user.id) redirect('/concept?tab=works')
 
   const userPlan = normalizePlan(user.plan || 'FREE')
+  if (getHistoryRetentionStatus(campaign.createdAt, userPlan).isExpired) {
+    await dbService.deleteCampaign(user.id, campaign.id)
+    redirect('/concept?tab=works')
+  }
+
+  const [brand, post] = await Promise.all([
+    dbService.getBrand(campaign.brandId),
+    dbService.getPostByCampaign(user.id, campaign.id),
+  ])
+  if (!brand || !post) redirect('/concept?tab=works')
+
   const planName = PRICING_PLANS[userPlan].name
 
   const serializedCampaign = {

@@ -185,6 +185,7 @@ function PricingGrid({
 
               <div className="space-y-3 border-y border-[#ece9e0] py-5 text-sm">
                 <Feature>월 카드뉴스 {formatLimit(plan.monthlyCardLimit)} 생성</Feature>
+                <Feature>작업 히스토리 {plan.historyRetentionDays}일 보관</Feature>
                 <Feature>캠페인별 AI 배경 재생성 1회분</Feature>
                 <Feature>참고 이미지 입력 및 결과 편집</Feature>
               </div>

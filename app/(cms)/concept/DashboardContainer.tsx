@@ -25,10 +25,22 @@ interface DashboardContainerProps {
     status: string
     createdAt: string
     thumbnail: string | null
+    expiresAt: string
+    daysUntilDeletion: number
+    expiresSoon: boolean
   }>
+  planName: string
+  retentionDays: number
+  canUpgradeRetention: boolean
 }
 
-export default function DashboardContainer({ existingBrand, campaigns }: DashboardContainerProps) {
+export default function DashboardContainer({
+  existingBrand,
+  campaigns,
+  planName,
+  retentionDays,
+  canUpgradeRetention,
+}: DashboardContainerProps) {
   const { activeTab: tab } = useTab()
 
   const hasCompleteBrand = existingBrand && Boolean(existingBrand.websiteUrl)
@@ -75,7 +87,12 @@ export default function DashboardContainer({ existingBrand, campaigns }: Dashboa
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="h-full"
         >
-          <WorksGrid campaigns={campaigns} />
+          <WorksGrid
+            campaigns={campaigns}
+            planName={planName}
+            retentionDays={retentionDays}
+            canUpgradeRetention={canUpgradeRetention}
+          />
         </motion.div>
       )}
     </div>

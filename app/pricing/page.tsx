@@ -16,7 +16,7 @@ const plans = [
         period: '',
         desc: PRICING_PLANS.LITE.description,
         cta: 'Google Login',
-        features: ['월 1회 카드뉴스 생성', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
+        features: ['월 1회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
         highlight: false,
     },
     {
@@ -28,6 +28,7 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 20회 카드뉴스 생성',
+            '작업 히스토리 90일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
             'AI 문구·이미지 생성',
@@ -45,6 +46,7 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 30회 카드뉴스 생성',
+            '작업 히스토리 365일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
             'AI 문구·이미지 생성',
@@ -70,7 +72,7 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '월간 생성 가능 횟수가 다릅니다. Creator는 평일 운영을 위한 월 20회 생성 플랜이며, 모든 생성 건에는 카드 장수 기준 AI 배경 재생성 1회분이 포함됩니다.',
+        a: '월간 생성 가능 횟수와 작업 히스토리 보관 기간이 다릅니다. Single은 30일, Creator는 90일, Studio는 365일 동안 작업물을 보관하며, 모든 생성 건에는 카드 장수 기준 AI 배경 재생성 1회분이 포함됩니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
@@ -88,6 +90,7 @@ const faqs = [
 
 const compareFeatures = [
     { feature: '월 카드뉴스 생성 수', single: '1회', creator: '20회', studio: '30회' },
+    { feature: '작업 히스토리 보관', single: '30일', creator: '90일', studio: '365일' },
     { feature: '브랜드 URL 분석', single: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', single: '✓', creator: '✓', studio: '✓' },
     { feature: '상품 참고 이미지 입력', single: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
