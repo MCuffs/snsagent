@@ -58,7 +58,8 @@ export class OpenAIImageProvider implements ImageProvider {
 
         const image = response.data?.[0]
         if (image?.b64_json) {
-          return { imageUrl: `data:image/png;base64,${image.b64_json}` }
+          const persistedUrl = await persistBase64Image(image.b64_json)
+          return { imageUrl: persistedUrl }
         }
         const persistedUrl = await persistImageUrl(image?.url)
         return { imageUrl: persistedUrl }
@@ -89,7 +90,8 @@ export class OpenAIImageProvider implements ImageProvider {
             size,
             n: 1,
           })
-          return { imageUrl: fallbackResponse.data?.[0]?.url || '' }
+          const persistedUrl = await persistImageUrl(fallbackResponse.data?.[0]?.url)
+          return { imageUrl: persistedUrl }
         } catch (fallbackErr: unknown) {
           console.warn('dall-e-2 also failed, falling back to mock image provider', fallbackErr)
           return new MockImageProvider().generateImage(prompt)
@@ -137,7 +139,8 @@ export class OpenAIImageProvider implements ImageProvider {
 
     const image = response.data?.[0]
     if (image?.b64_json) {
-      return { imageUrl: `data:image/png;base64,${image.b64_json}` }
+      const persistedUrl = await persistBase64Image(image.b64_json)
+      return { imageUrl: persistedUrl }
     }
     const persistedUrl = await persistImageUrl(image?.url)
     return { imageUrl: persistedUrl }
@@ -162,6 +165,22 @@ async function persistImageUrl(url: string | undefined): Promise<string> {
   } catch (err) {
     console.error('[OpenAIImageProvider] Failed to persist image:', err)
     return url
+  }
+}
+
+async function persistBase64Image(b64Json: string | undefined): Promise<string> {
+  if (!b64Json) return ''
+  try {
+    const buffer = Buffer.from(b64Json, 'base64')
+    const fileName = `dalle-bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+    return await uploadGeneratedAsset({
+      fileName,
+      content: buffer,
+      contentType: 'image/png',
+    })
+  } catch (err) {
+    console.error('[OpenAIImageProvider] Failed to persist base64 image:', err)
+    return `data:image/png;base64,${b64Json}`
   }
 }
 

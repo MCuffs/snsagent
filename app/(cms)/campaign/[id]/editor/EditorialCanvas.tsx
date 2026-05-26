@@ -22,9 +22,11 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   const backgroundFailed = Boolean(background?.imageUrl && failedBackgroundUrl === background.imageUrl)
   const backgroundSource = backgroundFailed && fallbackImageUrl ? fallbackImageUrl : background?.imageUrl
   const overlay = document.overlay
-  const elements = document.layers
-    .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
-    .sort((a, b) => a.zIndex - b.zIndex)
+  const elements = backgroundFailed
+    ? [] // Prevent duplicate text rendering when showing the baked final preview image
+    : document.layers
+        .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
+        .sort((a, b) => a.zIndex - b.zIndex)
 
   const handleDragEnd = (layer: EditorialLayer, x: number, y: number) => {
     const snappedX = snap(x / SCALE, [72, 540, 1008 - layer.width], 12)

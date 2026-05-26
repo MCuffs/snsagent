@@ -51,7 +51,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       colorFilter: '#17121f',
     },
     layers: [
-      layer('background', '배경 이미지', 0, { imageUrl: seed.backgroundImageUrl || seed.imageUrl, locked: true }),
+      layer('background', '배경 이미지', 0, { imageUrl: seed.backgroundImageUrl || undefined, locked: true }),
       layer('overlay', '시네마틱 오버레이', 10, { locked: true }),
       layer('watermark', 'Shuffla 워터마크', 20, {
         text: 'SHUFFLA / EDITORIAL',
