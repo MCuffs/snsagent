@@ -41,6 +41,7 @@ export interface Brand {
   ctaStyle: string
   websiteUrl?: string | null
   brandDna?: string | null
+  editorPreferences?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -599,6 +600,21 @@ export const dbService = {
     }
     writeMockDb(db)
     return brand
+  },
+
+  async updateBrandEditorPreferences(brandId: string, editorPreferences: string): Promise<void> {
+    if (!isMock()) {
+      await prisma.brand.update({ where: { id: brandId }, data: { editorPreferences } })
+      return
+    }
+
+    const db = initMockDb()
+    const brand = db.brands.find(item => item.id === brandId)
+    if (brand) {
+      brand.editorPreferences = editorPreferences
+      brand.updatedAt = new Date()
+      writeMockDb(db)
+    }
   },
 
   // Instagram operations

@@ -17,7 +17,7 @@ import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTyp
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
-import { layerByType, parseEditorialDocument } from '../src/lib/editor/document'
+import { layerByType, parseEditorialDocument, serializeBrandStyleMemory } from '../src/lib/editor/document'
 import { renderEditorialDocument } from '../src/lib/editor/renderer'
 import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
@@ -391,6 +391,9 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
       backgroundImageUrl,
       editorDocument: JSON.stringify(document),
     })
+    if (renderOutput) {
+      await dbService.updateBrandEditorPreferences(existingSlide.campaign.brandId, serializeBrandStyleMemory(document))
+    }
     return { success: true as const, slide, document, rendered: renderOutput }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '편집 문서 저장에 실패했습니다.'))

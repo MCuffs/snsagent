@@ -32,23 +32,24 @@ model User {
 }
 
 model Brand {
-  id             String            @id @default(uuid())
-  userId         String
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String
-  industry       String
-  targetAudience String
-  toneOfVoice    String
-  mainColor      String
-  forbiddenWords String
-  ctaStyle       String
-  websiteUrl     String?
-  brandDna       String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  campaigns      Campaign[]
-  instagram      InstagramAccount?
-  posts          Post[]
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  industry          String
+  targetAudience    String
+  toneOfVoice       String
+  mainColor         String
+  forbiddenWords    String
+  ctaStyle          String
+  websiteUrl        String?
+  brandDna          String?
+  editorPreferences String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  campaigns         Campaign[]
+  instagram         InstagramAccount?
+  posts             Post[]
 }
 
 model InstagramAccount {

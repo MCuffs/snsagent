@@ -38,6 +38,10 @@ try {
       ADD COLUMN IF NOT EXISTS "bodyFontSize" INTEGER,
       ADD COLUMN IF NOT EXISTS "editorDocument" TEXT;
   `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Brand"
+      ADD COLUMN IF NOT EXISTS "editorPreferences" TEXT;
+  `)
 
   const requiredColumns = [
     'backgroundImageUrl',
@@ -59,6 +63,14 @@ try {
   if (missingColumns.length > 0) {
     throw new Error(`Missing slide customization columns after migration: ${missingColumns.join(', ')}`)
   }
+  const brandColumns = await prisma.$queryRawUnsafe(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'Brand'
+      AND column_name = 'editorPreferences'
+  `)
+  if (brandColumns.length !== 1) throw new Error('Missing Brand.editorPreferences after migration.')
   console.log('Slide customization fields are ready.')
 } finally {
   await prisma.$disconnect()

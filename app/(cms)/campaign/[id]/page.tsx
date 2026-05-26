@@ -70,6 +70,7 @@ export default async function CampaignDetailsPage({
     name: brand.name,
     mainColor: brand.mainColor,
     ctaStyle: brand.ctaStyle,
+    editorPreferences: brand.editorPreferences || null,
   }
 
   return (

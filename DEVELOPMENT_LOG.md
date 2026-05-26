@@ -276,9 +276,10 @@ This file records meaningful development work, fixes, verification commands, and
 - Added background, overlay, title, subtitle, sticker, CTA and watermark layers with ordering, visibility, positioning, opacity, scale, blur and motion metadata controls.
 - Added inline text editing, drag movement with safe-zone/center snapping, typography and cinematic overlay presets, undo/redo, and debounced autosave using isolated Zustand editor state.
 - Added AI-assisted copy refinement and current-background variations that preserve the user-controlled document rather than regenerating full slides.
+- Stored the last confirmed typography and overlay selection on `Brand.editorPreferences` and reuse it as a new slide editing default.
 - Preserved original background image URLs separately from composed results, preventing repeated text compositing when editing an existing card.
 - Added deterministic editorial document rendering and PNG/JPG/PNG 2x/current-campaign ZIP export paths.
 
 ### Operational Note
 - Deployments must run `node scripts/migrate-slide-customization.mjs` before serving this build so Prisma can select the new `CarouselSlide` document and customization fields.
-- Brand-level learned style preferences, motion video output and real-time collaboration remain follow-up scopes; the layer document includes metadata needed to extend toward those workflows.
+- Multi-session learned style recommendations beyond the last confirmed brand preference, motion video output and real-time collaboration remain follow-up scopes; the layer document includes metadata needed to extend toward those workflows.

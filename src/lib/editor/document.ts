@@ -175,6 +175,44 @@ export function layerByType(document: EditorialDocument, type: EditorialLayer['t
   return document.layers.find(item => item.type === type)
 }
 
+export function applyBrandStyleMemory(document: EditorialDocument, rawPreferences?: string | null) {
+  if (!rawPreferences) return document
+  try {
+    const preferences = JSON.parse(rawPreferences) as Partial<{
+      typographyPreset: TypographyPreset
+      overlay: EditorialDocument['overlay']
+      titleStyle: Partial<EditorialLayer>
+      subtitleStyle: Partial<EditorialLayer>
+    }>
+    return normalizeDocument({
+      ...document,
+      typographyPreset: preferences.typographyPreset || document.typographyPreset,
+      overlay: { ...document.overlay, ...preferences.overlay },
+      layers: document.layers.map(layerItem => {
+        if (layerItem.type === 'title') return { ...layerItem, ...preferences.titleStyle, text: layerItem.text }
+        if (layerItem.type === 'subtitle') return { ...layerItem, ...preferences.subtitleStyle, text: layerItem.text }
+        return layerItem
+      }),
+    })
+  } catch {
+    return document
+  }
+}
+
+export function serializeBrandStyleMemory(document: EditorialDocument) {
+  const pickStyle = (type: EditorialLayer['type']) => {
+    const value = layerByType(document, type)
+    if (!value) return {}
+    const { fontPreset, fontSize, fontWeight, lineHeight, tracking, color, shadow, stroke, strokeColor } = value
+    return { fontPreset, fontSize, fontWeight, lineHeight, tracking, color, shadow, stroke, strokeColor }
+  }
+  return JSON.stringify({
+    typographyPreset: document.typographyPreset,
+    overlay: document.overlay,
+    titleStyle: pickStyle('title'),
+    subtitleStyle: pickStyle('subtitle'),
+  })
+}
 function layer(type: EditorialLayer['type'], name: string, zIndex: number, overrides: Partial<EditorialLayer>): EditorialLayer {
   return {
     id: type,

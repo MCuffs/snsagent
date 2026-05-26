@@ -20,7 +20,7 @@ import {
   updatePostDetailsAction,
 } from '../../../actions'
 import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
-import { parseEditorialDocument } from '../../../../src/lib/editor/document'
+import { applyBrandStyleMemory, parseEditorialDocument } from '../../../../src/lib/editor/document'
 import { EditorialCanvas } from './editor/EditorialCanvas'
 import { EditorialInspector } from './editor/EditorialInspector'
 import { useEditorialStore } from './editor/useEditorialStore'
@@ -68,6 +68,7 @@ interface Brand {
   name: string
   mainColor: string
   ctaStyle: string
+  editorPreferences: string | null
 }
 
 interface CampaignResultViewProps {
@@ -172,10 +173,12 @@ export default function CampaignResultView({
   useEffect(() => {
     const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
       slide.id,
-      parseEditorialDocument(slide.editorDocument, slide),
+      slide.editorDocument
+        ? parseEditorialDocument(slide.editorDocument, slide)
+        : applyBrandStyleMemory(parseEditorialDocument(null, slide), brand.editorPreferences),
     ]))
     if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
-  }, [campaign.slides, initializeEditor])
+  }, [brand.editorPreferences, campaign.slides, initializeEditor])
 
   useEffect(() => {
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
