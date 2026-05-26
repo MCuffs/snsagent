@@ -58,7 +58,7 @@ export default async function PricingPage({
         currentPlan={normalizePlan(user.plan)}
         plansList={plansList}
         hasSubscription={hasSubscription}
-        paypalClientId={process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? ''}
+        paypalClientId={(process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()}
         paypalPlanIds={paypalPlanIds}
       />
     </div>
