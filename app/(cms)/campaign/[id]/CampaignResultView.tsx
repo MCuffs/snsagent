@@ -355,11 +355,20 @@ export default function CampaignResultView({
 
   const downloadActiveSlide = async () => {
     if (!activeSlide?.imageUrl) return
+    setExporting(true)
     setMessage(null)
     try {
-      await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
+      if (activeDocument) {
+        const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), 'png', 1)
+        if (!result.success) return setMessage({ type: 'error', text: result.error })
+        await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber))
+      } else {
+        await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
+      }
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '이미지 다운로드에 실패했습니다.') })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -691,8 +700,8 @@ export default function CampaignResultView({
                     <ExternalLink className="h-4 w-4" />
                     원본 열기
                   </a>
-                  <button type="button" onClick={downloadActiveSlide} className="btn-secondary min-h-10 px-4 text-xs">
-                    <Download className="h-4 w-4" />
+                  <button type="button" onClick={downloadActiveSlide} disabled={exporting} className="btn-secondary min-h-10 px-4 text-xs">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     현재 카드 다운로드
                   </button>
                 </>

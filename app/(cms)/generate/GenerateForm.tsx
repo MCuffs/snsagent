@@ -79,6 +79,26 @@ function userDisplay(content: string): DisplayMessage {
   return { id: mkId(), role: 'user', content }
 }
 
+function buildCardCopyContext(params: GenerateParams) {
+  const lines = [
+    `주제: ${params.topic}`,
+    `콘텐츠 방향: ${params.contentType}`,
+    `기획 목표: ${params.objective}`,
+  ]
+
+  if (params.hookDirection) lines.push(`훅 방향: ${params.hookDirection}`)
+  if (params.brandAnalysis) lines.push(`브랜드 해석: ${params.brandAnalysis}`)
+  if (params.recommendedCta) lines.push(`권장 행동: ${params.recommendedCta}`)
+  if (params.structurePreview?.length) {
+    lines.push('슬라이드별 기획 흐름:')
+    params.structurePreview.forEach(slide => {
+      lines.push(`${slide.slideNumber}. ${slide.role}: ${slide.description}`)
+    })
+  }
+
+  return lines.join('\n')
+}
+
 // Custom smooth cubic bezier for high-end feel
 const smoothTransition = { duration: 0.75, ease: [0.19, 1, 0.22, 1] as const }
 
@@ -262,7 +282,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           topic: readyParams.topic,
           category: brand.industry,
           title: `${readyParams.topic} 카드뉴스`,
-          keyContent: readyParams.topic,
+          keyContent: buildCardCopyContext(readyParams),
           tone: brand.toneOfVoice || '감성적이고 따뜻하게',
           contentType: readyParams.contentType,
           slideCount: readyParams.slideCount,

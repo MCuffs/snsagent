@@ -76,13 +76,60 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
   const x = layer.textAlign === 'center' ? layer.x + layer.width / 2 : layer.textAlign === 'right' ? layer.x + layer.width : layer.x
   const fontSize = layer.fontSize || 24
   const lineHeight = fontSize * (layer.lineHeight || 1.25)
-  const text = layer.text.split('\n').slice(0, 8).map((line, index) =>
+  const text = wrapTextForLayer(layer, fontSize).slice(0, 12).map((line, index) =>
     `<tspan x="${x}" y="${layer.y + fontSize + index * lineHeight}">${escapeXml(line)}</tspan>`
   ).join('')
   const background = layer.textBackground
     ? `<rect x="${layer.x - 12}" y="${layer.y - 8}" width="${layer.width + 24}" height="${layer.height + 16}" rx="10" fill="${escapeXml(layer.textBackground)}" opacity="${opacity}"/>`
     : ''
   return `${background}<text text-anchor="${anchor}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="${layer.fontWeight || 400}" letter-spacing="${layer.tracking || 0}" fill="${escapeXml(layer.color || '#ffffff')}" opacity="${opacity}" stroke="${escapeXml(layer.strokeColor || 'none')}" stroke-width="${layer.stroke || 0}" paint-order="stroke" filter="${layer.shadow ? 'url(#editor-text-shadow)' : ''}" transform="rotate(${layer.rotation} ${x} ${layer.y}) scale(${layer.scale})">${text}</text>`
+}
+
+function wrapTextForLayer(layer: EditorialLayer, fontSize: number) {
+  const maxWidth = Math.max(layer.width, fontSize)
+  const tracking = layer.tracking || 0
+  return String(layer.text || '')
+    .split(/\r?\n/)
+    .flatMap(paragraph => wrapParagraph(paragraph, maxWidth, fontSize, tracking))
+}
+
+function wrapParagraph(text: string, maxWidth: number, fontSize: number, tracking: number) {
+  if (!text) return ['']
+
+  const lines: string[] = []
+  let line = ''
+
+  for (const char of text) {
+    const candidate = `${line}${char}`
+    if (line && estimateTextWidth(candidate, fontSize, tracking) > maxWidth) {
+      const breakAt = line.lastIndexOf(' ')
+      if (breakAt > 0) {
+        lines.push(line.slice(0, breakAt).trimEnd())
+        line = `${line.slice(breakAt + 1)}${char}`.trimStart()
+      } else {
+        lines.push(line)
+        line = char
+      }
+    } else {
+      line = candidate
+    }
+  }
+
+  if (line) lines.push(line)
+  return lines
+}
+
+function estimateTextWidth(text: string, fontSize: number, tracking: number) {
+  let width = 0
+  for (const char of text) {
+    if (/\s/.test(char)) width += fontSize * 0.32
+    else if (/[A-Z]/.test(char)) width += fontSize * 0.68
+    else if (/[a-z0-9]/.test(char)) width += fontSize * 0.55
+    else if (/[.,:;!?/()'"-]/.test(char)) width += fontSize * 0.38
+    else width += fontSize
+    width += tracking
+  }
+  return width
 }
 
 export function fontFamilyForPreset(preset?: FontPreset | null) {

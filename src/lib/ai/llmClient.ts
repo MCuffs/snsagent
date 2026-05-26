@@ -1,7 +1,13 @@
 import OpenAI from 'openai'
 
 export interface LLMClient {
-  generateJson<T>(stepName: string, prompt: string, fallback: () => T): Promise<T>
+  generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T>
+}
+
+export interface LLMRequestOptions {
+  model?: string
+  temperature?: number
+  systemPrompt?: string
 }
 
 export class MockLLMClient implements LLMClient {
@@ -18,20 +24,20 @@ export class OpenAILLMClient implements LLMClient {
     this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, ...(baseURL ? { baseURL } : {}) })
   }
 
-  async generateJson<T>(stepName: string, prompt: string, fallback: () => T): Promise<T> {
+  async generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T> {
     try {
       const response = await this.client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: options?.model || process.env.OPENAI_TEXT_MODEL || 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content:
+            content: options?.systemPrompt ||
               '당신은 한국 인스타그램 카드뉴스 전문 카피라이터입니다. 요청된 JSON 형식으로만 응답하세요. 응답은 반드시 유효한 JSON이어야 합니다.',
           },
           { role: 'user', content: prompt },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.7,
+        temperature: options?.temperature ?? 0.7,
       })
 
       const content = response.choices[0]?.message?.content
@@ -54,6 +60,10 @@ export function getLLMClient(): LLMClient {
     return new OpenAILLMClient()
   }
   return new MockLLMClient()
+}
+
+export function getCopywritingModel() {
+  return process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o'
 }
 
 export async function withJsonRetry<T>(

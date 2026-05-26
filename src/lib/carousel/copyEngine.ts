@@ -1,4 +1,4 @@
-import { getLLMClient } from '../ai/llmClient'
+import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, HookCandidate, SlideRole, SlideCopy } from './types'
 
@@ -49,6 +49,8 @@ ${slideDescriptions}
 - hook 슬라이드의 headline은 반드시 "${selectedHook.text}" 그대로 사용
 - 브랜드 DNA가 제공된 경우, 핵심 상품·차별점·고객 페인포인트·가치 제안 중 하나 이상이 슬라이드 카피에 반드시 녹아들어야 합니다
 - 일반적인 업종 표현 대신 브랜드 고유의 언어와 키워드를 사용하세요
+- 상품 정보와 브랜드 DNA에서 확인할 수 없는 수치, 할인율, 인증, 순위, 후기, 성분, 성능 또는 효능은 만들지 마세요
+- 문제 제기 → 해결 방법 → 근거/혜택 → CTA 흐름으로 연결하고, 인접 슬라이드에서 같은 메시지를 반복하지 마세요
 
 JSON 응답 형식:
 {
@@ -65,7 +67,12 @@ JSON 응답 형식:
       slides: structure.slides.map(slide =>
         generateFallbackCopy(brand, input, slide.slideNumber, slide.role, selectedHook)
       ),
-    })
+    }),
+    {
+      model: getCopywritingModel(),
+      temperature: 0.35,
+      systemPrompt: '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 입력 자료에서 확인할 수 없는 사실이나 수치를 만들지 말고, 일관된 슬라이드 흐름을 가진 유효한 JSON으로만 응답하세요.',
+    }
   )
 
   const generatedSlides = Array.isArray(result?.slides) ? result.slides : []
@@ -73,9 +80,23 @@ JSON 응답 형식:
 
   return structure.slides
     .map(slide => {
-      const copy = slidesMap.get(slide.slideNumber) ?? generateFallbackCopy(brand, input, slide.slideNumber, slide.role, selectedHook)
+      const fallback = generateFallbackCopy(brand, input, slide.slideNumber, slide.role, selectedHook)
+      const generated = slidesMap.get(slide.slideNumber)
+      const copy = isGroundedCopy(generated, input) ? generated : fallback
       return cleanCopy(brand, copy)
     })
+}
+
+function isGroundedCopy(copy: SlideCopy | undefined, input: CampaignInput): copy is SlideCopy {
+  if (!copy || typeof copy.headline !== 'string' || typeof copy.body !== 'string') return false
+  const text = `${copy.headline} ${copy.body}`
+  const source = `${input.productName}\n${input.productDescription}\n${input.keyBenefits}`
+  const generatedSignals = text.match(/\d[\d,.]*\s*(?:%|퍼센트|원|명|개|회|배|위|일|시간|분|ml|g|kg|cm)?/gi) || []
+  const sourceSignals = new Set(
+    (source.match(/\d[\d,.]*\s*(?:%|퍼센트|원|명|개|회|배|위|일|시간|분|ml|g|kg|cm)?/gi) || [])
+      .map(signal => signal.replace(/\s+/g, '').toLowerCase())
+  )
+  return generatedSignals.every(signal => sourceSignals.has(signal.replace(/\s+/g, '').toLowerCase()))
 }
 
 function generateFallbackCopy(

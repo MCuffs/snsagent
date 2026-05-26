@@ -41,7 +41,6 @@ interface AgentResponse {
 }
 
 const VISUAL_HINT_OPTIONS = ['dark-editorial', 'trend-feed', 'community-style', 'minimal-clean', 'breaking-news']
-const CONTENT_TYPE_OPTIONS = ['저장형 카드뉴스', '구매 전환형', '계정 유입형', '교육 정보형', '브랜드 인지도형']
 
 function buildSystemPrompt(
   brand: {
@@ -227,7 +226,7 @@ export async function POST(request: Request) {
     const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext)
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
