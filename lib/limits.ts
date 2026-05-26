@@ -1,5 +1,6 @@
 import { dbService } from './db-service'
 import { SubscriptionPlan, PlanFeature, PRICING_PLANS, normalizePlan } from './limits-types'
+import { getCampaignUsagePeriodStart } from './usage-period'
 
 export type { SubscriptionPlan, PlanFeature }
 export { PRICING_PLANS }
@@ -12,35 +13,33 @@ function isSuperUser(email?: string | null): boolean {
 }
 
 /**
- * Checks if user is allowed to generate a new card news this month
+ * Checks if user is allowed to generate a new card news in the active plan window.
  */
-export async function checkCampaignCreationLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+export async function checkCampaignCreationLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'day' | 'month' }> {
   const user = await dbService.getUser(userId)
-  
+  const plan = normalizePlan(user?.plan || 'FREE')
   const campaigns = await dbService.getCampaigns(userId)
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-
-  const monthlyCampaigns = campaigns.filter(
-    c => new Date(c.createdAt).getTime() >= startOfMonth.getTime()
+  const periodStart = getCampaignUsagePeriodStart(plan)
+  const currentCampaigns = campaigns.filter(
+    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
   )
 
   if (isSuperUser(user?.email)) {
     return {
       allowed: true,
-      current: monthlyCampaigns.length,
+      current: currentCampaigns.length,
       limit: 999999,
+      period: 'month',
     }
   }
 
-  const plan = normalizePlan(user?.plan || 'FREE')
   const limit = PRICING_PLANS[plan].monthlyCardLimit
 
   return {
-    allowed: monthlyCampaigns.length < limit,
-    current: monthlyCampaigns.length,
+    allowed: currentCampaigns.length < limit,
+    current: currentCampaigns.length,
     limit,
+    period: plan === 'FREE' ? 'day' : 'month',
   }
 }
 

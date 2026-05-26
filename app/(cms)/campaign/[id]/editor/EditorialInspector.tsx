@@ -11,14 +11,16 @@ interface Props {
   slideId: string
   busy: boolean
   credits: number
+  regenerationAccess: 'blocked' | 'single-use' | 'included'
   onSave: (render: boolean) => void
   onBackgroundVariation: (type: 'same-style' | 'stronger-mood' | 'brighter-background') => void
+  onRegenerationBlocked: () => void
   onRewrite: (intent: string) => void
   onUpload: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroundVariation, onRewrite, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, busy, credits, regenerationAccess, onSave, onBackgroundVariation, onRegenerationBlocked, onRewrite, onUpload, onImageUpload }: Props) {
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
@@ -77,7 +79,14 @@ export function EditorialInspector({ slideId, busy, credits, onSave, onBackgroun
           />
         )}
         {tab === 'background' && (
-          <BackgroundPanel busy={busy} credits={credits} onUpload={onUpload} onVariation={onBackgroundVariation} />
+          <BackgroundPanel
+            busy={busy}
+            credits={credits}
+            regenerationAccess={regenerationAccess}
+            onUpload={onUpload}
+            onVariation={onBackgroundVariation}
+            onRegenerationBlocked={onRegenerationBlocked}
+          />
         )}
         {tab === 'overlay' && (
           <OverlayPanel
@@ -206,20 +215,47 @@ function OverlayPanel({
   )
 }
 
-function BackgroundPanel({ busy, credits, onUpload, onVariation }: { busy: boolean; credits: number; onUpload: () => void; onVariation: Props['onBackgroundVariation'] }) {
+function BackgroundPanel({
+  busy,
+  credits,
+  regenerationAccess,
+  onUpload,
+  onVariation,
+  onRegenerationBlocked,
+}: {
+  busy: boolean
+  credits: number
+  regenerationAccess: Props['regenerationAccess']
+  onUpload: () => void
+  onVariation: Props['onBackgroundVariation']
+  onRegenerationBlocked: () => void
+}) {
+  const blocked = regenerationAccess === 'blocked'
+  const applyVariation = (variation: Parameters<Props['onBackgroundVariation']>[0]) => {
+    if (blocked) {
+      onRegenerationBlocked()
+      return
+    }
+    onVariation(variation)
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
-        <p>글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong></p>
+        {blocked ? (
+          <p>무료 플랜에서는 AI 배경 재생성을 사용할 수 없습니다. 버튼을 눌러 1회 이용권 안내를 확인하세요.</p>
+        ) : (
+          <p>글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong></p>
+        )}
         <p className="text-[10px] text-[#717b8f] font-semibold">※ 배경 이미지는 텍스트 없이 생성되고, 문구는 편집 가능한 레이어로만 올라갑니다.</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> 내 이미지로 교체
       </button>
       <p className="pt-2 text-xs font-bold text-[#746a62]">AI 배경 변형</p>
-      <button type="button" disabled={busy || credits < 1} onClick={() => onVariation('same-style')} className="btn-secondary w-full rounded-md text-sm">같은 분위기, 다른 이미지</button>
-      <button type="button" disabled={busy || credits < 1} onClick={() => onVariation('stronger-mood')} className="btn-secondary w-full rounded-md text-sm">더 깊은 시네마틱 무드</button>
-      <button type="button" disabled={busy || credits < 1} onClick={() => onVariation('brighter-background')} className="btn-secondary w-full rounded-md text-sm">더 밝고 깨끗한 배경</button>
+      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('same-style')} className="btn-secondary w-full rounded-md text-sm">같은 분위기, 다른 이미지</button>
+      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('stronger-mood')} className="btn-secondary w-full rounded-md text-sm">더 깊은 시네마틱 무드</button>
+      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('brighter-background')} className="btn-secondary w-full rounded-md text-sm">더 밝고 깨끗한 배경</button>
     </div>
   )
 }

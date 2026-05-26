@@ -1,5 +1,6 @@
 import { dbService } from '../../lib/db-service'
 import { PRICING_PLANS, normalizePlan } from '../../lib/limits-types'
+import { getCampaignUsagePeriodStart } from '../../lib/usage-period'
 
 const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com']
 
@@ -8,15 +9,13 @@ function isSuperUser(email?: string | null): boolean {
   return SUPER_USER_EMAILS.includes(email.toLowerCase())
 }
 
-export async function checkMonthlyCampaignUsage(userId: string) {
+export async function checkCampaignUsage(userId: string) {
   const user = await dbService.getUser(userId)
+  const plan = normalizePlan(user?.plan || 'FREE')
   const campaigns = await dbService.getCampaigns(userId)
+  const periodStart = getCampaignUsagePeriodStart(plan)
 
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-
-  const current = campaigns.filter(campaign => campaign.createdAt >= startOfMonth).length
+  const current = campaigns.filter(campaign => campaign.createdAt >= periodStart).length
 
   if (isSuperUser(user?.email)) {
     return {
@@ -24,10 +23,10 @@ export async function checkMonthlyCampaignUsage(userId: string) {
       current,
       limit: 999999,
       plan: 'UNLIMITED',
+      period: 'month' as const,
     }
   }
 
-  const plan = normalizePlan(user?.plan || 'FREE')
   const limit = PRICING_PLANS[plan].monthlyCardLimit
 
   return {
@@ -35,5 +34,6 @@ export async function checkMonthlyCampaignUsage(userId: string) {
     current,
     limit,
     plan,
+    period: plan === 'FREE' ? 'day' as const : 'month' as const,
   }
 }

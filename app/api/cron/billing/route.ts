@@ -3,6 +3,7 @@ import { dbService } from '../../../../lib/db-service'
 import {
   approveBillingPayment,
   createTossOrderId,
+  deleteBillingKey,
   findPaymentByOrderId,
   isPaidPlan,
   nextMonthlyBillingDate,
@@ -30,6 +31,20 @@ async function handleBillingRenewal(request: NextRequest) {
   const results: Array<{ userId: string; status: 'paid' | 'failed'; error?: string }> = []
 
   for (const user of subscriptions) {
+    if (user.plan === 'LITE') {
+      if (user.tossBillingKey) {
+        await deleteBillingKey(user.tossBillingKey).catch(error => {
+          console.error('[Toss Legacy One-time Cleanup]', user.id, error)
+        })
+      }
+      await dbService.updateUserToss(user.id, {
+        tossBillingKey: null,
+        tossSubscriptionStatus: null,
+        tossNextBillingAt: null,
+      })
+      continue
+    }
+
     if (!user.tossBillingKey || !user.tossCustomerKey || !isPaidPlan(user.plan) || !user.tossNextBillingAt) {
       continue
     }

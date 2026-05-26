@@ -1,7 +1,7 @@
 export type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
 
 export const SUBSCRIPTION_PLANS = ['FREE', 'LITE', 'PRO', 'UNLIMITED'] as const
-export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['LITE', 'PRO', 'UNLIMITED']
+export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['PRO', 'UNLIMITED']
 
 export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
   return SUBSCRIPTION_PLANS.includes(plan as SubscriptionPlan)
@@ -18,20 +18,20 @@ export interface PlanFeature {
 
 export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
-    name: 'No Pass',
-    monthlyCardLimit: 0,
-    historyRetentionDays: 30,
-    hasWatermark: true,
-    description: 'Google Login 후 이용권을 선택하세요',
-    price: '이용권 없음',
-  },
-  LITE: {
-    name: 'Single',
+    name: 'Free',
     monthlyCardLimit: 1,
     historyRetentionDays: 30,
+    hasWatermark: true,
+    description: '하루 한 번 카드뉴스를 생성하는 무료 플랜',
+    price: '무료',
+  },
+  LITE: {
+    name: 'AI 재생성 1회권',
+    monthlyCardLimit: 0,
+    historyRetentionDays: 30,
     hasWatermark: false,
-    description: '한 번의 캠페인을 부담 없이 제작하는 입문 플랜',
-    price: '월 3,000원',
+    description: '무료 결과물의 AI 재생성을 한 번 추가하는 단건 이용권',
+    price: '3,000원',
   },
   PRO: {
     name: 'Creator',

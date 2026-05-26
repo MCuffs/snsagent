@@ -5,7 +5,7 @@ import { saveErrorLog } from '../../../../../lib/errorLogger'
 import { generateCarouselCampaign } from '../../../../lib/carousel/pipeline'
 import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types'
 import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipeline'
-import { checkMonthlyCampaignUsage } from '../../../../lib/usageLimit'
+import { checkCampaignUsage } from '../../../../lib/usageLimit'
 import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
 
 export const runtime = 'nodejs'
@@ -53,10 +53,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    const usage = await checkMonthlyCampaignUsage(user.id)
+    const usage = await checkCampaignUsage(user.id)
     if (!usage.allowed) {
       return NextResponse.json({
-        error: `월간 카드뉴스 생성 한도를 초과했습니다. ${usage.current}/${usage.limit} (${usage.plan})`,
+        error: usage.plan === 'LITE'
+          ? 'AI 재생성 1회권은 기존 결과물의 배경 재생성에 사용할 수 있습니다. 작업 히스토리에서 결과물을 열어 사용해주세요.'
+          : usage.period === 'day'
+          ? '무료 플랜은 하루에 카드뉴스 1개를 생성할 수 있습니다. 내일 다시 시도하거나 Creator 플랜을 선택해주세요.'
+          : `월간 카드뉴스 생성 한도를 초과했습니다. ${usage.current}/${usage.limit} (${usage.plan})`,
       }, { status: 429 })
     }
 

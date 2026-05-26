@@ -9,13 +9,15 @@ import {
   issueBillingKey,
   nextMonthlyBillingDate,
 } from '../../../../../../lib/tosspayments'
+import { normalizePlan } from '../../../../../../lib/limits-types'
 
 export const runtime = 'nodejs'
 
-function redirectToBilling(request: NextRequest, key: 'success' | 'canceled', message?: string) {
+function redirectToBilling(request: NextRequest, key: 'success' | 'canceled', message?: string, offer?: string) {
   const url = new URL('/billing', request.url)
   url.searchParams.set(key, 'true')
   if (message) url.searchParams.set('message', message)
+  if (offer) url.searchParams.set('offer', offer)
   return NextResponse.redirect(url)
 }
 
@@ -35,6 +37,9 @@ export async function GET(request: NextRequest) {
   }
   if (user.tossSubscriptionStatus === 'ACTIVE' || user.paypalSubscriptionId) {
     return redirectToBilling(request, 'canceled', '이미 활성 구독이 있습니다.')
+  }
+  if (plan === 'LITE' && normalizePlan(user.plan) === 'LITE') {
+    return redirectToBilling(request, 'canceled', '이미 사용 가능한 1회권이 있습니다.', 'regeneration')
   }
 
   let billingKey: string | null = null
@@ -65,6 +70,22 @@ export async function GET(request: NextRequest) {
     paymentCompleted = true
 
     const paidAt = new Date()
+    if (plan === 'LITE') {
+      await dbService.updateUserToss(user.id, {
+        plan,
+        tossBillingKey: null,
+        tossPaymentKey: payment.paymentKey,
+        tossSubscriptionStatus: null,
+        tossLastPaidAt: paidAt,
+        tossNextBillingAt: null,
+        tossCanceledAt: null,
+      })
+      await deleteBillingKey(billing.billingKey).catch(deleteError => {
+        console.error('[Toss One-time Pass Cleanup]', deleteError)
+      })
+      return redirectToBilling(request, 'success', undefined, 'regeneration')
+    }
+
     await dbService.updateUserToss(user.id, {
       plan,
       tossPaymentKey: payment.paymentKey,

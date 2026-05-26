@@ -34,6 +34,7 @@ interface PricingClientViewProps {
   paypalPlanIds: Record<string, string>
   customerName?: string | null
   customerEmail: string
+  showRegenerationOffer: boolean
 }
 
 function formatLimit(limit: number) {
@@ -68,6 +69,7 @@ function PricingGrid({
   paypalPlanIds,
   customerName,
   customerEmail,
+  showRegenerationOffer,
 }: PricingClientViewProps) {
   const router = useRouter()
   const [error, setError] = useState('')
@@ -155,11 +157,45 @@ function PricingGrid({
 
       {currentPlan === 'FREE' && (
         <div className="rounded-lg border border-[#ece9e0] bg-white px-5 py-4 text-sm font-bold text-[#5d584f]">
-          현재 이용권이 없습니다. 카드뉴스를 생성하려면 아래 플랜을 선택하세요.
+          Free 플랜 사용 중입니다. 하루에 카드뉴스 1개를 생성할 수 있으며 AI 재생성은 포함되지 않습니다.
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {(showRegenerationOffer || currentPlan === 'LITE') && (
+        <article className="rounded-xl border border-[#f0cdb7] bg-[#fff8f2] p-6">
+          <p className="text-[11px] font-black uppercase tracking-widest text-[#b94718]">One-time option</p>
+          <div className="mt-3 flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-[#171411]">AI 재생성 1회 이용권</h2>
+              <p className="mt-2 text-sm font-bold text-[#5d584f]">
+                19,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[#746a62]">
+                현재 작업물에서 AI 배경 재생성을 한 번 실행할 수 있습니다. 자동 갱신되지 않습니다.
+              </p>
+            </div>
+            <div className="w-full shrink-0 md:w-64">
+              {currentPlan === 'LITE' ? (
+                <div className="rounded-lg bg-[#f1f0eb] px-4 py-3 text-center text-sm font-bold text-[#5d584f]">
+                  사용 가능한 1회권이 있습니다
+                </div>
+              ) : tossClientKey ? (
+                <button
+                  type="button"
+                  onClick={() => void handleTossPayment('LITE')}
+                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
+                >
+                  3,000원으로 1회 추가
+                </button>
+              ) : (
+                <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
+              )}
+            </div>
+          </div>
+        </article>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey

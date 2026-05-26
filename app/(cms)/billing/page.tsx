@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ success?: string; canceled?: string }>
+  searchParams?: Promise<{ success?: string; canceled?: string; offer?: string }>
 }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
@@ -38,7 +38,7 @@ export default async function PricingPage({
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[#111111]">요금제</h1>
             <p className="mt-1.5 text-sm text-[#52525b]">
-              월 3,000원 1회부터 제작 빈도에 맞는 카드뉴스 이용권을 선택하세요.
+              무료로 하루 한 장을 생성하고, 더 많은 운영이 필요하면 월 19,000원 Creator를 선택하세요.
             </p>
           </div>
         </div>
@@ -46,7 +46,7 @@ export default async function PricingPage({
 
       {params.success && (
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
-          결제가 완료되었습니다. 플랜이 업그레이드되었습니다.
+          결제가 완료되었습니다. 선택한 이용 권한이 계정에 반영되었습니다.
         </div>
       )}
       {params.canceled && (
@@ -67,6 +67,7 @@ export default async function PricingPage({
         paypalPlanIds={paypalPlanIds}
         customerName={user.name}
         customerEmail={user.email}
+        showRegenerationOffer={params.offer === 'regeneration'}
       />
     </div>
   )

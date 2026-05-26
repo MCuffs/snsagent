@@ -10,7 +10,7 @@ import { analyzeBrandWithGemini } from '../lib/gemini'
 import { analyzeBrandWithGroq } from '../lib/groq'
 import { analyzeBrandWithPerplexity, analyzeNaverStoreWithPerplexity } from '../lib/perplexity'
 import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from '../lib/naver-shopping'
-import { isSubscriptionPlan } from '../lib/limits-types'
+import { isSubscriptionPlan, normalizePlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageModel, getPipelineImageProvider } from '../src/lib/ai/providers'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
@@ -50,6 +50,24 @@ function unauthenticated() {
 
 function failed(error: string) {
   return { success: false as const, error }
+}
+
+function regenerationPurchaseRequired() {
+  return {
+    success: false as const,
+    error: '무료 플랜에서는 AI 재생성을 이용할 수 없습니다.',
+    requiresRegenerationPass: true as const,
+  }
+}
+
+function hasAiRegenerationAccess(plan: string) {
+  return normalizePlan(plan) !== 'FREE'
+}
+
+async function consumeRegenerationPass(userId: string, plan: string) {
+  if (normalizePlan(plan) === 'LITE') {
+    await dbService.updateUserPlan(userId, 'FREE')
+  }
 }
 
 function slideEditorSeed(slide: {
@@ -240,7 +258,11 @@ export async function createCampaignAction(brandId: string, data: {
   // Limit Check
   const limitCheck = await checkCampaignCreationLimit(user.id)
   if (!limitCheck.allowed) {
-    return failed(`월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
+    return failed(normalizePlan(user.plan) === 'LITE'
+      ? 'AI 재생성 1회권은 기존 결과물의 배경 재생성에 사용할 수 있습니다. 작업 히스토리에서 결과물을 열어 사용해주세요.'
+      : limitCheck.period === 'day'
+      ? '무료 플랜은 하루에 카드뉴스 1개를 생성할 수 있습니다. 내일 다시 시도하거나 Creator 플랜을 선택해주세요.'
+      : `월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
   }
 
   const brand = await dbService.getBrand(brandId)
@@ -307,6 +329,7 @@ export async function rerenderMediaSlideAction(
     const existingSlide = await dbService.getSlide(slideId)
     if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
     if (existingSlide.campaign.userId !== user.id) return forbidden()
+    if (!hasAiRegenerationAccess(user.plan)) return regenerationPurchaseRequired()
 
     const regenerationUsage = await dbService.reserveRegenerationImages(
       existingSlide.campaign.id,
@@ -360,6 +383,7 @@ export async function rerenderMediaSlideAction(
       imageUrl,
       backgroundImageUrl: background.imageUrl,
     })
+    await consumeRegenerationPass(user.id, user.plan)
     return { success: true as const, slide, regenerationUsage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 재렌더링에 실패했습니다.'))
@@ -430,6 +454,7 @@ export async function regenerateEditorialBackgroundAction(
     const existingSlide = await dbService.getSlide(slideId)
     if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
     if (existingSlide.campaign.userId !== user.id) return forbidden()
+    if (!hasAiRegenerationAccess(user.plan)) return regenerationPurchaseRequired()
     const usage = await dbService.reserveRegenerationImages(existingSlide.campaign.id, 1, getPipelineImageModel())
     if (!usage.allowed) return failed(`포함된 AI 배경 재생성 크레딧을 모두 사용했습니다. (${usage.used}/${usage.limit}장)`)
 
@@ -453,6 +478,7 @@ export async function regenerateEditorialBackgroundAction(
       backgroundImageUrl: result.imageUrl,
       editorDocument: JSON.stringify(document),
     })
+    await consumeRegenerationPass(user.id, user.plan)
     return { success: true as const, slide, document, regenerationUsage: usage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '배경 변형 생성에 실패했습니다.'))
@@ -809,6 +835,7 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
   const campaign = await dbService.getCampaign(campaignId)
   if (!campaign) return failed('캠페인을 찾을 수 없습니다.')
   if (campaign.userId !== user.id) return forbidden()
+  if (!hasAiRegenerationAccess(user.plan)) return regenerationPurchaseRequired()
 
   const brand = await dbService.getBrand(campaign.brandId)
   if (!brand) return failed('브랜드 정보를 찾을 수 없습니다.')
@@ -892,6 +919,7 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
       })
     )
 
+    await consumeRegenerationPass(user.id, user.plan)
     return {
       success: true as const,
       slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber),

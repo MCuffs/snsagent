@@ -5,18 +5,18 @@ import { PRICING_PLANS } from '../../lib/limits-types'
 
 export const metadata = {
     title: '요금제 — Shuffla',
-    description: '월 3,000원 1회부터, 제작 빈도에 맞는 Shuffla 카드뉴스 생성 플랜을 선택하세요.',
+    description: '무료 하루 1회 생성부터, 운영 규모에 맞는 Shuffla 카드뉴스 생성 플랜을 선택하세요.',
 }
 
 const plans = [
     {
-        name: PRICING_PLANS.LITE.name,
-        tagline: '첫 캠페인',
-        price: PRICING_PLANS.LITE.price,
+        name: PRICING_PLANS.FREE.name,
+        tagline: '체험 시작',
+        price: PRICING_PLANS.FREE.price,
         period: '',
-        desc: PRICING_PLANS.LITE.description,
-        cta: 'Google Login',
-        features: ['월 1회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
+        desc: PRICING_PLANS.FREE.description,
+        cta: '무료로 시작하기',
+        features: ['하루 1회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
     },
     {
@@ -59,12 +59,16 @@ const plans = [
 
 const faqs = [
     {
-        q: '월 3,000원 플랜에서는 무엇을 만들 수 있나요?',
-        a: 'Single 플랜은 한 달에 카드뉴스 1세트를 생성할 수 있습니다. 브랜드 분석, 참고 이미지 입력, 결과 편집과 다운로드 흐름을 그대로 사용할 수 있습니다.',
+        q: '무료 플랜에서는 무엇을 만들 수 있나요?',
+        a: 'Free 플랜은 결제 없이 하루에 카드뉴스 1세트를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.',
+    },
+    {
+        q: '무료 결과물을 다시 생성하고 싶으면 어떻게 하나요?',
+        a: '결과 화면에서 AI 재생성을 선택하면 3,000원 1회 이용권을 안내합니다. 월 19,000원 Creator 구독 대신 필요한 시점에 한 번만 추가할 수 있습니다.',
     },
     {
         q: 'AI가 만든 카드뉴스를 직접 수정할 수 있나요?',
-        a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있고, 캠페인마다 최초 슬라이드 수만큼 AI 배경 재생성 크레딧이 포함됩니다. 업로드한 배경 교체와 텍스트 렌더 적용은 이 크레딧을 사용하지 않습니다.',
+        a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있습니다. AI 배경 재생성은 Creator 이상 플랜에 포함되며, Free 결과에서 필요할 경우 3,000원 1회 이용권을 선택할 수 있습니다.',
     },
     {
         q: '브랜드가 여러 개인 경우에도 사용할 수 있나요?',
@@ -72,11 +76,11 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '월간 생성 가능 횟수와 작업 히스토리 보관 기간이 다릅니다. Single은 30일, Creator는 90일, Studio는 365일 동안 작업물을 보관하며, 모든 생성 건에는 카드 장수 기준 AI 배경 재생성 1회분이 포함됩니다.',
+        a: '무료 사용자는 하루 1회 생성과 30일 보관을 이용합니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
-        a: 'Google Login으로 브랜드 설정을 시작할 수 있으며, 카드뉴스 생성은 이용권 구독 후 가능합니다.',
+        a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 하루 한 번 카드뉴스를 생성할 수 있습니다.',
     },
     {
         q: '플랜은 언제든지 변경할 수 있나요?',
@@ -89,13 +93,13 @@ const faqs = [
 ]
 
 const compareFeatures = [
-    { feature: '월 카드뉴스 생성 수', single: '1회', creator: '20회', studio: '30회' },
-    { feature: '작업 히스토리 보관', single: '30일', creator: '90일', studio: '365일' },
-    { feature: '브랜드 URL 분석', single: '✓', creator: '✓', studio: '✓' },
-    { feature: 'AI 문구·이미지 생성', single: '✓', creator: '✓', studio: '✓' },
-    { feature: '상품 참고 이미지 입력', single: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
-    { feature: 'AI 배경 재생성', single: '1회분', creator: '1회분/건', studio: '1회분/건' },
-    { feature: '결과 편집 및 다운로드', single: '✓', creator: '✓', studio: '✓' },
+    { feature: '카드뉴스 생성 수', free: '하루 1회', creator: '월 20회', studio: '월 30회' },
+    { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
+    { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
+    { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
+    { feature: '상품 참고 이미지 입력', free: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
+    { feature: 'AI 배경 재생성', free: '3,000원 / 1회', creator: '1회분/건', studio: '1회분/건' },
+    { feature: '결과 편집 및 다운로드', free: '✓', creator: '✓', studio: '✓' },
 ]
 
 export default function PricingPage() {
@@ -113,7 +117,7 @@ export default function PricingPage() {
                             필요한 만큼 선택하고<br />카드뉴스를 제작하세요
                         </h1>
                         <p className="mt-7 text-[17px] text-[#525252] max-w-md mx-auto">
-                            월 3,000원으로 1회부터 시작하고,<br />제작 빈도에 맞춰 플랜을 선택하세요.
+                            무료로 하루 한 장을 만들고,<br />운영이 필요해지면 Creator로 확장하세요.
                         </p>
                     </div>
                 </section>
@@ -214,7 +218,7 @@ export default function PricingPage() {
                                     <thead>
                                         <tr className="border-b border-black/[0.06] bg-[#fafaf7]">
                                             <th className="text-left py-4 px-6 font-bold text-[#525252]">기능</th>
-                                            <th className="text-center py-4 px-4 font-bold text-[#525252]">Single</th>
+                                            <th className="text-center py-4 px-4 font-bold text-[#525252]">Free</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#ff6b35]">Creator</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#525252]">Studio</th>
                                         </tr>
@@ -223,7 +227,7 @@ export default function PricingPage() {
                                         {compareFeatures.map((row, i) => (
                                             <tr key={i}>
                                                 <td className="py-4 px-6 font-medium text-[#0a0a0a]">{row.feature}</td>
-                                                <td className="text-center py-4 px-4 text-[#525252]">{row.single}</td>
+                                                <td className="text-center py-4 px-4 text-[#525252]">{row.free}</td>
                                                 <td className="text-center py-4 px-4 text-[#0a0a0a] font-bold">{row.creator}</td>
                                                 <td className="text-center py-4 px-4 text-[#525252]">{row.studio}</td>
                                             </tr>

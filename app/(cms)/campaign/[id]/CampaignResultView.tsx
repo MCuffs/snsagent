@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import JSZip from 'jszip'
 import {
@@ -78,6 +79,7 @@ interface CampaignResultViewProps {
   post: Post
   brand: Brand
   planName: string
+  regenerationAccess: 'blocked' | 'single-use' | 'included'
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -136,6 +138,7 @@ export default function CampaignResultView({
   post,
   brand,
   planName,
+  regenerationAccess,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
@@ -150,6 +153,7 @@ export default function CampaignResultView({
   const [exporting, setExporting] = useState(false)
   const [regenerationImageCount, setRegenerationImageCount] = useState(campaign.regenerationImageCount)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showRegenerationOffer, setShowRegenerationOffer] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
   const documents = useEditorialStore(state => state.documents)
   const dirtySlides = useEditorialStore(state => state.dirtySlides)
@@ -225,14 +229,27 @@ export default function CampaignResultView({
 
   const regenerateBackground = async (variation: 'same-style' | 'stronger-mood' | 'brighter-background') => {
     if (!activeSlide || !activeDocument) return
+    if (regenerationAccess === 'blocked') {
+      setShowRegenerationOffer(true)
+      return
+    }
     setEditorBusy(true)
     setMessage(null)
     try {
       const result = await regenerateEditorialBackgroundAction(activeSlide.id, JSON.stringify(activeDocument), variation)
-      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      if (!result.success) {
+        if ('requiresRegenerationPass' in result && result.requiresRegenerationPass) {
+          setShowRegenerationOffer(true)
+          return
+        }
+        return setMessage({ type: 'error', text: result.error })
+      }
       applyServerSlide(result.slide as Slide, result.document)
       setRegenerationImageCount(result.regenerationUsage.used)
       setMessage({ type: 'success', text: '레이아웃을 유지한 채 현재 슬라이드 배경만 변경했습니다.' })
+      if (regenerationAccess === 'single-use') {
+        setShowRegenerationOffer(false)
+      }
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '배경 생성 중 오류가 발생했습니다.') })
     } finally {
@@ -462,6 +479,26 @@ export default function CampaignResultView({
         </div>
       )}
 
+      {showRegenerationOffer && (
+        <div className="mb-6 flex flex-col gap-4 rounded-[12px] border border-[#f2d1bb] bg-[#fff6ef] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b94718]">AI Regeneration Pass</p>
+            <p className="mt-2 text-base font-black text-[#1f1512]">
+              19,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[#746a62]">
+              무료 플랜에는 AI 재생성이 포함되지 않습니다. 1회권으로 현재 결과물의 배경을 한 번 다시 만들 수 있습니다.
+            </p>
+          </div>
+          <Link
+            href="/billing?offer=regeneration"
+            className="shrink-0 rounded-lg bg-[#111318] px-5 py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
+          >
+            3,000원 1회권 보기
+          </Link>
+        </div>
+      )}
+
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <section className="space-y-5">
           <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-5 shadow-[0_24px_70px_rgba(31,21,18,0.18)]">
@@ -555,8 +592,10 @@ export default function CampaignResultView({
                     slideId={activeSlide.id}
                     busy={editorBusy}
                     credits={remainingRegenerationImages}
+                    regenerationAccess={regenerationAccess}
                     onSave={saveEditor}
                     onBackgroundVariation={regenerateBackground}
+                    onRegenerationBlocked={() => setShowRegenerationOffer(true)}
                     onRewrite={rewriteCopy}
                     onUpload={() => bgFileInputRef.current?.click()}
                     onImageUpload={() => imgFileInputRef.current?.click()}
