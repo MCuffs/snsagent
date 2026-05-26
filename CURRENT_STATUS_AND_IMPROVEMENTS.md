@@ -16,7 +16,7 @@
 | 로그인 | `/login`, Google OAuth API | Google OAuth 및 HMAC 서명 세션 구현됨 |
 | 브랜드 콘셉트 | `/concept` | URL 분석, 저장, 대화형 수정 구현됨 |
 | 카드뉴스 생성 | `/generate`, `POST /api/campaigns/generate` | 이용권 한도 내 참고 이미지 최대 4장 포함 생성 구현됨 |
-| 생성 결과/편집 | `/campaign/[id]` | 문구/배경 교체/다운로드 및 포함 크레딧 내 AI 배경 재생성 구현됨 |
+| 생성 결과/편집 | `/campaign/[id]` | 레이어 캔버스, 인라인/드래그 편집, AI 부분 보정, 확정 렌더/다중 포맷 export 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
 | 결제 | `/billing`, Toss Payments 빌링, PayPal Subscription | 국내 카드 자동결제 및 해외 PayPal 구독 승인/취소 구현됨 |
 | Instagram 연동/게시 | 서버 API와 Action 존재 | UI 흐름은 추후 개발 예정, 이번 범위 제외 |
@@ -45,7 +45,7 @@
 | 브랜드 온보딩 | URL 입력, 분석 결과 편집/저장, Brand DNA 저장, 대화형 프로필 수정 | `app/(cms)/concept/*`, `app/api/agents/brand/route.ts`, `lib/brand-dna.ts` |
 | 생성 UX | AI 대화로 생성 조건 수집 후 미디어 생성 API 호출 | `app/(cms)/generate/*`, `app/api/agents/generate/route.ts` |
 | 생성 파이프라인 | LLM 카피, Agent 보정, 레이아웃/렌더링, 품질 로그 저장 | `src/lib/layout/*`, `src/lib/carousel/agents.ts` |
-| 결과 조회/편집 | 결과 미리보기, 문구/캡션 저장, 폰트/색상/스타일 변경, 다운로드 | `app/(cms)/campaign/[id]/*`, `app/actions.ts` |
+| 결과 조회/편집 | Editorial Canvas, 7종 레이어, 직접 텍스트 편집/드래그/스냅, 타이포그래피·오버레이 인스펙터, undo/redo·자동 저장, PNG/JPG/2x/ZIP export | `app/(cms)/campaign/[id]/*`, `src/lib/editor/*`, `app/actions.ts` |
 | 결제 기반 코드 | 이용권 없음 상태와 3개 유료 요금제, 국내 토스 빌링 및 해외 PayPal 구독 | `lib/limits-types.ts`, `app/(cms)/billing/*`, `app/api/payments/toss/*`, `app/api/paypal/*` |
 
 ### 이번 우선 개발로 완료한 사항
@@ -67,6 +67,8 @@
 | P1 | Creator 손익 분석 | `UNIT_ECONOMICS.md`에 OpenAI 원가, 토스페이먼츠 일반 카드 공식 요율, VAT 가정 기반 기여이익을 정리했다. |
 | P1 | Google 로그인 진입 단축 | 랜딩·공개 요금제·공통 마케팅 CTA의 `Google Login`을 `/api/auth/google/start`에 직접 연결해 중간 로그인 화면을 생략한다. `/login`은 오류 안내와 개발용 대체 진입으로 유지한다. |
 | P0 | 국내/해외 결제 분리 | 네이버페이 결제 경로를 제거하고 국내 고객용 토스 빌링과 해외 고객용 PayPal 구독을 병행한다. 활성 구독이 있는 사용자의 이중 가입은 차단한다. |
+| P1 | Editorial Studio 편집기 | 최종 이미지와 분리된 `editorDocument`를 저장하고 배경/오버레이/타이틀/본문/스티커/CTA/워터마크 레이어를 시각 편집한다. AI 카피·배경 변형은 해당 레이어만 변경하며 확정 렌더는 서버에서 결정론적으로 수행한다. |
+| P1 | 제작용 내보내기 | 현재 슬라이드 PNG/JPG/2x 렌더와 전체 Instagram 4:5 PNG ZIP export를 제공한다. |
 
 현재 연결된 주요 사용자 흐름은 다음과 같다.
 
@@ -89,6 +91,7 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 | P1 | 토스 월 청구 운영 미설정 | 토스는 자동 청구 스케줄을 제공하지 않아 갱신 결제가 실행되지 않음 | `CRON_SECRET`과 일별 `/api/cron/billing` 호출을 배포 환경에 설정하고 실패 알림 추가 |
 | P2 | AI 응답 검증 확대 | 비정상 모델 응답의 일부 경로 실패 가능 | 공통 런타임 스키마와 관측/비용 지표 추가 |
 | P2 | 의존성 감사 경고 | moderate 취약점 2건 보고됨 | 영향 범위 분석 후 호환 가능한 의존성 업데이트 |
+| P1 | Editor E2E/시각 회귀 미수행 | 드래그, 자동 저장, 원격 이미지 렌더와 ZIP 출력이 브라우저/Blob 구성에 영향받음 | 운영 DB 마이그레이션 후 실제 생성본으로 캔버스 편집-확정 렌더-export 회귀 테스트 수행 |
 | P0 | 토스 자동결제 운영 계약 필요 | 빌링 MID 계약 및 API 키 없이는 국내 카드 정기결제 판매 불가 | 토스 자동결제 리스크 검토/계약 후 키 설정, DB 마이그레이션, 테스트/라이브 소액 결제 수행 |
 | P1 | PayPal 해외 판매 검증 필요 | 통화 변환, 해외 수수료, 구독 웹훅 운영 상태가 수익과 권한에 영향 | PayPal plan/webhook 설정 후 해외 테스트 결제 및 실수수료를 확인 |
 
@@ -98,6 +101,8 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 | --- | --- | --- |
 | Instagram 계정 연결 UI | Meta OAuth/게시 백엔드는 있으나 CMS 화면과 리다이렉트 대상 `/instagram`이 없음 | 사용자 요청에 따라 이번 개발에서 제외하고 추후 제품 흐름으로 구현 |
 | Instagram 예약 게시 운영 UX | cron/API 기반 코드는 있으나 사용자 접근/실패 처리 화면 없음 | Instagram 흐름 재개 시 함께 설계 및 검증 |
+| 브랜드 단위 Style Memory | 슬라이드 문서에는 프리셋과 역할 메타데이터가 저장되지만 브랜드 선호 학습/재사용은 미구현 | 브랜드 편집 선호 저장 모델과 생성 기본값 피드백 루프를 후속 구현 |
+| Motion/협업 | 레이어에 animation metadata 구조는 있으나 MP4 출력과 실시간 공동 편집은 미구현 | 문서 버전/동시성 정책과 모션 렌더 파이프라인을 후속 설계 |
 
 ## 4. 정책 결정 사항
 
@@ -105,7 +110,7 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 | --- | --- |
 | 유료 권한 부여 | 국내 토스는 검증된 `customerKey`와 서버 금액 승인 완료 시, 해외 PayPal은 검증된 `plan_id` 승인 완료 시만 플랜을 부여한다. |
 | 가격 정책 | 내부 `FREE`는 생성 권한 없는 상태다. 유료 플랜은 Single 월 3,000원/1회, Creator 월 19,000원/20회, Studio 월 45,000원/30회다. |
-| AI 재생성 정책 | 캠페인마다 최초 슬라이드 수만큼 AI 배경 재생성 이미지를 포함한다. 전체 스타일 재생성 1회 또는 같은 수의 개별 재생성으로 사용할 수 있으며 초과 생성은 차단한다. |
+| AI 재생성 정책 | 캠페인마다 최초 슬라이드 수만큼 AI 배경 변형 이미지를 포함한다. 에디터는 `same style`, `stronger mood`, `brighter background`처럼 현재 슬라이드 배경만 생성하고 카피/레이어/스타일은 유지한다. |
 | 이미지 모델/원가 기록 | 유료 CMS 생성의 OpenAI 이미지 모델은 `gpt-image-1`로 고정하고 캠페인에 최초/재생성 이미지 수와 재생성 모델을 저장한다. |
 | 구독 취소/실패 | 토스 빌링키 해지/월 청구 실패 또는 PayPal 구독 취소/중단 시 내부 `FREE`(이용권 없음)로 전환한다. |
 | 개발 로그인 | 테스트 로그인은 비운영 환경에서만 허용한다. |

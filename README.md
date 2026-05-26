@@ -22,7 +22,7 @@ Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하
 | 인증 | `/login`, `app/api/auth/google/*` | Google OAuth 및 HMAC 서명 세션 구현됨 |
 | 브랜드 콘셉트 | `/concept`, `app/api/agents/brand` | URL 분석, 프로필 저장, 대화형 수정 구현됨 |
 | 카드뉴스 생성 | `/generate`, `app/api/agents/generate`, `POST /api/campaigns/generate` | 유료 이용권의 월 횟수 내 대화형 생성 및 렌더링 구현됨 |
-| 결과/편집 | `/campaign/[id]` | 텍스트/스타일/배경 교체/다운로드 구현됨 |
+| 결과/편집 | `/campaign/[id]` | Editorial Canvas, 레이어 편집, AI 부분 보정, 확정 렌더/내보내기 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
 | 구독 | `/billing`, `app/api/payments/toss/*`, `app/api/paypal/*`, `app/api/cron/billing` | 국내 토스 자동결제 및 해외 PayPal 구독으로 유료 플랜 결제 구현됨 |
 | Instagram 발행 | `app/api/auth/meta/*`, `app/api/cron/publish`, Server Actions | 백엔드 코드 유지, 사용자 흐름은 추후 개발 예정 |
@@ -58,7 +58,9 @@ Google Login
 - `/generate`에서 상품 참고 이미지를 최대 4장 업로드해 생성 요청의 `productImageUrls`로 전달할 수 있습니다.
 - 생성 진입점은 `POST /api/campaigns/generate`이며, 현재 CMS 흐름은 `src/lib/layout/mediaCarouselPipeline.ts`의 미디어 파이프라인을 사용합니다.
 - 미디어 파이프라인은 LLM 카피 생성, 규칙 기반 Agent 보정, 레이아웃/타이포그래피 계산, 이미지 생성, SVG/PNG 렌더링, 품질 로그 저장을 수행합니다.
-- 결과 화면은 슬라이드 문구 저장, 폰트/색상 적용 재렌더링, 제한된 AI 배경 재생성, 캡션 저장, 개별/전체 다운로드 기능을 포함합니다.
+- 결과 화면은 `AI-Assisted Editorial Carousel Studio` 방식의 직접 조작 캔버스입니다. 배경/오버레이/타이틀/본문/스티커/CTA/워터마크 레이어를 분리하고, 텍스트 인라인 편집, 드래그/스냅, 순서/가시성/불투명도/서체/크기/오버레이 조절, undo/redo와 자동 저장을 지원합니다.
+- AI 보정은 전체 슬라이드를 다시 생성하지 않고 선택 슬라이드의 카피 레이어 또는 배경 레이어만 변경합니다. 사용자 편집 상태는 `CarouselSlide.editorDocument`에 보존되고 확정 렌더 때 결정론적 PNG/JPG로 합성됩니다.
+- 내보내기는 현재 슬라이드의 PNG/JPG, PNG 2x 및 전체 슬라이드 Instagram 4:5 PNG ZIP을 제공합니다.
 - 생성 캠페인은 사용 이미지 모델, 최초 이미지 수, AI 배경 재생성 이미지 수를 저장하며 AI 배경 재생성은 최초 슬라이드 수만큼의 포함 크레딧으로 제한됩니다.
 
 `src/lib/carousel/pipeline.ts`의 commerce 파이프라인도 남아 있으며 API의 비-`media` 입력에서 사용할 수 있으나, 현재 CMS 주 흐름은 미디어 파이프라인입니다.
@@ -83,6 +85,7 @@ Google Login
 3. 운영 DB fail-closed, 마이그레이션/백업 정책을 확정해야 합니다.
 4. 토스페이먼츠 자동결제 MID 계약·청구 크론과 PayPal 해외 결제 플랜/웹훅을 설정하고 두 결제 경로의 테스트/라이브 소액 E2E를 완료해야 합니다.
 5. 외부 인증/이미지 공급자를 사용한 E2E와 `npm audit` moderate 2건 검토가 남아 있습니다.
+6. 브랜드 단위 스타일 메모리, MP4/애니메이션 출력, 실시간 공동 편집은 편집 문서가 확장 가능하도록 준비되어 있으나 후속 구현 범위입니다.
 
 ## 로컬 실행
 

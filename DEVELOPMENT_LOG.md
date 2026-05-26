@@ -268,3 +268,17 @@ This file records meaningful development work, fixes, verification commands, and
 - Toss Payments does not schedule monthly charges. Deployment must apply `scripts/migrate-tosspayments.mjs` before deploying payment code and invoke `/api/cron/billing` with `CRON_SECRET` on a recurring schedule.
 - The migration retains `naverpayRecurrentId` and `naverpaySubscriptionStatus` compatibility columns because an earlier deployed Prisma Client still selects them during login until the payment-provider release rolls out.
 - PayPal international sales require configured monthly plan IDs and a verified webhook; exchange and cross-border fees must be confirmed with test and live transactions.
+
+## 2026-05-26 KST - AI-Assisted Editorial Carousel Studio
+
+### Changes
+- Replaced the static result preview/form editor with a 1080x1350 direct manipulation canvas backed by a versioned `editorDocument`.
+- Added background, overlay, title, subtitle, sticker, CTA and watermark layers with ordering, visibility, positioning, opacity, scale, blur and motion metadata controls.
+- Added inline text editing, drag movement with safe-zone/center snapping, typography and cinematic overlay presets, undo/redo, and debounced autosave using isolated Zustand editor state.
+- Added AI-assisted copy refinement and current-background variations that preserve the user-controlled document rather than regenerating full slides.
+- Preserved original background image URLs separately from composed results, preventing repeated text compositing when editing an existing card.
+- Added deterministic editorial document rendering and PNG/JPG/PNG 2x/current-campaign ZIP export paths.
+
+### Operational Note
+- Deployments must run `node scripts/migrate-slide-customization.mjs` before serving this build so Prisma can select the new `CarouselSlide` document and customization fields.
+- Brand-level learned style preferences, motion video output and real-time collaboration remain follow-up scopes; the layer document includes metadata needed to extend toward those workflows.

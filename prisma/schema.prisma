@@ -95,16 +95,22 @@ model Campaign {
 }
 
 model CarouselSlide {
-  id           String   @id @default(uuid())
-  campaignId   String
-  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  slideNumber  Int
-  headline     String
-  body         String
-  designPrompt String
-  imageUrl     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  campaignId         String
+  campaign           Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  slideNumber        Int
+  headline           String
+  body               String
+  designPrompt       String
+  imageUrl           String?
+  backgroundImageUrl String?
+  fontPreset         String?
+  textColor          String?
+  headlineFontSize   Int?
+  bodyFontSize       Int?
+  editorDocument     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Post {

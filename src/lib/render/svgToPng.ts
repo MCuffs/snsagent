@@ -7,8 +7,9 @@ const FONT_FILES = [
   path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-Bold.otf'),
 ]
 
-export function renderSvgToPng(svg: string): Buffer {
+export function renderSvgToPng(svg: string, scale = 1): Buffer {
   const renderer = new Resvg(svg, {
+    fitTo: scale > 1 ? { mode: 'zoom', value: scale } : undefined,
     font: {
       fontFiles: FONT_FILES,
       loadSystemFonts: true,

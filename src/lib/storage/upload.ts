@@ -4,7 +4,7 @@ import path from 'path'
 export async function uploadGeneratedAsset(params: {
   fileName: string
   content: string | Buffer
-  contentType: 'image/svg+xml' | 'image/png'
+  contentType: 'image/svg+xml' | 'image/png' | 'image/jpeg'
 }): Promise<string> {
   const safeFileName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
 

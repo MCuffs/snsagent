@@ -121,16 +121,21 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Result["/campaign/[id]"] --> Text["슬라이드 텍스트 편집 Action"]
-    Result --> ReRender["스타일/이미지 재생성 Action"]
-    Result --> Replace["배경 이미지 교체 Action"]
-    Replace --> Upload["/api/upload"]
-    Text --> DB["DB Service"]
-    ReRender --> Pipeline["Renderer / Image Provider"]
-    Pipeline --> DB
+    Result["/campaign/[id] Editorial Studio"] --> Store["Zustand 문서 상태 / Undo Redo"]
+    Store --> Canvas["1080x1350 Visual Canvas<br/>직접 편집 / 드래그 / 스냅"]
+    Store --> Auto["Autosave Action"]
+    Store --> Commit["확정 렌더 Action"]
+    Store --> Copy["AI Copy Assist<br/>텍스트 레이어만 변경"]
+    Store --> Bg["AI Background Variation<br/>배경 레이어만 변경"]
+    Bg --> Provider["Image Provider"]
+    Commit --> Renderer["Deterministic Editorial Renderer"]
+    Renderer --> Export["PNG / JPG / PNG 2x / ZIP"]
+    Auto --> DB["CarouselSlide.editorDocument"]
+    Commit --> DB
+    Bg --> DB
 ```
 
-관련 Server Actions는 `app/actions.ts`에 위치한다. 배경 이미지 교체 UI는 업로드 API의 `files` 입력과 `urls` 응답 계약을 사용하도록 연결되어 있다.
+`editorDocument`는 배경, 오버레이, 타이틀, 본문, 스티커, CTA, 워터마크 레이어와 위치/순서/스타일/모션 메타데이터, 슬라이드 역할·의도, 오버레이 프리셋을 저장한다. 캔버스 조작은 로컬 상태에서 즉시 반응하고 저장/내보내기 때 서버가 검증된 문서를 결정론적으로 렌더한다. 관련 Server Actions는 `app/actions.ts`, 문서/렌더 계약은 `src/lib/editor/*`에 위치한다.
 
 ## 7. 데이터 모델
 
@@ -153,7 +158,7 @@ erDiagram
 | `User` | 로그인 사용자, 플랜, 토스 빌링키/청구 상태 또는 PayPal 구독 상태 |
 | `Brand` | 브랜드 분석 결과 및 생성 기준 정보 |
 | `Campaign` | 카드뉴스 생성 단위와 상태, 사용 이미지 모델 및 AI 재생성 이미지 수 |
-| `CarouselSlide` | 각 슬라이드 카피 및 이미지 |
+| `CarouselSlide` | 각 슬라이드 카피, 원본 배경, 확정 이미지 및 `editorDocument` 레이어 문서 |
 | `Post` | Instagram 게시 캡션, 예약 시간, 게시 상태 |
 | `InstagramAccount` | Meta 연동 계정 및 암호화 토큰 |
 

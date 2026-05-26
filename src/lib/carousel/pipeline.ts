@@ -256,6 +256,7 @@ export async function generateCarouselCampaign(params: {
         body: slide.body,
         designPrompt: slide.designPrompt,
         imageUrl: slide.finalImageUrl,
+        backgroundImageUrl: slide.backgroundImageUrl,
       }))
     )
 

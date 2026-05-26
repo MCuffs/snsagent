@@ -91,6 +91,12 @@ export interface CarouselSlide {
   body: string
   designPrompt: string
   imageUrl: string | null
+  backgroundImageUrl: string | null
+  fontPreset: string | null
+  textColor: string | null
+  headlineFontSize: number | null
+  bodyFontSize: number | null
+  editorDocument: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -165,6 +171,20 @@ function hydrateUser(user: StoredUser | User): User {
   }
 }
 
+function hydrateSlide(slide: StoredCarouselSlide | CarouselSlide): CarouselSlide {
+  return {
+    ...slide,
+    backgroundImageUrl: slide.backgroundImageUrl ?? null,
+    fontPreset: slide.fontPreset ?? null,
+    textColor: slide.textColor ?? null,
+    headlineFontSize: slide.headlineFontSize ?? null,
+    bodyFontSize: slide.bodyFontSize ?? null,
+    editorDocument: slide.editorDocument ?? null,
+    createdAt: new Date(slide.createdAt),
+    updatedAt: new Date(slide.updatedAt),
+  }
+}
+
 function initMockDb(): MockDatabase {
   if (!fs.existsSync(path.dirname(DB_FILE_PATH))) {
     fs.mkdirSync(path.dirname(DB_FILE_PATH), { recursive: true })
@@ -179,7 +199,7 @@ function initMockDb(): MockDatabase {
         brands: (parsed.brands || []).map((b) => ({ ...b, createdAt: new Date(b.createdAt), updatedAt: new Date(b.updatedAt) })),
         instagramAccounts: (parsed.instagramAccounts || []).map((ia) => ({ ...ia, tokenExpiresAt: ia.tokenExpiresAt ? new Date(ia.tokenExpiresAt) : null, createdAt: new Date(ia.createdAt), updatedAt: new Date(ia.updatedAt) })),
         campaigns: (parsed.campaigns || []).map(hydrateCampaign),
-        slides: (parsed.slides || []).map((s) => ({ ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) })),
+        slides: (parsed.slides || []).map(hydrateSlide),
         posts: (parsed.posts || []).map((p) => ({ ...p, scheduledAt: new Date(p.scheduledAt), createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })),
       }
     } catch (e) {
@@ -762,7 +782,19 @@ export const dbService = {
       imageModel?: string | null
       initialImageCount?: number
     },
-    slides: { slideNumber: number; headline: string; body: string; designPrompt: string; imageUrl?: string | null }[]
+    slides: {
+      slideNumber: number
+      headline: string
+      body: string
+      designPrompt: string
+      imageUrl?: string | null
+      backgroundImageUrl?: string | null
+      fontPreset?: string | null
+      textColor?: string | null
+      headlineFontSize?: number | null
+      bodyFontSize?: number | null
+      editorDocument?: string | null
+    }[]
   ): Promise<Campaign> {
     if (!isMock()) {
       try {
@@ -779,6 +811,12 @@ export const dbService = {
                 body: s.body,
                 designPrompt: s.designPrompt,
                 imageUrl: s.imageUrl || null,
+                backgroundImageUrl: s.backgroundImageUrl || null,
+                fontPreset: s.fontPreset || null,
+                textColor: s.textColor || null,
+                headlineFontSize: s.headlineFontSize ?? null,
+                bodyFontSize: s.bodyFontSize ?? null,
+                editorDocument: s.editorDocument ?? null,
               })),
             },
           },
@@ -820,6 +858,12 @@ export const dbService = {
       body: s.body,
       designPrompt: s.designPrompt,
       imageUrl: s.imageUrl || null,
+      backgroundImageUrl: s.backgroundImageUrl || null,
+      fontPreset: s.fontPreset || null,
+      textColor: s.textColor || null,
+      headlineFontSize: s.headlineFontSize ?? null,
+      bodyFontSize: s.bodyFontSize ?? null,
+      editorDocument: s.editorDocument ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }))
@@ -1012,6 +1056,45 @@ export const dbService = {
         db.slides[idx].imageUrl = imageUrl
       }
       db.slides[idx].updatedAt = new Date()
+      writeMockDb(db)
+      return db.slides[idx]
+    }
+    throw new Error('Slide not found')
+  },
+
+  async updateSlideCustomization(slideId: string, data: {
+    headline?: string
+    body?: string
+    imageUrl?: string | null
+    backgroundImageUrl?: string | null
+    fontPreset?: string | null
+    textColor?: string | null
+    headlineFontSize?: number | null
+    bodyFontSize?: number | null
+    editorDocument?: string | null
+  }): Promise<CarouselSlide> {
+    if (!isMock()) {
+      try {
+        return await prisma.carouselSlide.update({
+          where: { id: slideId },
+          data,
+        })
+      } catch (err) {
+        console.warn('Prisma updateSlideCustomization failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    const idx = db.slides.findIndex(s => s.id === slideId)
+    if (idx !== -1) {
+      db.slides[idx] = {
+        ...db.slides[idx],
+        ...data,
+        updatedAt: new Date(),
+      }
       writeMockDb(db)
       return db.slides[idx]
     }

@@ -50,6 +50,12 @@ export default async function CampaignDetailsPage({
       body: s.body,
       designPrompt: s.designPrompt,
       imageUrl: s.imageUrl,
+      backgroundImageUrl: s.backgroundImageUrl,
+      fontPreset: s.fontPreset,
+      textColor: s.textColor,
+      headlineFontSize: s.headlineFontSize,
+      bodyFontSize: s.bodyFontSize,
+      editorDocument: s.editorDocument,
     }))
   }
 

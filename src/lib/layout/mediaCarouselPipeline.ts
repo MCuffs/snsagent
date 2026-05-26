@@ -295,6 +295,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       body: slide.body,
       designPrompt: slide.designPrompt,
       imageUrl: slide.finalImageUrl,
+      backgroundImageUrl: slide.backgroundImageUrl,
     }))
   )
 

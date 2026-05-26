@@ -1,29 +1,29 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import JSZip from 'jszip'
 import {
   Check,
   ChevronLeft,
   ChevronRight,
   Download,
   ExternalLink,
-  ImagePlus,
   Loader2,
   RefreshCw,
-  Save,
-  Sparkles,
-  Type,
 } from 'lucide-react'
 import {
-  rerenderMediaSlideAction,
-  fastRerenderTextAction,
-  saveSlideTextAction,
-  replaceBackgroundAction,
+  saveEditorialDocumentAction,
+  regenerateEditorialBackgroundAction,
+  rewriteEditorialCopyAction,
+  exportEditorialSlideAction,
   updatePostDetailsAction,
-  regenerateCampaignImagesAction,
 } from '../../../actions'
 import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
+import { parseEditorialDocument } from '../../../../src/lib/editor/document'
+import { EditorialCanvas } from './editor/EditorialCanvas'
+import { EditorialInspector } from './editor/EditorialInspector'
+import { useEditorialStore } from './editor/useEditorialStore'
 
 interface Slide {
   id: string
@@ -32,6 +32,12 @@ interface Slide {
   body: string
   designPrompt: string
   imageUrl: string | null
+  backgroundImageUrl: string | null
+  fontPreset: string | null
+  textColor: string | null
+  headlineFontSize: number | null
+  bodyFontSize: number | null
+  editorDocument: string | null
 }
 
 interface Campaign {
@@ -131,24 +137,22 @@ export default function CampaignResultView({
   const router = useRouter()
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
-  const [headline, setHeadline] = useState(slides[0]?.headline || '')
-  const [body, setBody] = useState(slides[0]?.body || '')
   const [caption, setCaption] = useState(post.caption)
   const [hashtags, setHashtags] = useState(post.hashtags)
-  const [rerendering, setRerendering] = useState(false)
-  const [savingText, setSavingText] = useState(false)
-  const [fastRendering, setFastRendering] = useState(false)
-  const [replacingBg, setReplacingBg] = useState(false)
+  const [editorBusy, setEditorBusy] = useState(false)
   const bgFileInputRef = useRef<HTMLInputElement>(null)
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
-  const [selectedStyle, setSelectedStyle] = useState('photo')
-  const [regeneratingStyle, setRegeneratingStyle] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [regenerationImageCount, setRegenerationImageCount] = useState(campaign.regenerationImageCount)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
-  const [selectedFont, setSelectedFont] = useState<'sans' | 'serif'>('sans')
-  const [textColor, setTextColor] = useState<string>('#ffffff')
+  const documents = useEditorialStore(state => state.documents)
+  const dirtySlides = useEditorialStore(state => state.dirtySlides)
+  const initializeEditor = useEditorialStore(state => state.initialize)
+  const activateSlide = useEditorialStore(state => state.activate)
+  const updateDocument = useEditorialStore(state => state.updateDocument)
+  const markSaved = useEditorialStore(state => state.markSaved)
 
   let agentReportData: AgentReport | null = null
   if (campaign.agentReport) {
@@ -163,136 +167,92 @@ export default function CampaignResultView({
   const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
   const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
   const remainingRegenerationImages = Math.max(campaign.slideCount - regenerationImageCount, 0)
+  const activeDocument = activeSlide ? documents[activeSlide.id] : undefined
+
+  useEffect(() => {
+    const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
+      slide.id,
+      parseEditorialDocument(slide.editorDocument, slide),
+    ]))
+    if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
+  }, [campaign.slides, initializeEditor])
+
+  useEffect(() => {
+    if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
+    const timeout = window.setTimeout(async () => {
+      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), false)
+      if (result.success) markSaved(activeSlide.id)
+    }, 900)
+    return () => window.clearTimeout(timeout)
+  }, [activeDocument, activeSlide, dirtySlides, editorBusy, markSaved])
 
   const selectSlide = (index: number) => {
     setActiveSlideIndex(index)
-    setHeadline(slides[index]?.headline || '')
-    setBody(slides[index]?.body || '')
+    if (slides[index]) activateSlide(slides[index].id)
     setMessage(null)
   }
 
-  const handleRegenerateStyle = async () => {
-    setRegeneratingStyle(true)
+  const applyServerSlide = (slide: Slide, document?: typeof activeDocument) => {
+    setSlides(current => current.map(item => item.id === slide.id ? { ...item, ...slide } : item))
+    if (document) {
+      updateDocument(slide.id, () => document)
+      markSaved(slide.id)
+    }
+  }
+
+  const saveEditor = async (renderOutput: boolean) => {
+    if (!activeSlide || !activeDocument) return
+    setEditorBusy(true)
     setMessage(null)
-
     try {
-      const result = await regenerateCampaignImagesAction(campaign.id, selectedStyle)
-      if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '스타일 재생성에 실패했습니다.' })
-        return
-      }
+      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), renderOutput)
+      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      applyServerSlide(result.slide as Slide, result.document)
+      setMessage({ type: 'success', text: renderOutput ? '편집본을 고해상도 PNG로 확정 렌더했습니다.' : '편집 내용을 저장했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '편집 저장 중 오류가 발생했습니다.') })
+    } finally {
+      setEditorBusy(false)
+    }
+  }
 
-      const updated = result.slides
-        .map((slide: Slide) => ({
-          id: slide.id,
-          slideNumber: slide.slideNumber,
-          headline: slide.headline,
-          body: slide.body,
-          designPrompt: slide.designPrompt,
-          imageUrl: slide.imageUrl,
-        }))
-        .sort((a: Slide, b: Slide) => a.slideNumber - b.slideNumber)
-
-      setSlides(updated)
-      if (updated[activeSlideIndex]) {
-        setHeadline(updated[activeSlideIndex].headline)
-        setBody(updated[activeSlideIndex].body)
-      }
+  const regenerateBackground = async (variation: 'same-style' | 'stronger-mood' | 'brighter-background') => {
+    if (!activeSlide || !activeDocument) return
+    setEditorBusy(true)
+    setMessage(null)
+    try {
+      const result = await regenerateEditorialBackgroundAction(activeSlide.id, JSON.stringify(activeDocument), variation)
+      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      applyServerSlide(result.slide as Slide, result.document)
       setRegenerationImageCount(result.regenerationUsage.used)
-      setMessage({ type: 'success', text: '전체 카드 스타일을 다시 생성했습니다.' })
+      setMessage({ type: 'success', text: '레이아웃을 유지한 채 현재 슬라이드 배경만 변경했습니다.' })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '스타일 재생성 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, '배경 생성 중 오류가 발생했습니다.') })
     } finally {
-      setRegeneratingStyle(false)
+      setEditorBusy(false)
     }
   }
 
-  const rerenderSlide = async () => {
-    if (!activeSlide) return
-    setRerendering(true)
-    setMessage(null)
-
+  const rewriteCopy = async (intent: string) => {
+    if (!activeSlide || !activeDocument) return
+    if (/밝|brighter/i.test(intent)) return regenerateBackground('brighter-background')
+    if (/배경|이미지|무드|mood|background/i.test(intent)) return regenerateBackground('stronger-mood')
+    setEditorBusy(true)
     try {
-      const fontFamily = selectedFont === 'serif'
-        ? 'Georgia, Times New Roman, Pretendard, serif'
-        : 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif'
-      const result = await rerenderMediaSlideAction(activeSlide.id, headline, body, {
-        fontFamily,
-        textColor,
-      })
-      if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '슬라이드 재렌더링에 실패했습니다.' })
-        return
-      }
-
-      const updatedSlides = slides.map((slide) =>
-        slide.id === activeSlide.id
-          ? { ...slide, headline, body, imageUrl: result.slide.imageUrl }
-          : slide
-      )
-      setSlides(updatedSlides)
-      setRegenerationImageCount(result.regenerationUsage.used)
-      setMessage({ type: 'success', text: `${activeSlide.slideNumber}번 카드를 다시 렌더링했습니다.` })
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '슬라이드 재렌더링 중 오류가 발생했습니다.') })
+      const result = await rewriteEditorialCopyAction(activeSlide.id, JSON.stringify(activeDocument), intent)
+      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      applyServerSlide(result.slide as Slide, result.document)
+      setMessage({ type: 'success', text: '이미지는 유지하고 문구 레이어만 보정했습니다. 확정 렌더로 출력에 반영하세요.' })
     } finally {
-      setRerendering(false)
-    }
-  }
-
-  const saveText = async () => {
-    if (!activeSlide) return
-    setSavingText(true)
-    setMessage(null)
-    try {
-      const result = await saveSlideTextAction(activeSlide.id, headline, body)
-      if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '저장에 실패했습니다.' })
-        return
-      }
-      const updatedSlides = slides.map((slide) =>
-        slide.id === activeSlide.id ? { ...slide, headline, body } : slide
-      )
-      setSlides(updatedSlides)
-      setMessage({ type: 'success', text: '텍스트를 저장했습니다.' })
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '저장 중 오류가 발생했습니다.') })
-    } finally {
-      setSavingText(false)
-    }
-  }
-
-  const fastRerenderText = async () => {
-    if (!activeSlide) return
-    setFastRendering(true)
-    setMessage(null)
-    try {
-      const fontFamily = selectedFont === 'serif'
-        ? 'Georgia, Times New Roman, Pretendard, serif'
-        : 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif'
-      const result = await fastRerenderTextAction(activeSlide.id, headline, body, { fontFamily, textColor })
-      if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '렌더링에 실패했습니다.' })
-        return
-      }
-      const updatedSlides = slides.map((slide) =>
-        slide.id === activeSlide.id
-          ? { ...slide, headline, body, imageUrl: result.slide.imageUrl }
-          : slide
-      )
-      setSlides(updatedSlides)
-      setMessage({ type: 'success', text: '텍스트를 렌더링했습니다. (~3초)' })
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '렌더링 중 오류가 발생했습니다.') })
-    } finally {
-      setFastRendering(false)
+      setEditorBusy(false)
     }
   }
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !activeSlide) return
-    setReplacingBg(true)
+    if (!activeDocument) return
+    setEditorBusy(true)
     setMessage(null)
     try {
       const formData = new FormData()
@@ -304,22 +264,22 @@ export default function CampaignResultView({
         setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
         return
       }
-      const result = await replaceBackgroundAction(activeSlide.id, backgroundUrl)
+      const nextDocument = {
+        ...activeDocument,
+        layers: activeDocument.layers.map(layer => layer.type === 'background' ? { ...layer, imageUrl: backgroundUrl } : layer),
+      }
+      updateDocument(activeSlide.id, () => nextDocument)
+      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(nextDocument), true)
       if (!result.success) {
         setMessage({ type: 'error', text: result.error || '배경 교체에 실패했습니다.' })
         return
       }
-      const updatedSlides = slides.map((slide) =>
-        slide.id === activeSlide.id
-          ? { ...slide, imageUrl: result.slide.imageUrl }
-          : slide
-      )
-      setSlides(updatedSlides)
-      setMessage({ type: 'success', text: '배경 이미지를 교체했습니다.' })
+      applyServerSlide(result.slide as Slide, result.document)
+      setMessage({ type: 'success', text: '업로드한 배경을 적용하고 확정 렌더했습니다.' })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '배경 교체 중 오류가 발생했습니다.') })
     } finally {
-      setReplacingBg(false)
+      setEditorBusy(false)
       if (bgFileInputRef.current) bgFileInputRef.current.value = ''
     }
   }
@@ -353,19 +313,43 @@ export default function CampaignResultView({
     }
   }
 
-  const downloadAllSlides = async () => {
+  const exportActive = async (format: 'png' | 'jpg', scale: 1 | 2) => {
+    if (!activeSlide || !activeDocument) return
+    setExporting(true)
+    setMessage(null)
+    try {
+      const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), format, scale)
+      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber, format))
+      setMessage({ type: 'success', text: `${format.toUpperCase()} ${scale === 2 ? '2x 고해상도' : ''} 내보내기를 완료했습니다.` })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, '내보내기에 실패했습니다.') })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const exportZip = async () => {
     setDownloadingAll(true)
     setMessage(null)
     try {
+      const zip = new JSZip()
       for (const slide of slides) {
-        if (slide.imageUrl) {
-          await downloadImage(slide.imageUrl, fileNameFor(campaign.title, slide.slideNumber))
-          await new Promise(resolve => setTimeout(resolve, 140))
-        }
+        const document = documents[slide.id] || parseEditorialDocument(slide.editorDocument, slide)
+        const result = await exportEditorialSlideAction(slide.id, JSON.stringify(document), 'png', 1)
+        if (!result.success) throw new Error(result.error)
+        const response = await fetch(result.url)
+        zip.file(fileNameFor(campaign.title, slide.slideNumber), await response.blob())
       }
-      setMessage({ type: 'success', text: '전체 카드 다운로드를 시작했습니다.' })
+      const archive = await zip.generateAsync({ type: 'blob' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(archive)
+      link.download = `${campaign.title.replace(/\s+/g, '-')}-instagram-4x5.zip`
+      link.click()
+      URL.revokeObjectURL(link.href)
+      setMessage({ type: 'success', text: 'Instagram 4:5 PNG 묶음을 ZIP으로 내보냈습니다.' })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '전체 다운로드 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, 'ZIP 내보내기에 실패했습니다.') })
     } finally {
       setDownloadingAll(false)
     }
@@ -380,13 +364,13 @@ export default function CampaignResultView({
             {campaign.title}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
-            카드뉴스를 검토하고 문구를 편집한 뒤 PNG 파일로 다운로드하세요. 새 카드뉴스가 필요하면 바로 이어서 만들 수 있습니다.
+            AI가 만든 초안을 캔버스에서 직접 다듬고, 필요한 레이어만 AI로 보정한 뒤 제작용 이미지로 확정하세요.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={downloadAllSlides} disabled={downloadingAll} className="btn-primary px-5">
+          <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary px-5">
             {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            전체 다운로드
+            전체 ZIP 내보내기
           </button>
           <button type="button" onClick={() => router.push('/generate')} className="btn-secondary px-5">
             <RefreshCw className="h-4 w-4" />
@@ -405,24 +389,8 @@ export default function CampaignResultView({
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <section className="space-y-5">
-          <div className="rounded-[10px] border border-[#e8dfd4] bg-[#f8f3e9] p-4 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-            <div className="mx-auto max-w-[560px]">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#1f1512] shadow-[0_22px_70px_rgba(31,21,18,0.22)]">
-                {activeSlide?.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={activeSlide.imageUrl}
-                    src={activeSlide.imageUrl}
-                    alt={`${activeSlide.slideNumber}번 카드뉴스`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-bold text-white/70">
-                    렌더링 이미지가 없습니다.
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-5 shadow-[0_24px_70px_rgba(31,21,18,0.18)]">
+            {activeSlide && <EditorialCanvas slideId={activeSlide.id} />}
 
             <div className="mt-5 flex items-center justify-between">
               <button
@@ -500,195 +468,26 @@ export default function CampaignResultView({
 
           {sidebarTab === 'edit' && (
             <>
-              <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="eyebrow">Style</p>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">전체 스타일 재생성</h2>
+              {activeSlide && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Meta label="role" value={roleLabel} />
+                    <Meta label="layout" value={layoutLabel} />
+                    <Meta label="brand" value={brand.name} />
+                    <Meta label="plan" value={planName} />
                   </div>
-                  <Sparkles className="h-5 w-5 text-[#ff4f0a]" />
-                </div>
-
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'photo', label: '보도사진' },
-                    { key: 'minimalist', label: '미니멀' },
-                    { key: 'gradients', label: '다크 무드' },
-                    { key: 'cyberpunk', label: '이슈 브리핑' },
-                    { key: 'vector', label: '매거진 포토' },
-                  ].map((style) => (
-                    <button
-                      key={style.key}
-                      type="button"
-                      onClick={() => setSelectedStyle(style.key)}
-                      className={`rounded-[6px] border py-2 text-xs font-bold transition ${
-                        selectedStyle === style.key
-                          ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
-                          : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
-                      }`}
-                    >
-                      {style.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mb-4 rounded-[6px] bg-[#faf8f4] px-3 py-2 text-xs font-bold text-[#746a62]">
-                  포함 AI 배경 재생성 크레딧: {remainingRegenerationImages}/{campaign.slideCount}장 남음
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleRegenerateStyle}
-                  disabled={regeneratingStyle || remainingRegenerationImages < campaign.slideCount}
-                  className="btn-primary w-full rounded-[8px]"
-                >
-                  {regeneratingStyle ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  스타일 다시 만들기 ({campaign.slideCount}장 사용)
-                </button>
-              </div>
-
-              <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="eyebrow">Slide {activeSlide?.slideNumber}</p>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">문구 편집</h2>
-                  </div>
-                  <Type className="h-5 w-5 text-[#ff4f0a]" />
-                </div>
-
-                <div className="mb-5 grid grid-cols-2 gap-3">
-                  <Meta label="role" value={roleLabel} />
-                  <Meta label="layout" value={layoutLabel} />
-                  <Meta label="brand" value={brand.name} />
-                  <Meta label="plan" value={planName} />
-                  <Meta label="AI credits" value={`${remainingRegenerationImages}/${campaign.slideCount}`} />
-                </div>
-
-                <div className="space-y-4">
-                  {/* Font selector */}
-                  <div>
-                    <label className="mb-2 block text-xs font-black text-[#4a4039]">폰트</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { key: 'sans' as const, label: 'Pretendard', hint: '기본 고딕체' },
-                        { key: 'serif' as const, label: 'Georgia', hint: '세리프 서체' },
-                      ].map((f) => (
-                        <button
-                          key={f.key}
-                          type="button"
-                          onClick={() => setSelectedFont(f.key)}
-                          className={`rounded-[6px] border py-2.5 text-left px-3 transition ${
-                            selectedFont === f.key
-                              ? 'border-[#ff4f0a] bg-[#ff4f0a]/5 text-[#ff4f0a]'
-                              : 'border-[#e8dfd4] bg-white text-[#746a62] hover:border-[#ffb08a]'
-                          }`}
-                        >
-                          <p className="text-xs font-black">{f.label}</p>
-                          <p className="text-[10px] opacity-60">{f.hint}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Text color selector */}
-                  <div>
-                    <label className="mb-2 block text-xs font-black text-[#4a4039]">텍스트 색상</label>
-                    <div className="flex items-center gap-2">
-                      {[
-                        { value: '#ffffff', label: '화이트' },
-                        { value: '#111111', label: '다크' },
-                        { value: brand.mainColor, label: '브랜드' },
-                      ].map((c) => (
-                        <button
-                          key={c.value}
-                          type="button"
-                          title={c.label}
-                          onClick={() => setTextColor(c.value)}
-                          className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
-                            textColor === c.value ? 'border-[#ff4f0a] scale-110' : 'border-[#e8dfd4] hover:border-[#ffb08a]'
-                          }`}
-                          style={{ backgroundColor: c.value }}
-                        />
-                      ))}
-                      <input
-                        type="color"
-                        value={textColor}
-                        onChange={(e) => setTextColor(e.target.value)}
-                        title="커스텀 색상"
-                        className="h-9 w-9 cursor-pointer rounded-full border-2 border-[#e8dfd4] p-0.5 hover:border-[#ffb08a]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="headline" className="mb-2 block text-xs font-black text-[#4a4039]">
-                      헤드라인
-                    </label>
-                    <input
-                      id="headline"
-                      value={headline}
-                      onChange={(event) => setHeadline(event.target.value)}
-                      className="field h-12 px-4 text-base font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="body" className="mb-2 block text-xs font-black text-[#4a4039]">
-                      본문
-                    </label>
-                    <textarea
-                      id="body"
-                      rows={4}
-                      value={body}
-                      onChange={(event) => setBody(event.target.value)}
-                      className="field resize-none px-4 py-3 text-base leading-7"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={saveText}
-                      disabled={savingText || fastRendering || rerendering || replacingBg}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-white py-2.5 text-xs font-bold text-[#4a4039] transition hover:border-[#ffb08a] disabled:opacity-40"
-                    >
-                      {savingText ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                      저장
-                    </button>
-                    <button
-                      type="button"
-                      onClick={fastRerenderText}
-                      disabled={savingText || fastRendering || rerendering || replacingBg}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-[#ff4f0a]/5 py-2.5 text-xs font-bold text-[#ff4f0a] transition hover:bg-[#ff4f0a]/10 disabled:opacity-40"
-                    >
-                      {fastRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      렌더 적용
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => bgFileInputRef.current?.click()}
-                      disabled={savingText || fastRendering || rerendering || replacingBg}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-[#e8dfd4] bg-white py-2.5 text-xs font-bold text-[#4a4039] transition hover:border-[#ffb08a] disabled:opacity-40"
-                    >
-                      {replacingBg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-                      배경 교체
-                    </button>
-                    <input
-                      ref={bgFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleBackgroundUpload}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={rerenderSlide}
-                    disabled={rerendering || fastRendering || savingText || replacingBg || remainingRegenerationImages < 1}
-                    className="btn-primary w-full rounded-[8px]"
-                  >
-                    {rerendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    현재 카드 AI 배경 재생성 (1장 사용)
-                  </button>
-                </div>
-              </div>
+                  <EditorialInspector
+                    slideId={activeSlide.id}
+                    busy={editorBusy}
+                    credits={remainingRegenerationImages}
+                    onSave={saveEditor}
+                    onBackgroundVariation={regenerateBackground}
+                    onRewrite={rewriteCopy}
+                    onUpload={() => bgFileInputRef.current?.click()}
+                  />
+                </>
+              )}
+              <input ref={bgFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
 
               <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
                 <div className="mb-5 flex items-center justify-between">
@@ -822,9 +621,18 @@ export default function CampaignResultView({
                   </button>
                 </>
               )}
-              <button type="button" onClick={downloadAllSlides} disabled={downloadingAll} className="btn-primary min-h-10 px-4 text-xs">
+              <button type="button" onClick={() => exportActive('png', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+                PNG
+              </button>
+              <button type="button" onClick={() => exportActive('jpg', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+                JPG
+              </button>
+              <button type="button" onClick={() => exportActive('png', 2)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+                PNG 2x
+              </button>
+              <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary min-h-10 px-4 text-xs">
                 {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                전체 다운로드
+                전체 ZIP
               </button>
             </div>
           </div>

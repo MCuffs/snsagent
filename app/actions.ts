@@ -17,6 +17,9 @@ import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTyp
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
+import { layerByType, parseEditorialDocument } from '../src/lib/editor/document'
+import { renderEditorialDocument } from '../src/lib/editor/renderer'
+import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
@@ -35,6 +38,39 @@ function unauthenticated() {
 
 function failed(error: string) {
   return { success: false as const, error }
+}
+
+function slideEditorSeed(slide: {
+  slideNumber: number
+  headline: string
+  body: string
+  imageUrl: string | null
+  backgroundImageUrl: string | null
+  fontPreset: string | null
+  textColor: string | null
+  headlineFontSize: number | null
+  bodyFontSize: number | null
+  editorDocument: string | null
+}) {
+  return {
+    slideNumber: slide.slideNumber,
+    headline: slide.headline,
+    body: slide.body,
+    imageUrl: slide.imageUrl,
+    backgroundImageUrl: slide.backgroundImageUrl,
+    fontPreset: slide.fontPreset,
+    textColor: slide.textColor,
+    headlineFontSize: slide.headlineFontSize,
+    bodyFontSize: slide.bodyFontSize,
+    editorDocument: slide.editorDocument,
+  }
+}
+
+function documentText(document: EditorialDocument) {
+  return {
+    headline: layerByType(document, 'title')?.text || '',
+    body: layerByType(document, 'subtitle')?.text || '',
+  }
 }
 
 async function getOwnedBrandOrFallback(userId: string, brandId?: string | null) {
@@ -327,6 +363,158 @@ export async function saveSlideTextAction(slideId: string, headline: string, bod
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 저장에 실패했습니다.'))
+  }
+}
+
+// Persist local canvas edits and optionally produce a deterministic final asset.
+export async function saveEditorialDocumentAction(slideId: string, rawDocument: string, renderOutput = false) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+  if (rawDocument.length > 120_000) return failed('편집 문서가 너무 큽니다.')
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
+    const document = parseEditorialDocument(rawDocument, slideEditorSeed(existingSlide))
+    const { headline, body } = documentText(document)
+    const backgroundImageUrl = layerByType(document, 'background')?.imageUrl || existingSlide.backgroundImageUrl
+    const imageUrl = renderOutput
+      ? await renderEditorialDocument(`editorial-${Date.now()}-${existingSlide.slideNumber}`, document)
+      : existingSlide.imageUrl
+
+    const slide = await dbService.updateSlideCustomization(slideId, {
+      headline,
+      body,
+      imageUrl,
+      backgroundImageUrl,
+      editorDocument: JSON.stringify(document),
+    })
+    return { success: true as const, slide, document, rendered: renderOutput }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '편집 문서 저장에 실패했습니다.'))
+  }
+}
+
+export async function regenerateEditorialBackgroundAction(
+  slideId: string,
+  rawDocument: string,
+  variation: 'same-style' | 'stronger-mood' | 'brighter-background',
+) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+    const usage = await dbService.reserveRegenerationImages(existingSlide.campaign.id, 1, getPipelineImageModel())
+    if (!usage.allowed) return failed(`포함된 AI 배경 재생성 크레딧을 모두 사용했습니다. (${usage.used}/${usage.limit}장)`)
+
+    const document = parseEditorialDocument(rawDocument, slideEditorSeed(existingSlide))
+    const direction = {
+      'same-style': 'retain identical editorial style, palette, mood and composition; create a different photographic take',
+      'stronger-mood': 'retain layout and subject placement; increase cinematic atmosphere and emotional lighting',
+      'brighter-background': 'retain layout and visual language; use a brighter clean background with readable negative space',
+    }[variation]
+    const prompt = `${existingSlide.designPrompt}, ${direction}, never render letters or typography in the image`
+    const result = await getPipelineImageProvider().generateImage(prompt, { size: '1024x1024', productImageUrls: [] })
+    document.layers = document.layers.map(layer =>
+      layer.type === 'background' ? { ...layer, imageUrl: result.imageUrl } : layer
+    )
+    const imageUrl = await renderEditorialDocument(`editorial-bg-${Date.now()}-${existingSlide.slideNumber}`, document)
+    const { headline, body } = documentText(document)
+    const slide = await dbService.updateSlideCustomization(slideId, {
+      headline,
+      body,
+      imageUrl,
+      backgroundImageUrl: result.imageUrl,
+      editorDocument: JSON.stringify(document),
+    })
+    return { success: true as const, slide, document, regenerationUsage: usage }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '배경 변형 생성에 실패했습니다.'))
+  }
+}
+
+export async function rewriteEditorialCopyAction(
+  slideId: string,
+  rawDocument: string,
+  intent: 'stronger-hook' | 'emotional' | 'clickbait' | 'premium' | 'luxury' | 'trendy' | 'gen-z' | 'cleaner' | 'shorter' | string,
+) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+  try {
+    const slide = await dbService.getSlide(slideId)
+    if (!slide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (slide.campaign.userId !== user.id) return forbidden()
+    const document = parseEditorialDocument(rawDocument, slideEditorSeed(slide))
+    const text = documentText(document)
+    let rewrite = localCopyRewrite(text.headline, text.body, intent)
+    const apiKey = process.env.OPENAI_API_KEY
+    if (isConfiguredOpenAIKey(apiKey)) {
+      const openai = new OpenAI({ apiKey })
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: '당신은 한국 프리미엄 에디토리얼 카피라이터입니다. 슬라이드 문구만 개선하고 유효한 JSON만 반환하세요.' },
+          { role: 'user', content: `방향: ${intent}\n현재 제목: ${text.headline}\n현재 본문: ${text.body}\n제목 26자 이하, 본문 60자 이하로 headline/body JSON을 반환하세요.` },
+        ],
+      })
+      const parsed = JSON.parse(response.choices[0]?.message?.content || '{}') as { headline?: string; body?: string }
+      if (parsed.headline && parsed.body) rewrite = { headline: parsed.headline.slice(0, 52), body: parsed.body.slice(0, 120) }
+    }
+    document.layers = document.layers.map(layer => {
+      if (layer.type === 'title') return { ...layer, text: rewrite.headline }
+      if (layer.type === 'subtitle') return { ...layer, text: rewrite.body }
+      return layer
+    })
+    const updated = await dbService.updateSlideCustomization(slideId, {
+      headline: rewrite.headline,
+      body: rewrite.body,
+      editorDocument: JSON.stringify(document),
+    })
+    return { success: true as const, slide: updated, document }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '카피 제안 생성에 실패했습니다.'))
+  }
+}
+
+export async function exportEditorialSlideAction(
+  slideId: string,
+  rawDocument: string,
+  format: 'png' | 'jpg',
+  scale: 1 | 2,
+) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+  try {
+    const slide = await dbService.getSlide(slideId)
+    if (!slide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (slide.campaign.userId !== user.id) return forbidden()
+    const document = parseEditorialDocument(rawDocument, slideEditorSeed(slide))
+    const url = await renderEditorialDocument(`export-${Date.now()}-${slide.slideNumber}`, document, { format, scale })
+    return { success: true as const, url }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, '내보내기 렌더링에 실패했습니다.'))
+  }
+}
+
+function localCopyRewrite(headline: string, body: string, intent: string) {
+  switch (intent) {
+    case 'stronger-hook':
+      return { headline: `${headline.replace(/[.!?]+$/, '')}, 놓치지 마세요`, body }
+    case 'shorter':
+    case 'cleaner':
+      return { headline: headline.slice(0, 20), body: body.slice(0, 42) }
+    case 'premium':
+    case 'luxury':
+      return { headline: `더 정제된 ${headline}`.slice(0, 28), body: body.slice(0, 56) }
+    default:
+      return { headline, body }
   }
 }
 

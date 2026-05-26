@@ -20,6 +20,8 @@ export interface RenderMediaCardInput {
   totalPages?: number
   fontOverride?: string
   textColorOverride?: string
+  headlineFontSizeOverride?: number
+  bodyFontSizeOverride?: number
 }
 
 export async function renderMediaCard(input: RenderMediaCardInput) {
@@ -32,6 +34,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
   const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
   const fontFam = input.fontOverride ?? fontFamily(input.layout.typographyStyle)
+  const typography = applyTypographyOverrides(input)
   const textColor = input.textColorOverride ?? (input.layout.overlayStyle === 'none' ? '#ffffff' : input.overlay.textColor)
   const secondaryTextColor = input.textColorOverride
     ? `${input.textColorOverride}cc`
@@ -45,14 +48,14 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const kickerMarkup = renderKicker(input, textBox.x, currentY, textColor)
   currentY += 24 + badgeToHeadlineGap
 
-  const headlineStartBaseline = currentY + input.typography.headlineFontSize * 0.95
-  const headlineMarkup = renderHeadline(input.typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam)
+  const headlineStartBaseline = currentY + typography.headlineFontSize * 0.95
+  const headlineMarkup = renderHeadline(typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam)
   const bodyStartBaseline =
     headlineStartBaseline +
-    (input.typography.headlineLines.length - 1) * input.typography.headlineFontSize * headlineLineGap +
+    (typography.headlineLines.length - 1) * typography.headlineFontSize * headlineLineGap +
     headlineToBodyGap +
-    input.typography.bodyFontSize * 0.95
-  const bodyMarkup = renderBody(input.typography, textBox.x, bodyStartBaseline, secondaryTextColor, textBox.align, fontFam, bodyLineGap)
+    typography.bodyFontSize * 0.95
+  const bodyMarkup = renderBody(typography, textBox.x, bodyStartBaseline, secondaryTextColor, textBox.align, fontFam, bodyLineGap)
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
@@ -149,10 +152,15 @@ function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, al
 async function renderArchiveCta(input: RenderMediaCardInput) {
   const sourceHandle = normalizeInstagramHandle(input.source || 'shuffla')
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
-  const headline = input.typography.headlineLines
+  const typography = applyTypographyOverrides(input)
+  const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
+  const fontFam = input.fontOverride ?? fontFamily('clean-sans')
+  const textColor = input.textColorOverride ?? '#f5f5f5'
+  const secondaryTextColor = input.textColorOverride ?? '#ffffff'
+  const headline = typography.headlineLines
     .map(line => line.tokens.map(token => token.text).join(' '))
     .join(' ') || input.headline
-  const bodyLines = input.typography.bodyLines.length ? input.typography.bodyLines : [input.body]
+  const bodyLines = typography.bodyLines.length ? typography.bodyLines : [input.body]
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
@@ -164,11 +172,12 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
       <stop offset="100%" stop-color="#000000" stop-opacity="0.92"/>
     </linearGradient>
   </defs>
+  ${backgroundImageDataUri || input.backgroundImageUrl ? `<image href="${escapeXml(backgroundImageDataUri || input.backgroundImageUrl)}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"/>` : ''}
   <rect width="1080" height="1350" fill="url(#cta-bottom-gradient)"/>
-  ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, '#ffffff')}
-  <text xml:space="preserve" x="540" y="675" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="52" font-weight="700" fill="#ffffff" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
-  <text xml:space="preserve" x="72" y="970" font-family="${fontFamily('clean-sans')}" font-size="82" font-weight="750" fill="#f5f5f5" letter-spacing="-0.5">${escapeXml(headline)}</text>
-  ${bodyLines.slice(0, 2).map((line, index) => `<text xml:space="preserve" x="72" y="${1060 + index * 52}" font-family="${fontFamily('clean-sans')}" font-size="29" font-weight="400" fill="#ffffff" fill-opacity="0.44" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
+  ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, textColor)}
+  <text xml:space="preserve" x="540" y="675" text-anchor="middle" font-family="${fontFam}" font-size="52" font-weight="700" fill="${textColor}" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
+  <text xml:space="preserve" x="72" y="970" font-family="${fontFam}" font-size="${typography.headlineFontSize}" font-weight="750" fill="${textColor}" letter-spacing="-0.5">${escapeXml(headline)}</text>
+  ${bodyLines.slice(0, 2).map((line, index) => `<text xml:space="preserve" x="72" y="${1060 + index * (typography.bodyFontSize + 23)}" font-family="${fontFam}" font-size="${typography.bodyFontSize}" font-weight="400" fill="${secondaryTextColor}" fill-opacity="0.64" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
   <line x1="72" y1="1188" x2="1008" y2="1188" stroke="#ffffff" stroke-opacity="0.16"/>
   <rect x="72" y="1230" width="936" height="78" fill="#f3f3f3"/>
   <text xml:space="preserve" x="540" y="1280" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="28" font-weight="700" fill="#050505" letter-spacing="0">팔로우 ${escapeXml(sourceHandle)}</text>
@@ -188,6 +197,14 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
       content: svg,
       contentType: 'image/svg+xml',
     })
+  }
+}
+
+function applyTypographyOverrides(input: RenderMediaCardInput): TypographyPlan {
+  return {
+    ...input.typography,
+    headlineFontSize: input.headlineFontSizeOverride ?? input.typography.headlineFontSize,
+    bodyFontSize: input.bodyFontSizeOverride ?? input.typography.bodyFontSize,
   }
 }
 
