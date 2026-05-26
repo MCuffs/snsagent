@@ -5,8 +5,8 @@ import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
 
 const navItems = [
   { href: '/concept', label: 'Concept', icon: BookOpen, desc: '브랜드 프로필' },
-  { href: '/generate', label: 'Generate', icon: Zap, desc: '카드뉴스 생성' },
-  { href: '/works', label: 'Works', icon: Grid3X3, desc: '작업 히스토리' },
+  { href: '/concept?tab=generate', label: 'Generate', icon: Zap, desc: '카드뉴스 생성' },
+  { href: '/concept?tab=works', label: 'Works', icon: Grid3X3, desc: '작업 히스토리' },
 ]
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {

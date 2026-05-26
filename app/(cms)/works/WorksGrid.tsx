@@ -41,7 +41,7 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
           <h2 className="text-lg font-bold text-[#111111]">아직 생성된 카드뉴스가 없습니다</h2>
           <p className="mt-2 text-sm text-[#71717a]">첫 번째 카드뉴스를 생성해보세요.</p>
           <Link
-            href="/generate"
+            href="/concept?tab=generate"
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#333333]"
           >
             카드뉴스 생성하기
@@ -61,7 +61,7 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#111111]">작업 히스토리</h1>
         </div>
         <Link
-          href="/generate"
+          href="/concept?tab=generate"
           className="flex items-center gap-1.5 rounded-lg bg-[#111111] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#333333]"
         >
           새로 만들기

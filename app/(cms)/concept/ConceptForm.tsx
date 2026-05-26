@@ -521,7 +521,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
           {brandId && (
             <button
               type="button"
-              onClick={() => router.push('/generate')}
+              onClick={() => router.push('/concept?tab=generate')}
               className="flex h-11 items-center gap-2 rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#a1a1aa] hover:bg-[#fafafa]"
             >
               카드뉴스 생성하기
