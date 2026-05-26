@@ -1,28 +1,22 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2, X } from 'lucide-react'
-import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js'
+import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 
 declare global {
   interface Window {
-    Naver?: {
-      Pay: {
-        create: (config: {
-          mode: 'development' | 'production'
-          payType: 'recurrent'
-          clientId: string
-          chainId: string
-        }) => {
-          open: (options: {
-            productCode: string
-            productName: string
-            totalPayAmount: number
-            returnUrl: string
-          }) => void
-        }
+    TossPayments?: (clientKey: string) => {
+      payment: (options: { customerKey: string }) => {
+        requestBillingAuth: (options: {
+          method: 'CARD'
+          successUrl: string
+          failUrl: string
+          customerName?: string
+          customerEmail?: string
+        }) => Promise<void>
       }
     }
   }
@@ -32,12 +26,14 @@ interface PricingClientViewProps {
   currentPlan: string
   plansList: SubscriptionPlan[]
   hasSubscription: boolean
+  paymentProvider: 'toss' | 'paypal' | null
+  userId: string
+  tossClientKey: string
+  tossCustomerKey: string
   paypalClientId: string
   paypalPlanIds: Record<string, string>
-  naverpayClientId: string
-  naverpayChainId: string
-  naverpaySubscriptionStatus?: string | null
-  naverpayRecurrentId?: string | null
+  customerName?: string | null
+  customerEmail: string
 }
 
 function formatLimit(limit: number) {
@@ -45,9 +41,7 @@ function formatLimit(limit: number) {
 }
 
 export default function PricingClientView(props: PricingClientViewProps) {
-  if (!props.paypalClientId) {
-    return <PricingGrid {...props} />
-  }
+  if (!props.paypalClientId) return <PricingGrid {...props} />
 
   return (
     <PayPalScriptProvider
@@ -67,32 +61,36 @@ function PricingGrid({
   currentPlan,
   plansList,
   hasSubscription,
+  paymentProvider,
+  userId,
+  tossClientKey,
+  tossCustomerKey,
   paypalPlanIds,
-  naverpayClientId,
-  naverpayChainId,
-  naverpaySubscriptionStatus,
-  naverpayRecurrentId,
+  customerName,
+  customerEmail,
 }: PricingClientViewProps) {
   const router = useRouter()
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
 
-  // Load Naver Pay SDK Script dynamically
   useEffect(() => {
+    if (!tossClientKey || window.TossPayments) return
+
     const script = document.createElement('script')
-    script.src = 'https://nsp.pay.naver.com/sdk/js/naverpay.min.js'
+    script.src = 'https://js.tosspayments.com/v2/standard'
     script.async = true
+    script.onerror = () => setError('토스페이먼츠 결제 모듈을 불러오지 못했습니다.')
     document.body.appendChild(script)
     return () => {
       document.body.removeChild(script)
     }
-  }, [])
+  }, [tossClientKey])
 
   const cancelSubscription = async () => {
     if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
     setCanceling(true)
     try {
-      const endpoint = naverpayRecurrentId ? '/api/payments/naverpay/cancel' : '/api/paypal/cancel'
+      const endpoint = paymentProvider === 'toss' ? '/api/payments/toss/cancel' : '/api/paypal/cancel'
       const res = await fetch(endpoint, { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
@@ -107,43 +105,29 @@ function PricingGrid({
     }
   }
 
-  const handleNaverPay = (planKey: string) => {
-    if (!window.Naver?.Pay) {
-      setError('네이버페이 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+  const handleTossPayment = async (planKey: string) => {
+    if (!tossClientKey) {
+      setError('토스페이먼츠 클라이언트 키가 설정되지 않았습니다.')
+      return
+    }
+    if (!window.TossPayments) {
+      setError('토스페이먼츠 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
       return
     }
 
-    const isSandbox = process.env.NEXT_PUBLIC_NAVERPAY_SANDBOX !== 'false'
-    const mode = isSandbox ? 'development' : 'production'
-
-    const oPay = window.Naver.Pay.create({
-      payType: 'recurrent',
-      mode,
-      clientId: naverpayClientId,
-      chainId: naverpayChainId,
-    })
-
-    const prices: Record<string, number> = {
-      LITE: 3000,
-      PRO: 19000,
-      UNLIMITED: 45000,
-    }
-
-    const names: Record<string, string> = {
-      LITE: 'Single (LITE)',
-      PRO: 'Creator (PRO)',
-      UNLIMITED: 'Studio (UNLIMITED)',
-    }
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    const returnUrl = `${appUrl}/api/payments/naverpay/callback?plan=${planKey}`
-
-    oPay.open({
-      productCode: planKey,
-      productName: `Shuffla ${names[planKey]} 정기구독`,
-      totalPayAmount: prices[planKey],
-      returnUrl,
-    })
+    const payment = window.TossPayments(tossClientKey).payment({ customerKey: tossCustomerKey })
+    try {
+      await payment.requestBillingAuth({
+        method: 'CARD',
+        successUrl: `${appUrl}/api/payments/toss/billing/callback?plan=${encodeURIComponent(planKey)}`,
+        failUrl: `${appUrl}/billing?canceled=true`,
+        customerName: customerName || undefined,
+        customerEmail,
+      })
+    } catch {
+      setError('카드 등록을 시작하지 못했습니다. 다시 시도해주세요.')
+    }
   }
 
   return (
@@ -179,7 +163,7 @@ function PricingGrid({
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
-          const planId = paypalPlanIds[planKey]
+          const paypalPlanId = paypalPlanIds[planKey]
 
           return (
             <article
@@ -219,32 +203,33 @@ function PricingGrid({
                     현재 구독 취소 후 선택
                   </button>
                 ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => handleNaverPay(planKey)}
-                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#03C75A] hover:bg-[#02b14f] text-white py-2 text-sm font-black transition-all shadow-sm hover:shadow active:scale-[0.98]"
-                    >
-                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                        <path d="M16.2 3H7.8C5.2 3 3 5.2 3 7.8v8.4C3 18.8 5.2 21 7.8 21h8.4c2.6 0 4.8-2.2 4.8-4.8V7.8C21 5.2 18.8 3 16.2 3zm-2.4 12.3l-3.2-4.9v4.9H8.4V8.7h2.2l3.2 4.9V8.7h2.2v6.6h-2.2z" />
-                      </svg>
-                      네이버페이 정기결제
-                    </button>
-                    
-                    {planId && (
-                      <div className="relative flex py-1 items-center">
-                        <div className="flex-grow border-t border-[#ece9e0]"></div>
-                        <span className="flex-shrink mx-3 text-[10px] font-bold text-[#6f6a61] uppercase">또는 해외 카드</span>
-                        <div className="flex-grow border-t border-[#ece9e0]"></div>
+                  <div className="space-y-3">
+                    {tossClientKey && (
+                      <button
+                        type="button"
+                        onClick={() => void handleTossPayment(planKey)}
+                        className="w-full rounded-lg bg-[#0064ff] py-2.5 text-sm font-black text-white transition-all hover:bg-[#0054d6] active:scale-[0.98]"
+                      >
+                        국내 카드 결제 (토스페이먼츠)
+                      </button>
+                    )}
+                    {tossClientKey && paypalPlanId && (
+                      <div className="flex items-center gap-3 py-1 text-[11px] font-bold text-[#6f6a61]">
+                        <span className="h-px flex-1 bg-[#ece9e0]" />
+                        해외 고객
+                        <span className="h-px flex-1 bg-[#ece9e0]" />
                       </div>
                     )}
-
-                    {planId && (
+                    {paypalPlanId && (
                       <PayPalSubscribeButton
-                        planId={planId}
+                        planId={paypalPlanId}
+                        userId={userId}
                         onSuccess={() => router.refresh()}
                         onError={setError}
                       />
+                    )}
+                    {!tossClientKey && !paypalPlanId && (
+                      <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
                     )}
                   </div>
                 )}
@@ -259,57 +244,59 @@ function PricingGrid({
 
 function PayPalSubscribeButton({
   planId,
+  userId,
   onSuccess,
   onError,
 }: {
   planId: string
+  userId: string
   onSuccess: () => void
-  onError: (msg: string) => void
+  onError: (message: string) => void
 }) {
   const [{ isPending }] = usePayPalScriptReducer()
 
   const createSubscription = useCallback(
-    (_data: Record<string, unknown>, actions: { subscription: { create: (o: object) => Promise<string> } }) =>
-      actions.subscription.create({ plan_id: planId }),
-    [planId],
+    (_data: Record<string, unknown>, actions: { subscription: { create: (options: object) => Promise<string> } }) =>
+      actions.subscription.create({ plan_id: planId, custom_id: userId }),
+    [planId, userId],
   )
 
-  const onApprove = useCallback(
-    async (data: { subscriptionID?: string | null }) => {
-      try {
-        const res = await fetch('/api/paypal/activate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscriptionId: data.subscriptionID }),
-        })
-        const json = await res.json() as { error?: string }
-        if (!res.ok) {
-          onError(json.error || '구독 활성화에 실패했습니다.')
-        } else {
-          onSuccess()
-        }
-      } catch {
-        onError('네트워크 오류가 발생했습니다.')
+  const onApprove = useCallback(async (data: { subscriptionID?: string | null }) => {
+    try {
+      const response = await fetch('/api/paypal/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: data.subscriptionID }),
+      })
+      const body = await response.json() as { error?: string }
+      if (!response.ok) {
+        onError(body.error || 'PayPal 구독 활성화에 실패했습니다.')
+        return
       }
-    },
-    [onSuccess, onError],
-  )
+      onSuccess()
+    } catch {
+      onError('네트워크 오류가 발생했습니다.')
+    }
+  }, [onError, onSuccess])
 
   if (isPending) {
     return (
       <div className="flex h-10 items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin text-[#b94718]" />
+        <Loader2 className="h-4 w-4 animate-spin text-[#0064ff]" />
       </div>
     )
   }
 
   return (
-    <PayPalButtons
-      style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
-      createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
-      onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
-      onError={() => onError('PayPal 결제 중 오류가 발생했습니다.')}
-    />
+    <div>
+      <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">PayPal 해외 결제</p>
+      <PayPalButtons
+        style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
+        createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
+        onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
+        onError={() => onError('PayPal 결제 중 오류가 발생했습니다.')}
+      />
+    </div>
   )
 }
 

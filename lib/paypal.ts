@@ -50,7 +50,7 @@ export async function cancelSubscription(subscriptionId: string, reason = '사�
 
 export async function verifyWebhookSignature(body: string, headers: Record<string, string>): Promise<boolean> {
   const token = await getAccessToken()
-  const webhookId = process.env.PAYPAL_WEBHOOK_ID
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim()
   if (!webhookId) return false
 
   const res = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
@@ -68,13 +68,13 @@ export async function verifyWebhookSignature(body: string, headers: Record<strin
       webhook_id: webhookId,
       webhook_event: JSON.parse(body),
     }),
+    cache: 'no-store',
   })
   if (!res.ok) return false
   const data = await res.json() as { verification_status: string }
   return data.verification_status === 'SUCCESS'
 }
 
-// PayPal billing plan IDs — set in env (NEXT_PUBLIC_ so client can read them)
 export const PAYPAL_PLAN_IDS: Record<'LITE' | 'PRO' | 'UNLIMITED', string | undefined> = {
   LITE: process.env.NEXT_PUBLIC_PAYPAL_PLAN_LITE?.trim(),
   PRO: process.env.NEXT_PUBLIC_PAYPAL_PLAN_PRO?.trim(),

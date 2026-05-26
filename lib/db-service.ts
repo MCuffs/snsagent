@@ -1,6 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { randomUUID } from 'crypto'
 import prisma from './db'
 import { saveErrorLog } from './errorLogger'
 
@@ -16,8 +17,14 @@ export interface User {
   plan: string // FREE, LITE, PRO, UNLIMITED
   paypalSubscriptionId: string | null
   paypalSubscriptionStatus: string | null
-  naverpayRecurrentId: string | null
-  naverpaySubscriptionStatus: string | null
+  tossCustomerKey: string | null
+  tossBillingKey: string | null
+  tossPaymentKey: string | null
+  tossLastOrderId: string | null
+  tossSubscriptionStatus: string | null
+  tossNextBillingAt: Date | null
+  tossLastPaidAt: Date | null
+  tossCanceledAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -140,6 +147,24 @@ function hydrateCampaign(campaign: StoredCampaign | Campaign): Campaign {
   }
 }
 
+function hydrateUser(user: StoredUser | User): User {
+  return {
+    ...user,
+    paypalSubscriptionId: user.paypalSubscriptionId ?? null,
+    paypalSubscriptionStatus: user.paypalSubscriptionStatus ?? null,
+    tossCustomerKey: user.tossCustomerKey ?? null,
+    tossBillingKey: user.tossBillingKey ?? null,
+    tossPaymentKey: user.tossPaymentKey ?? null,
+    tossLastOrderId: user.tossLastOrderId ?? null,
+    tossSubscriptionStatus: user.tossSubscriptionStatus ?? null,
+    tossNextBillingAt: user.tossNextBillingAt ? new Date(user.tossNextBillingAt) : null,
+    tossLastPaidAt: user.tossLastPaidAt ? new Date(user.tossLastPaidAt) : null,
+    tossCanceledAt: user.tossCanceledAt ? new Date(user.tossCanceledAt) : null,
+    createdAt: new Date(user.createdAt),
+    updatedAt: new Date(user.updatedAt),
+  }
+}
+
 function initMockDb(): MockDatabase {
   if (!fs.existsSync(path.dirname(DB_FILE_PATH))) {
     fs.mkdirSync(path.dirname(DB_FILE_PATH), { recursive: true })
@@ -150,7 +175,7 @@ function initMockDb(): MockDatabase {
       const parsed = JSON.parse(content) as StoredMockDatabase
       // Convert dates back to Date objects
       return {
-        users: (parsed.users || []).map((u) => ({ ...u, createdAt: new Date(u.createdAt), updatedAt: new Date(u.updatedAt) })),
+        users: (parsed.users || []).map(hydrateUser),
         brands: (parsed.brands || []).map((b) => ({ ...b, createdAt: new Date(b.createdAt), updatedAt: new Date(b.updatedAt) })),
         instagramAccounts: (parsed.instagramAccounts || []).map((ia) => ({ ...ia, tokenExpiresAt: ia.tokenExpiresAt ? new Date(ia.tokenExpiresAt) : null, createdAt: new Date(ia.createdAt), updatedAt: new Date(ia.updatedAt) })),
         campaigns: (parsed.campaigns || []).map(hydrateCampaign),
@@ -257,8 +282,14 @@ export const dbService = {
         plan: 'FREE',
         paypalSubscriptionId: null,
         paypalSubscriptionStatus: null,
-        naverpayRecurrentId: null,
-        naverpaySubscriptionStatus: null,
+        tossCustomerKey: null,
+        tossBillingKey: null,
+        tossPaymentKey: null,
+        tossLastOrderId: null,
+        tossSubscriptionStatus: null,
+        tossNextBillingAt: null,
+        tossLastPaidAt: null,
+        tossCanceledAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -318,9 +349,25 @@ export const dbService = {
     }
   },
 
-  async updateUserNaverPay(userId: string, data: {
-    naverpayRecurrentId?: string | null
-    naverpaySubscriptionStatus?: string | null
+  async ensureTossCustomerKey(userId: string): Promise<string> {
+    const user = await this.getUser(userId)
+    if (!user) throw new Error('User not found')
+    if (user.tossCustomerKey) return user.tossCustomerKey
+
+    const customerKey = `tp_${randomUUID()}`
+    await this.updateUserToss(userId, { tossCustomerKey: customerKey })
+    return customerKey
+  },
+
+  async updateUserToss(userId: string, data: {
+    tossCustomerKey?: string | null
+    tossBillingKey?: string | null
+    tossPaymentKey?: string | null
+    tossLastOrderId?: string | null
+    tossSubscriptionStatus?: string | null
+    tossNextBillingAt?: Date | null
+    tossLastPaidAt?: Date | null
+    tossCanceledAt?: Date | null
     plan?: string
   }): Promise<void> {
     if (!isMock()) {
@@ -333,12 +380,39 @@ export const dbService = {
       const userIndex = db.users.findIndex(u => u.id === userId)
       if (userIndex !== -1) {
         if (data.plan !== undefined) db.users[userIndex].plan = data.plan
-        if (data.naverpayRecurrentId !== undefined) db.users[userIndex].naverpayRecurrentId = data.naverpayRecurrentId
-        if (data.naverpaySubscriptionStatus !== undefined) db.users[userIndex].naverpaySubscriptionStatus = data.naverpaySubscriptionStatus
+        if (data.tossCustomerKey !== undefined) db.users[userIndex].tossCustomerKey = data.tossCustomerKey
+        if (data.tossBillingKey !== undefined) db.users[userIndex].tossBillingKey = data.tossBillingKey
+        if (data.tossPaymentKey !== undefined) db.users[userIndex].tossPaymentKey = data.tossPaymentKey
+        if (data.tossLastOrderId !== undefined) db.users[userIndex].tossLastOrderId = data.tossLastOrderId
+        if (data.tossSubscriptionStatus !== undefined) db.users[userIndex].tossSubscriptionStatus = data.tossSubscriptionStatus
+        if (data.tossNextBillingAt !== undefined) db.users[userIndex].tossNextBillingAt = data.tossNextBillingAt
+        if (data.tossLastPaidAt !== undefined) db.users[userIndex].tossLastPaidAt = data.tossLastPaidAt
+        if (data.tossCanceledAt !== undefined) db.users[userIndex].tossCanceledAt = data.tossCanceledAt
         db.users[userIndex].updatedAt = new Date()
         writeMockDb(db)
       }
     }
+  },
+
+  async getDueTossSubscriptions(at: Date): Promise<User[]> {
+    if (!isMock()) {
+      return prisma.user.findMany({
+        where: {
+          tossSubscriptionStatus: 'ACTIVE',
+          tossBillingKey: { not: null },
+          tossCustomerKey: { not: null },
+          tossNextBillingAt: { lte: at },
+        },
+      })
+    }
+
+    const db = initMockDb()
+    return db.users.filter(user =>
+      user.tossSubscriptionStatus === 'ACTIVE' &&
+      Boolean(user.tossBillingKey) &&
+      Boolean(user.tossCustomerKey) &&
+      Boolean(user.tossNextBillingAt && user.tossNextBillingAt.getTime() <= at.getTime()),
+    )
   },
 
   async getUserByPayPalSubscriptionId(paypalSubscriptionId: string): Promise<User | null> {

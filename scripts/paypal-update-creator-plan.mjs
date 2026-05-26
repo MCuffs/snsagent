@@ -1,7 +1,6 @@
 /**
- * Updates the existing PayPal Creator plan description after the included usage changes.
+ * Updates the international PayPal Creator plan entitlement wording.
  *
- * The monthly charge remains KRW 19,000; this updates entitlement wording only.
  * Usage:
  *   PAYPAL_CLIENT_ID=... PAYPAL_CLIENT_SECRET=... NEXT_PUBLIC_PAYPAL_PLAN_PRO=P-... node scripts/paypal-update-creator-plan.mjs
  *   Add PAYPAL_SANDBOX=true when updating a sandbox plan.
@@ -18,8 +17,8 @@ if (!clientId || !clientSecret || !planId) {
   process.exit(1)
 }
 
-async function getToken() {
-  const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
+async function main() {
+  const tokenResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
       Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
@@ -27,13 +26,9 @@ async function getToken() {
     },
     body: 'grant_type=client_credentials',
   })
-  if (!response.ok) throw new Error(`PayPal token request failed: ${response.status}`)
-  const body = await response.json()
-  return body.access_token
-}
+  if (!tokenResponse.ok) throw new Error(`PayPal token request failed: ${tokenResponse.status}`)
+  const token = (await tokenResponse.json()).access_token
 
-async function main() {
-  const token = await getToken()
   const response = await fetch(`${baseUrl}/v1/billing/plans/${planId}`, {
     method: 'PATCH',
     headers: {
@@ -47,7 +42,7 @@ async function main() {
   if (!response.ok && response.status !== 204) {
     throw new Error(`PayPal plan update failed: ${response.status} ${await response.text()}`)
   }
-  console.log(`Creator plan description updated: ${planId} (KRW 19,000 / month, 20 generations)`)
+  console.log(`Creator PayPal plan description updated: ${planId}`)
 }
 
 main().catch(error => {

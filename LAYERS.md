@@ -107,6 +107,9 @@ app/api/auth/meta/start/route.ts
 app/api/auth/test-login/route.ts
 app/api/instagram/accounts/route.ts
 app/api/cron/publish/route.ts
+app/api/cron/billing/route.ts
+app/api/payments/toss/billing/callback/route.ts
+app/api/payments/toss/cancel/route.ts
 app/api/paypal/activate/route.ts
 app/api/paypal/cancel/route.ts
 app/api/paypal/webhook/route.ts
@@ -501,7 +504,7 @@ BLOB_READ_WRITE_TOKEN 없음  → 로컬 public/generated/carousel/ (상대 경�
 
 ### DB 모델 요약
 ```
-User          id, email, name, plan (FREE|LITE|PRO|UNLIMITED), paypalSubscriptionId
+User          id, email, name, plan, tossBillingKey, tossCustomerKey, tossNextBillingAt, paypalSubscriptionId
 Brand         id, userId, name, industry, ..., brandDna (JSON string)
 InstagramAccount  id, userId, brandId, accessTokenEncrypted, status
 Campaign      id, userId, brandId, status (draft→generated→scheduled→posted)
@@ -641,11 +644,11 @@ isConfiguredOpenAIKey(apiKey)
 
 ### 우선 순위 개선 항목
 1. **구현됨** L10 Storage에 Vercel Blob과 로컬 fallback 저장 경로 연결
-2. **구현됨** HMAC 서명 세션, PayPal `plan_id` 검증, CMS 참고 이미지/배경 업로드/생성 이동 경로 수정
+2. **구현됨** HMAC 서명 세션, 국내 토스 빌링 및 해외 PayPal 구독 검증 경로, CMS 참고 이미지/배경 업로드/생성 이동 경로 수정
 3. **구현됨** URL 수집 SSRF 방어와 주요 AI 배열 응답 fallback 보강
 4. **구현됨** 공개 UI의 Google Login CTA 및 Single/Creator/Studio 유료 플랜과 내부 생성 한도 정합성 반영
 5. **구현됨** Creator 20회 조정, `gpt-image-1` 비용 기준 고정, 캠페인별 AI 배경 재생성 1회분 제한과 이미지 수 기록
-6. **예정** 업로드 쿼터/속도 제한, 운영 DB fail-closed, PayPal KRW 실수수료 확인과 외부 서비스 E2E
+6. **예정** 업로드 쿼터/속도 제한, 운영 DB fail-closed, 토스/PayPal 결제 계약·수수료 확인과 외부 서비스 E2E
 7. **예정** `lib/ai/brandAnalyzer.ts` 및 Agent service 추출 (L2→L6 정리)
 8. **추후 범위** L9 Instagram Distribution UI 복구, 재시도 로직, Cron 배포 설정
 9. **장기** L5 Agent의 QualityGuard → 실패 시 재생성 트리거 구현

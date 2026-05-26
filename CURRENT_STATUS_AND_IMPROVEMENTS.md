@@ -2,7 +2,7 @@
 
 기준일: 2026-05-26 (KST)
 기준 브랜치: `main`
-기준 소스 커밋: `17346e5` 이후 작업 트리 반영 기준
+기준 소스: `main` 이후 현재 작업 트리 반영 기준
 
 이 문서는 현재 구현 단계와 운영 전 보완 항목의 기준 문서다. Instagram 계정 연결 및 게시 사용자 흐름은 이번 우선 개발 범위에서 제외하며 추후 개발 대상으로 둔다.
 
@@ -18,7 +18,7 @@
 | 카드뉴스 생성 | `/generate`, `POST /api/campaigns/generate` | 이용권 한도 내 참고 이미지 최대 4장 포함 생성 구현됨 |
 | 생성 결과/편집 | `/campaign/[id]` | 문구/배경 교체/다운로드 및 포함 크레딧 내 AI 배경 재생성 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
-| 결제 | `/billing`, PayPal API/Webhook | Single/Creator/Studio 가격 및 서버 검증 기반 활성화 구현됨 |
+| 결제 | `/billing`, Toss Payments 빌링, PayPal Subscription | 국내 카드 자동결제 및 해외 PayPal 구독 승인/취소 구현됨 |
 | Instagram 연동/게시 | 서버 API와 Action 존재 | UI 흐름은 추후 개발 예정, 이번 범위 제외 |
 
 ### 핵심 백엔드 기능
@@ -31,7 +31,8 @@
 | 대화형 Agent API | `app/api/agents/brand/route.ts`, `app/api/agents/generate/route.ts` | 구현됨, 외부 공급자 E2E 필요 |
 | URL/참고 이미지 입력 경계 | `lib/brand-url-collector.ts`, `src/lib/ai/providers/openAIImageProvider.ts` | SSRF 및 신뢰 URL 검증 반영 |
 | Google 인증 | `app/api/auth/google/*`, `lib/auth/session.ts` | OAuth와 서명 세션 구현됨 |
-| PayPal 구독 | `app/api/paypal/*`, `lib/paypal.ts` | `plan_id` 서버 매핑 구현됨 |
+| Toss Payments 구독 | `app/api/payments/toss/*`, `app/api/cron/billing`, `lib/tosspayments.ts` | 빌링키 발급, 서버 금액 승인, 취소 및 월 갱신 구현됨 |
+| PayPal 해외 구독 | `app/api/paypal/*`, `lib/paypal.ts` | 서버 `plan_id` 검증, 취소, 서명 검증 webhook 구현됨 |
 | 생성 비용 통제 | `lib/db-service.ts`, `app/actions.ts` | 이미지 모델/초기·재생성 수 기록, 캠페인별 재생성 1회분 제한 구현됨 |
 | Meta OAuth/게시 | `app/api/auth/meta/*`, `lib/instagram/client.ts` | 백엔드 유지, 제품 흐름은 보류 |
 
@@ -45,14 +46,14 @@
 | 생성 UX | AI 대화로 생성 조건 수집 후 미디어 생성 API 호출 | `app/(cms)/generate/*`, `app/api/agents/generate/route.ts` |
 | 생성 파이프라인 | LLM 카피, Agent 보정, 레이아웃/렌더링, 품질 로그 저장 | `src/lib/layout/*`, `src/lib/carousel/agents.ts` |
 | 결과 조회/편집 | 결과 미리보기, 문구/캡션 저장, 폰트/색상/스타일 변경, 다운로드 | `app/(cms)/campaign/[id]/*`, `app/actions.ts` |
-| 결제 기반 코드 | 이용권 없음 상태와 3개 유료 요금제, PayPal 생성/활성화/취소/webhook | `lib/limits-types.ts`, `app/(cms)/billing/*`, `app/api/paypal/*` |
+| 결제 기반 코드 | 이용권 없음 상태와 3개 유료 요금제, 국내 토스 빌링 및 해외 PayPal 구독 | `lib/limits-types.ts`, `app/(cms)/billing/*`, `app/api/payments/toss/*`, `app/api/paypal/*` |
 
 ### 이번 우선 개발로 완료한 사항
 
 | 우선도 | 완료 항목 | 구현 결과 |
 | --- | --- | --- |
 | P0 | 세션 위조 차단 | 이메일 원문 쿠키 대신 `SESSION_SECRET` 기반 HMAC 서명 토큰을 검증하고 레거시 쿠키를 제거한다. 운영 환경의 개발용 이메일 로그인도 차단한다. |
-| P0 | PayPal 권한 검증 | 활성화 API가 클라이언트 플랜 값을 받지 않고 PayPal 구독의 `plan_id`만 내부 플랜으로 매핑한다. 직접 유료 플랜 변경 Action도 차단한다. |
+| P0 | 결제 권한 검증 | 토스는 무작위 `customerKey` 및 서버 금액을 검증하고, PayPal은 조회된 `plan_id`와 서명 웹훅만 신뢰한다. 직접 유료 플랜 변경 Action도 차단한다. |
 | P1 | 참고 이미지 생성 연결 | `/generate`에서 상품 이미지 최대 4장을 업로드하고 생성 API에 전달한다. |
 | P1 | 배경 교체 정상화 | 결과 화면과 업로드 API의 `files`/`urls` 계약을 통일했다. |
 | P1 | 잘못된 새 생성 경로 수정 | 결과 화면에서 새 생성을 `/generate`로 이동시킨다. |
@@ -60,11 +61,12 @@
 | P1 | 레거시 플랜 호환 | billing/result 페이지에서 저장된 과거 플랜 값을 `normalizePlan()`으로 처리한다. |
 | P2 | 외부 URL 요청 방어 | URL 수집에 프로토콜/사설 IP/DNS/redirect/응답 크기 제한을 추가하고, 참고 이미지 fetch는 신뢰 업로드 URL로 제한한다. |
 | P2 | 생성 응답 안정성 | media 및 commerce 생성 흐름에서 모델 배열 응답 누락 시 fallback을 사용하도록 방어했다. |
-| P2 | 로컬 PayPal 재현성 | mock DB가 구독 ID, 상태, 플랜을 저장/조회하도록 계약을 맞췄다. |
-| P1 | 프론트 제공 범위/가격 정합성 | 자동 게시 및 무료 생성 안내를 제거하고 `Google Login`, Single 3,000원/1회, Creator 19,000원/20회, Studio 45,000원/30회로 UI·한도·PayPal 설정 스크립트를 통일했다. |
+| P2 | 로컬 결제 상태 재현성 | mock DB가 토스 고객키, 빌링키, 다음 청구일, 최신 결제 상태를 저장/조회하도록 계약을 맞췄다. |
+| P1 | 프론트 제공 범위/가격 정합성 | 자동 게시 및 무료 생성 안내를 제거하고 `Google Login`, Single 3,000원/1회, Creator 19,000원/20회, Studio 45,000원/30회로 UI·한도를 통일했다. |
 | P1 | AI 이미지 원가 상한 | 활성 CMS 이미지 모델을 `gpt-image-1`로 고정하고 캠페인별 최초 장수와 같은 AI 배경 재생성 크레딧만 허용한다. 사용 모델·최초/재생성 이미지 수를 저장한다. |
-| P1 | Creator 손익 분석 | `UNIT_ECONOMICS.md`에 OpenAI 원가, PayPal 공식 요율과 KRW 고정 수수료 미공개 리스크, VAT 가정 기반 기여이익을 정리했다. |
+| P1 | Creator 손익 분석 | `UNIT_ECONOMICS.md`에 OpenAI 원가, 토스페이먼츠 일반 카드 공식 요율, VAT 가정 기반 기여이익을 정리했다. |
 | P1 | Google 로그인 진입 단축 | 랜딩·공개 요금제·공통 마케팅 CTA의 `Google Login`을 `/api/auth/google/start`에 직접 연결해 중간 로그인 화면을 생략한다. `/login`은 오류 안내와 개발용 대체 진입으로 유지한다. |
+| P0 | 국내/해외 결제 분리 | 네이버페이 결제 경로를 제거하고 국내 고객용 토스 빌링과 해외 고객용 PayPal 구독을 병행한다. 활성 구독이 있는 사용자의 이중 가입은 차단한다. |
 
 현재 연결된 주요 사용자 흐름은 다음과 같다.
 
@@ -84,10 +86,11 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 | P1 | 업로드 운영 제한 미완료 | 저장 비용 및 오남용 위험 | 사용자별 용량 쿼터, 요청 속도 제한, 만료/정리 정책 추가 |
 | P1 | 운영 DB 장애 정책 미확정 | fallback 동작 시 데이터 신뢰성 저하 | production fail-closed 강제, 마이그레이션/백업 절차 검증 |
 | P1 | 외부 서비스 E2E 미수행 | OAuth/결제/이미지 공급자 실환경 회귀 미확인 | 테스트 계정과 sandbox로 로그인-생성-편집-결제 E2E 수행 |
-| P2 | webhook 운영 강건성 검증 | 결제 상태 중복/지연 이벤트 대응 불명확 | PayPal 이벤트 멱등성 및 재처리 시나리오 테스트 |
+| P1 | 토스 월 청구 운영 미설정 | 토스는 자동 청구 스케줄을 제공하지 않아 갱신 결제가 실행되지 않음 | `CRON_SECRET`과 일별 `/api/cron/billing` 호출을 배포 환경에 설정하고 실패 알림 추가 |
 | P2 | AI 응답 검증 확대 | 비정상 모델 응답의 일부 경로 실패 가능 | 공통 런타임 스키마와 관측/비용 지표 추가 |
 | P2 | 의존성 감사 경고 | moderate 취약점 2건 보고됨 | 영향 범위 분석 후 호환 가능한 의존성 업데이트 |
-| P1 | PayPal 실거래 검증 필요 | 한국 판매자 공식 표에 KRW 고정 수수료가 기재되지 않아 손익 확정 불가 | 기존 Creator plan 설명은 `scripts/paypal-update-creator-plan.mjs`로 갱신하고, sandbox/live 소액 검증으로 KRW 승인·수수료·세금·환전을 확인 |
+| P0 | 토스 자동결제 운영 계약 필요 | 빌링 MID 계약 및 API 키 없이는 국내 카드 정기결제 판매 불가 | 토스 자동결제 리스크 검토/계약 후 키 설정, DB 마이그레이션, 테스트/라이브 소액 결제 수행 |
+| P1 | PayPal 해외 판매 검증 필요 | 통화 변환, 해외 수수료, 구독 웹훅 운영 상태가 수익과 권한에 영향 | PayPal plan/webhook 설정 후 해외 테스트 결제 및 실수수료를 확인 |
 
 ### 추후 개발 범위
 
@@ -100,11 +103,11 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 
 | 주제 | 현재 결정 |
 | --- | --- |
-| 유료 권한 부여 | PayPal에서 조회한 구독 `plan_id`만 신뢰한다. |
+| 유료 권한 부여 | 국내 토스는 검증된 `customerKey`와 서버 금액 승인 완료 시, 해외 PayPal은 검증된 `plan_id` 승인 완료 시만 플랜을 부여한다. |
 | 가격 정책 | 내부 `FREE`는 생성 권한 없는 상태다. 유료 플랜은 Single 월 3,000원/1회, Creator 월 19,000원/20회, Studio 월 45,000원/30회다. |
 | AI 재생성 정책 | 캠페인마다 최초 슬라이드 수만큼 AI 배경 재생성 이미지를 포함한다. 전체 스타일 재생성 1회 또는 같은 수의 개별 재생성으로 사용할 수 있으며 초과 생성은 차단한다. |
 | 이미지 모델/원가 기록 | 유료 CMS 생성의 OpenAI 이미지 모델은 `gpt-image-1`로 고정하고 캠페인에 최초/재생성 이미지 수와 재생성 모델을 저장한다. |
-| 구독 취소 | 현재 데이터 모델 범위에서는 취소 시 즉시 내부 `FREE`(이용권 없음)로 전환하며 UI에도 동일하게 안내한다. 결제 기간 종료 유지가 필요하면 billing period 필드를 먼저 추가한다. |
+| 구독 취소/실패 | 토스 빌링키 해지/월 청구 실패 또는 PayPal 구독 취소/중단 시 내부 `FREE`(이용권 없음)로 전환한다. |
 | 개발 로그인 | 테스트 로그인은 비운영 환경에서만 허용한다. |
 | Instagram | 서버 코드 유지, UI/게시 흐름 구현은 차기 범위로 분리한다. |
 
@@ -116,12 +119,13 @@ Google Login -> /concept 브랜드 분석/저장 -> /billing 이용권 구독
 | `npm run lint` | 통과 | 2026-05-26, 우선 수정 반영 후 재실행 |
 | `npm run build` | 통과 | 2026-05-26, Next.js 16.2.6 빌드 및 라우트 생성 성공 |
 | 로그인-생성-편집 E2E | 미검증 | 실 OAuth/AI/Blob 환경 구성 후 확인 필요 |
-| PayPal sandbox E2E | 미검증 | `plan_id` 매핑과 취소/웹훅 시나리오 확인 필요 |
+| Toss Payments 테스트 E2E | 미검증 | 자동결제 계약/테스트 키 설정 후 카드 인증, 최초 승인, 취소, 월 갱신 확인 필요 |
+| PayPal sandbox E2E | 미검증 | 해외 고객 승인, `plan_id` 매핑, 서명 webhook 및 취소 확인 필요 |
 | Instagram E2E | 범위 제외 | 추후 개발 재개 시 수행 |
 
 ## 6. 이후 개발 순서
 
 1. 업로드 쿼터/속도 제한과 운영 DB fail-closed를 구현한다.
-2. 생성 사용량 DB 마이그레이션을 적용하고 Creator PayPal 설명을 월 20회로 갱신한 뒤, KRW 수수료 확인을 포함한 PayPal sandbox E2E를 수행한다.
-3. webhook 강건성과 AI 응답 공통 스키마 검증, 의존성 감사 경고를 정리한다.
+2. 생성 사용량 및 `scripts/migrate-tosspayments.mjs` DB 마이그레이션을 적용하고, 토스 자동결제 계약·청구 크론과 PayPal 해외 플랜·웹훅을 구성한 뒤 두 결제 경로의 E2E를 수행한다.
+3. 청구 실패 알림/재시도 정책과 AI 응답 공통 스키마 검증, 의존성 감사 경고를 정리한다.
 4. Instagram 흐름은 별도 제품 범위가 확정된 뒤 연결 UI와 게시 운영 UX를 함께 구현한다.

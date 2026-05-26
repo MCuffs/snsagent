@@ -1,7 +1,7 @@
 # Shuffla 현재 시스템 구조
 
 기준일: 2026-05-26 (KST)
-대상: `main`의 `c19c7d2` 소스 기준 Next.js 애플리케이션
+대상: `main` 이후 현재 작업 트리의 Next.js 애플리케이션
 
 현재 구현 상태와 우선순위는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`, 변경 경과는 `DEVELOPMENT_LOG.md`, 코드 책임 규칙은 `LAYERS.md`를 기준으로 한다.
 
@@ -14,7 +14,7 @@
 | DB | PostgreSQL, Prisma 5 |
 | 파일 저장 | Vercel Blob 및 생성 이미지 저장 모듈 |
 | AI/콘텐츠 | Gemini, Groq, OpenAI 계열 연동 모듈 및 레이아웃 파이프라인 |
-| 결제 | PayPal Subscription API/Webhook |
+| 결제 | 국내 Toss Payments 자동결제(빌링), 해외 PayPal Subscription |
 | 소셜 게시 | Meta OAuth, Instagram Graph API |
 
 ## 2. 디렉터리 역할
@@ -29,7 +29,7 @@
 | `src/lib/ai/` | LLM 및 이미지 공급자 추상화 |
 | `app/api/agents/` | 브랜드 수정 및 카드뉴스 설정을 위한 대화형 API |
 | `prisma/` | 데이터 모델과 로컬 데이터 관련 파일 |
-| `scripts/` | 마이그레이션 및 PayPal 설정 스크립트 |
+| `scripts/` | 마이그레이션 스크립트 |
 
 ## 3. 사용자 화면 구조
 
@@ -150,7 +150,7 @@ erDiagram
 
 | 모델 | 용도 |
 | --- | --- |
-| `User` | 로그인 사용자, 플랜, PayPal 구독 상태 |
+| `User` | 로그인 사용자, 플랜, 토스 빌링키/청구 상태 또는 PayPal 구독 상태 |
 | `Brand` | 브랜드 분석 결과 및 생성 기준 정보 |
 | `Campaign` | 카드뉴스 생성 단위와 상태, 사용 이미지 모델 및 AI 재생성 이미지 수 |
 | `CarouselSlide` | 각 슬라이드 카피 및 이미지 |
@@ -163,17 +163,29 @@ erDiagram
 sequenceDiagram
     participant U as 사용자
     participant UI as /billing
-    participant API as PayPal API Route
+    participant API as Payment API Routes
+    participant TP as Toss Payments
     participant PP as PayPal
     participant DB as DB Service
 
     U->>UI: 플랜 선택
-    UI->>PP: 구독 승인
-    UI->>API: subscriptionId 전달
-    API->>PP: 구독 상태 조회
-    API->>DB: 검증된 plan_id 기반 플랜/구독 상태 저장
-    PP->>API: Webhook 이벤트
-    API->>DB: 결제 상태 동기화
+    UI->>TP: SDK 카드 자동결제 인증
+    TP->>API: authKey, customerKey 리다이렉트
+    API->>DB: 저장된 customerKey 검증
+    API->>TP: 빌링키 발급 및 서버 고정 금액 최초 승인
+    API->>DB: 플랜, 빌링키, 다음 청구일 저장
+    API->>TP: /api/cron/billing 월별 승인
+    API->>DB: 다음 청구일 및 결제 상태 갱신
+
+    alt 해외 고객
+        U->>UI: PayPal 구독 선택
+        UI->>PP: PayPal Subscription 승인
+        UI->>API: subscriptionId 전달
+        API->>PP: 구독 상태 및 plan_id 조회
+        API->>DB: 검증된 플랜/구독 상태 저장
+        PP->>API: 서명된 Webhook 상태 이벤트
+        API->>DB: 구독 취소/중단 상태 동기화
+    end
 ```
 
 관련 파일:
@@ -181,11 +193,14 @@ sequenceDiagram
 | 기능 | 파일 |
 | --- | --- |
 | 결제 UI | `app/(cms)/billing/PricingClientView.tsx` |
-| 활성화/취소/Webhook | `app/api/paypal/*` |
-| PayPal 클라이언트 | `lib/paypal.ts` |
+| 최초 승인/취소 | `app/api/payments/toss/*` |
+| 월별 청구 | `app/api/cron/billing/route.ts` |
+| 토스 API 클라이언트 | `lib/tosspayments.ts` |
+| 해외 구독 활성화/취소/Webhook | `app/api/paypal/*` |
+| PayPal API 클라이언트 | `lib/paypal.ts` |
 | 요금제 제한 | `lib/limits.ts` |
 
-구독 활성화 시 내부 플랜은 PayPal 구독의 검증된 `plan_id`를 기준으로 결정된다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 19,000원/20회), Studio(월 45,000원/30회)다. 현재 취소 정책은 즉시 이용권 없음 상태 전환이며 결제 화면의 안내도 같은 정책을 표시한다.
+국내 카드 경로에서 브라우저는 카드 등록 인증만 수행하며 결제 금액은 서버의 플랜 매핑으로 결정된다. `customerKey`는 사용자별 무작위 값으로 DB에 저장하고 콜백에서 일치 여부를 검증한다. 토스페이먼츠 자동결제는 별도 빌링 계약이 필요하고 자체 스케줄링을 제공하지 않으므로 보호된 크론 호출이 필요하다. 해외 PayPal 경로는 PayPal에서 조회한 `plan_id`와 서명된 웹훅만 신뢰한다. 한 사용자에게는 토스 또는 PayPal 중 하나의 활성 구독만 허용한다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 19,000원/20회), Studio(월 45,000원/30회)다.
 
 AI 이미지 원가는 캠페인 단위로 통제한다. 활성 CMS OpenAI 이미지 모델은 `gpt-image-1`로 고정하며, `Campaign.imageModel`, `initialImageCount`, `regenerationImageCount`, `lastRegenerationImageModel`에 생성 사용량을 저장한다. 결과 화면의 AI 배경 재생성은 최초 슬라이드 수와 같은 이미지 크레딧까지만 서버에서 원자적으로 예약해 허용한다.
 
@@ -219,7 +234,7 @@ flowchart LR
 | 외부 URL 수집 | SSRF/redirect/크기 방어 적용됨; 운영 관측 지속 |
 | AI 생성 | 주요 배열 응답 fallback 및 이미지 재생성 상한/수량 기록 적용됨; 실제 청구 토큰·생성 시간 관측 보완 |
 | 업로드 | MIME/파일 크기/요청당 4장 적용됨; 사용자 쿼터와 속도 제한 보완 |
-| 결제 | PayPal 플랜 검증 적용됨; webhook 멱등성과 sandbox E2E 보완 |
+| 결제 | 국내 토스 빌링 및 해외 PayPal 구독 검증 구현됨; 각 공급자 계약/키, 운영 크론 및 sandbox E2E 필요 |
 | 게시 | Instagram 연결 UI, 예약 게시 재시도 및 실패 알림 |
 | 데이터 저장 | 운영 DB fail-closed, 마이그레이션 및 백업 |
 

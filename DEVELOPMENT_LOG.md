@@ -253,3 +253,18 @@ This file records meaningful development work, fixes, verification commands, and
 ### Frontend Follow-up
 - Routed public `Google Login` calls to action directly to `/api/auth/google/start` while retaining `/login` for OAuth errors and local development entry.
 - Aligned all public pricing cards with the included per-campaign AI background regeneration allowance.
+
+## 2026-05-26 KST - Domestic Toss Payments and International PayPal Billing
+
+### Changes
+- Removed the Naver Pay payment path and added Toss Payments automatic billing for domestic card subscriptions while retaining PayPal Subscription for international customers.
+- Added the SDK billing-auth entry, server-side billing-key issuance and initial charge callback, immediate cancellation, and protected monthly renewal route.
+- Stored a randomized Toss `customerKey`, billing key, latest payment/order identifiers, and billing dates on the user; payment amounts remain server-defined by the selected paid plan.
+- Retained PayPal subscription activation, cancellation and webhook synchronization for international buyers, requiring signature validation even in sandbox.
+- Recalculated the domestic `UNIT_ECONOMICS.md` baseline using Toss Payments' published credit/debit card general rate of 3.4% plus VAT and noted separate overseas PayPal validation.
+
+### Operational Note
+- Toss Payments automatic billing requires a separate billing MID contract and API individual integration keys.
+- Toss Payments does not schedule monthly charges. Deployment must apply `scripts/migrate-tosspayments.mjs` before deploying payment code and invoke `/api/cron/billing` with `CRON_SECRET` on a recurring schedule.
+- The migration retains `naverpayRecurrentId` and `naverpaySubscriptionStatus` compatibility columns because an earlier deployed Prisma Client still selects them during login until the payment-provider release rolls out.
+- PayPal international sales require configured monthly plan IDs and a verified webhook; exchange and cross-border fees must be confirmed with test and live transactions.

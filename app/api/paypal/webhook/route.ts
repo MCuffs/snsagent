@@ -1,29 +1,28 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyWebhookSignature, planFromPayPalPlanId } from '../../../../lib/paypal'
+import { planFromPayPalPlanId, verifyWebhookSignature } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
-
   const headers: Record<string, string> = {}
-  for (const key of ['paypal-auth-algo', 'paypal-cert-url', 'paypal-transmission-id',
-                      'paypal-transmission-sig', 'paypal-transmission-time']) {
+  for (const key of [
+    'paypal-auth-algo',
+    'paypal-cert-url',
+    'paypal-transmission-id',
+    'paypal-transmission-sig',
+    'paypal-transmission-time',
+  ]) {
     headers[key] = request.headers.get(key) ?? ''
   }
 
-  const verified = await verifyWebhookSignature(body, headers)
-  if (!verified) {
-    console.warn('[PayPal Webhook] Signature verification failed')
-    // Accept anyway in sandbox mode to allow testing
-    if (process.env.PAYPAL_SANDBOX !== 'true') {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
-    }
+  if (!await verifyWebhookSignature(body, headers)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  let event: { event_type: string; resource: Record<string, unknown> }
+  let event: { event_type: string; resource: { id?: string; status?: string; plan_id?: string; custom_id?: string } }
   try {
     event = JSON.parse(body) as typeof event
   } catch {
@@ -31,76 +30,44 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const resource = event.resource
+    const subscriptionId = event.resource.id
+    if (!subscriptionId) return NextResponse.json({ received: true })
+    let user = await dbService.getUserByPayPalSubscriptionId(subscriptionId)
 
-    switch (event.event_type) {
-      case 'BILLING.SUBSCRIPTION.ACTIVATED': {
-        const subscriptionId = resource.id as string
-        const planId = (resource.plan_id as string) || ''
-        const customId = resource.custom_id as string | undefined
-        const userId = customId
-
-        if (!userId) break
-
-        const plan = planFromPayPalPlanId(planId) ?? undefined
-        await dbService.updateUserPayPal(userId, {
+    if (event.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED' && !user && event.resource.custom_id) {
+      user = await dbService.getUser(event.resource.custom_id)
+      const plan = planFromPayPalPlanId(event.resource.plan_id || '')
+      if (user && plan && !user.tossBillingKey && !user.paypalSubscriptionId) {
+        await dbService.updateUserPayPal(user.id, {
           paypalSubscriptionId: subscriptionId,
           paypalSubscriptionStatus: 'ACTIVE',
-          ...(plan ? { plan } : {}),
+          plan,
         })
-        break
       }
+      return NextResponse.json({ received: true })
+    }
 
-      case 'BILLING.SUBSCRIPTION.UPDATED': {
-        const subscriptionId = resource.id as string
-        const status = resource.status as string
-        const customId = resource.custom_id as string | undefined
-        const userId = customId
+    if (!user) return NextResponse.json({ received: true })
 
-        if (!userId) break
-
-        await dbService.updateUserPayPal(userId, {
-          paypalSubscriptionId: subscriptionId,
-          paypalSubscriptionStatus: status,
-        })
-        break
-      }
-
-      case 'BILLING.SUBSCRIPTION.CANCELLED':
-      case 'BILLING.SUBSCRIPTION.EXPIRED':
-      case 'BILLING.SUBSCRIPTION.SUSPENDED': {
-        const subscriptionId = resource.id as string
-        const customId = resource.custom_id as string | undefined
-        const userId = customId
-
-        if (!userId) {
-          // Try lookup by subscriptionId
-          const user = await dbService.getUserByPayPalSubscriptionId(subscriptionId)
-          if (!user) break
-          await dbService.updateUserPayPal(user.id, {
-            paypalSubscriptionId: null,
-            paypalSubscriptionStatus: 'CANCELLED',
-            plan: 'FREE',
-          })
-          break
-        }
-
-        await dbService.updateUserPayPal(userId, {
-          paypalSubscriptionId: null,
-          paypalSubscriptionStatus: 'CANCELLED',
-          plan: 'FREE',
-        })
-        break
-      }
-
-      case 'PAYMENT.SALE.COMPLETED':
-        // Payment confirmed — no action needed, subscription already active
-        break
+    if (
+      event.event_type === 'BILLING.SUBSCRIPTION.CANCELLED' ||
+      event.event_type === 'BILLING.SUBSCRIPTION.EXPIRED' ||
+      event.event_type === 'BILLING.SUBSCRIPTION.SUSPENDED'
+    ) {
+      await dbService.updateUserPayPal(user.id, {
+        paypalSubscriptionId: null,
+        paypalSubscriptionStatus: 'CANCELLED',
+        plan: 'FREE',
+      })
+    } else if (event.event_type === 'BILLING.SUBSCRIPTION.UPDATED') {
+      await dbService.updateUserPayPal(user.id, {
+        paypalSubscriptionStatus: event.resource.status || 'ACTIVE',
+      })
     }
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('[PayPal Webhook] Handler error:', error)
+    console.error('[PayPal Webhook]', error)
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
   }
 }

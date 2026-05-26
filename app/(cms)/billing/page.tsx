@@ -21,11 +21,12 @@ export default async function PricingPage({
 
   const params = searchParams ? await searchParams : {}
   const plansList = PAID_SUBSCRIPTION_PLANS
-  const hasSubscription = Boolean(user.paypalSubscriptionId || user.naverpayRecurrentId)
-
+  const hasSubscription = Boolean(user.tossBillingKey || user.paypalSubscriptionId)
+  const tossCustomerKey = await dbService.ensureTossCustomerKey(user.id)
+  const paymentProvider = user.tossBillingKey ? 'toss' : user.paypalSubscriptionId ? 'paypal' : null
   const paypalPlanIds: Record<string, string> = {}
-  for (const [key, val] of Object.entries(PAYPAL_PLAN_IDS)) {
-    if (val) paypalPlanIds[key] = val
+  for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
+    if (value) paypalPlanIds[key] = value
   }
 
   return (
@@ -58,12 +59,14 @@ export default async function PricingPage({
         currentPlan={normalizePlan(user.plan)}
         plansList={plansList}
         hasSubscription={hasSubscription}
+        paymentProvider={paymentProvider}
+        userId={user.id}
+        tossClientKey={(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || '').trim()}
+        tossCustomerKey={tossCustomerKey}
         paypalClientId={(process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()}
         paypalPlanIds={paypalPlanIds}
-        naverpayClientId={(process.env.NEXT_PUBLIC_NAVERPAY_CLIENT_ID || 'dQPaTGkl7UD9gyUVttF3').trim()}
-        naverpayChainId={(process.env.NEXT_PUBLIC_NAVERPAY_CHAIN_ID || 'TDZSUHBoVGRFS2l').trim()}
-        naverpaySubscriptionStatus={user.naverpaySubscriptionStatus}
-        naverpayRecurrentId={user.naverpayRecurrentId}
+        customerName={user.name}
+        customerEmail={user.email}
       />
     </div>
   )

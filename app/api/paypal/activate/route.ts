@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSessionUser } from '../../../actions'
+import { getSessionUser } from '../../../../lib/auth/user'
 import { getSubscription, planFromPayPalPlanId } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
 
@@ -11,16 +11,16 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
+    if (user.tossBillingKey || user.paypalSubscriptionId) {
+      return NextResponse.json({ error: '이미 활성 구독이 있습니다.' }, { status: 409 })
+    }
 
     const body = await request.json() as { subscriptionId?: string }
-    const { subscriptionId } = body
-
-    if (!subscriptionId) {
+    if (!body.subscriptionId) {
       return NextResponse.json({ error: '유효하지 않은 요청입니다.' }, { status: 400 })
     }
 
-    // Verify subscription is active with PayPal
-    const subscription = await getSubscription(subscriptionId)
+    const subscription = await getSubscription(body.subscriptionId)
     if (subscription.status !== 'ACTIVE' && subscription.status !== 'APPROVED') {
       return NextResponse.json({ error: '구독이 활성화되지 않았습니다.' }, { status: 400 })
     }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     await dbService.updateUserPayPal(user.id, {
-      paypalSubscriptionId: subscriptionId,
+      paypalSubscriptionId: body.subscriptionId,
       paypalSubscriptionStatus: subscription.status,
       plan,
     })
