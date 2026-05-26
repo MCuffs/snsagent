@@ -412,6 +412,132 @@ body {
     opacity: 0.58;
     transform: translate3d(0, 18px, 0);
   }
+
+  .landing-gallery-card {
+    --gallery-x: 50%;
+    --gallery-y: 50%;
+    isolation: isolate;
+    transition: transform 480ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 480ms cubic-bezier(0.16, 1, 0.3, 1), border-color 480ms ease;
+  }
+
+  .landing-gallery-card:hover {
+    border-color: rgba(224, 146, 110, 0.42);
+    box-shadow: 0 24px 68px rgba(42, 32, 24, 0.16), 0 0 54px rgba(237, 98, 56, 0.14);
+    transform: translateY(-5px);
+  }
+
+  .landing-gallery-card:hover img {
+    transform: scale(1.018);
+  }
+
+  .landing-gallery-glow {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0;
+    background:
+      radial-gradient(250px circle at var(--gallery-x) var(--gallery-y), rgba(255, 224, 198, 0.2), transparent 62%),
+      linear-gradient(140deg, rgba(255, 255, 255, 0.07), transparent 40%);
+    mix-blend-mode: screen;
+    transition: opacity 420ms ease;
+  }
+
+  .landing-gallery-card:hover .landing-gallery-glow {
+    opacity: 1;
+  }
+
+  .landing-capability-figure {
+    position: relative;
+  }
+
+  .landing-capability-figure::after {
+    content: "";
+    position: absolute;
+    inset: 34% 21%;
+    z-index: -1;
+    border-radius: 999px;
+    background: rgba(237, 98, 56, 0.09);
+    filter: blur(30px);
+    animation: landing-soft-glow 4.8s ease-in-out infinite;
+  }
+
+  .landing-layer-sheet {
+    animation: landing-layer-rise 4.2s ease-in-out infinite;
+  }
+
+  .landing-layer-head {
+    animation: landing-layer-rise 4.2s ease-in-out .55s infinite;
+  }
+
+  .landing-agent-route {
+    stroke-dasharray: 9 9;
+    animation: landing-route-flow 2.2s linear infinite;
+  }
+
+  .landing-capability-2 rect {
+    animation: landing-node-pulse 4s ease-in-out infinite;
+  }
+
+  .landing-capability-2 rect:nth-child(2) {
+    animation-delay: .4s;
+  }
+
+  .landing-capability-2 rect:nth-child(3) {
+    animation-delay: .8s;
+  }
+
+  .landing-capability-2 rect:nth-child(4) {
+    animation-delay: 1.2s;
+  }
+
+  .landing-export-page {
+    animation: landing-page-drift 4.2s ease-in-out infinite;
+  }
+
+  .landing-export-arrow {
+    stroke-dasharray: 55;
+    animation: landing-export-flow 2.7s ease-in-out infinite;
+  }
+
+  .landing-operations-panel {
+    box-shadow: 0 20px 70px rgba(50, 42, 32, 0.045);
+  }
+
+  .landing-live-dot {
+    animation: landing-live-pulse 2.2s ease-in-out infinite;
+  }
+
+  .landing-pipeline-track::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: -1px;
+    height: 3px;
+    width: 36%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgba(237, 98, 56, 0.75), transparent);
+    animation: landing-signal-travel 3.2s ease-in-out infinite;
+  }
+
+  .landing-operation-progress {
+    transition: width 520ms cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .landing-operation-progress::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .54), transparent);
+    transform: translateX(-100%);
+    animation: landing-progress-sheen 2.4s ease-in-out infinite;
+  }
+
+  .landing-activity-item {
+    animation: landing-activity-arrive 3.4s ease-in-out infinite;
+  }
 }
 
 @keyframes blue-gradient-drift {
@@ -463,6 +589,125 @@ body {
 
   94%, 100% {
     transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes landing-soft-glow {
+  0%, 100% {
+    opacity: .45;
+    transform: scale(.92);
+  }
+  50% {
+    opacity: .9;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes landing-layer-rise {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes landing-route-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+@keyframes landing-node-pulse {
+  0%, 100% {
+    stroke: currentColor;
+    opacity: .84;
+  }
+  50% {
+    stroke: #ed6238;
+    opacity: 1;
+  }
+}
+
+@keyframes landing-page-drift {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes landing-export-flow {
+  0% {
+    stroke-dashoffset: 55;
+    opacity: .45;
+  }
+  48%, 100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes landing-live-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(237, 98, 56, .3);
+  }
+  55% {
+    box-shadow: 0 0 0 7px rgba(237, 98, 56, 0);
+  }
+}
+
+@keyframes landing-signal-travel {
+  0% {
+    transform: translateX(-35%);
+    opacity: 0;
+  }
+  20%, 75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(225%);
+    opacity: 0;
+  }
+}
+
+@keyframes landing-progress-sheen {
+  0%, 25% {
+    transform: translateX(-100%);
+  }
+  70%, 100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes landing-activity-arrive {
+  0%, 100% {
+    opacity: .62;
+    transform: translateX(0);
+  }
+  18%, 70% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-gallery-card,
+  .landing-gallery-card img,
+  .landing-capability-figure::after,
+  .landing-layer-sheet,
+  .landing-layer-head,
+  .landing-agent-route,
+  .landing-capability-2 rect,
+  .landing-export-page,
+  .landing-export-arrow,
+  .landing-live-dot,
+  .landing-pipeline-track::after,
+  .landing-operation-progress::after,
+  .landing-activity-item {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

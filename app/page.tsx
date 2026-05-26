@@ -1,27 +1,12 @@
 import { ArrowRight, Check } from 'lucide-react'
 import { MarketingFooter } from './components/MarketingFooter'
 import { MarketingNav } from './components/MarketingNav'
-import { CapabilityObjects, EditorialGallery, ProductShowcase } from './components/LandingProductShowcase'
+import { CapabilityObjects, ConnectedWorkflow, EditorialGallery, ProductShowcase } from './components/LandingProductShowcase'
 
 export const metadata = {
   title: 'Shuffla - AI Card News Studio',
   description: '브랜드 분석부터 카드뉴스 생성, 편집, 다운로드까지 이어지는 AI 콘텐츠 스튜디오.',
 }
-
-const workflow = [
-  {
-    title: 'Concept',
-    desc: '브랜드 URL과 상품 정보를 읽고 타겟에 맞는 콘텐츠 방향을 설계합니다.',
-  },
-  {
-    title: 'Generate',
-    desc: '슬라이드별 카피와 비주얼을 하나의 완성된 카드뉴스 세트로 생성합니다.',
-  },
-  {
-    title: 'Publish',
-    desc: '에디터에서 디테일을 조정하고 게시 가능한 PNG와 ZIP으로 내보냅니다.',
-  },
-]
 
 export default function LandingPage() {
   return (
@@ -74,28 +59,7 @@ export default function LandingPage() {
 
       <ProductShowcase />
       <CapabilityObjects />
-
-      <section id="workflow" className="bg-[#fbfaf7] py-24 md:py-32">
-        <div className="mx-auto grid max-w-[1300px] gap-16 px-5 md:px-8 lg:grid-cols-[0.45fr_0.55fr]">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#847d73]">One connected system</p>
-            <h2 className="mt-5 text-[clamp(2.2rem,4vw,3.5rem)] font-semibold leading-[1.12] tracking-[-0.06em]">
-              콘텐츠 운영을
-              <br />
-              하나의 흐름으로
-            </h2>
-          </div>
-          <div className="border-t border-[#dfdad0]">
-            {workflow.map((item, index) => (
-              <article key={item.title} className="grid gap-3 border-b border-[#dfdad0] py-8 sm:grid-cols-[80px_150px_1fr] sm:items-start">
-                <p className="font-mono text-xs text-[#aaa294]">0{index + 1}</p>
-                <h3 className="text-xl font-medium tracking-[-0.04em]">{item.title}</h3>
-                <p className="text-sm leading-7 text-[#777064]">{item.desc}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ConnectedWorkflow />
 
       <section className="px-5 pb-24 md:px-8 md:pb-32">
         <div className="mx-auto max-w-[1300px] overflow-hidden rounded-[30px] border border-[#e6dfd5] bg-white px-6 py-16 text-center md:px-10 md:py-24">
