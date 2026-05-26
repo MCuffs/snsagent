@@ -90,13 +90,16 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
             onDragEnd={(_, info) => handleDragEnd(layer, layer.x * SCALE + info.offset.x, layer.y * SCALE + info.offset.y)}
             className={`absolute cursor-move overflow-visible ${selectedLayerId === layer.id ? 'ring-1 ring-[#29c5ff]' : ''}`}
             style={{
-              left: layer.x * SCALE,
-              top: layer.y * SCALE,
+              x: layer.x * SCALE,
+              y: layer.y * SCALE,
+              left: 0,
+              top: 0,
               width: layer.width * SCALE,
               minHeight: layer.height * SCALE,
               zIndex: layer.zIndex,
               opacity: layer.opacity / 100,
-              transform: `scale(${layer.scale}) rotate(${layer.rotation}deg)`,
+              scale: layer.scale,
+              rotate: layer.rotation,
               filter: layer.blur ? `blur(${layer.blur * SCALE}px)` : undefined,
             }}
           >

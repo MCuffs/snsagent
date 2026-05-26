@@ -126,7 +126,13 @@ export function parseEditorialDocument(raw: string | null | undefined, seed: Sli
     const input = JSON.parse(raw) as Partial<EditorialDocument>
     const fallback = createEditorialDocument(seed)
     if (!Array.isArray(input.layers)) return fallback
-    return normalizeDocument({ ...fallback, ...input, layers: input.layers })
+    const doc = normalizeDocument({ ...fallback, ...input, layers: input.layers })
+    if (seed.backgroundImageUrl) {
+      doc.layers = doc.layers.map(layer =>
+        layer.type === 'background' ? { ...layer, imageUrl: seed.backgroundImageUrl } : layer
+      )
+    }
+    return doc
   } catch {
     return createEditorialDocument(seed)
   }
