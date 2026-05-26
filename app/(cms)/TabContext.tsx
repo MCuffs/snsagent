@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 interface TabContextType {
   activeTab: string
@@ -11,20 +11,33 @@ interface TabContextType {
 const TabContext = createContext<TabContextType | null>(null)
 
 export function TabProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get('tab') || 'concept'
+  
+  // Read target tab from URL query searchParams
+  const getTabFromUrl = () => searchParams.get('tab') || 'concept'
+  
+  const [activeTab, setActiveTabState] = useState<string>(getTabFromUrl)
+
+  // Sync state if URL search parameters change externally (e.g. Back/Forward navigation)
+  useEffect(() => {
+    setActiveTabState(getTabFromUrl())
+  }, [searchParams])
 
   const setActiveTab = (tab: string) => {
-    const params = new URLSearchParams(searchParams.toString())
+    // 1. Instantly update react state (0ms latency UI switch)
+    setActiveTabState(tab)
+    
+    // 2. Silently update browser history address bar without triggering Next.js router delay
+    const params = new URLSearchParams(window.location.search)
     if (tab === 'concept') {
       params.delete('tab')
     } else {
       params.set('tab', tab)
     }
     const query = params.toString()
-    router.push(query ? `${pathname}?${query}` : pathname)
+    const newUrl = query ? `${pathname}?${query}` : pathname
+    window.history.pushState(null, '', newUrl)
   }
 
   return (

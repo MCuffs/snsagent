@@ -24,6 +24,29 @@ interface ConceptFormProps {
   existingBrand: BrandData | null
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.16, 1, 0.3, 1] as const,
+    },
+  },
+}
+
 const VISUAL_MOODS = [
   { id: 'minimal', label: 'Minimal', desc: '깔끔하고 여백 중심' },
   { id: 'dark-editorial', label: 'Dark Editorial', desc: '무게감 있는 에디토리얼' },
@@ -230,8 +253,13 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   if (phase === 'url') {
     return (
       <div className="flex min-h-full flex-col items-center justify-center px-6 py-16">
-        <div className="w-full max-w-lg">
-          <div className="mb-10">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-lg"
+        >
+          <motion.div variants={itemVariants} className="mb-10">
             <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Step 1 of 1</p>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#111111]">
               브랜드 스토어 URL을 입력하세요
@@ -239,16 +267,16 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             <p className="mt-3 text-sm leading-6 text-[#52525b]">
               스마트스토어, 쇼핑몰, 브랜드 홈페이지 URL을 입력하면 AI가 브랜드 프로필을 자동으로 생성합니다.
             </p>
-          </div>
+          </motion.div>
 
           {error && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <motion.div variants={itemVariants} className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               {error}
-            </div>
+            </motion.div>
           )}
 
-          <form onSubmit={handleAnalyze} className="space-y-4">
+          <motion.form variants={itemVariants} onSubmit={handleAnalyze} className="space-y-4">
             <div className="relative">
               <Globe className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a1a1aa]" />
               <input
@@ -289,59 +317,68 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               )}
               {isAnalyzing ? '분석 중...' : 'AI로 브랜드 분석하기'}
             </button>
-          </form>
+          </motion.form>
 
           {/* 분석 완료 후 결과 + 저장 버튼 */}
-          {analysisReport && !isAnalyzing && (
-            <div className="mt-4 space-y-4">
-              <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e4e4e7] bg-white">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <span className="text-xs font-semibold text-[#111111]">AI 브랜드 분석 완료</span>
-                </div>
-                <div className="max-h-64 overflow-y-auto p-4 text-xs leading-relaxed text-[#52525b] whitespace-pre-wrap">
-                  {analysisReport}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsSaving(true)
-                  setError(null)
-                  const saved = await saveBrandAction(brandId, {
-                    name, industry, targetAudience, toneOfVoice,
-                    mainColor, forbiddenWords, ctaStyle,
-                    brandDna: brandDna || null,
-                    websiteUrl: url,
-                  })
-                  setIsSaving(false)
-                  if (saved.success) {
-                    setBrandId(saved.brand.id)
-                    setPhase('profile')
-                  } else {
-                    setError(saved.error || '저장 실패')
-                  }
-                }}
-                disabled={isSaving}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0066ff] text-sm font-semibold text-white transition hover:bg-[#0052cc] disabled:opacity-50"
+          <AnimatePresence>
+            {analysisReport && !isAnalyzing && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
+                className="mt-4 space-y-4 overflow-hidden"
               >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                브랜드 저장하고 계속하기
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+                <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e4e4e7] bg-white">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs font-semibold text-[#111111]">AI 브랜드 분석 완료</span>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-4 text-xs leading-relaxed text-[#52525b] whitespace-pre-wrap">
+                    {analysisReport}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsSaving(true)
+                    setError(null)
+                    const saved = await saveBrandAction(brandId, {
+                      name, industry, targetAudience, toneOfVoice,
+                      mainColor, forbiddenWords, ctaStyle,
+                      brandDna: brandDna || null,
+                      websiteUrl: url,
+                    })
+                    setIsSaving(false)
+                    if (saved.success) {
+                      setBrandId(saved.brand.id)
+                      setPhase('profile')
+                    } else {
+                      setError(saved.error || '저장 실패')
+                    }
+                  }}
+                  disabled={isSaving}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0066ff] text-sm font-semibold text-white transition hover:bg-[#0052cc] disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  브랜드 저장하고 계속하기
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {existingBrand && !analysisReport && (
-            <button
+            <motion.button
+              variants={itemVariants}
               type="button"
               onClick={() => setPhase('profile')}
-              className="mt-4 w-full text-center text-sm text-[#71717a] hover:text-[#111111] underline underline-offset-2"
+              className="mt-4 w-full text-center text-sm text-[#71717a] hover:text-[#111111] underline underline-offset-2 block"
             >
               기존 브랜드 프로필 수정하기 →
-            </button>
+            </motion.button>
           )}
-        </div>
+        </motion.div>
       </div>
     )
   }
@@ -351,8 +388,13 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     <div className="flex h-full overflow-hidden">
       {/* Main form */}
       <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-2xl px-6 py-12">
-      <div className="mb-10 flex items-start justify-between">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-6 py-12"
+      >
+      <motion.div variants={itemVariants} className="mb-10 flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Brand Concept</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#111111]">브랜드 프로필</h1>
@@ -380,19 +422,19 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             AI와 대화하기
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {error && (
-        <div className="mb-6 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <motion.div variants={itemVariants} className="mb-6 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           {error}
-        </div>
+        </motion.div>
       )}
       {success && (
-        <div className="mb-6 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+        <motion.div variants={itemVariants} className="mb-6 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
           {success}
-        </div>
+        </motion.div>
       )}
 
       <form onSubmit={handleSave} className="space-y-8">
@@ -509,7 +551,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         </Section>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 border-t border-[#e4e4e7] pt-6">
+        <motion.div variants={itemVariants} className="flex items-center gap-3 border-t border-[#e4e4e7] pt-6">
           <button
             type="submit"
             disabled={isSaving || !name}
@@ -528,9 +570,9 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               <ArrowRight className="h-4 w-4" />
             </button>
           )}
-        </div>
+        </motion.div>
       </form>
-      </div>
+      </motion.div>
       </div>
 
       {/* AI Chat Panel */}
@@ -540,7 +582,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 360, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
             className="flex shrink-0 flex-col border-l border-[#e4e4e7] bg-[#fafafa] overflow-hidden"
           >
             {/* Chat header */}
@@ -637,10 +679,10 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
+    <motion.div variants={itemVariants}>
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#71717a]">{title}</h2>
       {children}
-    </div>
+    </motion.div>
   )
 }
 

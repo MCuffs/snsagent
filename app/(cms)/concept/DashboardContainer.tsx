@@ -4,6 +4,7 @@ import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
+import { motion } from 'framer-motion'
 
 interface DashboardContainerProps {
   existingBrand: {
@@ -34,24 +35,49 @@ export default function DashboardContainer({ existingBrand, campaigns }: Dashboa
   const activeTab = (!hasCompleteBrand && tab !== 'concept') ? 'concept' : tab
 
   return (
-    <>
-      {activeTab === 'concept' && <ConceptForm existingBrand={existingBrand} />}
-      {activeTab === 'generate' && existingBrand && (
-        <GenerateForm
-          brand={{
-            id: existingBrand.id,
-            name: existingBrand.name,
-            industry: existingBrand.industry,
-            targetAudience: existingBrand.targetAudience,
-            toneOfVoice: existingBrand.toneOfVoice,
-            mainColor: existingBrand.mainColor,
-            forbiddenWords: existingBrand.forbiddenWords,
-            ctaStyle: existingBrand.ctaStyle,
-            brandDna: existingBrand.brandDna || null,
-          }}
-        />
+    <div className="h-full">
+      {activeTab === 'concept' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="h-full"
+        >
+          <ConceptForm existingBrand={existingBrand} />
+        </motion.div>
       )}
-      {activeTab === 'works' && <WorksGrid campaigns={campaigns} />}
-    </>
+      {activeTab === 'generate' && existingBrand && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="h-full"
+        >
+          <GenerateForm
+            brand={{
+              id: existingBrand.id,
+              name: existingBrand.name,
+              industry: existingBrand.industry,
+              targetAudience: existingBrand.targetAudience,
+              toneOfVoice: existingBrand.toneOfVoice,
+              mainColor: existingBrand.mainColor,
+              forbiddenWords: existingBrand.forbiddenWords,
+              ctaStyle: existingBrand.ctaStyle,
+              brandDna: existingBrand.brandDna || null,
+            }}
+          />
+        </motion.div>
+      )}
+      {activeTab === 'works' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="h-full"
+        >
+          <WorksGrid campaigns={campaigns} />
+        </motion.div>
+      )}
+    </div>
   )
 }

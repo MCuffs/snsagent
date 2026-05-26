@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, Clock, ImageOff } from 'lucide-react'
 import { useTab } from '../TabContext'
+import { motion } from 'framer-motion'
 
 interface WorkItem {
   id: string
@@ -10,6 +11,29 @@ interface WorkItem {
   status: string
   createdAt: string
   thumbnail: string | null
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.05
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: [0.16, 1, 0.3, 1] as const
+    }
+  }
 }
 
 interface WorksGridProps {
@@ -79,47 +103,56 @@ export default function WorksGrid({ campaigns }: WorksGridProps) {
       </div>
 
       {/* Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         {campaigns.map((item) => {
           const statusInfo = STATUS_LABELS[item.status] ?? { label: item.status, color: 'bg-[#f4f4f5] text-[#52525b]' }
           return (
-            <Link
+            <motion.div
               key={item.id}
-              href={`/campaign/${item.id}`}
-              className="group overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#a1a1aa] hover:shadow-md"
+              variants={itemVariants}
             >
-              {/* Thumbnail */}
-              <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#f4f4f5]">
-                {item.thumbnail ? (
-                  <img
-                    src={item.thumbnail}
-                    alt={item.title}
-                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <ImageOff className="h-8 w-8 text-[#d4d4d8]" />
-                  </div>
-                )}
-              </div>
+              <Link
+                href={`/campaign/${item.id}`}
+                className="group block overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#a1a1aa] hover:shadow-md"
+              >
+                {/* Thumbnail */}
+                <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#f4f4f5]">
+                  {item.thumbnail ? (
+                    <img
+                      src={item.thumbnail}
+                      alt={item.title}
+                      className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <ImageOff className="h-8 w-8 text-[#d4d4d8]" />
+                    </div>
+                  )}
+                </div>
 
-              {/* Info */}
-              <div className="p-4">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <p className="line-clamp-2 text-sm font-semibold text-[#111111] leading-snug">{item.title}</p>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusInfo.color}`}>
-                    {statusInfo.label}
-                  </span>
+                {/* Info */}
+                <div className="p-4">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <p className="line-clamp-2 text-sm font-semibold text-[#111111] leading-snug">{item.title}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusInfo.color}`}>
+                      {statusInfo.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
+                    <Clock className="h-3 w-3" />
+                    {formatDate(item.createdAt)}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
-                  <Clock className="h-3 w-3" />
-                  {formatDate(item.createdAt)}
-                </div>
-              </div>
-            </Link>
+              </Link>
+            </motion.div>
           )
         })}
-      </div>
+      </motion.div>
     </div>
   )
 }

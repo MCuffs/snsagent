@@ -105,6 +105,29 @@ const itemVariants = {
   }
 }
 
+const formContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05
+    }
+  }
+}
+
+const formItemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.16, 1, 0.3, 1] as const
+    }
+  }
+}
+
 export default function GenerateForm({ brand }: GenerateFormProps) {
   const router = useRouter()
 
@@ -315,7 +338,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
   // ── Main layout ─────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#FAF5EE]">
+    <motion.div
+      variants={formContainerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex h-full overflow-hidden bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#FAF5EE]"
+    >
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {
           width: 5px;
@@ -334,7 +362,10 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       ` }} />
 
       {/* Chat panel */}
-      <div className="flex min-w-0 flex-1 flex-col bg-[#FFFDFB]/80 backdrop-blur-sm border-r border-[#EFEAE2]">
+      <motion.div
+        variants={formItemVariants}
+        className="flex min-w-0 flex-1 flex-col bg-[#FFFDFB]/80 backdrop-blur-sm border-r border-[#EFEAE2]"
+      >
         {/* Brand chip */}
         <div className="shrink-0 border-b border-[#EFEAE2] px-5 py-3.5 bg-[#FCFBF9]/60">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#E5DDD3] bg-white px-3 py-1.5 text-xs font-bold text-[#5C4E4B] shadow-[0_2px_8px_rgba(158,125,104,0.04)]">
@@ -494,10 +525,13 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
             </button>
           </form>
         </div>
-      </div>
+      </motion.div>
 
       {/* AI Strategy Director Panel (hidden on mobile) */}
-      <div className="hidden w-[390px] shrink-0 flex-col bg-gradient-to-b from-[#FCFBF9] to-[#F5F1E9] text-[#2C1E1A] border-l border-[#EFEAE2] overflow-y-auto xl:flex custom-scrollbar">
+      <motion.div
+        variants={formItemVariants}
+        className="hidden w-[390px] shrink-0 flex-col bg-gradient-to-b from-[#FCFBF9] to-[#F5F1E9] text-[#2C1E1A] border-l border-[#EFEAE2] overflow-y-auto xl:flex custom-scrollbar"
+      >
         <div className="border-b border-[#EFEAE2] px-5 py-5 bg-[#FCFBF9]/90 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <div>
@@ -675,7 +709,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
             Shuffla AI Content Strategy Engine v2.0
           </p>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
