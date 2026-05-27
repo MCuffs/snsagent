@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
+import { PrismaClient } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +23,18 @@ export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return NextResponse.json(
+      { success: false, error: "Migration database URL is unavailable." },
+      { status: 500 },
+    );
+  }
+
+  const prisma = new PrismaClient({
+    datasources: { db: { url: databaseUrl } },
+  });
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -99,8 +111,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[Schema migration]", error);
     return NextResponse.json(
-      { success: false, error: "Schema migration failed." },
+      {
+        success: false,
+        error: "Schema migration failed.",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
