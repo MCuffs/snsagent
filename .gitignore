@@ -56,3 +56,5 @@ prisma/errors.log
 # downloaded font assets and logos (reference copies, not deployed)
 /Pretendard-1.3.9/
 /logo/
+/Front/
+/public/logo.png

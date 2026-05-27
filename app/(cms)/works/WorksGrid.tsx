@@ -193,6 +193,8 @@ export default function WorksGrid({
                     </span>
                   )}
                   {item.thumbnail ? (
+                    // Thumbnails can be runtime Blob or data URLs that are not valid Next Image sources.
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={item.thumbnail}
                       alt={item.title}

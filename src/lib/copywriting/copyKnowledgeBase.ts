@@ -1,4 +1,3 @@
-import { parseBrandDna } from '../../../lib/brand-dna'
 import type { LLMClient } from '../ai/llmClient'
 import type {
   BrandProfile,
@@ -579,7 +578,7 @@ export interface EditorialStyleCluster {
   visualCues: string[]
 }
 
-const EDITORIAL_CLUSTERS: EditorialStyleCluster[] = [
+export const EDITORIAL_CLUSTERS: EditorialStyleCluster[] = [
   {
     id: 'personal_finance_confession',
     name: '개인 금융 고백형',
