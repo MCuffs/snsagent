@@ -23,6 +23,7 @@ import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
+import { logEditEvent } from '../src/lib/intelligence/editLogger'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -310,6 +311,7 @@ export async function updateSlideAction(slideId: string, headline: string, body:
     if (existingSlide.campaign.userId !== user.id) return forbidden()
 
     const slide = await dbService.updateSlideContent(slideId, headline, body, imageUrl)
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'headline_edit', editDelta: { beforeLength: existingSlide.headline.length, afterLength: headline.length }, metadata: { action: 'updateSlide' } })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 수정에 실패했습니다.'))
@@ -384,6 +386,7 @@ export async function rerenderMediaSlideAction(
       backgroundImageUrl: background.imageUrl,
     })
     await consumeRegenerationPass(user.id, user.plan)
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'layout_change', metadata: { action: 'rerenderMediaSlide', fontFamily: options?.fontFamily } })
     return { success: true as const, slide, regenerationUsage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 재렌더링에 실패했습니다.'))
@@ -401,6 +404,7 @@ export async function saveSlideTextAction(slideId: string, headline: string, bod
     if (existingSlide.campaign.userId !== user.id) return forbidden()
 
     const slide = await dbService.updateSlideContent(slideId, headline, body, existingSlide.imageUrl)
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: headline !== existingSlide.headline ? 'headline_edit' : 'body_edit', editDelta: { beforeLength: existingSlide.headline.length + existingSlide.body.length, afterLength: headline.length + body.length } })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '슬라이드 저장에 실패했습니다.'))
@@ -436,6 +440,7 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
     if (renderOutput) {
       await dbService.updateBrandEditorPreferences(existingSlide.campaign.brandId, serializeBrandStyleMemory(document))
     }
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'headline_edit', editDelta: { beforeLength: existingSlide.headline.length, afterLength: headline.length }, metadata: { action: 'saveEditorialDocument', rendered: renderOutput } })
     return { success: true as const, slide, document, rendered: renderOutput }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '편집 문서 저장에 실패했습니다.'))
@@ -524,6 +529,7 @@ export async function rewriteEditorialCopyAction(
       body: rewrite.body,
       editorDocument: JSON.stringify(document),
     })
+    logEditEvent({ userId: user.id, brandId: slide.campaign.brandId, campaignId: slide.campaign.id, slideId, eventType: 'copy_rewrite', metadata: { intent, action: 'rewriteEditorialCopy' } })
     return { success: true as const, slide: updated, document }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '카피 제안 생성에 실패했습니다.'))
@@ -638,6 +644,7 @@ export async function fastRerenderTextAction(
       imageUrl,
       backgroundImageUrl,
     })
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'font_change', metadata: { action: 'fastRerenderText', fontFamily: options?.fontFamily, textColor: options?.textColor } })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '빠른 재렌더링에 실패했습니다.'))
@@ -700,6 +707,7 @@ export async function replaceBackgroundAction(
       imageUrl,
       backgroundImageUrl: cleanBackgroundUrl,
     })
+    logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'image_replace', metadata: { action: 'replaceBackground' } })
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '배경 교체에 실패했습니다.'))

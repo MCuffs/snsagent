@@ -1500,4 +1500,153 @@ export const dbService = {
     }
     throw new Error('Post not found')
   },
+
+  // ─── Intelligence Layer ───────────────────────────────────────────────────
+
+  async createEditLog(data: {
+    userId: string
+    brandId: string
+    campaignId?: string
+    slideId?: string
+    eventType: string
+    editDelta?: string
+    metadata?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.userEditLog.create({ data: {
+          userId: data.userId,
+          brandId: data.brandId,
+          campaignId: data.campaignId ?? null,
+          slideId: data.slideId ?? null,
+          eventType: data.eventType,
+          editDelta: data.editDelta ?? null,
+          metadata: data.metadata ?? null,
+        }})
+        return
+      } catch (err) {
+        console.warn('Prisma createEditLog failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op (no edit log array in mock DB)
+  },
+
+  async getSummarizedPreference(brandId: string): Promise<{
+    summary: string | null
+    preferredHookPatterns: string | null
+    preferredLayouts: string | null
+    avoidPatterns: string | null
+    preferredCopyTone: string | null
+  } | null> {
+    if (!isMock()) {
+      try {
+        const pref = await prisma.summarizedPreference.findUnique({ where: { brandId } })
+        if (!pref) return null
+        return {
+          summary: pref.summary,
+          preferredHookPatterns: pref.preferredHookPatterns,
+          preferredLayouts: pref.preferredLayouts,
+          avoidPatterns: pref.avoidPatterns,
+          preferredCopyTone: pref.preferredCopyTone,
+        }
+      } catch (err) {
+        console.warn('Prisma getSummarizedPreference failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    return null
+  },
+
+  async upsertSummarizedPreference(data: {
+    userId: string
+    brandId: string
+    summary?: string
+    preferredHookPatterns?: string
+    preferredLayouts?: string
+    preferredEmotions?: string
+    preferredCopyTone?: string
+    preferredColorStyle?: string
+    avoidPatterns?: string
+    editLogCountAtCompress?: number
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.summarizedPreference.upsert({
+          where: { brandId: data.brandId },
+          update: {
+            summary: data.summary ?? null,
+            preferredHookPatterns: data.preferredHookPatterns ?? null,
+            preferredLayouts: data.preferredLayouts ?? null,
+            preferredEmotions: data.preferredEmotions ?? null,
+            preferredCopyTone: data.preferredCopyTone ?? null,
+            preferredColorStyle: data.preferredColorStyle ?? null,
+            avoidPatterns: data.avoidPatterns ?? null,
+            editLogCountAtCompress: data.editLogCountAtCompress ?? 0,
+            compressedAt: new Date(),
+          },
+          create: {
+            userId: data.userId,
+            brandId: data.brandId,
+            summary: data.summary ?? null,
+            preferredHookPatterns: data.preferredHookPatterns ?? null,
+            preferredLayouts: data.preferredLayouts ?? null,
+            preferredEmotions: data.preferredEmotions ?? null,
+            preferredCopyTone: data.preferredCopyTone ?? null,
+            preferredColorStyle: data.preferredColorStyle ?? null,
+            avoidPatterns: data.avoidPatterns ?? null,
+            editLogCountAtCompress: data.editLogCountAtCompress ?? 0,
+          },
+        })
+        return
+      } catch (err) {
+        console.warn('Prisma upsertSummarizedPreference failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op
+  },
+
+  async createQualityScoreLog(data: {
+    campaignId: string
+    userId: string
+    passed: boolean
+    score: number
+    narrativeFlowScore: number
+    personaFitScore: number
+    hookPatternScore: number
+    issueCount: number
+    issuesJson?: string
+    hookPatternUsed?: string
+    personaUsed?: string
+    industryUsed?: string
+    trendContextUsed?: boolean
+    memoryContextUsed?: boolean
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.qualityScoreLog.create({ data: {
+          campaignId: data.campaignId,
+          userId: data.userId,
+          passed: data.passed,
+          score: data.score,
+          narrativeFlowScore: data.narrativeFlowScore,
+          personaFitScore: data.personaFitScore,
+          hookPatternScore: data.hookPatternScore,
+          issueCount: data.issueCount,
+          issuesJson: data.issuesJson ?? null,
+          hookPatternUsed: data.hookPatternUsed ?? null,
+          personaUsed: data.personaUsed ?? null,
+          industryUsed: data.industryUsed ?? null,
+          trendContextUsed: data.trendContextUsed ?? false,
+          memoryContextUsed: data.memoryContextUsed ?? false,
+        }})
+        return
+      } catch (err) {
+        console.warn('Prisma createQualityScoreLog failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op
+  },
 }

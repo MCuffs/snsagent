@@ -10,47 +10,52 @@ generator client {
 }
 
 model User {
-  id                       String            @id @default(uuid())
-  email                    String            @unique
+  id                       String                 @id @default(uuid())
+  email                    String                 @unique
   name                     String?
-  plan                     String            @default("FREE") // FREE, LITE, PRO, UNLIMITED
-  paypalSubscriptionId     String?           @unique
+  plan                     String                 @default("FREE") // FREE, LITE, PRO, UNLIMITED
+  paypalSubscriptionId     String?                @unique
   paypalSubscriptionStatus String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
-  tossCustomerKey          String?           @unique
-  tossBillingKey           String?           @unique
-  tossPaymentKey           String?           @unique
-  tossLastOrderId          String?           @unique
+  tossCustomerKey          String?                @unique
+  tossBillingKey           String?                @unique
+  tossPaymentKey           String?                @unique
+  tossLastOrderId          String?                @unique
   tossSubscriptionStatus   String? // PENDING, ACTIVE, PAST_DUE, CANCELED
   tossNextBillingAt        DateTime?
   tossLastPaidAt           DateTime?
   tossCanceledAt           DateTime?
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
   brands                   Brand[]
   campaigns                Campaign[]
   posts                    Post[]
   instagramAccount         InstagramAccount?
+  editLogs                 UserEditLog[]
+  summarizedPreferences    SummarizedPreference[]
+  qualityScoreLogs         QualityScoreLog[]
 }
 
 model Brand {
-  id                String            @id @default(uuid())
-  userId            String
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name              String
-  industry          String
-  targetAudience    String
-  toneOfVoice       String
-  mainColor         String
-  forbiddenWords    String
-  ctaStyle          String
-  websiteUrl        String?
-  brandDna          String?
-  editorPreferences String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  campaigns         Campaign[]
-  instagram         InstagramAccount?
-  posts             Post[]
+  id                   String                @id @default(uuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String
+  industry             String
+  targetAudience       String
+  toneOfVoice          String
+  mainColor            String
+  forbiddenWords       String
+  ctaStyle             String
+  websiteUrl           String?
+  brandDna             String?
+  editorPreferences    String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  campaigns            Campaign[]
+  instagram            InstagramAccount?
+  posts                Post[]
+  editLogs             UserEditLog[]
+  summarizedPreference SummarizedPreference?
 }
 
 model InstagramAccount {
@@ -73,27 +78,28 @@ model InstagramAccount {
 }
 
 model Campaign {
-  id                         String          @id @default(uuid())
+  id                         String           @id @default(uuid())
   userId                     String
-  user                       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   brandId                    String
-  brand                      Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand                      Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
   title                      String
   productName                String
   productDescription         String
   keyBenefits                String
   objective                  String
   slideCount                 Int
-  status                     String          @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
+  status                     String           @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
   agentReport                String?
   imageModel                 String?
-  initialImageCount          Int             @default(0)
-  regenerationImageCount     Int             @default(0)
+  initialImageCount          Int              @default(0)
+  regenerationImageCount     Int              @default(0)
   lastRegenerationImageModel String?
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
   slides                     CarouselSlide[]
   posts                      Post[]
+  qualityScoreLogs           QualityScoreLog[]
 }
 
 model CarouselSlide {
@@ -140,4 +146,143 @@ model ErrorLog {
   errorStack   String?
   contextData  String? // JSON stringified context
   createdAt    DateTime @default(now())
+}
+
+// ─── Intelligence Layer Models ────────────────────────────────────────────────
+
+model CrawledPost {
+  id                 String   @id @default(uuid())
+  platform           String   // "instagram" | "threads" | "naver_blog" | "pinterest"
+  sourceUrl          String   @unique
+  crawledAt          DateTime @default(now())
+  isCarousel         Boolean  @default(false)
+  carouselConfidence Float?
+  carouselType       String?  // "product_showcase" | "how_to" | "list" | "story" | "unknown"
+  slideCount         Int?
+  estimatedLikes     Int?
+  estimatedComments  Int?
+  headlinePosition   String?
+  headlineLength     Int?
+  emotionSignal      String?
+  designStyle        String?
+  colorPalette       String?  // JSON string: { dominant, accent }
+  textDensity        String?  // "low" | "medium" | "high"
+  trendKeywords      String?  // JSON string: string[]
+  hashtags           String?  // JSON string: string[]
+  embedding          Unsupported("vector(1536)")?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([platform, crawledAt])
+  @@index([isCarousel])
+}
+
+model ViralCopyPattern {
+  id                    String   @id @default(uuid())
+  sourceType            String   // "url" | "image_url" | "crawled"
+  sourcePlatform        String?
+  analyzedAt            DateTime
+  headlineStyle         String
+  emotionalTrigger      String   // EmotionalIntent
+  detectedHookPattern   String   // HookPatternId
+  slideRole             String   // SlideRole
+  layoutType            String
+  copyTone              String
+  extractedPatternNotes String
+  engagementScore       Float    @default(0.0)
+  usageCount            Int      @default(0)
+  industry              String?  // IndustryCategory or null
+  embedding             Unsupported("vector(1536)")?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([detectedHookPattern])
+  @@index([industry])
+  @@index([engagementScore])
+}
+
+model TrendSignal {
+  id                  String   @id @default(uuid())
+  platform            String   // "naver" | "instagram" | "pinterest" | "cross"
+  keyword             String
+  category            String?  // IndustryCategory or null
+  phase               String   @default("emerging") // "emerging" | "rising" | "peak" | "declining"
+  mentionCount        Int      @default(0)
+  velocityScore       Float    @default(0.0)
+  engagementProxy     Float    @default(0.0)
+  associatedLayouts   String?  // JSON string: LayoutType[]
+  associatedColors    String?  // JSON string: string[]
+  associatedEmotions  String?  // JSON string: EmotionalIntent[]
+  firstSeenAt         DateTime @default(now())
+  lastSeenAt          DateTime @default(now())
+  peakAt              DateTime?
+  embedding           Unsupported("vector(1536)")?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([platform, keyword])
+  @@index([phase, platform])
+  @@index([velocityScore])
+}
+
+model UserEditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaignId String?
+  slideId    String?
+  eventType  String   // "headline_edit" | "body_edit" | "font_change" | "layout_change"
+                      // | "color_change" | "image_replace" | "copy_rewrite" | "reset"
+  editDelta  String?  // JSON: { beforeLength, afterLength } — NO raw text stored
+  metadata   String?  // JSON: { fontPreset, hookPatternApplied, layoutType, intent, ... }
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([brandId])
+}
+
+model SummarizedPreference {
+  id                     String   @id @default(uuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId                String   @unique
+  brand                  Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  preferredHookPatterns  String?  // JSON: { pattern: HookPatternId, weight: number }[]
+  preferredLayouts       String?  // JSON: { layout: LayoutType, weight: number }[]
+  preferredEmotions      String?  // JSON: { emotion: EmotionalIntent, weight: number }[]
+  preferredCopyTone      String?  // "short_punchy" | "emotional" | "informational" | "luxury"
+  preferredColorStyle    String?  // "dark" | "bright" | "neutral"
+  avoidPatterns          String?  // JSON: HookPatternId[]
+  summary                String?  // 200-char Korean plain text injected into prompts
+  embedding              Unsupported("vector(1536)")?
+  compressedAt           DateTime @default(now())
+  editLogCountAtCompress Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model QualityScoreLog {
+  id                 String   @id @default(uuid())
+  campaignId         String
+  campaign           Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passed             Boolean
+  score              Int
+  narrativeFlowScore Int
+  personaFitScore    Int
+  hookPatternScore   Int
+  issueCount         Int
+  issuesJson         String?  // JSON: CopyQualityIssue[]
+  hookPatternUsed    String?  // HookPatternId
+  personaUsed        String?  // PersonaId
+  industryUsed       String?  // IndustryCategory
+  trendContextUsed   Boolean  @default(false)
+  memoryContextUsed  Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([score])
 }
