@@ -295,7 +295,7 @@ This file records meaningful development work, fixes, verification commands, and
 - Pushed the same migration baseline to `main` and `dev` in `Shuffla-AI/Shuffla_SaaS`.
 - Confirmed the official Vercel GitHub App is installed for the `Shuffla-AI` organization.
 - Identified that Vercel Hobby cannot directly connect an organization-owned private GitHub repository.
-- Added `.github/workflows/vercel-dev-production.yml` so a push to `dev` builds inside GitHub Actions and uploads prebuilt output to the Vercel production deployment through the CLI.
+- Added `.github/workflows/vercel-dev-production.yml` with `actions/checkout@v6` so a push to `dev` builds inside GitHub Actions and uploads prebuilt output to the Vercel production deployment through the CLI.
 - Configured encrypted GitHub Actions repository secrets for the Vercel token, team ID, and project ID.
 - Documented required Actions secrets and the Hobby non-commercial-use limitation in `README.md`.
 
