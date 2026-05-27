@@ -342,3 +342,5 @@ This file records meaningful development work, fixes, verification commands, and
 - Confirmed the Vercel project Git connection to `Shuffla-AI/Shuffla_SaaS`.
 - `git diff --check` passed.
 - `npm run build` passed with Next.js `16.2.6`.
+- Confirmed that Git pushes are classified correctly as Preview for `dev` and Production for `main`.
+- The first Git-triggered deployments were blocked because commit email `mcuffs@github.com` is not associated with a GitHub user; future commits use the repository's GitHub noreply identity, and the Vercel owner account must connect its GitHub login before Git builds can be promoted.

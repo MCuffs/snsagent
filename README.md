@@ -123,6 +123,7 @@ Vercel Pro 프로젝트는 private 조직 저장소 `Shuffla-AI/Shuffla_SaaS`와
 - 로컬 CLI Production 배포나 GitHub Actions 기반 prebuilt 업로드는 복구 또는 진단 상황 외에는 사용하지 않습니다.
 
 운영 배포는 `main`을 기준으로 하며, 검증된 `dev` 변경을 `main`에 병합한 뒤 Vercel 자동 배포 결과를 확인합니다.
+Private 조직 저장소에서 Git 배포를 실행하는 커밋 작성자는 Vercel 팀 멤버여야 하며, Vercel 계정의 GitHub Login Connection과 GitHub에 연결된 커밋 이메일을 사용해야 합니다.
 
 ## 검증
 
