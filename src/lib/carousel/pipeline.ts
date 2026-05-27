@@ -179,7 +179,7 @@ export async function generateCarouselCampaign(params: {
       ),
     ])
 
-    const slides: GeneratedSlide[] = slideResults
+    let slides: GeneratedSlide[] = slideResults
       .sort((a, b) => a.copy.slideNumber - b.copy.slideNumber)
       .map(({ copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }) => {
         const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
@@ -215,6 +215,45 @@ export async function generateCarouselCampaign(params: {
         passed: false,
         issues: [...qualityCheck.issues, '이미지 생성 실패로 placeholder가 사용되었습니다.'],
         suggestions: [...qualityCheck.suggestions, '배경 이미지를 운영자가 확인하세요.'],
+      }
+    }
+
+    // Copy-only regeneration for fixable copy issues (no image regeneration cost)
+    const copySlidesWithIssues = extractCopyIssueSlides(qualityCheck.issues)
+    if (copySlidesWithIssues.size > 0) {
+      log(`Copy-only regeneration triggered for ${copySlidesWithIssues.size} slide(s)`)
+      try {
+        const regenCopies = await generateSlideCopies(
+          params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx
+        )
+        const regenMap = new Map(regenCopies.map(c => [c.slideNumber, c]))
+        slides = await Promise.all(
+          slides.map(async slide => {
+            if (!copySlidesWithIssues.has(slide.slideNumber)) return slide
+            const newCopy = regenMap.get(slide.slideNumber)
+            if (!newCopy) return slide
+            const design = designPrompts.find(d => d.slideNumber === slide.slideNumber)
+            if (!design) return slide
+            const finalImageUrl = await renderSlide({
+              campaignKey,
+              brand: params.brandProfile,
+              copy: newCopy,
+              design,
+              backgroundImageUrl: slide.backgroundImageUrl,
+              showSlideNumber: true,
+            })
+            return { ...slide, headline: newCopy.headline, body: newCopy.body, finalImageUrl }
+          })
+        )
+        qualityCheck = await runQualityCheck({
+          brand: params.brandProfile,
+          input: params.campaignInput,
+          slides,
+          caption: captionResult,
+        })
+        log('Copy-only regeneration complete')
+      } catch (regenError) {
+        log('Copy-only regeneration failed, keeping original slides')
       }
     }
 
@@ -319,4 +358,15 @@ function tomorrowAt20() {
   date.setDate(date.getDate() + 1)
   date.setHours(20, 0, 0, 0)
   return date
+}
+
+function extractCopyIssueSlides(issues: string[]): Set<number> {
+  const nums = new Set<number>()
+  for (const issue of issues) {
+    const match = issue.match(/^(\d+)번/)
+    if (match && /headline.*20자|body.*60자|금지어|과장 표현/.test(issue)) {
+      nums.add(parseInt(match[1], 10))
+    }
+  }
+  return nums
 }
