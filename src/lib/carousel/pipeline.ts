@@ -81,19 +81,15 @@ export async function generateCarouselCampaign(params: {
 
     const agentReportLogs: AgentReportItem[] = []
 
-    // Convert copies to AgentSlideData for agent chain
-    let agentSlides: AgentSlideData[] = copies.map(c => {
-      const isFirst = c.slideNumber === 1
-      const isLast = c.slideNumber === copies.length
-      const role = isFirst ? 'hook' : isLast ? 'save-cta' : 'key-point'
-      return {
-        slideNumber: c.slideNumber,
-        role,
-        headline: c.headline,
-        body: c.body,
-        layoutType: 'commerce-standard',
-      }
-    })
+    // Convert copies to AgentSlideData for agent chain — preserve actual SlideRole
+    const structureRoleMap = new Map(structure.slides.map(s => [s.slideNumber, s.role]))
+    let agentSlides: AgentSlideData[] = copies.map(c => ({
+      slideNumber: c.slideNumber,
+      role: structureRoleMap.get(c.slideNumber) ?? 'feature',
+      headline: c.headline,
+      body: c.body,
+      layoutType: 'commerce-standard',
+    }))
 
     // Execute BrandIdentityAgent
     const brandRes = brandAgent.run({
@@ -117,15 +113,6 @@ export async function generateCarouselCampaign(params: {
     })
     agentSlides = copyRes.slides
     agentReportLogs.push(...copyRes.logs)
-
-    // Sync adjusted copies back to pipeline copies array
-    copies.forEach((c) => {
-      const updated = agentSlides.find(s => s.slideNumber === c.slideNumber)
-      if (updated) {
-        c.headline = updated.headline
-        c.body = updated.body
-      }
-    })
 
     // Execute VisualConceptAgent
     const visualRes = visualAgent.run({

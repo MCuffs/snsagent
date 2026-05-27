@@ -98,8 +98,8 @@ export class BrandIdentityAgent {
         this.log('info', `슬라이드 ${slide.slideNumber}번: 브랜드 톤앤매너 '${params.brandToneOfVoice}' 적합성 검사 완료.`)
       }
 
-      // CTA 스타일 적용
-      if (isLast && params.ctaStyle) {
+      // CTA 스타일 적용 — only when body is missing
+      if (isLast && params.ctaStyle && !body) {
         body = this.normalizeCopy(params.ctaStyle)
         this.log('success', `마지막 슬라이드에 브랜드 지정 CTA 스타일 적용 완료: "${body}"`)
       }
@@ -230,28 +230,54 @@ export class CopywritingAgent {
 
   private getHeadlineLimit(role: string): number {
     const limits: Record<string, number> = {
-      hook: 18,
+      // SlideRole values
+      hook: 20,
+      problem: 20,
+      cause: 20,
+      common_mistake: 20,
+      product_solution: 20,
+      feature: 20,
+      feature_1: 20,
+      feature_2: 20,
+      benefit_or_proof: 20,
+      proof: 20,
+      offer: 20,
+      cta: 20,
+      // Legacy simplified roles
       context: 20,
-      'key-point': 18,
+      'key-point': 20,
       detail: 20,
-      stat: 16,
-      summary: 18,
-      'save-cta': 16,
+      stat: 20,
+      summary: 20,
+      'save-cta': 20,
     }
-    return limits[role] || 20
+    return limits[role] ?? 20
   }
 
   private getBodyLimit(role: string): number {
     const limits: Record<string, number> = {
-      hook: 46,
-      context: 58,
-      'key-point': 54,
-      detail: 62,
-      stat: 48,
-      summary: 52,
-      'save-cta': 42,
+      // SlideRole values — match copyEngine.ts cleanCopy() limit of 60
+      hook: 60,
+      problem: 60,
+      cause: 60,
+      common_mistake: 60,
+      product_solution: 60,
+      feature: 60,
+      feature_1: 60,
+      feature_2: 60,
+      benefit_or_proof: 60,
+      proof: 60,
+      offer: 60,
+      cta: 60,
+      // Legacy simplified roles
+      context: 60,
+      'key-point': 60,
+      detail: 60,
+      stat: 60,
+      summary: 60,
+      'save-cta': 60,
     }
-    return limits[role] || 56
+    return limits[role] ?? 60
   }
 
   private trimToNaturalLength(value: string, maxLength: number) {
