@@ -4,7 +4,7 @@ import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
-import { buildBrandHarnessPrompt, checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
+import { checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
@@ -154,14 +154,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   let plannedSlides = planMediaSlides(input, editorialPlan)
   plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx)
 
-  const brandHarnessPrompt = buildBrandHarnessPrompt({
-    brandName: input.brandName,
-    brandIndustry: input.brandIndustry,
-    brandToneOfVoice: input.brandToneOfVoice,
-    brandMainColor: input.brandMainColor,
-    brandDna: input.brandDna,
-  })
-
   // 1. Initialize Agents
   const brandAgent = new BrandIdentityAgent()
   const copyAgent = new CopywritingAgent()
@@ -262,6 +254,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         brandToneOfVoice: input.brandToneOfVoice,
         brandIndustry: input.brandIndustry,
         brandDna: input.brandDna,
+        role: slide.role as MediaSlideRole,
         editorialDirection: slidePlan?.visualDirection,
       })
 
@@ -270,8 +263,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       let backgroundImageUrl = ''
       let slideFallback = false
       try {
-        const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`, harness.template, slidePlan?.visualDirection), {
-          size: '1024x1024',
+        const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection), {
+          size: '1024x1536',
           productImageUrls: input.productImageUrls || [],
         })
         backgroundImageUrl = background.imageUrl
@@ -295,7 +288,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         headline: slide.headline,
         body: slide.body,
         backgroundImageUrl,
-        designPrompt: `${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`,
+        designPrompt: sanitizedVisualPrompt,
         harnessDiagnostics: harness.diagnostics,
       })
       const slideQualityCheck = checkBrandFit({

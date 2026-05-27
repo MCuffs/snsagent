@@ -359,7 +359,7 @@ export async function rerenderMediaSlideAction(
       totalSlides: existingSlide.campaign.slideCount,
     })
     const background = await getPipelineImageProvider().generateImage(buildHarnessedVisualPrompt(existingSlide.designPrompt, harness.template), {
-      size: '1024x1024',
+      size: '1024x1536',
       productImageUrls: [],
     })
 
@@ -470,7 +470,7 @@ export async function regenerateEditorialBackgroundAction(
       'brighter-background': 'retain layout and visual language; use a brighter clean background with readable negative space',
     }[variation]
     const prompt = `${existingSlide.designPrompt}, ${direction}, never render letters or typography in the image`
-    const result = await getPipelineImageProvider().generateImage(prompt, { size: '1024x1024', productImageUrls: [] })
+    const result = await getPipelineImageProvider().generateImage(prompt, { size: '1024x1536', productImageUrls: [] })
     document.layers = document.layers.map(layer =>
       layer.type === 'background' ? { ...layer, imageUrl: result.imageUrl } : layer
     )
@@ -888,7 +888,10 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
           totalSlides: campaign.slideCount,
         })
         const finalPrompt = `${keyword}, ${slide.designPrompt}`
-        const imgResult = await provider.generateImage(buildHarnessedVisualPrompt(finalPrompt, harness.template))
+        const imgResult = await provider.generateImage(buildHarnessedVisualPrompt(finalPrompt, harness.template), {
+          size: '1024x1536',
+          productImageUrls: [],
+        })
         
         const finalImageUrl = await renderMediaCard({
           id: `media-card-style-${Date.now()}-${slide.slideNumber}`,

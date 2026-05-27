@@ -67,7 +67,7 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
   })
 
   const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(visualDirection.prompt, harness.template), {
-    size: '1024x1024',
+    size: '1024x1536',
     productImageUrls: [],
   })
 

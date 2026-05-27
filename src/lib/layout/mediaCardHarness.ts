@@ -62,26 +62,19 @@ export function buildHarnessedVisualPrompt(
   editorialDirection?: EditorialVisualDirection
 ) {
   const templatePrompt = {
-    'product-light': 'bright product archive background, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for app-rendered overlay later, subtle white fog gradient at bottom',
-    'product-dark': 'muted gray product archive background, object centered in middle, subdued contrast, gray film veil, strong lower shadow, calm premium catalogue mood, clean empty lower-left area for app-rendered overlay later',
-    'journal-light': 'minimal journal archive background, grayscale editorial photo placed as a centered rectangular frame with generous light gray margins, quiet documentary mood, clean empty bottom area for app-rendered overlay later',
-    'cta-dark': 'black closing slide background, very minimal centered blank negative space, no blur, no object clutter, premium archive ending background',
+    'product-light': 'LAYOUT FRAME: soft light-background product document; restrained off-white atmosphere and a low-detail overlay-safe region.',
+    'product-dark': 'LAYOUT FRAME: subdued dark product document; controlled shadow falloff and a quiet overlay-safe region.',
+    'journal-light': 'LAYOUT FRAME: observational journal frame; restrained light-gray atmosphere and generous breathing room.',
+    'cta-dark': 'LAYOUT FRAME: quiet closing still life; deep neutral background, one restrained object, maximum breathing room.',
   }[template]
 
   return [
+    prompt,
     templatePrompt,
-    'archive style Korean editorial background photo reference',
     editorialDirection
-      ? `reserve clean negative space for the planned composition: ${editorialDirection.composition}; focus=${editorialDirection.focus}; whitespace=${editorialDirection.whitespaceRatio}`
-      : 'clear top negative space and lower-left overlay-safe empty area',
-    'ignore any conflicting centered-title, vivid-gradient, poster, UI, or white-panel layout direction from the source prompt',
-    `source visual context: ${prompt}`,
-    'background image only',
-    'no text, no letters, no Korean text, no English text, no typography, no captions, no signs, no logo, no watermark, no UI text',
-    'empty area reserved for editable text overlay',
-    'no generated text, no pseudo text, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no icons, no symbols',
-    'no signs, posters, menu boards, labels, book covers, newspaper headlines, package text, screen text, handwriting, or calligraphy',
-  ].join(', ')
+      ? `LAYOUT PRIORITY: preserve the planned ${editorialDirection.composition} rhythm with ${editorialDirection.whitespaceRatio} whitespace and focus on ${editorialDirection.focus}.`
+      : 'LAYOUT PRIORITY: preserve clean low-detail negative space for later typography.',
+  ].join('\n')
 }
 
 function selectArchiveTemplate(slideNumber?: number, totalSlides?: number, role?: string): ArchiveTemplate {

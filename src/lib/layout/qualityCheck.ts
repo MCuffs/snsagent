@@ -29,6 +29,11 @@ export function runMediaCardQualityCheck(params: {
     suggestions.push('프롬프트에서 제목, 본문 내용 또는 "text", "headline", "title" 등 텍스트 생성 유도 단어를 제외하고, "no text"와 같은 부정 지시어 컨텍스트만 사용하세요.')
   }
 
+  if (params.designPrompt && !/portrait source intended for a final 4:5 crop/i.test(params.designPrompt)) {
+    issues.push('세로 4:5 최종 크롭을 고려한 이미지 구도 계약이 없습니다.')
+    suggestions.push('이미지 프롬프트에 portrait crop-safe 영역과 텍스트 여백을 명시하세요.')
+  }
+
   if (!params.backgroundImageUrl) {
     issues.push('배경 이미지 URL이 없습니다.')
     suggestions.push('이미지 provider fallback을 확인하세요.')

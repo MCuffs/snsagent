@@ -1,6 +1,6 @@
 import { LAYOUT_DEFINITIONS, type LayoutDefinition } from './layoutTypes'
-import { buildVisualBrandAnchors } from './brandHarness'
-import type { EditorialVisualDirection } from '../editorial/editorialDirector'
+import { formatVisualBrandLanguage, translateBrandToVisualLanguage } from './brandHarness'
+import type { EditorialSlideRole, EditorialVisualDirection } from '../editorial/editorialDirector'
 
 export interface VisualDirectionInput {
   layout: LayoutDefinition
@@ -12,6 +12,7 @@ export interface VisualDirectionInput {
   brandToneOfVoice?: string
   brandIndustry?: string
   brandDna?: string | null
+  role?: EditorialSlideRole
   editorialDirection?: EditorialVisualDirection
 }
 
@@ -30,56 +31,38 @@ function inferSubject(topic: string, category: string): string {
   if (text.includes('shoe') || text.includes('슈즈') || text.includes('스니커즈') || text.includes('신발')) return 'designer shoes'
   if (text.includes('cosmetic') || text.includes('세럼') || text.includes('크림') || text.includes('화장품') || text.includes('skin') || text.includes('뷰티') || text.includes('토너') || text.includes('앰플')) return 'a premium skincare cosmetic bottle'
   if (text.includes('coffee') || text.includes('커피') || text.includes('카페') || text.includes('원두')) return 'a cup of coffee'
+  if (text.includes('snack') || text.includes('간식') || text.includes('그래놀라') || text.includes('쿠키') || text.includes('식품')) return 'an opened pouch of bite-sized snacks with realistic food texture'
   if (text.includes('chair') || text.includes('의자') || text.includes('furniture') || text.includes('가구')) return 'minimalist designer furniture'
   if (text.includes('tumbler') || text.includes('텀블러') || text.includes('보틀') || text.includes('컵')) return 'a sleek minimalist tumbler'
   if (text.includes('clothing') || text.includes('의류') || text.includes('옷') || text.includes('패션') || text.includes('shirt') || text.includes('아우터')) return 'modern editorial clothing'
   
-  return 'a premium lifestyle object'
+  return `one tangible lived-in usage cue for ${topic.replace(/\s+/g, ' ').trim().slice(0, 60) || 'the featured product'}`
 }
 
 export function generateVisualDirection(input: VisualDirectionInput): VisualDirection {
-  const subjectPosition = inferSubjectPosition(input.layout.textPosition)
-  const safeTypographyArea = input.layout.textPosition
-  const palette = input.layout.preferredColorPalette.join(', ')
   const context = `${input.brandIndustry || ''} ${input.category} ${input.topic} ${input.tone}`.toLowerCase()
-  const brandAnchors = buildVisualBrandAnchors(input.brandDna)
-
+  const role = input.role || 'detail'
+  const roleDirection = roleVisualLanguage(role)
   const scene = inferScene(context)
-  // Reference design system: dark editorial card style (observed from reference templates)
-  // - Full-bleed vertical photo with strong cinematic subject
-  // - Strong gradient-dark overlay in lower 40% for headline legibility
-  // - Dramatic lighting, desaturated tones, high contrast
-  // - Upper-left brand watermark area stays minimal
-  // - Bottom-left typography safe zone is the primary text anchor
-  const referenceStyleBase = [
-    'Korean social media editorial card background — full-bleed cinematic portrait photograph',
-    'inspired by premium Korean news card layout: dramatic subject, lower half darkened for text overlay',
-    'deep shadow gradient at bottom 40% of frame',
-    'photojournalism quality, documentary lighting, subtle film grain',
-    'high contrast, cinematic color grade, muted naturalistic palette',
-  ].join(', ')
-
   const subject = inferSubject(input.topic, input.category)
+  const brandLanguage = translateBrandToVisualLanguage({
+    brandIndustry: input.brandIndustry,
+    brandToneOfVoice: input.brandToneOfVoice,
+    brandMainColor: input.brandMainColor,
+    brandDna: input.brandDna,
+  })
+  const subjectPosition = roleDirection.subjectPosition
+  const safeTypographyArea = roleDirection.copySafeArea
 
   const prompt = [
-    referenceStyleBase,
-    scene,
-    `subject: ${subject}`,
-    `tone: ${input.brandToneOfVoice || input.tone}`,
-    input.visualHint ? `reference direction: ${input.visualHint}` : '',
-    brandAnchors ? `brand visual anchors: ${brandAnchors}` : '',
-    input.editorialDirection ? `editorial purpose: ${input.editorialDirection.imagePurpose}` : '',
-    input.editorialDirection ? `visual focus: ${input.editorialDirection.focus}` : '',
-    input.editorialDirection ? `composition rhythm: ${input.editorialDirection.composition}, whitespace ${input.editorialDirection.whitespaceRatio}, text dominance ${input.editorialDirection.textDominance}` : '',
-    input.editorialDirection ? `emotional mood: ${input.editorialDirection.mood}` : '',
-    `preferred palette: ${palette}`,
-    `subject positioning: ${subjectPosition}`,
-    `keep ${safeTypographyArea} area as clean dark negative space for app-rendered text overlay`,
-    `overlay style: ${input.layout.overlayStyle}`,
-    'no generated text, no pseudo text, no letters, no Hangul, no alphabet, no numbers, no logo, no watermark, no UI, no frame',
-    'no signage, no posters, no menu boards, no book covers, no newspaper headlines, no package labels, no screens with text',
-    '1080x1350 portrait composition',
-  ].filter(Boolean).join(', ')
+    'CONTRACT: Background-only vertical editorial photograph for a Korean Instagram carousel; final typography is added by the application.',
+    `PRIMARY SCENE: ${scene}; feature ${subject} in a single believable moment. ${roleDirection.narrativeBeat}.`,
+    `CAMERA AND EMOTION: ${roleDirection.camera}; ${roleDirection.emotion}. ${input.editorialDirection?.imagePurpose || ''}`.trim(),
+    `COMPOSITION: Portrait source intended for a final 4:5 crop; ${subjectPosition}; reserve ${safeTypographyArea} as quiet low-detail negative space; keep essential details inside the central crop-safe region.`,
+    `BRAND TRANSLATION: ${formatVisualBrandLanguage(brandLanguage)}.`,
+    `KOREAN REALISM: ${roleDirection.realism}; subtle sensor grain, natural surface wear, believable reflections, restrained retouching.`,
+    input.visualHint ? `REFERENCE DIRECTION: ${input.visualHint}.` : '',
+  ].filter(Boolean).join('\n')
 
   return {
     prompt,
@@ -97,24 +80,85 @@ export function getLayoutDefinition(layoutType: keyof typeof LAYOUT_DEFINITIONS)
 
 function inferScene(text: string) {
   if (/정치|사회|뉴스|시장|금융|vc|스타트업|투자|tech|it|business/.test(text)) {
-    return 'newsroom, newspaper texture, public speech, office glass, market board, or documentary business scene'
+    return 'weekday Seoul office or startup meeting table with glass reflections, notebook edge, and a lived-in working trace'
   }
   if (/여행|공간|장소|로컬|맛집|카페|생활|라이프/.test(text)) {
-    return 'real Korean street, store interior, cafe table, travel spot, or everyday lifestyle documentary scene'
+    return 'rain-softened Seongsu side-street cafe window seat with tray, pavement reflection, and an unposed daily trace'
   }
   if (/제품|출시|브랜드|커머스|스토어|패션|뷰티|리빙/.test(text)) {
-    return 'premium product-adjacent editorial scene, real store shelf, fabric texture, object close-up, or studio reportage'
+    return 'small Seoul apartment entryway or shelf vignette with fabric texture, practical storage details, and natural daylight'
   }
   if (/건강|웰니스|식품|자연|운동/.test(text)) {
-    return 'natural wellness editorial scene, raw texture, food market, gym, plant shadow, or calm documentary close-up'
+    return 'weekday 3:40 PM Seoul shared-office break scene with natural crumbs, reusable bottle, and softened window daylight'
   }
-  return 'realistic Korean editorial scene with a clear subject and strong photographic depth'
+  return 'realistic Korean daily-life setting with one clear subject, a human usage trace, and natural available light'
 }
 
-function inferSubjectPosition(textPosition: string) {
-  if (textPosition.includes('left')) return 'center-right composition, keeping left area readable'
-  if (textPosition.includes('right')) return 'center-left composition, keeping right area readable'
-  if (textPosition.includes('top')) return 'lower-center composition, keeping upper area readable'
-  if (textPosition.includes('bottom')) return 'upper-center composition, keeping lower area readable'
-  return 'center composition with quiet surrounding space'
+function roleVisualLanguage(role: EditorialSlideRole) {
+  const language: Record<EditorialSlideRole, {
+    narrativeBeat: string
+    camera: string
+    emotion: string
+    subjectPosition: string
+    copySafeArea: string
+    realism: string
+  }> = {
+    hook: {
+      narrativeBeat: 'Capture an unresolved interruption rather than a polished product beauty shot',
+      camera: '35mm close documentary framing, asymmetric foreground tension and a slight off-axis angle',
+      emotion: 'curiosity with restrained tension',
+      subjectPosition: 'place the key subject on the upper-right or middle-right third',
+      copySafeArea: 'the lower-left 42% of the frame',
+      realism: 'unposed workday evidence and imperfect object alignment',
+    },
+    context: {
+      narrativeBeat: 'Show a recognizable everyday situation before the solution appears',
+      camera: '50mm eye-level observational framing with moderate depth',
+      emotion: 'recognition and empathy',
+      subjectPosition: 'place the situational action in the lower-right zone',
+      copySafeArea: 'the upper-left 35% of the frame',
+      realism: 'ordinary Korean routine objects and available daylight',
+    },
+    'key-point': {
+      narrativeBeat: 'Reduce the problem to one memorable physical contrast',
+      camera: '70mm focused editorial crop with one defining detail',
+      emotion: 'clarity after tension',
+      subjectPosition: 'place one defining object in the middle-right zone',
+      copySafeArea: 'the left 40% of the frame',
+      realism: 'tactile material texture and plausible use marks',
+    },
+    detail: {
+      narrativeBeat: 'Prove value through a practical in-use moment and tactile detail',
+      camera: '50mm close documentary view or restrained macro detail with realistic depth of field',
+      emotion: 'confidence and practical desire',
+      subjectPosition: 'place the product interaction in the upper-right to middle-right zone',
+      copySafeArea: 'the lower-left 38% of the frame',
+      realism: 'hands, folds, crumbs, condensation, fabric, or subtle repeated-use traces',
+    },
+    stat: {
+      narrativeBeat: 'Show quiet physical evidence rather than a literal infographic',
+      camera: 'stable front-facing frame with simplified geometry and controlled depth',
+      emotion: 'trust',
+      subjectPosition: 'place a single evidence-supporting object on the right half',
+      copySafeArea: 'the left 45% of the frame',
+      realism: 'ordered but not sterile props with natural lighting falloff',
+    },
+    summary: {
+      narrativeBeat: 'Resolve the previous tension in an open, breathable lifestyle moment',
+      camera: '50mm relaxed framing with increased spatial breathing room',
+      emotion: 'relief and resolution',
+      subjectPosition: 'place the resolved moment in the lower-right or center-right zone',
+      copySafeArea: 'the upper-left 40% of the frame',
+      realism: 'natural completion cues without posed celebration',
+    },
+    'save-cta': {
+      narrativeBeat: 'End on one calm object that leaves a memorable brand afterimage',
+      camera: 'restrained still-life framing, nearly front-facing, generous quiet space',
+      emotion: 'satisfaction and low-friction action',
+      subjectPosition: 'keep one small object centered slightly above the middle',
+      copySafeArea: 'the central and lower 50% of the frame',
+      realism: 'minimal props, controlled shadow, no decorative clutter',
+    },
+  }
+  return language[role]
 }

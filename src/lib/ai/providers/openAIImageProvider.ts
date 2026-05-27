@@ -5,13 +5,9 @@ import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
 const NO_TEXT_IMAGE_INSTRUCTIONS = [
-  'BACKGROUND IMAGE ONLY.',
-  'Do not generate any readable or pseudo-readable text.',
-  'No letters, Hangul, alphabet, numbers, captions, signs, labels, posters, menus, packaging text, logos, watermarks, UI, buttons, icons, typography, handwriting, calligraphy, brand marks, or symbols.',
-  'No Korean text, no English text, no typography, no captions, no signs, no logo, no watermark, no UI text.',
-  'Leave clean empty negative space for application-rendered text later.',
-  'Empty area reserved for editable text overlay.',
-  'If the scene contains signs, books, screens, packaging, newspapers, menus, labels, or billboards, keep them blank, blurred, cropped away, or turned from the camera.',
+  'EXCLUSIONS: Background photograph only.',
+  'No readable text, branding, signage, interface elements, or typographic shapes.',
+  'Keep any printed surfaces blank or out of focus.',
 ].join(' ')
 
 export const ACTIVE_OPENAI_IMAGE_MODEL = 'gpt-image-1'
@@ -34,8 +30,8 @@ export class OpenAIImageProvider implements ImageProvider {
     options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
     const sanitizedPrompt = sanitizeImagePrompt(prompt)
-    const fullPrompt = `${sanitizedPrompt}. ${NO_TEXT_IMAGE_INSTRUCTIONS}`
-    const size = '1024x1024'
+    const fullPrompt = `${sanitizedPrompt}\n${NO_TEXT_IMAGE_INSTRUCTIONS}`
+    const size = options?.size || '1024x1536'
     const refUrls = options?.productImageUrls?.filter(Boolean) ?? []
 
     try {
@@ -52,7 +48,7 @@ export class OpenAIImageProvider implements ImageProvider {
           prompt: fullPrompt,
           size,
           output_format: 'png',
-          quality: 'low',
+          quality: 'medium',
           n: 1,
         })
 
@@ -133,7 +129,7 @@ export class OpenAIImageProvider implements ImageProvider {
       prompt,
       size,
       output_format: 'png',
-      quality: 'low',
+      quality: 'medium',
       n: 1,
     })
 
@@ -154,18 +150,22 @@ async function persistImageUrl(url: string | undefined): Promise<string> {
     if (!res.ok) return url
     const arrayBuffer = await res.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    const contentType = res.headers.get('content-type') || 'image/png'
-    const ext = contentType.split('/')[1]?.split('+')[0] || 'png'
+    const contentType = normalizeGeneratedImageContentType(res.headers.get('content-type'))
+    const ext = contentType === 'image/jpeg' ? 'jpeg' : 'png'
     const fileName = `dalle-bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
     return await uploadGeneratedAsset({
       fileName,
       content: buffer,
-      contentType: contentType as any,
+      contentType,
     })
   } catch (err) {
     console.error('[OpenAIImageProvider] Failed to persist image:', err)
     return url
   }
+}
+
+function normalizeGeneratedImageContentType(value: string | null): 'image/png' | 'image/jpeg' {
+  return value?.toLowerCase().startsWith('image/jpeg') ? 'image/jpeg' : 'image/png'
 }
 
 async function persistBase64Image(b64Json: string | undefined): Promise<string> {

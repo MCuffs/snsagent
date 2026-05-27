@@ -11,121 +11,38 @@ export interface ImageProvider {
 export function sanitizeImagePrompt(prompt: string): string {
   if (!prompt) return ''
 
-  let sanitized = prompt
+  const unquoted = prompt
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/'[^']*'/g, ' ')
+    .replace(/“[^”]*”/g, ' ')
+    .replace(/‘[^’]*’/g, ' ')
 
-  // 1. Strip quoted text
-  sanitized = sanitized.replace(/"[^"]*"/g, ' ')
-  sanitized = sanitized.replace(/'[^']*'/g, ' ')
-  sanitized = sanitized.replace(/“[^”]*”/g, ' ')
-  sanitized = sanitized.replace(/‘[^’]*’/g, ' ')
-
-  // 2. Strip Korean characters (Hangul)
-  sanitized = sanitized.replace(/[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f\ua960-\ua97f\ud7b0-\ud7ff]+/g, ' ')
-
-  const forbiddenWords = [
-    'text',
-    'headline',
-    'caption',
-    'title',
-    'words',
-    'letters',
-    'typography',
-    'signage',
-    'sign',
-    'poster',
-    'menu',
-    'label',
-    'logo',
-    'watermark',
-    'ui',
-    'writing',
-    'calligraphy',
-    'handwriting',
-    '문구',
-    '제목',
-    '텍스트',
-    '카피'
-  ]
-
-  // Split into clauses by comma, period, or semicolon
-  const clauses = sanitized.split(/([,.;\n]+)/)
-  const processedClauses = clauses.map(clause => {
-    if (/^[,.;\n]+$/.test(clause)) return clause
-    
-    const trimmed = clause.trim()
-    if (!trimmed) return ''
-
-    // Check if it contains any forbidden word
-    const containingWord = forbiddenWords.find(word => trimmed.toLowerCase().includes(word))
-    if (containingWord) {
-      // Check if it is a negative instruction context
-      const isNegative = /^(no|without|never|avoid|empty|clean|do\s+not|don't|free|blank|ignore|never\s+render)\b/i.test(trimmed) || 
-                         /\b(no|without|never|avoid|empty|clean|free|blank)\b/i.test(trimmed)
-      
-      if (!isNegative) {
-        return ''
-      }
-    }
-    return clause
-  })
-
-  sanitized = processedClauses.join('')
-
-  // 3. Enforce background only if not already present
-  if (!sanitized.toLowerCase().includes('background only') && !sanitized.toLowerCase().includes('no text')) {
-    sanitized = `${sanitized}, clean background only, no text`
-  }
-
-  // Clean up whitespace and duplicate commas
-  sanitized = sanitized
-    .replace(/\s+/g, ' ')
-    .replace(/,\s*,/g, ',')
-    .replace(/^,\s*/, '')
-    .replace(/,\s*$/, '')
+  const sanitized = unquoted
+    .split(/\n+|,\s+|;\s+/)
+    .map(line => line.trim())
+    .filter(line => line && !requestsRenderedTypography(line))
+    .join('\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-  return sanitized
+  return sanitized || 'BACKGROUND-ONLY PHOTOGRAPH.'
 }
 
 export function isPromptAllowed(prompt: string): boolean {
-  if (!prompt) return true
-  const lowercasePrompt = prompt.toLowerCase()
-  
-  const forbiddenWords = [
-    'text',
-    'headline',
-    'caption',
-    'title',
-    'words',
-    'letters',
-    'korean typography',
-    'typography',
-    '문구',
-    '제목',
-    '텍스트',
-    '카피'
-  ]
+  return !prompt.split(/\n+|,\s+|;\s+/).some(line => requestsRenderedTypography(line))
+}
 
-  if (!forbiddenWords.some(word => lowercasePrompt.includes(word))) {
-    return true
-  }
+function requestsRenderedTypography(line: string) {
+  const normalized = line.toLowerCase()
+  const isConstraint = /\b(no|without|avoid|blank|empty|background-only|background only|later|reserved|reserve|application|app-rendered|out of focus)\b/i.test(normalized)
+    || /(금지|제외|비워|배경만|나중|앱에서)/.test(line)
+  if (isConstraint) return false
 
-  const clauses = lowercasePrompt.split(/[,.;\n]+/)
-  
-  for (const clause of clauses) {
-    const trimmed = clause.trim()
-    if (!trimmed) continue
-    
-    const containingWord = forbiddenWords.find(word => trimmed.includes(word))
-    if (containingWord) {
-      const isNegative = /^(no|without|never|avoid|empty|clean|do\s+not|don't|free|blank|ignore|never\s+render)\b/i.test(trimmed) || 
-                         /\b(no|without|never|avoid|empty|clean|free|blank)\b/i.test(trimmed)
-      
-      if (!isNegative) {
-        return false
-      }
-    }
-  }
+  const visualText = /\b(text|headline|caption|title|letters?|typography|logo|watermark|label|signage|button|ui)\b/i.test(normalized)
+    || /(텍스트|문구|제목|카피|로고|워터마크|버튼)/.test(line)
+  const renderAction = /\b(add|render|write|display|show|include|insert|overlay|place|print|feature)\b/i.test(normalized)
+    || /(넣|표시|작성|삽입|합성|보여)/.test(line)
 
-  return true
+  return visualText && renderAction
 }

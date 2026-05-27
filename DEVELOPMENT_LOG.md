@@ -344,3 +344,24 @@ This file records meaningful development work, fixes, verification commands, and
 - `npm run build` passed with Next.js `16.2.6`.
 - Confirmed that Git pushes are classified correctly as Preview for `dev` and Production for `main`.
 - The first Git-triggered deployments were blocked because commit email `mcuffs@github.com` is not associated with a GitHub user; after switching to the repository's GitHub noreply identity, the subsequent `dev` Preview Git build reached `Ready`.
+
+## 2026-05-27 KST - Editorial Image Prompt Architecture Upgrade
+
+### Summary
+- Replaced the flat image prompt stack with a hierarchy-driven Korean editorial visual brief for media carousel backgrounds.
+- Aligned generated image orientation with the 1080x1350 renderer by switching media image calls to portrait generation.
+
+### Changes
+- Compiles prompts in priority order: contract, primary scene, camera/emotion, crop-safe composition, translated brand materials, and Korean realism.
+- Added role-specific camera and whitespace behavior for hook, context, key-point, detail, stat, summary, and save-CTA slides.
+- Translates abstract brand DNA into concrete material, lighting, color-accent, styling, and environment cues instead of injecting raw brand prose.
+- Reduced repeated negative prompting to a concise provider-level background-only exclusion contract.
+- Preserves Korean scene context in prompt sanitation while removing explicit requests to render text, logos, watermarks, or UI.
+- Uses `1024x1536` image generation for media cards and their regeneration flows, with `medium` quality and 4:5 crop-safe quality validation.
+- Removed an unsafe MIME type cast while persisting generated PNG/JPEG assets.
+
+### Verification
+- `npx eslint 'src/lib/layout/brandHarness.ts' 'src/lib/layout/visualDirectionEngine.ts' 'src/lib/layout/mediaCardHarness.ts' 'src/lib/layout/mediaCarouselPipeline.ts' 'src/lib/layout/mediaCardPipeline.ts' 'src/lib/layout/qualityCheck.ts' 'src/lib/ai/imageProvider.ts' 'src/lib/ai/providers/openAIImageProvider.ts' 'app/actions.ts'` passed.
+- `npx tsc --noEmit --pretty false` passed.
+- `git diff --check` passed.
+- `npm run build` passed with Next.js `16.2.6`.
