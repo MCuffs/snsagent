@@ -37,8 +37,7 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`
+    await prisma.$executeRawUnsafe(`
         ALTER TABLE "User"
           ADD COLUMN IF NOT EXISTS "paypalSubscriptionId" TEXT,
           ADD COLUMN IF NOT EXISTS "paypalSubscriptionStatus" TEXT,
@@ -53,25 +52,25 @@ export async function POST(request: NextRequest) {
           ADD COLUMN IF NOT EXISTS "tossLastPaidAt" TIMESTAMP(3),
           ADD COLUMN IF NOT EXISTS "tossCanceledAt" TIMESTAMP(3);
       `);
-      for (const field of [
-        "paypalSubscriptionId",
-        "naverpayRecurrentId",
-        "tossCustomerKey",
-        "tossBillingKey",
-        "tossPaymentKey",
-        "tossLastOrderId",
-      ]) {
-        await tx.$executeRawUnsafe(
-          `CREATE UNIQUE INDEX IF NOT EXISTS "User_${field}_key" ON "User"("${field}");`,
-        );
-      }
-      await tx.$executeRawUnsafe(`
+    for (const field of [
+      "paypalSubscriptionId",
+      "naverpayRecurrentId",
+      "tossCustomerKey",
+      "tossBillingKey",
+      "tossPaymentKey",
+      "tossLastOrderId",
+    ]) {
+      await prisma.$executeRawUnsafe(
+        `CREATE UNIQUE INDEX IF NOT EXISTS "User_${field}_key" ON "User"("${field}");`,
+      );
+    }
+    await prisma.$executeRawUnsafe(`
         ALTER TABLE "Brand"
           ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT,
           ADD COLUMN IF NOT EXISTS "brandDna" TEXT,
           ADD COLUMN IF NOT EXISTS "editorPreferences" TEXT;
       `);
-      await tx.$executeRawUnsafe(`
+    await prisma.$executeRawUnsafe(`
         ALTER TABLE "Campaign"
           ADD COLUMN IF NOT EXISTS "agentReport" TEXT,
           ADD COLUMN IF NOT EXISTS "imageModel" TEXT,
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
           ADD COLUMN IF NOT EXISTS "regenerationImageCount" INTEGER NOT NULL DEFAULT 0,
           ADD COLUMN IF NOT EXISTS "lastRegenerationImageModel" TEXT;
       `);
-      await tx.$executeRawUnsafe(`
+    await prisma.$executeRawUnsafe(`
         ALTER TABLE "CarouselSlide"
           ADD COLUMN IF NOT EXISTS "backgroundImageUrl" TEXT,
           ADD COLUMN IF NOT EXISTS "fontPreset" TEXT,
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
           ADD COLUMN IF NOT EXISTS "bodyFontSize" INTEGER,
           ADD COLUMN IF NOT EXISTS "editorDocument" TEXT;
       `);
-      await tx.$executeRawUnsafe(`
+    await prisma.$executeRawUnsafe(`
         ALTER TABLE "InstagramAccount"
           ADD COLUMN IF NOT EXISTS "facebookPageId" TEXT,
           ADD COLUMN IF NOT EXISTS "pageAccessTokenEncrypted" TEXT,
@@ -97,8 +96,6 @@ export async function POST(request: NextRequest) {
           ADD COLUMN IF NOT EXISTS "profilePictureUrl" TEXT,
           ADD COLUMN IF NOT EXISTS "connectionMethod" TEXT NOT NULL DEFAULT 'manual';
       `);
-    });
-
     await prisma.user.findFirst();
     await prisma.brand.findFirst();
     await prisma.campaign.findFirst();
