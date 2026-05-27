@@ -21,6 +21,8 @@ import {
   type AgentReportItem,
   type AgentSlideData
 } from '../carousel/agents'
+import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
+import type { BrandProfile, CampaignInput } from '../carousel/types'
 
 export interface MediaCarouselInput {
   userId: string
@@ -90,7 +92,40 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   let plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
 
   // LLM copy generation — replaces rule-based placeholder copy with AI-written slide text
-  plannedSlides = await generateMediaSlideCopies(input, plannedSlides)
+  // Build knowledge context before copy generation
+  const mediaBrand: BrandProfile = {
+    id: input.brandId,
+    name: input.brandName,
+    industry: input.brandIndustry || '',
+    targetAudience: '',
+    toneOfVoice: input.brandToneOfVoice || '',
+    mainColor: input.brandMainColor || '',
+    forbiddenWords: input.brandForbiddenWords || '',
+    ctaStyle: input.brandCtaStyle || '',
+    brandDna: input.brandDna,
+  }
+  const mediaCampaignInput: CampaignInput = {
+    productName: input.topic,
+    productDescription: input.keyContent,
+    keyBenefits: input.category,
+    objective: input.objective || input.contentType,
+    slideCount: input.slideCount,
+    productImageUrls: input.productImageUrls || [],
+  }
+  const knowledgeCtx = buildCopyKnowledgeContext({
+    brand: mediaBrand,
+    input: mediaCampaignInput,
+    strategy: {
+      strategyType: 'problem_solution',
+      targetEmotion: '',
+      contentGoal: '',
+      angle: '',
+      recommendedSlideCount: input.slideCount,
+      reason: '',
+    },
+  })
+
+  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, knowledgeCtx)
 
   const brandHarnessPrompt = buildBrandHarnessPrompt({
     brandName: input.brandName,
@@ -164,95 +199,103 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   let hasFallbackImage = false
 
   // 5. Render slides and evaluate quality metrics
-  for (const slide of agentSlides) {
-    const layout = LAYOUT_DEFINITIONS[slide.layoutType as LayoutType] || LAYOUT_DEFINITIONS['dark-editorial']
-    const typographyPlan = planTypography({
-      headline: slide.headline,
-      body: slide.body,
-      category: input.category,
-      layout,
-      brandMainColor: input.brandMainColor,
-    })
-    const harness = applyMediaCardHarness({
-      layout,
-      typography: typographyPlan,
-      slideNumber: slide.slideNumber,
-      totalSlides: slideCount,
-      role: slide.role as MediaSlideRole,
-    })
-    const visualDirection = generateVisualDirection({
-      layout: harness.layout,
-      category: input.category,
-      topic: input.topic,
-      tone: input.tone,
-      visualHint: input.visualHint,
-      brandMainColor: input.brandMainColor,
-      brandToneOfVoice: input.brandToneOfVoice,
-      brandIndustry: input.brandIndustry,
-      brandDna: input.brandDna,
-    })
-
-    const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
-
-    let backgroundImageUrl = ''
-    try {
-      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
-        size: '1024x1024',
-        productImageUrls: input.productImageUrls || [],
+  const slideResults = await Promise.all(
+    agentSlides.map(async (slide) => {
+      const layout = LAYOUT_DEFINITIONS[slide.layoutType as LayoutType] || LAYOUT_DEFINITIONS['dark-editorial']
+      const typographyPlan = planTypography({
+        headline: slide.headline,
+        body: slide.body,
+        category: input.category,
+        layout,
+        brandMainColor: input.brandMainColor,
       })
-      backgroundImageUrl = background.imageUrl
-    } catch (err) {
-      console.error('[MediaCarouselPipeline] Background image generation failed', err)
-      hasFallbackImage = true
-      // Use mock image fallback
-      const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
-      backgroundImageUrl = fallbackImage.imageUrl
-    }
+      const harness = applyMediaCardHarness({
+        layout,
+        typography: typographyPlan,
+        slideNumber: slide.slideNumber,
+        totalSlides: slideCount,
+        role: slide.role as MediaSlideRole,
+      })
+      const visualDirection = generateVisualDirection({
+        layout: harness.layout,
+        category: input.category,
+        topic: input.topic,
+        tone: input.tone,
+        visualHint: input.visualHint,
+        brandMainColor: input.brandMainColor,
+        brandToneOfVoice: input.brandToneOfVoice,
+        brandIndustry: input.brandIndustry,
+        brandDna: input.brandDna,
+      })
 
-    analyzeReferencePattern({
-      layoutType: harness.layout.layoutType,
-      headlineLength: slide.headline.length,
-      bodyLength: slide.body.length,
-      hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
-    })
+      const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
 
-    const baseSlideQualityCheck = runMediaCardQualityCheck({
-      layout: harness.layout,
-      typography: harness.typography,
-      headline: slide.headline,
-      body: slide.body,
-      backgroundImageUrl,
-      designPrompt: `${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`,
-      harnessDiagnostics: harness.diagnostics,
+      let backgroundImageUrl = ''
+      let slideFallback = false
+      try {
+        const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
+          size: '1024x1024',
+          productImageUrls: input.productImageUrls || [],
+        })
+        backgroundImageUrl = background.imageUrl
+      } catch (err) {
+        console.error('[MediaCarouselPipeline] Background image generation failed', err)
+        slideFallback = true
+        const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
+        backgroundImageUrl = fallbackImage.imageUrl
+      }
+
+      analyzeReferencePattern({
+        layoutType: harness.layout.layoutType,
+        headlineLength: slide.headline.length,
+        bodyLength: slide.body.length,
+        hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
+      })
+
+      const baseSlideQualityCheck = runMediaCardQualityCheck({
+        layout: harness.layout,
+        typography: harness.typography,
+        headline: slide.headline,
+        body: slide.body,
+        backgroundImageUrl,
+        designPrompt: `${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`,
+        harnessDiagnostics: harness.diagnostics,
+      })
+      const slideQualityCheck = checkBrandFit({
+        headline: slide.headline,
+        body: slide.body,
+        designPrompt: sanitizedVisualPrompt,
+        brandDna: input.brandDna,
+        qualityCheck: baseSlideQualityCheck,
+      })
+
+      const finalImageUrl = await renderMediaCard({
+        id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
+        layout: harness.layout,
+        typography: harness.typography,
+        overlay: harness.overlay,
+        category: input.category,
+        headline: slide.headline,
+        body: slide.body,
+        backgroundImageUrl,
+        source: input.source || input.brandName,
+        pageNumber: slide.slideNumber,
+        totalPages: slideCount,
+      })
+
+      console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
+
+      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback }
     })
-    const slideQualityCheck = checkBrandFit({
-      headline: slide.headline,
-      body: slide.body,
-      designPrompt: sanitizedVisualPrompt,
-      brandDna: input.brandDna,
-      qualityCheck: baseSlideQualityCheck,
-    })
+  )
+
+  for (const result of slideResults) {
+    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback } = result
+    if (slideFallback) hasFallbackImage = true
 
     // Feed slide diagnostics to Quality Agent
     slide.diagnostics = slideQualityCheck.issues
     slide.backgroundImageUrl = backgroundImageUrl
-
-    const finalImageUrl = await renderMediaCard({
-      id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
-      layout: harness.layout,
-      typography: harness.typography,
-      overlay: harness.overlay,
-      category: input.category,
-      headline: slide.headline,
-      body: slide.body,
-      backgroundImageUrl,
-      source: input.source || input.brandName,
-      pageNumber: slide.slideNumber,
-      totalPages: slideCount,
-    })
-
-    // [DEBUG LOGGING]
-    console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
 
     slides.push({
       slideNumber: slide.slideNumber,
@@ -332,7 +375,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   }
 }
 
-async function generateMediaSlideCopies(input: MediaCarouselInput, slides: MediaSlidePlan[]): Promise<MediaSlidePlan[]> {
+async function generateMediaSlideCopies(input: MediaCarouselInput, slides: MediaSlidePlan[], knowledgeCtx?: ReturnType<typeof buildCopyKnowledgeContext>): Promise<MediaSlidePlan[]> {
   const client = getLLMClient()
 
   const slideDescriptions = slides
@@ -345,6 +388,14 @@ async function generateMediaSlideCopies(input: MediaCarouselInput, slides: Media
     ? `\n브랜드 DNA (카피에 반드시 반영):\n${formatBrandDnaForPrompt(input.brandDna)}\n`
     : ''
 
+  const knowledgeSection = knowledgeCtx
+    ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
+    : ''
+
+  const systemPrompt = knowledgeCtx
+    ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+    : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 브랜드 정보:
@@ -352,7 +403,7 @@ async function generateMediaSlideCopies(input: MediaCarouselInput, slides: Media
 - 업종: ${input.brandIndustry || '미지정'}
 - 톤앤매너: ${input.brandToneOfVoice || '전문적이고 신뢰감 있게'}
 - 금지어: ${input.brandForbiddenWords || '없음'}
-${brandDnaSection}
+${brandDnaSection}${knowledgeSection}
 콘텐츠 기획:
 - 주제(상품): ${input.topic}
 - 캠페인 목표: ${input.objective || input.contentType}
@@ -393,7 +444,7 @@ JSON 응답 형식:
     {
       model: getCopywritingModel(),
       temperature: 0.35,
-      systemPrompt: '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.',
+      systemPrompt,
     }
   )
 

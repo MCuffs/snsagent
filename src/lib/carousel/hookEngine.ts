@@ -1,6 +1,8 @@
 import { getLLMClient } from '../ai/llmClient'
 import { parseBrandDna } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, ContentStrategy, HookCandidate, HookType } from './types'
+import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
+import { buildHookPromptSection, rankHooksByPattern } from '../copywriting/hookPatternEngine'
 
 const FALLBACK_HOOKS: { text: string; type: HookType; baseScore: number }[] = [
   { text: '사기 전에 꼭 보세요', type: 'curiosity', baseScore: 92 },
@@ -13,7 +15,8 @@ const FALLBACK_HOOKS: { text: string; type: HookType; baseScore: number }[] = [
 export async function generateHooks(
   brand: BrandProfile,
   input: CampaignInput,
-  strategy: ContentStrategy
+  strategy: ContentStrategy,
+  knowledgeCtx?: CopyKnowledgeContext
 ): Promise<HookCandidate[]> {
   const client = getLLMClient()
   const dna = parseBrandDna(brand.brandDna)
@@ -25,6 +28,10 @@ export async function generateHooks(
     ? `\n브랜드 차별점 (comparison/benefit 훅 작성 시 반영하세요):\n${dna.differentiators.map(d => `- ${d}`).join('\n')}\n`
     : ''
 
+  const hookPatternSection = knowledgeCtx
+    ? `\n${buildHookPromptSection(knowledgeCtx)}\n`
+    : ''
+
   const prompt = `한국 인스타그램 카드뉴스 첫 슬라이드에 사용할 훅 문구를 5개 생성해주세요.
 
 브랜드: ${brand.name} (${brand.industry})
@@ -34,7 +41,7 @@ export async function generateHooks(
 핵심 혜택: ${input.keyBenefits}
 캠페인 목표: ${input.objective}
 콘텐츠 전략: ${strategy.strategyType} — ${strategy.angle}
-${painSection}${diffSection}
+${painSection}${diffSection}${hookPatternSection}
 훅 조건:
 - 반드시 20자 이하 (공백 포함)
 - 스크롤을 멈추게 하는 강렬한 첫 문장
@@ -74,9 +81,13 @@ JSON 응답 형식:
 
   const generatedHooks = Array.isArray(result?.hooks) ? result.hooks : []
 
-  return generatedHooks
-    .map(hook => ({ ...hook, text: fitTwentyChars(hook.text) }))
-    .sort((a, b) => b.score - a.score)
+  const trimmed = generatedHooks.map(hook => ({ ...hook, text: fitTwentyChars(hook.text) }))
+
+  // Use knowledge-aware ranking if context is available, otherwise fall back to score sort
+  if (knowledgeCtx) {
+    return rankHooksByPattern(trimmed, knowledgeCtx)
+  }
+  return trimmed.sort((a, b) => b.score - a.score)
 }
 
 export function selectBestHook(hooks: HookCandidate[]): HookCandidate {
@@ -101,3 +112,4 @@ function scoreBoost(hookType: HookType, strategyType: ContentStrategy['strategyT
 function fitTwentyChars(text: string) {
   return text.length > 20 ? text.slice(0, 20) : text
 }
+

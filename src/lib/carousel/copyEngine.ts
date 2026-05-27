@@ -1,6 +1,10 @@
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, HookCandidate, SlideRole, SlideCopy } from './types'
+import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
+import { formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
+import { checkCopyQuality } from '../copywriting/copyQualityChecker'
+import { buildNarrativeTransitionInstructions } from '../copywriting/slideNarrativeEngine'
 
 const BANNED_CLICHES = ['혁신적인', '최고의', '완벽한']
 
@@ -8,7 +12,8 @@ export async function generateSlideCopies(
   brand: BrandProfile,
   input: CampaignInput,
   structure: CarouselStructure,
-  selectedHook: HookCandidate
+  selectedHook: HookCandidate,
+  knowledgeCtx?: CopyKnowledgeContext
 ): Promise<SlideCopy[]> {
   const client = getLLMClient()
 
@@ -20,6 +25,18 @@ export async function generateSlideCopies(
     ? `\n브랜드 DNA (반드시 카피에 반영할 핵심 인사이트):\n${formatBrandDnaForPrompt(brand.brandDna)}\n`
     : ''
 
+  const knowledgeSection = knowledgeCtx
+    ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
+    : ''
+
+  const narrativeSection = knowledgeCtx
+    ? `\n${buildNarrativeTransitionInstructions(knowledgeCtx.narrativeArc, structure.slides)}\n`
+    : ''
+
+  const systemPrompt = knowledgeCtx
+    ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 입력 자료에서 확인할 수 없는 수치를 만들지 말고, 유효한 JSON으로만 응답하세요.`
+    : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 입력 자료에서 확인할 수 없는 사실이나 수치를 만들지 말고, 일관된 슬라이드 흐름을 가진 유효한 JSON으로만 응답하세요.'
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 브랜드 정보:
@@ -28,7 +45,7 @@ export async function generateSlideCopies(
 - 타겟 고객: ${brand.targetAudience}
 - 어조: ${brand.toneOfVoice}
 - 금지어: ${brand.forbiddenWords || '없음'}
-${brandDnaSection}
+${brandDnaSection}${knowledgeSection}
 상품 정보:
 - 상품명: ${input.productName}
 - 상품 설명: ${input.productDescription}
@@ -39,7 +56,7 @@ ${brandDnaSection}
 
 슬라이드 구성:
 ${slideDescriptions}
-
+${narrativeSection}
 규칙:
 - headline: 반드시 20자 이하, 강렬하고 구체적으로 (공백 포함)
 - body: 반드시 60자 이하, 핵심 메시지 전달 (공백 포함)
@@ -71,20 +88,39 @@ JSON 응답 형식:
     {
       model: getCopywritingModel(),
       temperature: 0.35,
-      systemPrompt: '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 입력 자료에서 확인할 수 없는 사실이나 수치를 만들지 말고, 일관된 슬라이드 흐름을 가진 유효한 JSON으로만 응답하세요.',
+      systemPrompt,
     }
   )
 
   const generatedSlides = Array.isArray(result?.slides) ? result.slides : []
   const slidesMap = new Map(generatedSlides.map(s => [s.slideNumber, s]))
 
-  return structure.slides
+  const cleaned = structure.slides
     .map(slide => {
       const fallback = generateFallbackCopy(brand, input, slide.slideNumber, slide.role, selectedHook)
       const generated = slidesMap.get(slide.slideNumber)
       const copy = isGroundedCopy(generated, input) ? generated : fallback
-      return cleanCopy(brand, copy)
+      return cleanCopy(brand, copy, knowledgeCtx)
     })
+
+  // Run copy quality check — replace block-severity slides with fallback
+  if (knowledgeCtx) {
+    const report = checkCopyQuality(cleaned, knowledgeCtx, structure.slides)
+    const blockSlides = new Set(
+      report.issues.filter(i => i.severity === 'block').map(i => i.slideNumber)
+    )
+    if (blockSlides.size > 0) {
+      return cleaned.map(copy => {
+        if (blockSlides.has(copy.slideNumber)) {
+          const role = structure.slides.find(s => s.slideNumber === copy.slideNumber)?.role ?? 'feature'
+          return cleanCopy(brand, generateFallbackCopy(brand, input, copy.slideNumber, role, selectedHook), knowledgeCtx)
+        }
+        return copy
+      })
+    }
+  }
+
+  return cleaned
 }
 
 function isGroundedCopy(copy: SlideCopy | undefined, input: CampaignInput): copy is SlideCopy {
@@ -130,15 +166,19 @@ function firstBenefit(keyBenefits: string) {
   return keyBenefits.split(',').map(item => item.trim()).filter(Boolean)[0] || '필요한 기능'
 }
 
-function cleanCopy(brand: BrandProfile, copy: SlideCopy): SlideCopy {
+function cleanCopy(brand: BrandProfile, copy: SlideCopy, knowledgeCtx?: CopyKnowledgeContext): SlideCopy {
   const forbiddenWords = brand.forbiddenWords
     .split(',')
     .map(word => word.trim())
     .filter(Boolean)
 
+  const allBanned = knowledgeCtx
+    ? [...new Set([...forbiddenWords, ...BANNED_CLICHES, ...knowledgeCtx.resolvedBannedPhrases])]
+    : [...forbiddenWords, ...BANNED_CLICHES]
+
   const clean = (text: string, limit: number) => {
     let result = text
-    for (const word of [...forbiddenWords, ...BANNED_CLICHES]) {
+    for (const word of allBanned) {
       result = result.replaceAll(word, '')
     }
     return result.trim().slice(0, limit)

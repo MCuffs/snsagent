@@ -10,6 +10,7 @@ import { renderSlide } from './renderer'
 import { generateStrategy } from './strategyEngine'
 import { generateStructure } from './structureEngine'
 import { runQualityCheck } from './qualityCheckEngine'
+import { buildCopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -48,8 +49,14 @@ export async function generateCarouselCampaign(params: {
     )
     log('Strategy generated')
 
+    const knowledgeCtx = buildCopyKnowledgeContext({
+      brand: params.brandProfile,
+      input: params.campaignInput,
+      strategy,
+    })
+
     const hooks = await runStep('Hook generation', () =>
-      generateHooks(params.brandProfile, params.campaignInput, strategy)
+      generateHooks(params.brandProfile, params.campaignInput, strategy, knowledgeCtx)
     )
     log('Hooks generated')
 
@@ -62,7 +69,7 @@ export async function generateCarouselCampaign(params: {
     log('Structure generated')
 
     const copies = await runStep('Slide copy generation', () =>
-      generateSlideCopies(params.brandProfile, params.campaignInput, structure, selectedHook)
+      generateSlideCopies(params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx)
     )
     log('Slide copies generated')
 
@@ -139,66 +146,71 @@ export async function generateCarouselCampaign(params: {
 
     const imageProvider = getPipelineImageProvider()
     const campaignKey = `cg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const slides: GeneratedSlide[] = []
 
-    for (const copy of copies) {
-      const design = designPrompts.find(item => item.slideNumber === copy.slideNumber)
-      if (!design) {
-        throw new Error(`Design prompt missing for slide ${copy.slideNumber}`)
-      }
+    const [slideResults, captionResult] = await Promise.all([
+      Promise.all(
+        copies.map(async (copy) => {
+          const design = designPrompts.find(item => item.slideNumber === copy.slideNumber)
+          if (!design) {
+            throw new Error(`Design prompt missing for slide ${copy.slideNumber}`)
+          }
 
-      const sanitizedPrompt = sanitizeImagePrompt(design.backgroundPrompt)
-      let backgroundImageUrl = ''
-      try {
-        const image = await imageProvider.generateImage(sanitizedPrompt, {
-          size: '1024x1024',
-          productImageUrls: params.campaignInput.productImageUrls,
+          const sanitizedPrompt = sanitizeImagePrompt(design.backgroundPrompt)
+          let backgroundImageUrl = ''
+          try {
+            const image = await imageProvider.generateImage(sanitizedPrompt, {
+              size: '1024x1024',
+              productImageUrls: params.campaignInput.productImageUrls,
+            })
+            backgroundImageUrl = image.imageUrl
+          } catch (error) {
+            imageFallbackUsed = true
+            log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
+            const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
+            backgroundImageUrl = fallbackImage.imageUrl
+            console.error('[CarouselPipeline] Image generation error', error)
+          }
+
+          design.backgroundPrompt = sanitizedPrompt
+
+          const finalImageUrl = await renderSlide({
+            campaignKey,
+            brand: params.brandProfile,
+            copy,
+            design,
+            backgroundImageUrl,
+            showSlideNumber: true,
+          })
+
+          console.log(`[DEBUG] Slide ${copy.slideNumber} - Background Prompt: "${sanitizedPrompt}" | Headline: "${copy.headline}" | Body: "${copy.body}" | Final Image URL: "${finalImageUrl}"`)
+
+          return { copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }
         })
-        backgroundImageUrl = image.imageUrl
-      } catch (error) {
-        imageFallbackUsed = true
-        log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
-        const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
-        backgroundImageUrl = fallbackImage.imageUrl
-        console.error('[CarouselPipeline] Image generation error', error)
-      }
+      ),
+      runStep('Caption generation', () =>
+        generateCaption(params.brandProfile, params.campaignInput, strategy, selectedHook)
+      ),
+    ])
 
-      // Sync sanitized prompt back to design object for renderer
-      design.backgroundPrompt = sanitizedPrompt
-
-      const finalImageUrl = await renderSlide({
-        campaignKey,
-        brand: params.brandProfile,
-        copy,
-        design,
-        backgroundImageUrl,
-        showSlideNumber: true,
+    const slides: GeneratedSlide[] = slideResults
+      .sort((a, b) => a.copy.slideNumber - b.copy.slideNumber)
+      .map(({ copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }) => {
+        const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
+        if (matchingAgentSlide) {
+          matchingAgentSlide.backgroundImageUrl = backgroundImageUrl
+        }
+        return {
+          slideNumber: copy.slideNumber,
+          headline: copy.headline,
+          body: copy.body,
+          designPrompt: sanitizedPrompt,
+          backgroundImageUrl,
+          finalImageUrl,
+        }
       })
 
-      // [DEBUG LOGGING]
-      console.log(`[DEBUG] Slide ${copy.slideNumber} - Background Prompt: "${sanitizedPrompt}" | Headline: "${copy.headline}" | Body: "${copy.body}" | Final Image URL: "${finalImageUrl}"`)
-
-      // Sync background url to agent slides for diagnostics
-      const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
-      if (matchingAgentSlide) {
-        matchingAgentSlide.backgroundImageUrl = backgroundImageUrl
-      }
-
-      slides.push({
-        slideNumber: copy.slideNumber,
-        headline: copy.headline,
-        body: copy.body,
-        designPrompt: sanitizedPrompt,
-        backgroundImageUrl,
-        finalImageUrl,
-      })
-    }
     log('Images generated')
     log('Slides rendered')
-
-    const captionResult = await runStep('Caption generation', () =>
-      generateCaption(params.brandProfile, params.campaignInput, strategy, selectedHook)
-    )
     log('Caption generated')
 
     qualityCheck = await runStep('Quality check', () =>
