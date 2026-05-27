@@ -321,3 +321,24 @@ This file records meaningful development work, fixes, verification commands, and
 ### Verification
 - `npm run build` passed with the Vercel Prisma engine included.
 - The protected runtime recovery request returned HTTP `200` after applying schema changes and verifying current Prisma reads for `User`, `Brand`, `Campaign`, and `CarouselSlide`.
+
+## 2026-05-27 KST - Vercel Pro Git Integration Normalization
+
+### Summary
+- Upgraded the deployment path from the Vercel Hobby workaround to the supported Vercel Pro Git Integration flow.
+- Restored `main` as the production release branch; `dev` is used for preview and validation.
+
+### Changes
+- Connected the Vercel project `snsagent` directly to `Shuffla-AI/Shuffla_SaaS`.
+- Removed `.github/workflows/vercel-dev-production.yml`; Production builds no longer depend on GitHub Actions prebuilt uploads or `VERCEL_*` deployment secrets.
+- Retained the Prisma Vercel runtime binary target and `.vercelignore` asset exclusions because they are runtime and deployment-safety settings, not Hobby routing workarounds.
+
+### Operational Policy
+- Pushes and merges to `main` trigger Production through Vercel Git Integration.
+- Pushes and pull requests from `dev` and feature branches create Preview deployments.
+- Manual CLI Production deployments are reserved for recovery or diagnosis.
+
+### Verification
+- Confirmed the Vercel project Git connection to `Shuffla-AI/Shuffla_SaaS`.
+- `git diff --check` passed.
+- `npm run build` passed with Next.js `16.2.6`.

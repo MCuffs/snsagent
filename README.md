@@ -116,17 +116,13 @@ npm run dev
 
 ## 배포
 
-현재 private 조직 저장소 `Shuffla-AI/Shuffla_SaaS`는 Vercel Hobby 프로젝트와 직접 Git 연결하지 않습니다. `.github/workflows/vercel-dev-production.yml`이 `dev` 브랜치 push를 감지해 GitHub Actions 안에서 Vercel production 설정을 pull하고, 빌드 산출물만 `snsagent` 프로젝트의 production 배포로 업로드합니다.
+Vercel Pro 프로젝트는 private 조직 저장소 `Shuffla-AI/Shuffla_SaaS`와 공식 Git Integration으로 직접 연결되어 있습니다.
 
-필요한 GitHub Actions repository secrets:
+- `main` push: Vercel Production 자동 배포 (`https://shuffla.vercel.app`)
+- `dev` 및 feature branch push/PR: Preview 배포
+- 로컬 CLI Production 배포나 GitHub Actions 기반 prebuilt 업로드는 복구 또는 진단 상황 외에는 사용하지 않습니다.
 
-| Secret | 용도 |
-| --- | --- |
-| `VERCEL_TOKEN` | Vercel CLI 배포 인증 토큰 |
-| `VERCEL_ORG_ID` | 배포 대상 Vercel 팀 ID |
-| `VERCEL_PROJECT_ID` | `snsagent` 프로젝트 ID |
-
-이 구성은 개발/시연 단계 배포를 위한 임시 경로입니다. Vercel Hobby는 비상업 개인 사용만 허용하므로 결제 제공 또는 실제 상업 운영을 시작하기 전에는 Vercel Pro 전환 또는 상업 사용이 가능한 호스팅 정책을 확정해야 합니다. 운영 전환 시에는 배포 기준 브랜치를 `main`으로 변경합니다.
+운영 배포는 `main`을 기준으로 하며, 검증된 `dev` 변경을 `main`에 병합한 뒤 Vercel 자동 배포 결과를 확인합니다.
 
 ## 검증
 
