@@ -145,10 +145,11 @@ export default async function LoginPage({
 
 function getLoginErrorMessage(error: string) {
   const map: Record<string, string> = {
-    google_config_missing: 'Google OAuth 환경변수가 설정되지 않았습니다. GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 입력하세요.',
+    google_config_missing: 'Google OAuth 환경변수가 없습니다. .env에 GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 입력한 뒤 dev 서버를 재시작하세요.',
     google_callback_invalid: 'Google 로그인 응답이 올바르지 않습니다.',
     google_state_invalid: 'Google 로그인 보안 검증에 실패했습니다. 다시 시도하세요.',
-    google_oauth_failed: 'Google 로그인 처리 중 오류가 발생했습니다.',
+    google_oauth_failed: 'Google 로그인 처리 중 오류가 발생했습니다. 로컬에서는 Google Cloud의 Authorized redirect URIs에 http://localhost:3000/api/auth/google/callback이 등록되어 있는지 확인하세요.',
+    database_unavailable: '로그인은 완료됐지만 데이터베이스에 연결할 수 없습니다. DATABASE_URL/DIRECT_URL과 DATABASE_MOCK_FALLBACK 값을 확인하고 dev 서버를 재시작하세요.',
     access_denied: 'Google 로그인이 취소되었습니다.',
   }
 

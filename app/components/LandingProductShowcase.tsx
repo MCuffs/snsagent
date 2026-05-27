@@ -279,7 +279,7 @@ export function CapabilityObjects() {
     {
       figure: <ExportFigure />,
       title: '편집과 다운로드',
-      body: '텍스트와 배경을 보정한 뒤 Instagram 4:5 결과물로 출력합니다.',
+      body: '텍스트와 배경을 보정한 뒤 4:5 고해상도 PNG/JPG 결과물로 출력합니다.',
     },
   ]
 
@@ -364,7 +364,7 @@ export function ConnectedWorkflow() {
   const stages = [
     { title: 'Concept', metric: '브랜드 DNA 분석', detail: '톤앤매너와 고객 맥락 수집', progress: '72%' },
     { title: 'Generate', metric: '5 slides ready', detail: '카피 및 이미지 렌더링', progress: '100%' },
-    { title: 'Publish', metric: 'PNG / ZIP', detail: '다운로드 준비 완료', progress: '86%' },
+    { title: 'Export', metric: 'PNG / ZIP', detail: '다운로드 준비 완료', progress: '86%' },
   ]
   const [active, setActive] = useState(1)
 

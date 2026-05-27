@@ -7,6 +7,7 @@ import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types
 import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipeline'
 import { checkCampaignUsage } from '../../../../lib/usageLimit'
 import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
+import { getUserFacingGenerationError } from '../../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -178,8 +179,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[CampaignGeneration] API generation failed', error)
     await saveErrorLog(user?.id, 'api/campaigns/generate', error, { body })
-    const message = error instanceof Error ? error.message : '카드뉴스 생성 중 오류가 발생했습니다.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: getUserFacingGenerationError(error) }, { status: 500 })
   }
 }
 

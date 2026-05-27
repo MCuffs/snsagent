@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ success?: string; canceled?: string; offer?: string }>
+  searchParams?: Promise<{ success?: string; canceled?: string; offer?: string; message?: string }>
 }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
@@ -28,6 +28,8 @@ export default async function PricingPage({
   for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
     if (value) paypalPlanIds[key] = value
   }
+  const tossClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || '').trim()
+  const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
@@ -51,7 +53,7 @@ export default async function PricingPage({
       )}
       {params.canceled && (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-800">
-          결제가 취소되었습니다.
+          {params.message || '결제가 취소되었습니다.'}
         </div>
       )}
 
@@ -61,9 +63,9 @@ export default async function PricingPage({
         hasSubscription={hasSubscription}
         paymentProvider={paymentProvider}
         userId={user.id}
-        tossClientKey={(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || '').trim()}
+        tossClientKey={tossClientKey}
         tossCustomerKey={tossCustomerKey}
-        paypalClientId={(process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()}
+        paypalClientId={paypalClientId}
         paypalPlanIds={paypalPlanIds}
         customerName={user.name}
         customerEmail={user.email}
