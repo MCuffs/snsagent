@@ -1,6 +1,7 @@
 import type { LayoutDefinition } from './layoutTypes'
 import { generateOverlay, type OverlayPlan } from './overlayEngine'
 import type { TypographyLine, TypographyPlan, TypographyToken } from './typographyEngine'
+import type { EditorialVisualDirection } from '../editorial/editorialDirector'
 
 export interface MediaCardHarnessResult {
   layout: LayoutDefinition
@@ -37,7 +38,7 @@ export function applyMediaCardHarness(input: {
   role?: string
 }): MediaCardHarnessResult {
   const template = selectArchiveTemplate(input.slideNumber, input.totalSlides, input.role)
-  const layout = enforceArchiveLayout(input.layout, template)
+  const layout = enforceArchiveLayout(input.layout, template, input.role)
   const typography = enforceArchiveTypography(input.typography, template)
   const overlay = generateOverlay(layout.overlayStyle)
   const issues = validateHarness(layout, typography)
@@ -55,7 +56,11 @@ export function applyMediaCardHarness(input: {
   }
 }
 
-export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemplate = 'product-dark') {
+export function buildHarnessedVisualPrompt(
+  prompt: string,
+  template: ArchiveTemplate = 'product-dark',
+  editorialDirection?: EditorialVisualDirection
+) {
   const templatePrompt = {
     'product-light': 'bright product archive background, object centered in upper-middle, off-white studio background, soft natural shadows, large clean empty lower area for app-rendered overlay later, subtle white fog gradient at bottom',
     'product-dark': 'muted gray product archive background, object centered in middle, subdued contrast, gray film veil, strong lower shadow, calm premium catalogue mood, clean empty lower-left area for app-rendered overlay later',
@@ -66,7 +71,9 @@ export function buildHarnessedVisualPrompt(prompt: string, template: ArchiveTemp
   return [
     templatePrompt,
     'archive style Korean editorial background photo reference',
-    'clear top negative space and lower-left overlay-safe empty area',
+    editorialDirection
+      ? `reserve clean negative space for the planned composition: ${editorialDirection.composition}; focus=${editorialDirection.focus}; whitespace=${editorialDirection.whitespaceRatio}`
+      : 'clear top negative space and lower-left overlay-safe empty area',
     'ignore any conflicting centered-title, vivid-gradient, poster, UI, or white-panel layout direction from the source prompt',
     `source visual context: ${prompt}`,
     'background image only',
@@ -86,7 +93,7 @@ function selectArchiveTemplate(slideNumber?: number, totalSlides?: number, role?
   return 'product-dark'
 }
 
-function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplate): LayoutDefinition {
+function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplate, role?: string): LayoutDefinition {
   const overlayStyle = template === 'product-light' || template === 'journal-light'
     ? 'archive-light'
     : template === 'cta-dark'
@@ -97,7 +104,7 @@ function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplat
     ...layout,
     typographyStyle: 'clean-sans',
     overlayStyle,
-    textPosition: 'bottom-left',
+    textPosition: selectRhythmPosition(role, template),
     safeArea: {
       top: 72,
       bottom: 132,
@@ -142,9 +149,6 @@ function enforceArchiveTypography(typography: TypographyPlan, template: ArchiveT
 function validateHarness(layout: LayoutDefinition, typography: TypographyPlan) {
   const issues: string[] = []
 
-  if (layout.textPosition !== 'bottom-left') {
-    issues.push('텍스트 위치가 하단 좌측 아카이브 구도가 아닙니다.')
-  }
   if (!['archive-light', 'archive-dark', 'archive-cta', 'dark-gradient'].includes(layout.overlayStyle)) {
     issues.push('회색 필름 오버레이와 하단 그림자 기준을 벗어났습니다.')
   }
@@ -162,6 +166,16 @@ function validateHarness(layout: LayoutDefinition, typography: TypographyPlan) {
   }
 
   return issues
+}
+
+function selectRhythmPosition(role: string | undefined, template: ArchiveTemplate): LayoutDefinition['textPosition'] {
+  if (role === 'hook') return 'bottom-left'
+  if (role === 'context') return 'top-left'
+  if (role === 'key-point') return 'bottom-center'
+  if (role === 'stat') return 'center'
+  if (role === 'summary') return 'top-center'
+  if (role === 'save-cta' || template === 'cta-dark') return 'center'
+  return 'left-column'
 }
 
 function rebuildHeadlineLines(typography: TypographyPlan): TypographyLine[] {

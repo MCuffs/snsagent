@@ -28,6 +28,12 @@ interface GenerateCampaignRequest {
   visualHint?: string
   source?: string
   productUrl?: string
+  brandAnalysis?: string
+  targetEmotion?: string
+  hookDirection?: string
+  recommendedCta?: string
+  reasonForStyle?: string
+  structurePreview?: { slideNumber: number; role: string; description: string }[]
 }
 
 export async function POST(request: Request) {
@@ -87,6 +93,7 @@ export async function POST(request: Request) {
         brandMainColor: brand.mainColor,
         brandToneOfVoice: brand.toneOfVoice,
         brandIndustry: brand.industry,
+        brandTargetAudience: brand.targetAudience,
         brandForbiddenWords: brand.forbiddenWords,
         brandCtaStyle: brand.ctaStyle,
         brandDna: brand.brandDna,
@@ -101,6 +108,14 @@ export async function POST(request: Request) {
         source,
         visualHint: body.visualHint,
         productImageUrls: body.productImageUrls || [],
+        briefing: {
+          brandAnalysis: body.brandAnalysis,
+          targetEmotion: body.targetEmotion,
+          hookDirection: body.hookDirection,
+          recommendedCta: body.recommendedCta,
+          reasonForStyle: body.reasonForStyle,
+          structurePreview: body.structurePreview,
+        },
       })
 
       return NextResponse.json({

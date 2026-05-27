@@ -355,6 +355,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           productUrl: readyParams.productUrl || undefined,
           visualHint: readyParams.visualHint,
           objective: readyParams.objective,
+          brandAnalysis: readyParams.brandAnalysis,
+          targetEmotion: readyParams.targetEmotion,
+          hookDirection: readyParams.hookDirection,
+          recommendedCta: readyParams.recommendedCta,
+          reasonForStyle: readyParams.reasonForStyle,
+          structurePreview: readyParams.structurePreview,
           productImageUrls,
         }),
       })

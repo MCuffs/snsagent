@@ -1,5 +1,6 @@
 import { LAYOUT_DEFINITIONS, type LayoutDefinition } from './layoutTypes'
 import { buildVisualBrandAnchors } from './brandHarness'
+import type { EditorialVisualDirection } from '../editorial/editorialDirector'
 
 export interface VisualDirectionInput {
   layout: LayoutDefinition
@@ -11,6 +12,7 @@ export interface VisualDirectionInput {
   brandToneOfVoice?: string
   brandIndustry?: string
   brandDna?: string | null
+  editorialDirection?: EditorialVisualDirection
 }
 
 export interface VisualDirection {
@@ -66,6 +68,10 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
     `tone: ${input.brandToneOfVoice || input.tone}`,
     input.visualHint ? `reference direction: ${input.visualHint}` : '',
     brandAnchors ? `brand visual anchors: ${brandAnchors}` : '',
+    input.editorialDirection ? `editorial purpose: ${input.editorialDirection.imagePurpose}` : '',
+    input.editorialDirection ? `visual focus: ${input.editorialDirection.focus}` : '',
+    input.editorialDirection ? `composition rhythm: ${input.editorialDirection.composition}, whitespace ${input.editorialDirection.whitespaceRatio}, text dominance ${input.editorialDirection.textDominance}` : '',
+    input.editorialDirection ? `emotional mood: ${input.editorialDirection.mood}` : '',
     `preferred palette: ${palette}`,
     `subject positioning: ${subjectPosition}`,
     `keep ${safeTypographyArea} area as clean dark negative space for app-rendered text overlay`,
