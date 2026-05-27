@@ -343,4 +343,4 @@ This file records meaningful development work, fixes, verification commands, and
 - `git diff --check` passed.
 - `npm run build` passed with Next.js `16.2.6`.
 - Confirmed that Git pushes are classified correctly as Preview for `dev` and Production for `main`.
-- The first Git-triggered deployments were blocked because commit email `mcuffs@github.com` is not associated with a GitHub user; future commits use the repository's GitHub noreply identity, and the Vercel owner account must connect its GitHub login before Git builds can be promoted.
+- The first Git-triggered deployments were blocked because commit email `mcuffs@github.com` is not associated with a GitHub user; after switching to the repository's GitHub noreply identity, the subsequent `dev` Preview Git build reached `Ready`.
