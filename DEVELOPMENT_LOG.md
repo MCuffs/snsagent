@@ -307,3 +307,13 @@ This file records meaningful development work, fixes, verification commands, and
 - `npx --yes prettier --check .github/workflows/vercel-dev-production.yml` passed.
 - `npm run build` passed with Next.js `16.2.6`.
 - `npm run lint` still reports two pre-existing errors in `app/(cms)/TabContext.tsx` and `src/lib/ai/providers/openAIImageProvider.ts`; these files were not changed by the deployment configuration.
+
+## 2026-05-27 KST - Production Google Login Recovery
+
+### Issue
+- Production Google OAuth failed after the GitHub Actions prebuilt deployment because Prisma Client was generated on the CI runner for `debian-openssl-3.0.x`, while the Vercel function runtime requires `rhel-openssl-3.0.x`.
+- The production schema also required verification against the currently deployed billing and editorial fields before authentication could be considered restored.
+
+### Changes
+- Added `rhel-openssl-3.0.x` to Prisma Client `binaryTargets` so Vercel runtime functions can load the query engine from GitHub Actions prebuilt deployments.
+- Added a temporary bearer-protected production recovery route to execute and verify idempotent schema additions from inside the Vercel runtime; this route is removed after recovery.
