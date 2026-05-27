@@ -8,7 +8,7 @@ export function MarketingFooter() {
         <div className="grid gap-12 md:grid-cols-[1.5fr_0.7fr_0.7fr_0.9fr]">
           <div>
             <Link href="/" className="inline-flex items-center gap-2.5 text-[19px] font-semibold tracking-[-0.05em]">
-              <Image src="/logo.svg" width={27} height={27} alt="Shuffla 로고" />
+              <Image src="/shuffla-logo-mark.png" width={30} height={30} alt="Shuffla 로고" />
               Shuffla
             </Link>
             <p className="mt-5 max-w-xs text-sm leading-7 text-[#70695f]">

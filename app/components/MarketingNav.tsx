@@ -6,7 +6,7 @@ export function MarketingNav() {
     <header className="sticky top-0 z-50 border-b border-[#ede9e2] bg-[#fbfaf7]/88 backdrop-blur-xl">
       <div className="mx-auto flex h-[68px] max-w-[1380px] items-center justify-between px-5 md:px-8">
         <Link href="/" className="flex items-center gap-2.5 text-[19px] font-semibold tracking-[-0.05em] text-[#171714] transition-opacity hover:opacity-70">
-          <Image src="/logo.svg" width={27} height={27} alt="Shuffla 로고" />
+          <Image src="/shuffla-logo-mark.png" width={30} height={30} alt="Shuffla 로고" />
           Shuffla
         </Link>
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 text-sm text-[#645e55] md:flex">

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { CreditCard, LogOut } from 'lucide-react'
 import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
@@ -20,9 +21,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           {/* Logo */}
           <div className="flex h-[60px] items-center border-b border-[#e4e4e7] px-5">
             <Link href="/concept" className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#111111]">
-                <span className="h-1.5 w-3 rounded-full bg-white" />
-              </span>
+              <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla 로고" />
               <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
             </Link>
           </div>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Mail, ShieldCheck } from 'lucide-react'
 import { getSessionUser, loginAction } from '../actions'
@@ -41,7 +42,7 @@ export default async function LoginPage({
     <main className="app-shell min-h-screen text-[#1f1512]">
       <header className="flex h-[76px] items-center justify-between border-b border-[#ece2d6] bg-[#fffdf8]/88 px-6 backdrop-blur-xl lg:px-12">
         <Link href="/" className="flex items-center gap-2 text-2xl font-black tracking-[-0.05em]">
-          <span className="h-1.5 w-7 rounded-full bg-[#ff4f0a]" />
+          <Image src="/shuffla-logo-mark.png" width={34} height={34} alt="Shuffla 로고" />
           Shuffla
         </Link>
         <Link href="/" className="flex items-center gap-2 text-sm font-black text-[#1f1512]">
