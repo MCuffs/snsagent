@@ -114,6 +114,20 @@ npm run dev
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 업로드 |
 | `CRON_SECRET` | 예약 게시 및 월 구독 청구 실행 보호 |
 
+## 배포
+
+현재 private 조직 저장소 `Shuffla-AI/Shuffla_SaaS`는 Vercel Hobby 프로젝트와 직접 Git 연결하지 않습니다. `.github/workflows/vercel-dev-production.yml`이 `dev` 브랜치 push를 감지해 GitHub Actions 안에서 Vercel production 설정을 pull하고, 빌드 산출물만 `snsagent` 프로젝트의 production 배포로 업로드합니다.
+
+필요한 GitHub Actions repository secrets:
+
+| Secret | 용도 |
+| --- | --- |
+| `VERCEL_TOKEN` | Vercel CLI 배포 인증 토큰 |
+| `VERCEL_ORG_ID` | 배포 대상 Vercel 팀 ID |
+| `VERCEL_PROJECT_ID` | `snsagent` 프로젝트 ID |
+
+이 구성은 개발/시연 단계 배포를 위한 임시 경로입니다. Vercel Hobby는 비상업 개인 사용만 허용하므로 결제 제공 또는 실제 상업 운영을 시작하기 전에는 Vercel Pro 전환 또는 상업 사용이 가능한 호스팅 정책을 확정해야 합니다. 운영 전환 시에는 배포 기준 브랜치를 `main`으로 변경합니다.
+
 ## 검증
 
-문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run lint`와 `npm run build`는 통과했으며, 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.
+문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run build`는 통과했으며, `npm run lint`에는 `app/(cms)/TabContext.tsx`와 `src/lib/ai/providers/openAIImageProvider.ts`의 기존 오류가 남아 있습니다. 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.

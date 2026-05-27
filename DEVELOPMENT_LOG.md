@@ -283,3 +283,27 @@ This file records meaningful development work, fixes, verification commands, and
 ### Operational Note
 - Deployments must run `node scripts/migrate-slide-customization.mjs` before serving this build so Prisma can select the new `CarouselSlide` document and customization fields.
 - Multi-session learned style recommendations beyond the last confirmed brand preference, motion video output and real-time collaboration remain follow-up scopes; the layer document includes metadata needed to extend toward those workflows.
+
+## 2026-05-27 KST - Repository Migration and Development Deployment
+
+### Summary
+- Migrated the current code history to the `Shuffla-AI/Shuffla_SaaS` repository.
+- Configured a CI deployment route for the `dev` branch while the Vercel project remains on the Hobby plan.
+
+### Changes
+- Preserved the previous repository history and the new organization repository's initial commit in migration commit `5b35a2d`.
+- Pushed the same migration baseline to `main` and `dev` in `Shuffla-AI/Shuffla_SaaS`.
+- Confirmed the official Vercel GitHub App is installed for the `Shuffla-AI` organization.
+- Identified that Vercel Hobby cannot directly connect an organization-owned private GitHub repository.
+- Added `.github/workflows/vercel-dev-production.yml` so a push to `dev` builds inside GitHub Actions and uploads prebuilt output to the Vercel production deployment through the CLI.
+- Configured encrypted GitHub Actions repository secrets for the Vercel token, team ID, and project ID.
+- Documented required Actions secrets and the Hobby non-commercial-use limitation in `README.md`.
+
+### Operational Note
+- The CI route intentionally treats `dev` as the current deployment branch. Before commercial operation, deployment must move to a commercially permitted plan or host and the release branch policy should return to `main`.
+
+### Verification
+- `git diff --check` passed.
+- `npx --yes prettier --check .github/workflows/vercel-dev-production.yml` passed.
+- `npm run build` passed with Next.js `16.2.6`.
+- `npm run lint` still reports two pre-existing errors in `app/(cms)/TabContext.tsx` and `src/lib/ai/providers/openAIImageProvider.ts`; these files were not changed by the deployment configuration.
