@@ -11,7 +11,9 @@ const editorialCards = [
   '/front/shuffla-editorial-05.webp',
 ]
 
-export function ProductShowcase() {
+export function ProductShowcase({ authenticated = false }: { authenticated?: boolean }) {
+  const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
+
   return (
     <section id="product" className="border-t border-[#ebe8e2] bg-[#fbfaf7] py-24 md:py-32">
       <div className="mx-auto max-w-[1380px] px-5 md:px-8">
@@ -30,6 +32,7 @@ export function ProductShowcase() {
             title="브랜드를 읽고, 콘텐츠 방향을 제안합니다"
             body="URL과 주제를 입력하면 브랜드 DNA, 타겟 고객, 콘텐츠 목적을 분석해 슬라이드별 흐름을 먼저 설계합니다."
             action="AI 기획 경험 살펴보기"
+            href={accessHref}
           >
             <DirectorMockup />
           </ShowcaseRow>
@@ -39,6 +42,7 @@ export function ProductShowcase() {
             title="생성된 결과를 바로 편집하고 완성합니다"
             body="문구, 배경 이미지, 오버레이와 타이포그래피를 조정하고 4:5 고해상도 이미지로 내려받습니다."
             action="편집 스튜디오 살펴보기"
+            href={accessHref}
           >
             <EditorMockup />
           </ShowcaseRow>
@@ -53,6 +57,7 @@ function ShowcaseRow({
   title,
   body,
   action,
+  href,
   reverse = false,
   children,
 }: {
@@ -60,6 +65,7 @@ function ShowcaseRow({
   title: string
   body: string
   action: string
+  href: string
   reverse?: boolean
   children: React.ReactNode
 }) {
@@ -72,7 +78,7 @@ function ShowcaseRow({
             {title}
           </h3>
           <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#716b63]">{body}</p>
-          <a href="/api/auth/google/start" className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-[#e95b30]">
+          <a href={href} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-[#e95b30]">
             {action} <ArrowRight className="h-4 w-4" />
           </a>
         </div>

@@ -2,6 +2,7 @@ import { MarketingNav } from '../components/MarketingNav'
 import { MarketingFooter } from '../components/MarketingFooter'
 import { Check, ArrowRight } from 'lucide-react'
 import { PRICING_PLANS } from '../../lib/limits-types'
+import { getSessionUser } from '../../lib/auth/user'
 
 export const metadata = {
     title: '요금제 — Shuffla',
@@ -102,10 +103,13 @@ const compareFeatures = [
     { feature: '결과 편집 및 다운로드', free: '✓', creator: '✓', studio: '✓' },
 ]
 
-export default function PricingPage() {
+export default async function PricingPage() {
+    const authenticated = Boolean(await getSessionUser())
+    const accessHref = authenticated ? '/billing' : '/api/auth/google/start'
+
     return (
         <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
-            <MarketingNav />
+            <MarketingNav authenticated={authenticated} />
 
             <main className="flex-1">
                 {/* HEADER */}
@@ -160,7 +164,7 @@ export default function PricingPage() {
                                         )}
                                     </div>
                                     <a
-                                        href="/api/auth/google/start"
+                                        href={accessHref}
                                         className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
                                             plan.highlight
                                                 ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
@@ -278,7 +282,7 @@ export default function PricingPage() {
                 </section>
             </main>
 
-            <MarketingFooter />
+            <MarketingFooter authenticated={authenticated} />
         </div>
     )
 }
