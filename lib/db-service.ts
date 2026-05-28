@@ -30,8 +30,8 @@ export interface User {
   nicepaySubscriptionStatus: string | null
   nicepayNextBillingAt: Date | null
   nicepayLastPaidAt: Date | null
-  nicepayLastOrderId: string | null
   nicepayCanceledAt: Date | null
+  nicepayLastOrderId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -182,12 +182,18 @@ function hydrateUser(user: StoredUser | User): User {
     tossNextBillingAt: user.tossNextBillingAt ? new Date(user.tossNextBillingAt) : null,
     tossLastPaidAt: user.tossLastPaidAt ? new Date(user.tossLastPaidAt) : null,
     tossCanceledAt: user.tossCanceledAt ? new Date(user.tossCanceledAt) : null,
-    nicepayBid: user.nicepayBid ?? null,
-    nicepaySubscriptionStatus: user.nicepaySubscriptionStatus ?? null,
-    nicepayNextBillingAt: user.nicepayNextBillingAt ? new Date(user.nicepayNextBillingAt) : null,
-    nicepayLastPaidAt: user.nicepayLastPaidAt ? new Date(user.nicepayLastPaidAt) : null,
-    nicepayLastOrderId: user.nicepayLastOrderId ?? null,
-    nicepayCanceledAt: user.nicepayCanceledAt ? new Date(user.nicepayCanceledAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayBid: (user as any).nicepayBid ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepaySubscriptionStatus: (user as any).nicepaySubscriptionStatus ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayNextBillingAt: (user as any).nicepayNextBillingAt ? new Date((user as any).nicepayNextBillingAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayLastPaidAt: (user as any).nicepayLastPaidAt ? new Date((user as any).nicepayLastPaidAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayCanceledAt: (user as any).nicepayCanceledAt ? new Date((user as any).nicepayCanceledAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayLastOrderId: (user as any).nicepayLastOrderId ?? null,
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   }
@@ -247,12 +253,7 @@ function writeMockDb(db: MockDatabase) {
 
 // Check if we should use Prisma database or Local Mock file database
 const isMock = () => {
-  if (process.env.NODE_ENV === 'production') return !process.env.DATABASE_URL
   return process.env.DATABASE_MOCK_FALLBACK === 'true' || !process.env.DATABASE_URL
-}
-
-const shouldThrowDatabaseError = () => {
-  return process.env.NODE_ENV === 'production' || process.env.DATABASE_MOCK_FALLBACK === 'false'
 }
 
 export const dbService = {
@@ -268,11 +269,11 @@ export const dbService = {
         const user = await prisma.user.findUnique({
           where: { id: userId },
         })
-        if (user) return user
+        if (user) return user as unknown as User
       } catch (err) {
         console.warn('Prisma getUser failed, falling back to mock database', err)
         await saveErrorLog(userId, 'getUser', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -287,11 +288,11 @@ export const dbService = {
       try {
         return await prisma.user.findUnique({
           where: { email },
-        })
+        }) as unknown as User
       } catch (err) {
         console.warn('Prisma getUserByEmail failed, falling back to mock database', err)
         await saveErrorLog(null, 'getUserByEmail', err, { email })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -309,11 +310,11 @@ export const dbService = {
           update: { name },
           create: { email, name, plan: 'FREE' },
         })
-        return user
+        return user as unknown as User
       } catch (err) {
         console.warn('Prisma getOrCreateUser failed, falling back to mock database', err)
         await saveErrorLog(null, 'getOrCreateUser', err, { email })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -341,8 +342,8 @@ export const dbService = {
         nicepaySubscriptionStatus: null,
         nicepayNextBillingAt: null,
         nicepayLastPaidAt: null,
-        nicepayLastOrderId: null,
         nicepayCanceledAt: null,
+        nicepayLastOrderId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -358,11 +359,11 @@ export const dbService = {
         return await prisma.user.update({
           where: { id: userId },
           data: { plan },
-        })
+        }) as unknown as User
       } catch (err) {
         console.warn('Prisma updateUserPlan failed, falling back to mock database', err)
         await saveErrorLog(userId, 'updateUserPlan', err, { plan })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -447,6 +448,46 @@ export const dbService = {
     }
   },
 
+  async updateUserNicepay(userId: string, data: {
+    nicepayBid?: string | null
+    nicepaySubscriptionStatus?: string | null
+    nicepayNextBillingAt?: Date | null
+    nicepayLastPaidAt?: Date | null
+    nicepayCanceledAt?: Date | null
+    nicepayLastOrderId?: string | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma.user as any).update({
+        where: { id: userId },
+        data,
+      })
+    } else {
+      const db = initMockDb()
+      const userIndex = db.users.findIndex(u => u.id === userId)
+      if (userIndex !== -1) {
+        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        db.users[userIndex].updatedAt = new Date()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (prisma.user as any).findMany({
+        where: {
+          nicepaySubscriptionStatus: 'ACTIVE',
+          nicepayBid: { not: null },
+          nicepayNextBillingAt: { lte: at },
+        },
+      })
+    }
+    return []
+  },
+
   async getDueTossSubscriptions(at: Date): Promise<User[]> {
     if (!isMock()) {
       return prisma.user.findMany({
@@ -456,7 +497,7 @@ export const dbService = {
           tossCustomerKey: { not: null },
           tossNextBillingAt: { lte: at },
         },
-      })
+      }) as unknown as Promise<User[]>
     }
 
     const db = initMockDb()
@@ -470,60 +511,10 @@ export const dbService = {
 
   async getUserByPayPalSubscriptionId(paypalSubscriptionId: string): Promise<User | null> {
     if (!isMock()) {
-      return prisma.user.findUnique({ where: { paypalSubscriptionId } })
+      return prisma.user.findUnique({ where: { paypalSubscriptionId } }) as unknown as Promise<User | null>
     }
     const db = initMockDb()
     return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
-  },
-
-  async updateUserNicepay(userId: string, data: {
-    nicepayBid?: string | null
-    nicepaySubscriptionStatus?: string | null
-    nicepayNextBillingAt?: Date | null
-    nicepayLastPaidAt?: Date | null
-    nicepayLastOrderId?: string | null
-    nicepayCanceledAt?: Date | null
-    plan?: string
-  }): Promise<void> {
-    if (!isMock()) {
-      await prisma.user.update({
-        where: { id: userId },
-        data,
-      })
-    } else {
-      const db = initMockDb()
-      const userIndex = db.users.findIndex(u => u.id === userId)
-      if (userIndex !== -1) {
-        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
-        if (data.nicepayBid !== undefined) db.users[userIndex].nicepayBid = data.nicepayBid
-        if (data.nicepaySubscriptionStatus !== undefined) db.users[userIndex].nicepaySubscriptionStatus = data.nicepaySubscriptionStatus
-        if (data.nicepayNextBillingAt !== undefined) db.users[userIndex].nicepayNextBillingAt = data.nicepayNextBillingAt
-        if (data.nicepayLastPaidAt !== undefined) db.users[userIndex].nicepayLastPaidAt = data.nicepayLastPaidAt
-        if (data.nicepayLastOrderId !== undefined) db.users[userIndex].nicepayLastOrderId = data.nicepayLastOrderId
-        if (data.nicepayCanceledAt !== undefined) db.users[userIndex].nicepayCanceledAt = data.nicepayCanceledAt
-        db.users[userIndex].updatedAt = new Date()
-        writeMockDb(db)
-      }
-    }
-  },
-
-  async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
-    if (!isMock()) {
-      return prisma.user.findMany({
-        where: {
-          nicepaySubscriptionStatus: 'ACTIVE',
-          nicepayBid: { not: null },
-          nicepayNextBillingAt: { lte: at },
-        },
-      })
-    }
-
-    const db = initMockDb()
-    return db.users.filter(user =>
-      user.nicepaySubscriptionStatus === 'ACTIVE' &&
-      Boolean(user.nicepayBid) &&
-      Boolean(user.nicepayNextBillingAt && user.nicepayNextBillingAt.getTime() <= at.getTime()),
-    )
   },
 
   // Brand operations
@@ -537,7 +528,7 @@ export const dbService = {
       } catch (err) {
         console.warn('Prisma getBrands failed, falling back to mock database', err)
         await saveErrorLog(userId, 'getBrands', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -562,7 +553,7 @@ export const dbService = {
       } catch (err) {
         console.warn('Prisma getBrand failed, falling back to mock database', err)
         await saveErrorLog(null, 'getBrand', err, { brandId })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -596,7 +587,7 @@ export const dbService = {
         if (slide) return slide
       } catch (err) {
         console.warn('Prisma getSlide failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -642,7 +633,7 @@ export const dbService = {
       } catch (err) {
         console.warn('Prisma saveBrand failed, falling back to mock database', err)
         await saveErrorLog(userId, 'saveBrand', err, { brandId, ...data })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -714,7 +705,7 @@ export const dbService = {
         if (account) return account
       } catch (err) {
         console.warn('Prisma getInstagramAccount failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -746,7 +737,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma saveInstagramAccount failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -823,7 +814,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma saveInstagramOAuthAccount failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -926,7 +917,7 @@ export const dbService = {
       } catch (err) {
         console.warn('Prisma createCampaign failed, falling back to mock database', err)
         await saveErrorLog(userId, 'createCampaign', err, { brandId, ...campaignData })
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1001,7 +992,7 @@ export const dbService = {
         if (c) return c
       } catch (err) {
         console.warn('Prisma getCampaign failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1031,7 +1022,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma getCampaigns failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1072,7 +1063,7 @@ export const dbService = {
         }))
       } catch (err) {
         console.warn('Prisma getCampaignSummaries failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1100,7 +1091,7 @@ export const dbService = {
         return result.count > 0
       } catch (err) {
         console.warn('Prisma deleteCampaign failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1126,7 +1117,7 @@ export const dbService = {
         return result.count
       } catch (err) {
         console.warn('Prisma deleteExpiredCampaignsForUser failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1230,7 +1221,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateCampaignStatus failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1260,7 +1251,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateSlideContent failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1300,7 +1291,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updateSlideCustomization failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1335,7 +1326,7 @@ export const dbService = {
         if (post) return post
       } catch (err) {
         console.warn('Prisma getPost failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1351,7 +1342,7 @@ export const dbService = {
         return await prisma.post.findFirst({ where: { userId, campaignId } })
       } catch (err) {
         console.warn('Prisma getPostByCampaign failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1379,7 +1370,7 @@ export const dbService = {
         return posts as unknown as (Post & { campaign: Campaign; brand: Brand })[]
       } catch (err) {
         console.warn('Prisma getPosts failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1418,7 +1409,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma createPost failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1455,7 +1446,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostStatus failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1484,7 +1475,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostDetails failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1525,7 +1516,7 @@ export const dbService = {
         return posts as unknown as (Post & { campaign: Campaign; brand: Brand })[]
       } catch (err) {
         console.warn('Prisma getPendingScheduledPosts failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1557,7 +1548,7 @@ export const dbService = {
         })
       } catch (err) {
         console.warn('Prisma updatePostScheduledTime failed, falling back to mock database', err)
-        if (shouldThrowDatabaseError()) {
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
           throw err
         }
       }
@@ -1599,7 +1590,7 @@ export const dbService = {
         return
       } catch (err) {
         console.warn('Prisma createEditLog failed', err)
-        if (shouldThrowDatabaseError()) throw err
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
       }
     }
     // Mock: no-op (no edit log array in mock DB)
@@ -1625,7 +1616,7 @@ export const dbService = {
         }
       } catch (err) {
         console.warn('Prisma getSummarizedPreference failed', err)
-        if (shouldThrowDatabaseError()) throw err
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
       }
     }
     return null
@@ -1674,7 +1665,7 @@ export const dbService = {
         return
       } catch (err) {
         console.warn('Prisma upsertSummarizedPreference failed', err)
-        if (shouldThrowDatabaseError()) throw err
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
       }
     }
     // Mock: no-op
@@ -1717,7 +1708,7 @@ export const dbService = {
         return
       } catch (err) {
         console.warn('Prisma createQualityScoreLog failed', err)
-        if (shouldThrowDatabaseError()) throw err
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
       }
     }
     // Mock: no-op
