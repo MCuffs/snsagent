@@ -1,6 +1,39 @@
 import { parseBrandDna } from '../../../lib/brand-dna'
-import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition } from './types'
+import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition, OverlayType } from './types'
 import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
+
+// ─── Overlay + TextPosition co-selection ────────────────────────────────────
+
+interface OverlayConfig {
+  overlayType: OverlayType
+  overlayStrength: number
+  textPosition: TextPosition
+}
+
+const ROLE_OVERLAY_MAP: Record<string, OverlayConfig> = {
+  hook:            { overlayType: 'dark_gradient_bottom', overlayStrength: 72, textPosition: 'bottom' },
+  problem:         { overlayType: 'cinematic_dark',       overlayStrength: 60, textPosition: 'center' },
+  cause:           { overlayType: 'dark_gradient_top',    overlayStrength: 65, textPosition: 'top'    },
+  common_mistake:  { overlayType: 'cinematic_dark',       overlayStrength: 55, textPosition: 'center' },
+  product_solution:{ overlayType: 'dark_gradient_bottom', overlayStrength: 60, textPosition: 'bottom' },
+  feature:         { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  feature_1:       { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  feature_2:       { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  benefit_or_proof:{ overlayType: 'dark_gradient_bottom', overlayStrength: 55, textPosition: 'bottom' },
+  proof:           { overlayType: 'dark_gradient_bottom', overlayStrength: 55, textPosition: 'bottom' },
+  offer:           { overlayType: 'radial_focus',         overlayStrength: 45, textPosition: 'center' },
+  cta:             { overlayType: 'dark_gradient_bottom', overlayStrength: 80, textPosition: 'bottom' },
+}
+
+const DEFAULT_OVERLAY: OverlayConfig = {
+  overlayType: 'dark_gradient_bottom',
+  overlayStrength: 60,
+  textPosition: 'bottom',
+}
+
+function getOverlayConfig(role: string): OverlayConfig {
+  return ROLE_OVERLAY_MAP[role] ?? DEFAULT_OVERLAY
+}
 
 export async function generateDesignPrompts(
   brand: BrandProfile,
@@ -19,14 +52,16 @@ export async function generateDesignPrompts(
 
   return copies.map((copy): SlideDesignPrompt => {
     const role = roleMap.get(copy.slideNumber) ?? 'product_solution'
-    const textPosition = pickTextPosition(copy.slideNumber, copies.length)
+    const overlay = getOverlayConfig(role)
     const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals, editorialVisualCues)
 
     return {
       slideNumber: copy.slideNumber,
       backgroundPrompt,
       layoutStyle: 'minimal-commerce',
-      textPosition,
+      textPosition: overlay.textPosition,
+      overlayType: overlay.overlayType,
+      overlayStrength: overlay.overlayStrength,
       visualMood: getVisualMood(role),
     }
   })
