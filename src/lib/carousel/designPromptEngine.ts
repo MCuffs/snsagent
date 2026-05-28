@@ -1,11 +1,13 @@
 import { parseBrandDna } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition } from './types'
+import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 
 export async function generateDesignPrompts(
   brand: BrandProfile,
   input: CampaignInput,
   copies: SlideCopy[],
-  structure?: CarouselStructure
+  structure?: CarouselStructure,
+  knowledgeCtx?: CopyKnowledgeContext
 ): Promise<SlideDesignPrompt[]> {
   const roleMap = new Map(
     structure?.slides.map(s => [s.slideNumber, s.role]) ?? []
@@ -13,11 +15,12 @@ export async function generateDesignPrompts(
   const dna = parseBrandDna(brand.brandDna)
   const visualMood = dna.visualMood || ''
   const avoidVisuals = dna.avoidVisuals.length ? dna.avoidVisuals : []
+  const editorialVisualCues = knowledgeCtx?.editorialCluster?.visualCues ?? []
 
   return copies.map((copy): SlideDesignPrompt => {
     const role = roleMap.get(copy.slideNumber) ?? 'product_solution'
     const textPosition = pickTextPosition(copy.slideNumber, copies.length)
-    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals)
+    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals, editorialVisualCues)
 
     return {
       slideNumber: copy.slideNumber,
@@ -48,13 +51,18 @@ function buildBackgroundPrompt(
   input: CampaignInput,
   brand: BrandProfile,
   visualMood: string,
-  avoidVisuals: string[]
+  avoidVisuals: string[],
+  editorialVisualCues: string[] = []
 ): string {
   const avoidClause = avoidVisuals.length
     ? avoidVisuals.map(v => `no ${v}`).join(', ')
     : ''
 
   const subject = inferSubject(input.productName, brand.industry)
+  // editorial visual cues only applied to the hook/first slide for maximum impact
+  const editorialCue = role === 'hook' && editorialVisualCues.length
+    ? editorialVisualCues.slice(0, 2).join(', ')
+    : ''
 
   const base = [
     'Korean Instagram card news style',
@@ -64,6 +72,7 @@ function buildBackgroundPrompt(
     'no signage, labels, posters, menus, packaging text, screen text, handwriting, or calligraphy',
     `brand accent color ${brand.mainColor}`,
     visualMood ? `visual mood: ${visualMood}` : '',
+    editorialCue,
     avoidClause,
     'clean empty negative space for app-rendered overlay later',
   ].filter(Boolean)

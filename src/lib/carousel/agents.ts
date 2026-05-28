@@ -361,6 +361,7 @@ export class QualityGuardAgent {
   public run(params: {
     slides: AgentSlideData[]
     hasFallbackImage: boolean
+    copyQualityReport?: { passed: boolean; score: number; narrativeFlowScore: number; personaFitScore: number; hookPatternScore: number } | null
   }): { passed: boolean; score: number; logs: AgentReportItem[] } {
     this.logs = []
     this.log('info', `최종 카드뉴스 퀄리티 검사(가독성, 정렬, 안전성)를 진행합니다.`)
@@ -392,6 +393,30 @@ export class QualityGuardAgent {
         })
       }
     })
+
+    // 3. 카피 품질 서브스코어 반영 (copyQualityChecker 결과)
+    if (params.copyQualityReport) {
+      const cqr = params.copyQualityReport
+      // narrativeFlowScore: 기준 70 미만이면 최대 -8점 감점
+      if (cqr.narrativeFlowScore < 70) {
+        const penalty = Math.round((70 - cqr.narrativeFlowScore) / 70 * 8)
+        totalScore -= penalty
+        this.log('warn', `서사 흐름 점수 낮음(${cqr.narrativeFlowScore}점). 감점(-${penalty}점)`)
+      }
+      // personaFitScore: 기준 70 미만이면 최대 -6점 감점
+      if (cqr.personaFitScore < 70) {
+        const penalty = Math.round((70 - cqr.personaFitScore) / 70 * 6)
+        totalScore -= penalty
+        this.log('warn', `페르소나 적합성 점수 낮음(${cqr.personaFitScore}점). 감점(-${penalty}점)`)
+      }
+      // hookPatternScore: 기준 60 미만이면 최대 -6점 감점
+      if (cqr.hookPatternScore < 60) {
+        const penalty = Math.round((60 - cqr.hookPatternScore) / 60 * 6)
+        totalScore -= penalty
+        this.log('warn', `훅 패턴 점수 낮음(${cqr.hookPatternScore}점). 감점(-${penalty}점)`)
+      }
+      this.log('info', `카피 품질 서브스코어 — 서사:${cqr.narrativeFlowScore} 페르소나:${cqr.personaFitScore} 훅:${cqr.hookPatternScore}`)
+    }
 
     // 최종 판정
     const score = Math.max(0, totalScore)

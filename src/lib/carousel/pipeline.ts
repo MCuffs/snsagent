@@ -68,9 +68,11 @@ export async function generateCarouselCampaign(params: {
     )
     log('Structure generated')
 
-    const copies = await runStep('Slide copy generation', () =>
+    const copyResult = await runStep('Slide copy generation', () =>
       generateSlideCopies(params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx)
     )
+    const copies = copyResult.copies
+    const copyQualityReport = copyResult.copyQualityReport
     log('Slide copies generated')
 
     // Initialize Agents
@@ -127,7 +129,7 @@ export async function generateCarouselCampaign(params: {
     agentReportLogs.push(...visualRes.logs)
 
     const designPrompts = await runStep('Design prompt generation', () =>
-      generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure)
+      generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure, knowledgeCtx)
     )
     log('Design prompts generated')
 
@@ -228,6 +230,7 @@ export async function generateCarouselCampaign(params: {
     const qualityRes = qualityAgent.run({
       slides: agentSlides,
       hasFallbackImage: imageFallbackUsed,
+      copyQualityReport,
     })
     agentReportLogs.push(...qualityRes.logs)
 
