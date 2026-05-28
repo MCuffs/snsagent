@@ -28,6 +28,13 @@ declare global {
         goodsName: string
         returnUrl: string
         fnError?: (result: { errorMsg?: string }) => void
+        fnClose?: (result: {
+          tid?: string
+          authToken?: string
+          orderId?: string
+          resultCode?: string
+          resultMsg?: string
+        }) => void
       }) => void
     }
   }
@@ -175,6 +182,7 @@ function PricingGrid({
     const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 19000, UNLIMITED: 45000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
+    // Server 승인 방식: returnUrl은 사용하지 않으나 필드 필수라 dummy 처리
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
 
     window.AUTHNICE.requestPay({
@@ -183,9 +191,39 @@ function PricingGrid({
       orderId,
       amount,
       goodsName: `Shuffla ${planKey} 월 구독`,
-      returnUrl: `${appUrl}/api/payments/nicepay/billing/callback?plan=${encodeURIComponent(planKey)}`,
+      returnUrl: `${appUrl}/api/nicepay/server-auth-dummy`,
       fnError: (result) => {
         setError(result.errorMsg || '나이스페이 결제를 시작하지 못했습니다.')
+      },
+      fnClose: async (result) => {
+        if (!result.tid || !result.authToken || result.resultCode !== '0000') {
+          if (result.resultCode && result.resultCode !== '0000') {
+            setError(result.resultMsg || '결제가 취소되었습니다.')
+          }
+          return
+        }
+        try {
+          const res = await fetch('/api/nicepay/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tid: result.tid,
+              authToken: result.authToken,
+              orderId: result.orderId ?? orderId,
+              plan: planKey,
+            }),
+          })
+          const data = await res.json() as { error?: string; offer?: string }
+          if (!res.ok) {
+            setError(data.error || '결제 승인에 실패했습니다.')
+          } else if (data.offer === 'regeneration') {
+            router.push('/billing?success=true&offer=regeneration')
+          } else {
+            router.push('/billing?success=true')
+          }
+        } catch {
+          setError('네트워크 오류가 발생했습니다.')
+        }
       },
     })
   }

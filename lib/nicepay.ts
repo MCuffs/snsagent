@@ -5,7 +5,7 @@ const NICEPAY_BASE_URL = 'https://api.nicepay.co.kr'
 
 export type PaidPlan = Exclude<SubscriptionPlan, 'FREE'>
 
-const PLAN_AMOUNTS: Record<PaidPlan, number> = {
+export const PLAN_AMOUNTS: Record<PaidPlan, number> = {
   LITE: 3000,
   PRO: 19000,
   UNLIMITED: 45000,
@@ -79,6 +79,30 @@ export interface NicepayPayment {
   orderId: string
   status: string
   amount: number
+}
+
+// Server 승인: 브라우저에서 받은 tid + authToken으로 서버가 직접 승인 처리
+export interface NicepayServerApproveResult {
+  tid: string
+  orderId: string
+  status: string
+  amount: number
+  resultCode: string
+  resultMsg: string
+}
+
+export async function serverApprove(input: {
+  tid: string
+  amount: number
+  orderId: string
+}): Promise<NicepayServerApproveResult> {
+  return callNicepay<NicepayServerApproveResult>(`/v1/pay/${encodeURIComponent(input.tid)}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      amount: input.amount,
+      orderId: input.orderId,
+    }),
+  })
 }
 
 export async function issueBillingKey(authToken: string, orderId: string): Promise<NicepayBillingKey> {
