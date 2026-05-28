@@ -5,7 +5,7 @@ import { getCampaignUsagePeriodStart } from './usage-period'
 export type { SubscriptionPlan, PlanFeature }
 export { PRICING_PLANS }
 
-const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com']
+const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com', 'kanghiee616@gmail.com']
 
 function isSuperUser(email?: string | null): boolean {
   if (!email) return false
