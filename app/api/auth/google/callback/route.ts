@@ -4,6 +4,7 @@ import { createSessionToken, GOOGLE_OAUTH_STATE_COOKIE_NAME, LEGACY_SESSION_COOK
 import { dbService } from '../../../../../lib/db-service'
 import { exchangeGoogleCode, fetchGoogleUserInfo } from '../../../../../lib/google/oauth'
 import { saveErrorLog } from '../../../../../lib/errorLogger'
+import { isLikelyDatabaseConnectionError } from '../../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -42,6 +43,9 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error('Google OAuth callback failed:', err)
     await saveErrorLog(null, 'google_oauth_callback', err)
+    if (isLikelyDatabaseConnectionError(err)) {
+      return NextResponse.redirect(new URL('/login?error=database_unavailable', request.url))
+    }
     return NextResponse.redirect(new URL('/login?error=google_oauth_failed', request.url))
   }
 }

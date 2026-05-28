@@ -29,8 +29,8 @@ export function MarketingFooter({ authenticated = false }: { authenticated?: boo
         <div className="mt-16 flex flex-col justify-between gap-3 border-t border-[#e0dbd2] pt-7 text-xs text-[#847d73] sm:flex-row">
           <p>&copy; 2026 Shuffla. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-[#171714]">Terms</a>
-            <a href="#" className="hover:text-[#171714]">Privacy</a>
+            <Link href="/terms" className="hover:text-[#171714]">Terms</Link>
+            <Link href="/privacy" className="hover:text-[#171714]">Privacy</Link>
           </div>
         </div>
       </div>

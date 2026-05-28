@@ -19,6 +19,17 @@ declare global {
         }) => Promise<void>
       }
     }
+    AUTHNICE?: {
+      requestPay: (options: {
+        clientId: string
+        method: string
+        orderId: string
+        amount: number
+        goodsName: string
+        returnUrl: string
+        fnError?: (result: { errorMsg?: string }) => void
+      }) => void
+    }
   }
 }
 
@@ -26,12 +37,13 @@ interface PricingClientViewProps {
   currentPlan: string
   plansList: SubscriptionPlan[]
   hasSubscription: boolean
-  paymentProvider: 'toss' | 'paypal' | null
+  paymentProvider: 'toss' | 'paypal' | 'nicepay' | null
   userId: string
   tossClientKey: string
   tossCustomerKey: string
   paypalClientId: string
   paypalPlanIds: Record<string, string>
+  nicepayClientKey: string
   customerName?: string | null
   customerEmail: string
   showRegenerationOffer: boolean
@@ -67,6 +79,7 @@ function PricingGrid({
   tossClientKey,
   tossCustomerKey,
   paypalPlanIds,
+  nicepayClientKey,
   customerName,
   customerEmail,
   showRegenerationOffer,
@@ -88,11 +101,28 @@ function PricingGrid({
     }
   }, [tossClientKey])
 
+  useEffect(() => {
+    if (!nicepayClientKey || window.AUTHNICE) return
+
+    const script = document.createElement('script')
+    script.src = 'https://pay.nicepay.co.kr/v1/js/'
+    script.async = true
+    script.onerror = () => setError('나이스페이 결제 모듈을 불러오지 못했습니다.')
+    document.body.appendChild(script)
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [nicepayClientKey])
+
   const cancelSubscription = async () => {
     if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
     setCanceling(true)
     try {
-      const endpoint = paymentProvider === 'toss' ? '/api/payments/toss/cancel' : '/api/paypal/cancel'
+      const endpoint = paymentProvider === 'toss'
+        ? '/api/payments/toss/cancel'
+        : paymentProvider === 'nicepay'
+          ? '/api/payments/nicepay/cancel'
+          : '/api/paypal/cancel'
       const res = await fetch(endpoint, { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
@@ -130,6 +160,34 @@ function PricingGrid({
     } catch {
       setError('카드 등록을 시작하지 못했습니다. 다시 시도해주세요.')
     }
+  }
+
+  const handleNicepayPayment = (planKey: string) => {
+    if (!nicepayClientKey) {
+      setError('나이스페이 클라이언트 키가 설정되지 않았습니다.')
+      return
+    }
+    if (!window.AUTHNICE) {
+      setError('나이스페이 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 19000, UNLIMITED: 45000 }
+    const amount = PLAN_AMOUNTS[planKey] ?? 0
+    const orderId = `shuffla_regist_${Date.now()}_${planKey}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+
+    window.AUTHNICE.requestPay({
+      clientId: nicepayClientKey,
+      method: 'card',
+      orderId,
+      amount,
+      goodsName: `Shuffla ${planKey} 월 구독`,
+      returnUrl: `${appUrl}/api/payments/nicepay/billing/callback?plan=${encodeURIComponent(planKey)}`,
+      fnError: (result) => {
+        setError(result.errorMsg || '나이스페이 결제를 시작하지 못했습니다.')
+      },
+    })
   }
 
   return (
@@ -185,7 +243,15 @@ function PricingGrid({
                   onClick={() => void handleTossPayment('LITE')}
                   className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
                 >
-                  3,000원으로 1회 추가
+                  3,000원으로 1회 추가 (토스)
+                </button>
+              ) : nicepayClientKey ? (
+                <button
+                  type="button"
+                  onClick={() => handleNicepayPayment('LITE')}
+                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
+                >
+                  3,000원으로 1회 추가 (나이스페이)
                 </button>
               ) : (
                 <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
@@ -250,7 +316,25 @@ function PricingGrid({
                         국내 카드 결제 (토스페이먼츠)
                       </button>
                     )}
-                    {tossClientKey && paypalPlanId && (
+                    {nicepayClientKey && !tossClientKey && (
+                      <button
+                        type="button"
+                        onClick={() => handleNicepayPayment(planKey)}
+                        className="w-full rounded-lg bg-[#e8173e] py-2.5 text-sm font-black text-white transition-all hover:bg-[#c90f32] active:scale-[0.98]"
+                      >
+                        국내 카드 결제 (나이스페이)
+                      </button>
+                    )}
+                    {nicepayClientKey && tossClientKey && (
+                      <button
+                        type="button"
+                        onClick={() => handleNicepayPayment(planKey)}
+                        className="w-full rounded-lg border border-[#e8173e] py-2.5 text-sm font-black text-[#e8173e] transition-all hover:bg-[#fff0f3] active:scale-[0.98]"
+                      >
+                        나이스페이로 결제
+                      </button>
+                    )}
+                    {(tossClientKey || nicepayClientKey) && paypalPlanId && (
                       <div className="flex items-center gap-3 py-1 text-[11px] font-bold text-[#6f6a61]">
                         <span className="h-px flex-1 bg-[#ece9e0]" />
                         해외 고객
@@ -265,7 +349,7 @@ function PricingGrid({
                         onError={setError}
                       />
                     )}
-                    {!tossClientKey && !paypalPlanId && (
+                    {!tossClientKey && !nicepayClientKey && !paypalPlanId && (
                       <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
                     )}
                   </div>

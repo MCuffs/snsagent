@@ -31,7 +31,7 @@ export default async function LandingPage() {
             더 정확하게, 빠르게.
           </h1>
           <p className="mx-auto mt-7 max-w-2xl text-[16px] leading-8 text-[#746e65] md:text-lg">
-            Shuffla는 브랜드를 이해하고, 흐름 있는 카피와 비주얼을 생성하고,
+            브랜드 URL만 입력하면 SNS 카드뉴스의 기획, 카피, 비주얼을 만들고,
             <br className="hidden sm:block" />
             바로 편집하고 다운로드할 수 있는 AI 콘텐츠 스튜디오입니다.
           </p>

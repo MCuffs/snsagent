@@ -10,6 +10,7 @@ import {
   nextMonthlyBillingDate,
 } from '../../../../../../lib/tosspayments'
 import { normalizePlan } from '../../../../../../lib/limits-types'
+import { formatMissingConfigMessage, getTossConfigStatus } from '../../../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -31,6 +32,10 @@ export async function GET(request: NextRequest) {
 
   if (!authKey || !customerKey || !isPaidPlan(plan)) {
     return redirectToBilling(request, 'canceled', '결제 인증 정보가 올바르지 않습니다.')
+  }
+  const config = getTossConfigStatus()
+  if (!config.ready) {
+    return redirectToBilling(request, 'canceled', formatMissingConfigMessage('토스페이먼츠', config.missing))
   }
   if (customerKey !== user.tossCustomerKey) {
     return redirectToBilling(request, 'canceled', '결제 고객 정보가 일치하지 않습니다.')

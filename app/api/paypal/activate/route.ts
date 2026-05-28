@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { getSubscription, planFromPayPalPlanId } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
+import { formatMissingConfigMessage, getPayPalConfigStatus } from '../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -13,6 +14,10 @@ export async function POST(request: Request) {
     }
     if (user.tossBillingKey || user.paypalSubscriptionId) {
       return NextResponse.json({ error: '이미 활성 구독이 있습니다.' }, { status: 409 })
+    }
+    const config = getPayPalConfigStatus()
+    if (!config.ready) {
+      return NextResponse.json({ error: formatMissingConfigMessage('PayPal', config.missing) }, { status: 503 })
     }
 
     const body = await request.json() as { subscriptionId?: string }

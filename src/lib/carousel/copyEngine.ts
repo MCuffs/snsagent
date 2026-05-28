@@ -3,10 +3,15 @@ import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, HookCandidate, SlideRole, SlideCopy } from './types'
 import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import { formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
-import { checkCopyQuality } from '../copywriting/copyQualityChecker'
+import { checkCopyQuality, type CopyQualityReport } from '../copywriting/copyQualityChecker'
 import { buildNarrativeTransitionInstructions } from '../copywriting/slideNarrativeEngine'
 
 const BANNED_CLICHES = ['혁신적인', '최고의', '완벽한']
+
+export interface SlideCopyResult {
+  copies: SlideCopy[]
+  copyQualityReport: CopyQualityReport | null
+}
 
 export async function generateSlideCopies(
   brand: BrandProfile,
@@ -14,7 +19,7 @@ export async function generateSlideCopies(
   structure: CarouselStructure,
   selectedHook: HookCandidate,
   knowledgeCtx?: CopyKnowledgeContext
-): Promise<SlideCopy[]> {
+): Promise<SlideCopyResult> {
   const client = getLLMClient()
 
   const slideDescriptions = structure.slides
@@ -42,7 +47,7 @@ export async function generateSlideCopies(
 브랜드 정보:
 - 브랜드명: ${brand.name}
 - 업종: ${brand.industry}
-- 타겟 고객: ${brand.targetAudience}
+- 타겟 고객 (참고용, body에 직접 인용 금지): ${brand.targetAudience}
 - 어조: ${brand.toneOfVoice}
 - 금지어: ${brand.forbiddenWords || '없음'}
 ${brandDnaSection}${knowledgeSection}
@@ -67,7 +72,10 @@ ${narrativeSection}
 - 브랜드 DNA가 제공된 경우, 핵심 상품·차별점·고객 페인포인트·가치 제안 중 하나 이상이 슬라이드 카피에 반드시 녹아들어야 합니다
 - 일반적인 업종 표현 대신 브랜드 고유의 언어와 키워드를 사용하세요
 - 상품 정보와 브랜드 DNA에서 확인할 수 없는 수치, 할인율, 인증, 순위, 후기, 성분, 성능 또는 효능은 만들지 마세요
-- 문제 제기 → 해결 방법 → 근거/혜택 → CTA 흐름으로 연결하고, 인접 슬라이드에서 같은 메시지를 반복하지 마세요
+- 타겟 고객 설명 문장을 body에 그대로 사용하지 마세요 (예: "20대 후반에서 40대 초반의 ..." 같은 표현 금지)
+- 스마트스토어, 쿠팡, 네이버쇼핑 등 특정 플랫폼명을 카피에 포함하지 마세요
+- 각 슬라이드는 이전 슬라이드의 내용을 받아 자연스럽게 이어지도록 하고, 같은 메시지를 반복하지 마세요
+- 문제 제기 → 해결 방법 → 근거/혜택 → CTA 흐름이 슬라이드 전체에서 하나의 이야기처럼 연결되어야 합니다
 
 JSON 응답 형식:
 {
@@ -110,17 +118,21 @@ JSON 응답 형식:
       report.issues.filter(i => i.severity === 'block').map(i => i.slideNumber)
     )
     if (blockSlides.size > 0) {
-      return cleaned.map(copy => {
+      const fixed = cleaned.map(copy => {
         if (blockSlides.has(copy.slideNumber)) {
           const role = structure.slides.find(s => s.slideNumber === copy.slideNumber)?.role ?? 'feature'
           return cleanCopy(brand, generateFallbackCopy(brand, input, copy.slideNumber, role, selectedHook), knowledgeCtx)
         }
         return copy
       })
+      // Re-run quality check on fixed copies to get accurate sub-scores
+      const fixedReport = checkCopyQuality(fixed, knowledgeCtx, structure.slides)
+      return { copies: fixed, copyQualityReport: fixedReport }
     }
+    return { copies: cleaned, copyQualityReport: report }
   }
 
-  return cleaned
+  return { copies: cleaned, copyQualityReport: null }
 }
 
 function isGroundedCopy(copy: SlideCopy | undefined, input: CampaignInput): copy is SlideCopy {
@@ -181,7 +193,11 @@ function cleanCopy(brand: BrandProfile, copy: SlideCopy, knowledgeCtx?: CopyKnow
     for (const word of allBanned) {
       result = result.replaceAll(word, '')
     }
-    return result.trim().slice(0, limit)
+    result = result.trim()
+    if (result.length <= limit) return result
+    const cut = result.slice(0, limit)
+    const lastSpace = cut.lastIndexOf(' ')
+    return lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut
   }
 
   return {
