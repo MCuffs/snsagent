@@ -3,10 +3,15 @@ import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, CarouselStructure, HookCandidate, SlideRole, SlideCopy } from './types'
 import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import { formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
-import { checkCopyQuality } from '../copywriting/copyQualityChecker'
+import { checkCopyQuality, type CopyQualityReport } from '../copywriting/copyQualityChecker'
 import { buildNarrativeTransitionInstructions } from '../copywriting/slideNarrativeEngine'
 
 const BANNED_CLICHES = ['혁신적인', '최고의', '완벽한']
+
+export interface SlideCopyResult {
+  copies: SlideCopy[]
+  copyQualityReport: CopyQualityReport | null
+}
 
 export async function generateSlideCopies(
   brand: BrandProfile,
@@ -14,7 +19,7 @@ export async function generateSlideCopies(
   structure: CarouselStructure,
   selectedHook: HookCandidate,
   knowledgeCtx?: CopyKnowledgeContext
-): Promise<SlideCopy[]> {
+): Promise<SlideCopyResult> {
   const client = getLLMClient()
 
   const slideDescriptions = structure.slides
@@ -113,17 +118,21 @@ JSON 응답 형식:
       report.issues.filter(i => i.severity === 'block').map(i => i.slideNumber)
     )
     if (blockSlides.size > 0) {
-      return cleaned.map(copy => {
+      const fixed = cleaned.map(copy => {
         if (blockSlides.has(copy.slideNumber)) {
           const role = structure.slides.find(s => s.slideNumber === copy.slideNumber)?.role ?? 'feature'
           return cleanCopy(brand, generateFallbackCopy(brand, input, copy.slideNumber, role, selectedHook), knowledgeCtx)
         }
         return copy
       })
+      // Re-run quality check on fixed copies to get accurate sub-scores
+      const fixedReport = checkCopyQuality(fixed, knowledgeCtx, structure.slides)
+      return { copies: fixed, copyQualityReport: fixedReport }
     }
+    return { copies: cleaned, copyQualityReport: report }
   }
 
-  return cleaned
+  return { copies: cleaned, copyQualityReport: null }
 }
 
 function isGroundedCopy(copy: SlideCopy | undefined, input: CampaignInput): copy is SlideCopy {

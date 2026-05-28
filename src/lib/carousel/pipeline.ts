@@ -3,8 +3,7 @@ import { MockImageProvider } from '../ai/providers/mockImageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { sanitizeImagePrompt } from '../ai/imageProvider'
 import { generateCaption } from './captionEngine'
-import { generateSlideCopies } from './copyEngine'
-import { generateDesignPrompts } from './designPromptEngine'
+import { runNarrativePipeline } from './narrativePipeline'
 import { generateHooks, selectBestHook } from './hookEngine'
 import { renderSlide } from './renderer'
 import { generateStrategy } from './strategyEngine'
@@ -12,9 +11,6 @@ import { generateStructure } from './structureEngine'
 import { runQualityCheck } from './qualityCheckEngine'
 import { buildCopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import {
-  BrandIdentityAgent,
-  CopywritingAgent,
-  VisualConceptAgent,
   QualityGuardAgent,
   type AgentReport,
   type AgentReportItem,
@@ -68,20 +64,26 @@ export async function generateCarouselCampaign(params: {
     )
     log('Structure generated')
 
-    const copies = await runStep('Slide copy generation', () =>
-      generateSlideCopies(params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx)
+    const narrativeResult = await runStep('Narrative pipeline', () =>
+      runNarrativePipeline({
+        brand: params.brandProfile,
+        input: params.campaignInput,
+        strategy,
+        knowledgeCtx,
+        selectedHook,
+        structure,
+      })
     )
-    log('Slide copies generated')
+    const copies = narrativeResult.copies
+    const designPrompts = narrativeResult.designPrompts
+    const copyQualityReport = narrativeResult.copyQualityReport
+    log('Narrative pipeline complete')
 
-    // Initialize Agents
-    const brandAgent = new BrandIdentityAgent()
-    const copyAgent = new CopywritingAgent()
-    const visualAgent = new VisualConceptAgent()
+    // Initialize Agents for report/quality tracking only
     const qualityAgent = new QualityGuardAgent()
-
     const agentReportLogs: AgentReportItem[] = []
 
-    // Convert copies to AgentSlideData for agent chain — preserve actual SlideRole
+    // Build AgentSlideData for downstream quality reporting
     const structureRoleMap = new Map(structure.slides.map(s => [s.slideNumber, s.role]))
     let agentSlides: AgentSlideData[] = copies.map(c => ({
       slideNumber: c.slideNumber,
@@ -90,46 +92,6 @@ export async function generateCarouselCampaign(params: {
       body: c.body,
       layoutType: 'commerce-standard',
     }))
-
-    // Execute BrandIdentityAgent
-    const brandRes = brandAgent.run({
-      brandName: params.brandProfile.name,
-      brandToneOfVoice: params.brandProfile.toneOfVoice,
-      forbiddenWords: params.brandProfile.forbiddenWords,
-      ctaStyle: params.brandProfile.ctaStyle,
-      brandDna: params.brandProfile.brandDna,
-      slides: agentSlides,
-    })
-    agentSlides = brandRes.slides
-    agentReportLogs.push(...brandRes.logs)
-
-    // Execute CopywritingAgent
-    const copyRes = copyAgent.run({
-      title: `${params.campaignInput.productName} 카드뉴스`,
-      topic: params.campaignInput.productName,
-      category: params.campaignInput.objective,
-      brandName: params.brandProfile.name,
-      slides: agentSlides,
-    })
-    agentSlides = copyRes.slides
-    agentReportLogs.push(...copyRes.logs)
-
-    // Execute VisualConceptAgent
-    const visualRes = visualAgent.run({
-      category: params.campaignInput.objective,
-      topic: params.campaignInput.productName,
-      tone: params.brandProfile.toneOfVoice || '전문적이고 신뢰감 있게',
-      brandMainColor: params.brandProfile.mainColor,
-      brandIndustry: params.brandProfile.industry,
-      slides: agentSlides,
-    })
-    agentSlides = visualRes.slides
-    agentReportLogs.push(...visualRes.logs)
-
-    const designPrompts = await runStep('Design prompt generation', () =>
-      generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure)
-    )
-    log('Design prompts generated')
 
     const imageProvider = getPipelineImageProvider()
     const campaignKey = `cg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -267,6 +229,7 @@ export async function generateCarouselCampaign(params: {
     const qualityRes = qualityAgent.run({
       slides: agentSlides,
       hasFallbackImage: imageFallbackUsed,
+      copyQualityReport,
     })
     agentReportLogs.push(...qualityRes.logs)
 

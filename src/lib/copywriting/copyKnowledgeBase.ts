@@ -141,6 +141,7 @@ export interface CopyKnowledgeContext {
   industryToneRule: IndustryToneRule | null
   referencePatterns: IngestedReferencePattern[]
   resolvedBannedPhrases: string[]
+  editorialCluster: EditorialStyleCluster | null
 }
 
 // ─── Data: Hook Patterns ──────────────────────────────────────────────────────
@@ -797,6 +798,9 @@ export function buildCopyKnowledgeContext(params: {
     new Set([...SYSTEM_BANNED_PHRASES, ...industryBanned, ...brandForbidden])
   )
 
+  // 7. Select editorial cluster
+  const editorialCluster = selectEditorialCluster(brand, input, strategy, narrativeArc)
+
   return {
     selectedHookPatterns,
     personaProfile,
@@ -805,6 +809,7 @@ export function buildCopyKnowledgeContext(params: {
     industryToneRule,
     referencePatterns,
     resolvedBannedPhrases,
+    editorialCluster,
   }
 }
 
@@ -898,7 +903,71 @@ function selectHookPatterns(
   return scored.slice(0, 3).map(s => s.pattern)
 }
 
-// ─── Prompt Formatter ─────────────────────────────────────────────────────────
+function selectEditorialCluster(
+  brand: BrandProfile,
+  input: CampaignInput,
+  strategy: ContentStrategy,
+  arc: NarrativeArc
+): EditorialStyleCluster | null {
+  const industry = (brand.industry ?? '').toLowerCase()
+  const objective = (input.objective ?? '').toLowerCase()
+  const productDesc = (input.productDescription ?? '').toLowerCase()
+  const tone = (brand.toneOfVoice ?? '').toLowerCase()
+  const strategyType = strategy.strategyType
+
+  const scores: Partial<Record<EditorialClusterId, number>> = {}
+
+  const add = (id: EditorialClusterId, n: number) => {
+    scores[id] = (scores[id] ?? 0) + n
+  }
+
+  // 숫자/수치 중심 콘텐츠 → 숫자 성과형 또는 시장규모 선언형
+  if (/\d+%|\d+만|\d+억|수치|성과|매출|절감/.test(productDesc + objective)) {
+    add('money_result_brag', 3)
+    add('market_cap_headline', 2)
+  }
+  // AI/기술/스타트업 업종
+  if (/ai|기술|스타트업|saas|b2b|소프트웨어|앱|플랫폼/.test(industry + objective)) {
+    add('ai_breaking_collab', 3)
+    add('finance_product_briefing', 2)
+  }
+  // 금융/투자/재테크
+  if (/금융|투자|재테크|주식|부동산|절약|절세/.test(industry + objective + productDesc)) {
+    add('personal_finance_confession', 3)
+    add('market_cap_headline', 2)
+  }
+  // 커리어/교육/자기계발
+  if (/교육|취업|커리어|부트캠프|자격증|성장|자기계발/.test(industry + objective)) {
+    add('career_turning_point', 3)
+  }
+  // 사회이슈/정책/공공
+  if (/사회|정책|공공|환경|이슈|문제/.test(industry + objective)) {
+    add('social_issue_statement', 3)
+    add('rescue_breaking_news', 1)
+  }
+  // B2B/리포트/분석
+  if (/b2b|리포트|분석|업계|동향|백서/.test(industry + objective)) {
+    add('long_explainer_photo', 3)
+    add('finance_product_briefing', 2)
+  }
+  // 브랜드 스토리 / 감성 / 라이프스타일
+  if (/브랜드|스토리|감성|라이프|뷰티|패션|음식|여행/.test(industry + tone)) {
+    add('essay_closing_slide', 3)
+  }
+  // narrative arc 보정: before_after 계열은 confession형과 잘 맞음
+  if (arc.id === 'before_after_proof') add('personal_finance_confession', 2)
+  if (arc.id === 'mini_story_cta') add('essay_closing_slide', 2)
+  if (arc.id === 'belief_challenge') add('social_issue_statement', 2)
+  // strategy 보정
+  if (strategyType === 'review_style') add('money_result_brag', 2)
+  if (strategyType === 'storytelling') add('career_turning_point', 2)
+  if (strategyType === 'comparison') add('long_explainer_photo', 2)
+
+  const sorted = (Object.entries(scores) as [EditorialClusterId, number][]).sort((a, b) => b[1] - a[1])
+  if (!sorted.length || sorted[0][1] < 2) return null
+
+  return EDITORIAL_CLUSTERS.find(c => c.id === sorted[0][0]) ?? null
+}
 
 export function formatKnowledgeContextForPrompt(ctx: CopyKnowledgeContext): string {
   const primaryPattern = ctx.selectedHookPatterns[0]
@@ -920,11 +989,15 @@ export function formatKnowledgeContextForPrompt(ctx: CopyKnowledgeContext): stri
     lines.push(`업종 어조(${ctx.industryToneRule.industry}): ${ctx.industryToneRule.copyPersonality}. CTA: ${ctx.industryToneRule.ctaStyle}`)
   }
 
+  if (ctx.editorialCluster) {
+    lines.push(`에디토리얼 스타일: ${ctx.editorialCluster.name} — 공식 "${ctx.editorialCluster.copyFormula}" / 헤드라인 톤: ${ctx.editorialCluster.sampleHeadlineTones.slice(0, 2).join(', ')}`)
+  }
+
   lines.push(`추가 금지: ${bannedSample}`)
 
   const result = lines.join('\n')
-  // Hard cap at 500 chars to keep token cost predictable
-  return result.length > 500 ? result.slice(0, 497) + '...' : result
+  // Hard cap at 650 chars (editorial cluster adds ~150 chars)
+  return result.length > 650 ? result.slice(0, 647) + '...' : result
 }
 
 // ─── Reference Ingestion ──────────────────────────────────────────────────────

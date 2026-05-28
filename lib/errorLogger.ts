@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import prisma from './db'
+import { isLikelyDatabaseConnectionError } from './runtime-diagnostics'
 
 const ERROR_LOG_FILE = process.env.VERCEL
   ? path.join(os.tmpdir(), 'shuffla-errors.log')
@@ -36,7 +37,14 @@ export async function saveErrorLog(
     console.error('Failed to write error log to file:', fileErr)
   }
 
-  // 3. Write to PostgreSQL database
+  // 3. Write to PostgreSQL database.
+  // If the original error is already a DB connectivity failure, attempting another
+  // DB write only adds noise and can slow the user-facing request path.
+  if (isLikelyDatabaseConnectionError(error)) {
+    console.error('[ERROR_LOG] Skipped DB persistence because the original error is a database connectivity failure.')
+    return
+  }
+
   try {
     await prisma.errorLog.create({
       data: {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../lib/auth/user'
 import { dbService } from '../../../../../lib/db-service'
 import { deleteBillingKey, TossPaymentsError } from '../../../../../lib/tosspayments'
+import { formatMissingConfigMessage, getTossConfigStatus } from '../../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -13,6 +14,10 @@ export async function POST() {
     }
     if (!user.tossBillingKey) {
       return NextResponse.json({ error: '활성 토스페이먼츠 구독이 없습니다.' }, { status: 400 })
+    }
+    const config = getTossConfigStatus()
+    if (!config.ready) {
+      return NextResponse.json({ error: formatMissingConfigMessage('토스페이먼츠', config.missing) }, { status: 503 })
     }
 
     try {

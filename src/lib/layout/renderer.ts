@@ -93,7 +93,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
 
 function getTextBox(layout: LayoutDefinition) {
   const left = layout.safeArea.left
-  const bottom = layout.overlayStyle === 'archive-light' ? 940 : 920
+  const bottom = layout.overlayStyle === 'archive-light' ? 880 : 860
   switch (layout.textPosition) {
     case 'top-left':
       return { x: left, y: 168, align: 'left' as const }
