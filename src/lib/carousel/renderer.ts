@@ -12,7 +12,7 @@ export async function renderSlide(params: {
   backgroundImageUrl: string
   showSlideNumber?: boolean
 }) {
-  const y = params.design.textPosition === 'top' ? 250 : params.design.textPosition === 'bottom' ? 700 : 500
+  const y = params.design.textPosition === 'top' ? 250 : params.design.textPosition === 'bottom' ? 620 : 460
   const escapedHeadline = escapeXml(params.copy.headline)
   const escapedCta = escapeXml(params.copy.ctaText || '')
   const bodyLines = wrapText(params.copy.body, 30)
