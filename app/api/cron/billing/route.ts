@@ -8,6 +8,13 @@ import {
   isPaidPlan,
   nextMonthlyBillingDate,
 } from '../../../../lib/tosspayments'
+import {
+  approveBillingPayment as approveNicepayPayment,
+  createNicepayOrderId,
+  expireBillingKey,
+  isPaidPlan as isNicepayPaidPlan,
+  nextMonthlyBillingDate as nicepayNextMonth,
+} from '../../../../lib/nicepay'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +87,43 @@ async function handleBillingRenewal(request: NextRequest) {
         tossSubscriptionStatus: 'PAST_DUE',
       })
       results.push({ userId: user.id, status: 'failed', error: 'Billing approval failed' })
+    }
+  }
+
+  // NicePay renewals
+  const nicepaySubscriptions = await dbService.getDueNicepaySubscriptions(now)
+
+  for (const user of nicepaySubscriptions) {
+    if (!user.nicepayBid || !isNicepayPaidPlan(user.plan) || !user.nicepayNextBillingAt) {
+      continue
+    }
+
+    const orderId = createNicepayOrderId('renew', `${user.id}:${user.nicepayNextBillingAt.toISOString()}`)
+    try {
+      const payment = await approveNicepayPayment({
+        bid: user.nicepayBid,
+        orderId,
+        plan: user.plan,
+        buyerName: user.name,
+        buyerEmail: user.email,
+      })
+
+      if (payment.status !== 'paid') throw new Error('NicePay payment is not paid')
+
+      await dbService.updateUserNicepay(user.id, {
+        nicepayLastOrderId: orderId,
+        nicepaySubscriptionStatus: 'ACTIVE',
+        nicepayLastPaidAt: now,
+        nicepayNextBillingAt: nicepayNextMonth(user.nicepayNextBillingAt),
+      })
+      results.push({ userId: user.id, status: 'paid' })
+    } catch (error) {
+      console.error('[NicePay Billing Renewal]', user.id, error)
+      await dbService.updateUserNicepay(user.id, {
+        plan: 'FREE',
+        nicepaySubscriptionStatus: 'PAST_DUE',
+      })
+      results.push({ userId: user.id, status: 'failed', error: 'NicePay billing approval failed' })
     }
   }
 

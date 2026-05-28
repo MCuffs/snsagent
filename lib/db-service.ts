@@ -26,6 +26,12 @@ export interface User {
   tossNextBillingAt: Date | null
   tossLastPaidAt: Date | null
   tossCanceledAt: Date | null
+  nicepayBid: string | null
+  nicepaySubscriptionStatus: string | null
+  nicepayNextBillingAt: Date | null
+  nicepayLastPaidAt: Date | null
+  nicepayLastOrderId: string | null
+  nicepayCanceledAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -176,6 +182,12 @@ function hydrateUser(user: StoredUser | User): User {
     tossNextBillingAt: user.tossNextBillingAt ? new Date(user.tossNextBillingAt) : null,
     tossLastPaidAt: user.tossLastPaidAt ? new Date(user.tossLastPaidAt) : null,
     tossCanceledAt: user.tossCanceledAt ? new Date(user.tossCanceledAt) : null,
+    nicepayBid: user.nicepayBid ?? null,
+    nicepaySubscriptionStatus: user.nicepaySubscriptionStatus ?? null,
+    nicepayNextBillingAt: user.nicepayNextBillingAt ? new Date(user.nicepayNextBillingAt) : null,
+    nicepayLastPaidAt: user.nicepayLastPaidAt ? new Date(user.nicepayLastPaidAt) : null,
+    nicepayLastOrderId: user.nicepayLastOrderId ?? null,
+    nicepayCanceledAt: user.nicepayCanceledAt ? new Date(user.nicepayCanceledAt) : null,
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   }
@@ -320,6 +332,12 @@ export const dbService = {
         tossNextBillingAt: null,
         tossLastPaidAt: null,
         tossCanceledAt: null,
+        nicepayBid: null,
+        nicepaySubscriptionStatus: null,
+        nicepayNextBillingAt: null,
+        nicepayLastPaidAt: null,
+        nicepayLastOrderId: null,
+        nicepayCanceledAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -451,6 +469,56 @@ export const dbService = {
     }
     const db = initMockDb()
     return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
+  },
+
+  async updateUserNicepay(userId: string, data: {
+    nicepayBid?: string | null
+    nicepaySubscriptionStatus?: string | null
+    nicepayNextBillingAt?: Date | null
+    nicepayLastPaidAt?: Date | null
+    nicepayLastOrderId?: string | null
+    nicepayCanceledAt?: Date | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      await prisma.user.update({
+        where: { id: userId },
+        data,
+      })
+    } else {
+      const db = initMockDb()
+      const userIndex = db.users.findIndex(u => u.id === userId)
+      if (userIndex !== -1) {
+        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        if (data.nicepayBid !== undefined) db.users[userIndex].nicepayBid = data.nicepayBid
+        if (data.nicepaySubscriptionStatus !== undefined) db.users[userIndex].nicepaySubscriptionStatus = data.nicepaySubscriptionStatus
+        if (data.nicepayNextBillingAt !== undefined) db.users[userIndex].nicepayNextBillingAt = data.nicepayNextBillingAt
+        if (data.nicepayLastPaidAt !== undefined) db.users[userIndex].nicepayLastPaidAt = data.nicepayLastPaidAt
+        if (data.nicepayLastOrderId !== undefined) db.users[userIndex].nicepayLastOrderId = data.nicepayLastOrderId
+        if (data.nicepayCanceledAt !== undefined) db.users[userIndex].nicepayCanceledAt = data.nicepayCanceledAt
+        db.users[userIndex].updatedAt = new Date()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
+    if (!isMock()) {
+      return prisma.user.findMany({
+        where: {
+          nicepaySubscriptionStatus: 'ACTIVE',
+          nicepayBid: { not: null },
+          nicepayNextBillingAt: { lte: at },
+        },
+      })
+    }
+
+    const db = initMockDb()
+    return db.users.filter(user =>
+      user.nicepaySubscriptionStatus === 'ACTIVE' &&
+      Boolean(user.nicepayBid) &&
+      Boolean(user.nicepayNextBillingAt && user.nicepayNextBillingAt.getTime() <= at.getTime()),
+    )
   },
 
   // Brand operations
