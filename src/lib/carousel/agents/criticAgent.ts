@@ -1,4 +1,4 @@
-import { checkCopyQuality, type CopyQualityReport, type CopyQualityIssue } from '../../copywriting/copyQualityChecker'
+import { checkCopyQuality, type CopyQualityReport } from '../../copywriting/copyQualityChecker'
 import type { SlideCopy } from '../types'
 import type { NarrativeMemory } from '../narrativeMemory'
 

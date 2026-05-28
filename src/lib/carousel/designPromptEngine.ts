@@ -234,9 +234,3 @@ function getVisualMood(role: string): string {
   }
   return moods[role] ?? 'clean, trustworthy, modern'
 }
-
-function pickTextPosition(slideNumber: number, slideCount: number): TextPosition {
-  if (slideNumber === 1) return 'center'
-  if (slideNumber === slideCount) return 'bottom'
-  return slideNumber % 2 === 0 ? 'top' : 'center'
-}

@@ -37,16 +37,24 @@ function hasEnv(name: string) {
   return Boolean(process.env[name]?.trim())
 }
 
+function hasAnyEnv(names: string[]) {
+  return names.some(hasEnv)
+}
+
 export function getPayPalConfigStatus() {
   const missing = [
-    'PAYPAL_CLIENT_ID',
-    'PAYPAL_CLIENT_SECRET',
-    'PAYPAL_WEBHOOK_ID',
-    'NEXT_PUBLIC_PAYPAL_CLIENT_ID',
-    'NEXT_PUBLIC_PAYPAL_PLAN_LITE',
-    'NEXT_PUBLIC_PAYPAL_PLAN_PRO',
-    'NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED',
-  ].filter(name => !hasEnv(name))
+    hasEnv('PAYPAL_CLIENT_ID') ? null : 'PAYPAL_CLIENT_ID',
+    hasEnv('PAYPAL_CLIENT_SECRET') ? null : 'PAYPAL_CLIENT_SECRET',
+    hasEnv('PAYPAL_WEBHOOK_ID') ? null : 'PAYPAL_WEBHOOK_ID',
+    hasEnv('NEXT_PUBLIC_PAYPAL_CLIENT_ID') ? null : 'NEXT_PUBLIC_PAYPAL_CLIENT_ID',
+    hasAnyEnv(['NEXT_PUBLIC_PAYPAL_PLAN_LITE', 'NEXT_PUBLIC_PAYPAL_PLAN_STARTER'])
+      ? null
+      : 'NEXT_PUBLIC_PAYPAL_PLAN_LITE or NEXT_PUBLIC_PAYPAL_PLAN_STARTER',
+    hasEnv('NEXT_PUBLIC_PAYPAL_PLAN_PRO') ? null : 'NEXT_PUBLIC_PAYPAL_PLAN_PRO',
+    hasAnyEnv(['NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED', 'NEXT_PUBLIC_PAYPAL_PLAN_AGENCY'])
+      ? null
+      : 'NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED or NEXT_PUBLIC_PAYPAL_PLAN_AGENCY',
+  ].filter((name): name is string => Boolean(name))
 
   return {
     ready: missing.length === 0,

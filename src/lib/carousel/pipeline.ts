@@ -3,6 +3,7 @@ import { MockImageProvider } from '../ai/providers/mockImageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { sanitizeImagePrompt } from '../ai/imageProvider'
 import { generateCaption } from './captionEngine'
+import { generateSlideCopies } from './copyEngine'
 import { runNarrativePipeline } from './narrativePipeline'
 import { generateHooks, selectBestHook } from './hookEngine'
 import { renderSlide } from './renderer'
@@ -85,7 +86,7 @@ export async function generateCarouselCampaign(params: {
 
     // Build AgentSlideData for downstream quality reporting
     const structureRoleMap = new Map(structure.slides.map(s => [s.slideNumber, s.role]))
-    let agentSlides: AgentSlideData[] = copies.map(c => ({
+    const agentSlides: AgentSlideData[] = copies.map(c => ({
       slideNumber: c.slideNumber,
       role: structureRoleMap.get(c.slideNumber) ?? 'feature',
       headline: c.headline,
@@ -131,7 +132,12 @@ export async function generateCarouselCampaign(params: {
             showSlideNumber: true,
           })
 
-          console.log(`[DEBUG] Slide ${copy.slideNumber} - Background Prompt: "${sanitizedPrompt}" | Headline: "${copy.headline}" | Body: "${copy.body}" | Final Image URL: "${finalImageUrl}"`)
+          debugSlideRender(copy.slideNumber, {
+            prompt: sanitizedPrompt,
+            headline: copy.headline,
+            body: copy.body,
+            imageUrl: finalImageUrl,
+          })
 
           return { copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }
         })
@@ -185,9 +191,10 @@ export async function generateCarouselCampaign(params: {
     if (copySlidesWithIssues.size > 0) {
       log(`Copy-only regeneration triggered for ${copySlidesWithIssues.size} slide(s)`)
       try {
-        const regenCopies = await generateSlideCopies(
+        const regenResult = await generateSlideCopies(
           params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx
         )
+        const regenCopies = regenResult.copies
         const regenMap = new Map(regenCopies.map(c => [c.slideNumber, c]))
         slides = await Promise.all(
           slides.map(async slide => {
@@ -214,7 +221,7 @@ export async function generateCarouselCampaign(params: {
           caption: captionResult,
         })
         log('Copy-only regeneration complete')
-      } catch (regenError) {
+      } catch {
         log('Copy-only regeneration failed, keeping original slides')
       }
     }
@@ -332,4 +339,22 @@ function extractCopyIssueSlides(issues: string[]): Set<number> {
     }
   }
   return nums
+}
+
+function debugSlideRender(
+  slideNumber: number,
+  details: { prompt: string; headline: string; body: string; imageUrl: string }
+) {
+  if (process.env.NODE_ENV === 'production') return
+
+  const summarize = (value: string) => value.length > 120 ? `${value.slice(0, 120)}...` : value
+  console.log(
+    `[DEBUG] Slide ${slideNumber} rendered`,
+    {
+      prompt: summarize(details.prompt),
+      headline: summarize(details.headline),
+      body: summarize(details.body),
+      imageUrl: summarize(details.imageUrl),
+    }
+  )
 }

@@ -11,7 +11,6 @@ import {
 import {
   approveBillingPayment as approveNicepayPayment,
   createNicepayOrderId,
-  expireBillingKey,
   isPaidPlan as isNicepayPaidPlan,
   nextMonthlyBillingDate as nicepayNextMonth,
 } from '../../../../lib/nicepay'
