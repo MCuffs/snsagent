@@ -1,5 +1,6 @@
 import { MarketingNav } from '../components/MarketingNav'
 import { MarketingFooter } from '../components/MarketingFooter'
+import { WhyShufflaSection } from '../components/WhyShufflaSection'
 import { Check, ArrowRight } from 'lucide-react'
 import { PRICING_PLANS } from '../../lib/limits-types'
 import { getSessionUser } from '../../lib/auth/user'
@@ -208,6 +209,9 @@ export default async function PricingPage() {
                         </div>
                     </div>
                 </section>
+
+                {/* WHY SHUFFLA */}
+                <WhyShufflaSection />
 
                 {/* COMPARISON TABLE */}
                 <section className="pb-28 lg:pb-32">
