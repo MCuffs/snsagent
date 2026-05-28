@@ -3,7 +3,7 @@ import { sanitizeImagePrompt } from '../imageProvider'
 import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
-const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation'
+const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 const NO_TEXT_INSTRUCTIONS = [

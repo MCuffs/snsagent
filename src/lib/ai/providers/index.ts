@@ -31,7 +31,7 @@ export function getPipelineImageProvider(): ImageProvider {
 export function getPipelineImageModel() {
   const provider = (process.env.IMAGE_PROVIDER || 'auto').toLowerCase()
 
-  if (provider === 'gemini') return 'gemini-2.0-flash-preview-image-generation'
+  if (provider === 'gemini') return 'gemini-3.1-flash-image'
 
   if ((provider === 'auto' || provider === 'openai') && isConfiguredOpenAIKey(process.env.OPENAI_API_KEY)) {
     return ACTIVE_OPENAI_IMAGE_MODEL
@@ -40,7 +40,7 @@ export function getPipelineImageModel() {
   if (provider === 'bytedance') return 'bytedance-placeholder'
 
   if (provider === 'auto' && isConfiguredGeminiKey(process.env.GEMINI_API_KEY)) {
-    return 'gemini-2.0-flash-preview-image-generation'
+    return 'gemini-3.1-flash-image'
   }
 
   return 'mock'
