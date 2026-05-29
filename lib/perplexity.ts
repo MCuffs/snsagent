@@ -93,8 +93,8 @@ const BRAND_ANALYSIS_PROMPT = (url: string, locale = 'ko') => {
     ? "'Online store', 'Cafe / F&B', 'Fitness', 'Beauty / Care', 'Education', 'IT / SaaS'"
     : "'온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'"
   const exampleReport = locale === 'en'
-    ? '# Brand Analysis Report\\n\\n## 1. Brand Identity\\n...'
-    : '# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n...'
+    ? 'This is a brand that... (3–4 natural paragraphs, no headers or bullets)'
+    : '이 브랜드는... (3~4문단 자연스러운 서술, 제목이나 목록 없이)'
 
   if (locale === 'en') {
     return `Visit this brand/store URL and perform an in-depth analysis: ${url}
@@ -134,7 +134,7 @@ Return ONLY valid JSON (no code fences, no bold **):
   "contentPillars": ["SNS content pillar (6 items)"],
   "brandKeywords": ["brand keyword (10 items)"],
   "avoidVisuals": ["visual to avoid"],
-  "markdownReport": "${exampleReport}"
+  "markdownReport": "3–4 natural prose paragraphs about this brand — no headers, no bullets, no bold. Plain conversational text a creative strategist would say about this brand."
 }`
   }
 
@@ -175,7 +175,7 @@ IMPORTANT: JSON 응답의 모든 텍스트 값은 반드시 ${lang}으로 작성
   "contentPillars": ["SNS 콘텐츠 기둥 6가지"],
   "brandKeywords": ["브랜드 키워드 10개"],
   "avoidVisuals": ["피해야 할 비주얼"],
-  "markdownReport": "${exampleReport}"
+  "markdownReport": "이 브랜드에 대해 크리에이티브 전략가가 동료에게 설명하듯 3~4문단으로 자연스럽게 서술. 제목(##), 목록(-), 볼드(**) 없이 순수 산문체로."
 }`
 }
 

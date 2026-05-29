@@ -14,8 +14,8 @@ const BRAND_ANALYSIS_PROMPT = (cleanedText: string, locale = 'ko') => {
   const tones = TONE_OPTIONS(locale)
   const industries = INDUSTRY_OPTIONS(locale)
   const exampleReport = locale === 'en'
-    ? '# Brand Analysis Report\\n\\n## 1. Brand Identity\\n...'
-    : '# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n...'
+    ? 'This is a brand that... (3–4 natural paragraphs, no headers or bullets)'
+    : '이 브랜드는... (3~4문단 자연스러운 서술, 제목이나 목록 없이)'
 
   return `You are an expert brand consultant and digital marketer.
 Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
@@ -32,7 +32,7 @@ ${cleanedText}
 3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry. Write them in ${lang}.
 4. The tone of voice must match one of these options: ${tones}
 5. The industry must fit one of: ${industries}
-6. Write a brand identity report under "markdownReport" in ${reportLang}. Cover Brand Identity, Key Strengths, and SNS content strategy. Do NOT use markdown bold syntax (**).
+6. Write a brand analysis summary under "markdownReport". Write it as 3–4 natural prose paragraphs — like a creative strategist explaining this brand to a colleague. Cover: what the brand is and who it's for, what makes it stand out, and what kind of card news content would work best. Do NOT use section headers, bullet points, numbered lists, or markdown bold (**). Plain flowing text only.
 7. Extract brand-specific DNA fields. These must be concrete to the website, not generic industry labels.
 
 Respond ONLY with valid JSON (no code fences) matching this exact structure:

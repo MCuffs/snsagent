@@ -1188,27 +1188,11 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
       ctaStyle: '오늘의 건강 혜택 프로필 링크에서 확인하기'
     }
 
-    const markdownReport = `# 🏷️ 브랜드 분석 및 구도 기획서 [휴100 - 스마트스토어]
+    const markdownReport = `휴100은 건강한 식습관과 친환경 웰빙 라이프스타일을 추구하는 사람들을 위한 온라인 스토어입니다. '하루 100%의 휴식과 건강'이라는 메시지 아래, 바쁜 일상 속에서도 자연과 가까운 삶을 실천하고 싶은 3050 직장인과 가족을 주요 고객으로 합니다.
 
-네이버 스마트스토어(\`${url}\`)의 접속 차단을 우회하여 숍 식별자(\`${shopId}\`) 기반 건강/웰빙 웰니스 카테고리 프로필을 적용하였습니다.
+브랜드의 가장 큰 강점은 진정성입니다. 과장된 효능 주장 없이 성분과 생산 방식의 투명성으로 신뢰를 쌓고, 오가닉 그린 컬러톤으로 시각적 일관성을 유지합니다. 스마트스토어 특성상 리뷰 기반 소셜 프루프가 강하며, 구매 후기를 콘텐츠로 재가공하면 신뢰도와 전환율을 동시에 높일 수 있습니다.
 
-## 1. 브랜드 기본 프로필
-* **브랜드명**: \`휴100 (hu100)\`
-* **업종**: \`온라인 스토어 (건강/친환경/웰빙 라이프스타일 숍)\`
-* **메인 컬러**: 오가닉 라이프를 상징하는 딥 숲 그린 (\`#2F855A\`)
-
-## 2. 브랜드 정체성 & 강점
-* **핵심 타겟**: 몸과 마음의 휴식을 필요로 하는 바쁜 현대인, 자연주의 제품을 찾는 스마트 컨슈머.
-* **브랜드 메시지**: "하루 100%의 완전한 휴식과 건강을 채우는 시간"
-* **권장 톤앤매너**: 차분하고 다정하며 정보전달력이 우수한 어조.
-
-## 3. SNS 카드뉴스 콘텐츠 전략
-* **콘텐츠 포커스**:
-  1. **웰빙 정보성 콘텐츠**: 면역력을 지키는 생활 습관, 친환경 제품 고르는 법 등 유용한 상식을 가독성 높은 카드뉴스로 연재.
-  2. **일상 공감 & 휴식**: 힐링 감성을 담은 릴스 및 자연 친화적 피드 비주얼 구축.
-* **사용 지양 용어 (금칙어)**: \`만병통치약, 기적의 효과, 최저가, 100% 완치\` (의료법상 허위/과대광고 소지가 있거나 신뢰를 저해하는 극단적 표현 배제)
-* **피드 전환율 상승을 위한 CTA**: \`오늘의 건강 혜택 프로필 링크에서 확인하기\`
-`
+카드뉴스는 '면역력을 지키는 생활 습관', '오가닉 제품 고르는 법' 같은 정보성 콘텐츠와 일상 힐링 감성을 교차 편성하는 것이 효과적입니다. "오늘의 건강 혜택 프로필 링크에서 확인하기" 같은 CTA로 마무리해 저압적으로 구매를 유도하는 것이 이 브랜드 톤과 잘 맞습니다.`
     return { brandProfile: withBrandDna(brandProfile, `${shopId} ${url}`), markdownReport }
   } else {
     const brandProfile = {
@@ -1216,31 +1200,16 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
       industry: '온라인 스토어' as const,
       targetAudience: '스마트스토어를 애용하는 합리적이고 트렌디한 2040 모바일 쇼핑족',
       toneOfVoice: '친근하고 명확한 톤' as const,
-      mainColor: '#03C75A', // 네이버 스마트스토어 시그니처 그린
+      mainColor: '#03C75A',
       forbiddenWords: '최저가, 100% 보장, 광고, 실패없는',
       ctaStyle: '스토어에서 단독 혜택 만나보기'
     }
 
-    const markdownReport = `# 🏷️ 브랜드 분석 및 구도 기획서 [스마트스토어]
+    const markdownReport = `${shopId} 스토어는 네이버 스마트스토어를 통해 운영되는 온라인 셀렉트샵으로, 모바일 쇼핑과 빠른 배송을 선호하는 2040 고객층을 주요 타겟으로 합니다. 직관적인 상세페이지 구성과 빠른 고객 응대가 경쟁력입니다.
 
-네이버 스마트스토어(\`${url}\`)의 접속 차단을 우회하여 숍 식별자(\`${shopId}\`) 기반 온라인 스토어 프로필을 적용하였습니다.
+SNS 카드뉴스는 실제 고객 리뷰와 사용 후기를 가공한 소셜 프루프 콘텐츠가 가장 효과적입니다. 상품의 핵심 특징을 3~5개 슬라이드로 간결하게 정리하고, 네이버 스토어 혜택(쿠폰, 포인트 적립)을 활용한 정기 이벤트 콘텐츠도 전환에 도움이 됩니다.
 
-## 1. BRAND IDENTITY
-* **브랜드명**: \`${shopId} 스토어\`
-* **업종**: \`온라인 스토어\`
-* **메인 컬러**: 네이버 스토어의 시그니처 아이덴티티를 살린 그린 (\`#03C75A\`)
-
-## 2. 브랜드 정체성 & 강점
-* **핵심 타겟**: 모바일 쇼핑과 빠른 배송, 상세페이지의 직관적 정보를 신뢰하는 스마트 쇼퍼.
-* **브랜드 경쟁력**: 트렌디한 셀렉션과 친절하고 신속한 네이버 톡톡 응대력.
-
-## 3. SNS 카드뉴스 콘텐츠 전략
-* **콘텐츠 포커스**:
-  1. **실제 사용 후기**: 고객의 리얼 포토리뷰를 활용한 소셜 프루프(Social Proof) 카드뉴스 제작.
-  2. **혜택 안내**: 알림받기 동의 쿠폰, 포인트 적립 이벤트 등 스마트스토어 연동 혜택 적극 홍보.
-* **사용 지양 용어 (금칙어)**: \`최저가, 100% 보장, 광고, 실패없는\` (지나치게 상업적이거나 어뷰징 요소가 느껴지는 문구 제외)
-* **피드 전환율 상승을 위한 CTA**: \`스토어에서 단독 혜택 만나보기\`
-`
+"스토어에서 단독 혜택 만나보기" CTA를 일관되게 사용해 브랜드 인지도와 클릭률을 함께 높이는 방향을 권장합니다.`
     return { brandProfile: withBrandDna(brandProfile, `${shopId} ${url}`), markdownReport }
   }
 }
@@ -1466,10 +1435,10 @@ JSON 형식으로만 응답하세요:`
         const rawJson = aiResponse.choices[0].message.content
         if (!rawJson) throw new Error('AI analysis failed: empty response.')
         parsed = JSON.parse(rawJson)
-        // markdownReport 별도 생성
+        // markdownReport 별도 생성 — 자연스러운 산문체
         parsed.markdownReport = isEn
-          ? `# Brand Analysis Complete\n\nBrand: ${parsed.name || signals.brandName}\nIndustry: ${parsed.industry}\nTarget: ${parsed.targetAudience}\n\nValue Proposition: ${parsed.valueProposition || '-'}\n\nDifferentiators: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
-          : `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
+          ? `${parsed.name || signals.brandName} is a ${parsed.industry?.toLowerCase() || 'brand'} focused on ${parsed.targetAudience || 'its target customers'}. ${parsed.valueProposition || ''}\n\n${Array.isArray(parsed.differentiators) && parsed.differentiators.length ? parsed.differentiators.join(' ') + ' ' : ''}The brand communicates with a ${parsed.toneOfVoice?.toLowerCase() || 'distinctive'} voice that resonates with its audience.\n\nFor card news, the strongest angle is to lead with ${Array.isArray(parsed.contentPillars) ? parsed.contentPillars[0] : 'product stories'} and close with ${parsed.ctaStyle || 'a clear call to action'}.`
+          : `${parsed.name || signals.brandName}은(는) ${parsed.targetAudience || '고객'}을 위한 ${parsed.industry || '브랜드'}입니다. ${parsed.valueProposition || ''}\n\n${Array.isArray(parsed.differentiators) && parsed.differentiators.length ? parsed.differentiators.join(', ') + ' 등의 차별점이 있으며, ' : ''}${parsed.toneOfVoice || '브랜드만의'} 톤으로 고객과 소통합니다.\n\n카드뉴스는 ${Array.isArray(parsed.contentPillars) ? parsed.contentPillars[0] : '핵심 가치'}를 앞세우고, "${parsed.ctaStyle || '자세히 보기'}"로 마무리하는 구성이 가장 효과적입니다.`
       }
 
       if (parsed) {
@@ -1636,15 +1605,14 @@ We tried to scrape the user's Naver SmartStore but were blocked (HTTP 429/403 or
 However, we know the SmartStore shop ID is "${shopId}" and the URL is "${url}".
 ${hint}
 
-Based on this information, infer/predict a highly relevant brand profile and write a professional brand identity and social card-news content strategy report in Markdown.
+Based on this information, infer/predict a highly relevant brand profile.
 
 [Requirements]
 1. Since we couldn't scrape, predict the brand profile values based on the shop ID "${shopId}". For "hu100", match it to a Wellness/Healthy food/Eco-friendly curated lifestyle store. For other IDs, generate a plausible modern online store profile.
 2. The tone of voice must match one of: "친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤".
 3. The industry must fit '온라인 스토어'.
-4. Write a beautiful brand identity and social card-news content strategy report in Markdown (under "markdownReport") in Korean.
-5. Emphasize in the report that this profile was generated via our smart shop-ID analysis fallback engine due to temporary carrier block, but is tailored for their store.
-6. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text, e.g. use "브랜드명: 값" instead of "**브랜드명**: 값".
+4. Write the "markdownReport" as 3–4 natural prose paragraphs in Korean — like a creative strategist describing this brand to a colleague. No section headers (##), no bullet points (-), no bold (**). Plain flowing sentences only.
+5. CRITICAL: No markdown formatting in "markdownReport". Just natural paragraph text separated by blank lines.
 
 You MUST respond ONLY with a valid JSON object matching the following structure:
 {
@@ -1655,7 +1623,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
   "mainColor": "#HEXCODE",
   "forbiddenWords": "word1, word2, word3",
   "ctaStyle": "CTA style recommendation",
-  "markdownReport": "# 🏷️ 브랜드 분석 및 구도 기획서 (스마트스토어 분석 복원)\\n\\n1. 브랜드 정체성\\n브랜드명: 휴100\\n업종: 온라인 스토어\\n\\n2. SNS 콘텐츠 전략\\n..."
+  "markdownReport": "이 브랜드는... (3~4문단 자연스러운 서술)"
 }
 `
           const aiResponse = await openai.chat.completions.create({

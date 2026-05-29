@@ -14,8 +14,8 @@ const BRAND_ANALYSIS_PROMPT = (cleanedText: string, locale = 'ko') => {
   const tones = TONE_OPTIONS(locale)
   const industries = INDUSTRY_OPTIONS(locale)
   const exampleReport = locale === 'en'
-    ? '# Brand Analysis Report\\n\\n## 1. Brand Identity\\n...'
-    : '# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n...'
+    ? 'This is a brand that... (3–4 natural paragraphs, no headers or bullets)'
+    : '이 브랜드는... (3~4문단 자연스러운 서술, 제목이나 목록 없이)'
   const exampleTarget = locale === 'en' ? 'Working women in their 20s–30s' : '2030 여성 직장인'
   const exampleCta = locale === 'en' ? 'Learn more via profile link' : '프로필 링크에서 만나보기'
 
@@ -34,8 +34,8 @@ ${cleanedText}
 3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry. Write them in ${lang}.
 4. The tone of voice must match one of these pre-defined options: ${tones}
 5. The industry must fit one of: ${industries}
-6. Write a brand identity report under "markdownReport" in ${reportLang}. Cover Brand Identity, Key Strengths, and SNS content strategy suggestions. Do NOT use markdown bold syntax (**).
-7. CRITICAL: Do NOT use markdown bold syntax like '**' or '***' anywhere in the "markdownReport". Write section items in plain text.
+6. Write a brand analysis summary under "markdownReport". Write it as 3–4 natural prose paragraphs — like a creative strategist explaining this brand to a colleague. Cover: what the brand is and who it's for, what makes it stand out, and what kind of card news content would work best. Do NOT use section headers, bullet points, numbered lists, or markdown bold (**). Plain flowing text only.
+7. CRITICAL: No markdown formatting of any kind in "markdownReport". No ##, no *, no **, no - lists. Just natural paragraph text separated by blank lines.
 8. Extract brand-specific DNA fields for downstream card-news generation. These must be concrete to the website, not generic industry labels.
 
 You MUST respond ONLY with a valid JSON object (no markdown code fences) matching this structure:
