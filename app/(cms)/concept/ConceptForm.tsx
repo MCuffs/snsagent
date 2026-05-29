@@ -7,6 +7,7 @@ import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
 import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
 import { motion, AnimatePresence } from 'framer-motion'
 import { analytics } from '../../../lib/analytics/thinkingdata'
+import { useTranslations } from 'next-intl'
 
 interface BrandData {
   id: string
@@ -49,22 +50,24 @@ const itemVariants = {
 }
 
 const VISUAL_MOODS = [
-  { id: 'minimal', label: 'Minimal', desc: '깔끔하고 여백 중심' },
-  { id: 'dark-editorial', label: 'Dark Editorial', desc: '무게감 있는 에디토리얼' },
-  { id: 'warm-lifestyle', label: 'Warm Lifestyle', desc: '따뜻하고 감성적인' },
-  { id: 'bold-commerce', label: 'Bold Commerce', desc: '강렬한 커머스 중심' },
-  { id: 'clean-pro', label: 'Clean Professional', desc: '신뢰감 있는 전문적' },
+  { id: 'minimal', label: 'Minimal', descKey: 'mood_minimal' },
+  { id: 'dark-editorial', label: 'Dark Editorial', descKey: 'mood_dark_editorial' },
+  { id: 'warm-lifestyle', label: 'Warm Lifestyle', descKey: 'mood_warm_lifestyle' },
+  { id: 'bold-commerce', label: 'Bold Commerce', descKey: 'mood_bold_commerce' },
+  { id: 'clean-pro', label: 'Clean Professional', descKey: 'mood_clean_pro' },
 ]
 
-const analyzeSteps = [
-  '웹사이트 데이터 스크래핑 중...',
-  '브랜드 주요 가치 및 정체성 분석 중...',
-  '비주얼 테마 및 컬러 추출 중...',
-  '브랜드 콘텐츠 가이드라인 생성 중...',
+const analyzeSteps = (t: (key: string) => string) => [
+  t('analyze_step1'),
+  t('analyze_step2'),
+  t('analyze_step3'),
+  t('analyze_step4'),
 ]
 
 export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   const { setActiveTab } = useTab()
+  const t = useTranslations('concept')
+  const steps = analyzeSteps(t)
   const [phase, setPhase] = useState<'url' | 'profile'>(
     existingBrand?.websiteUrl ? 'profile' : 'url'
   )
@@ -161,7 +164,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         error?: string
       }
 
-      const aiText = data.message || '알 수 없는 오류가 발생했습니다.'
+      const aiText = data.message || t('error_unknown')
       setChatMessages(prev => [...prev, { role: 'ai', content: aiText, id: `cm-ai-${Date.now()}` }])
       setChatHistory(prev => [...prev, { role: 'assistant', content: aiText }])
 
@@ -175,7 +178,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         if (u.brandDescription) handleBrandDescriptionChange(u.brandDescription)
       }
     } catch {
-      setChatMessages(prev => [...prev, { role: 'ai', content: '서버 오류가 발생했습니다.', id: `cm-err-${Date.now()}` }])
+      setChatMessages(prev => [...prev, { role: 'ai', content: t('error_server'), id: `cm-err-${Date.now()}` }])
     } finally {
       setChatWaiting(false)
       chatInputRef.current?.focus()
@@ -193,7 +196,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
       const res = await analyzeBrandWebsiteAction(url)
       if (!res || !res.success) {
         analytics.brandUrlAnalyzed(url, false)
-        setError(('error' in (res ?? {})) ? (res as { error: string }).error : 'AI 브랜드 분석에 실패했습니다.')
+        setError(('error' in (res ?? {})) ? (res as { error: string }).error : t('error_analyze_failed'))
         setIsAnalyzing(false)
         return
       }
@@ -215,7 +218,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         }
       }
     } catch {
-      setError('서버 통신 중 오류가 발생했습니다.')
+      setError(t('error_network'))
     } finally {
       setIsAnalyzing(false)
     }
@@ -242,12 +245,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
       if (res.success) {
         setBrandId(res.brand.id)
         analytics.brandCreateComplete(res.brand.id)
-        setSuccess('브랜드 프로필이 저장되었습니다.')
+        setSuccess(t('success_saved'))
       } else {
-        setError(res.error || '저장 실패')
+        setError(res.error || t('error_save'))
       }
     } catch {
-      setError('저장 중 오류가 발생했습니다.')
+      setError(t('error_save'))
     } finally {
       setIsSaving(false)
     }
@@ -266,10 +269,10 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
           <motion.div variants={itemVariants} className="mb-10">
             <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Step 1 of 1</p>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#111111]">
-              브랜드 스토어 URL을 입력하세요
+              {t('url_title')}
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#52525b]">
-              스마트스토어, 쇼핑몰, 브랜드 홈페이지 URL을 입력하면 AI가 브랜드 프로필을 자동으로 생성합니다.
+              {t('url_desc')}
             </p>
           </motion.div>
 
@@ -297,7 +300,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             {isAnalyzing && (
               <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] p-4">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-xs font-medium text-[#0066ff]">{analyzeSteps[analyzeStep]}</span>
+                  <span className="text-xs font-medium text-[#0066ff]">{steps[analyzeStep]}</span>
                   <span className="text-xs text-[#71717a]">{Math.round(((analyzeStep + 1) / 4) * 100)}%</span>
                 </div>
                 <div className="h-1 w-full overflow-hidden rounded-full bg-[#e4e4e7]">
@@ -319,7 +322,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              {isAnalyzing ? '분석 중...' : 'AI로 브랜드 분석하기'}
+              {isAnalyzing ? t('analyzing') : t('analyze_btn')}
             </button>
           </motion.form>
 
@@ -336,7 +339,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                 <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e4e4e7] bg-white">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="text-xs font-semibold text-[#111111]">AI 브랜드 분석 완료</span>
+                    <span className="text-xs font-semibold text-[#111111]">{t('analysis_complete')}</span>
                   </div>
                   <div className="max-h-64 overflow-y-auto p-4 text-xs leading-relaxed text-[#52525b] whitespace-pre-wrap">
                     {analysisReport}
@@ -358,14 +361,14 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                       setBrandId(saved.brand.id)
                       setPhase('profile')
                     } else {
-                      setError(saved.error || '저장 실패')
+                      setError(saved.error || t('error_save'))
                     }
                   }}
                   disabled={isSaving}
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0066ff] text-sm font-semibold text-white transition hover:bg-[#0052cc] disabled:opacity-50"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  브랜드 저장하고 계속하기
+                  {t('save_continue')}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </motion.div>
@@ -379,7 +382,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               onClick={() => setPhase('profile')}
               className="mt-4 w-full text-center text-sm text-[#71717a] hover:text-[#111111] underline underline-offset-2 block"
             >
-              기존 브랜드 프로필 수정하기 →
+              {t('skip_to_profile')}
             </motion.button>
           )}
         </motion.div>
@@ -401,8 +404,8 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
       <motion.div variants={itemVariants} className="mb-10 flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Brand Concept</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#111111]">브랜드 프로필</h1>
-          <p className="mt-1.5 text-sm text-[#52525b]">모든 카드뉴스 생성의 기준이 되는 브랜드 정체성을 설정합니다.</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#111111]">{t('profile_title')}</h1>
+          <p className="mt-1.5 text-sm text-[#52525b]">{t('profile_desc')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -411,7 +414,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             className="flex items-center gap-1.5 rounded-md border border-[#e4e4e7] bg-white px-3 py-1.5 text-xs font-medium text-[#52525b] hover:border-[#a1a1aa] transition-colors"
           >
             <Globe className="h-3.5 w-3.5" />
-            URL 재분석
+            {t('reanalyze')}
           </button>
           <button
             type="button"
@@ -423,7 +426,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             }`}
           >
             <MessageCircle className="h-3.5 w-3.5" />
-            AI와 대화하기
+            {t('ai_chat_btn')}
           </button>
         </div>
       </motion.div>
@@ -443,7 +446,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* Store URL */}
-        <Section title="스토어 URL">
+        <Section title={t('section_url')}>
           <div className="relative">
             <Globe className="absolute left-3.5 top-3 h-4 w-4 text-[#a1a1aa]" />
             <input
@@ -457,33 +460,33 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         </Section>
 
         {/* Basic Info */}
-        <Section title="기본 정보">
+        <Section title={t('section_basic')}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="브랜드명" value={name} onChange={setName} placeholder="예: Mocha Studio" required />
-            <Field label="업종 / 카테고리" value={industry} onChange={setIndustry} placeholder="예: 뷰티, 패션, 식품" required />
+            <Field label={t('field_brand_name')} value={name} onChange={setName} placeholder={t('field_brand_name_placeholder')} required />
+            <Field label={t('field_industry')} value={industry} onChange={setIndustry} placeholder={t('field_industry_placeholder')} required />
           </div>
           <div className="mt-4">
-            <Field label="주요 고객" value={targetAudience} onChange={setTargetAudience} placeholder="예: 2030 직장인 여성" required />
+            <Field label={t('field_audience')} value={targetAudience} onChange={setTargetAudience} placeholder={t('field_audience_placeholder')} required />
           </div>
         </Section>
 
         {/* Brand Description */}
-        <Section title="브랜드 설명">
+        <Section title={t('section_brand_desc')}>
           <label className="mb-1.5 block text-xs font-medium text-[#52525b]">Brand Description</label>
           <textarea
             value={brandDescription}
             onChange={(e) => handleBrandDescriptionChange(e.target.value)}
-            placeholder="브랜드의 핵심 가치, 차별점, 스토리를 간략히 작성하세요."
+            placeholder={t('brand_desc_placeholder')}
             rows={4}
             className="w-full resize-none rounded-lg border border-[#e4e4e7] bg-white px-3.5 py-2.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
           />
         </Section>
 
         {/* Visual Identity */}
-        <Section title="비주얼 아이덴티티">
+        <Section title={t('section_visual')}>
           {/* Visual Mood */}
           <div className="mb-5">
-            <label className="mb-2.5 block text-xs font-medium text-[#52525b]">비주얼 무드</label>
+            <label className="mb-2.5 block text-xs font-medium text-[#52525b]">{t('visual_mood')}</label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {VISUAL_MOODS.map((mood) => (
                 <button
@@ -497,7 +500,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   }`}
                 >
                   <p className="text-xs font-semibold text-[#111111]">{mood.label}</p>
-                  <p className="mt-0.5 text-[10px] text-[#71717a] leading-4">{mood.desc}</p>
+                  <p className="mt-0.5 text-[10px] text-[#71717a] leading-4">{t(mood.descKey as Parameters<typeof t>[0])}</p>
                 </button>
               ))}
             </div>
@@ -506,7 +509,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Brand Color */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[#52525b]">브랜드 컬러</label>
+              <label className="mb-1.5 block text-xs font-medium text-[#52525b]">{t('brand_color')}</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -520,36 +523,36 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   value={mainColor.startsWith('#') && mainColor.length === 7 ? mainColor : '#0066ff'}
                   onChange={(e) => setMainColor(e.target.value)}
                   className="h-11 w-11 cursor-pointer rounded-lg border border-[#e4e4e7] p-1"
-                  aria-label="컬러 선택"
+                  aria-label={t('color_picker')}
                 />
               </div>
             </div>
 
             {/* Tone */}
             <Field
-              label="톤앤매너"
+              label={t('field_tone')}
               value={toneOfVoice}
               onChange={setToneOfVoice}
-              placeholder="예: 친근하고 명확한"
+              placeholder={t('field_tone_placeholder')}
               required
             />
           </div>
         </Section>
 
         {/* CTA & Forbidden */}
-        <Section title="콘텐츠 가이드">
+        <Section title={t('section_content')}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="기본 CTA"
+              label={t('field_cta')}
               value={ctaStyle}
               onChange={setCtaStyle}
-              placeholder="예: 프로필 링크에서 구매하기"
+              placeholder={t('field_cta_placeholder')}
             />
             <Field
-              label="금칙어"
+              label={t('field_forbidden')}
               value={forbiddenWords}
               onChange={setForbiddenWords}
-              placeholder="쉼표로 구분, 예: 최저가, 100% 보장"
+              placeholder={t('field_forbidden_placeholder')}
             />
           </div>
         </Section>
@@ -562,7 +565,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             className="flex h-11 items-center gap-2 rounded-lg bg-[#111111] px-5 text-sm font-semibold text-white transition hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            저장하기
+            {t('save_btn')}
           </button>
           {brandId && (
             <button
@@ -570,7 +573,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               onClick={() => setActiveTab('generate')}
               className="flex h-11 items-center gap-2 rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#a1a1aa] hover:bg-[#fafafa]"
             >
-              카드뉴스 생성하기
+              {t('continue_btn')}
               <ArrowRight className="h-4 w-4" />
             </button>
           )}
@@ -593,7 +596,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             <div className="flex shrink-0 items-center justify-between border-b border-[#e4e4e7] px-4 py-3">
               <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0066ff] text-[10px] font-bold text-white">S</div>
-                <span className="text-xs font-semibold text-[#111111]">브랜드 프로필 AI</span>
+                <span className="text-xs font-semibold text-[#111111]">{t('ai_panel_title')}</span>
               </div>
               <button
                 type="button"
@@ -608,7 +611,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
               {chatMessages.length === 0 && !chatWaiting && (
                 <div className="rounded-xl rounded-tl-sm bg-[#f0f0f0] px-3.5 py-2.5 text-sm leading-5.5 text-[#111111]">
-                  안녕하세요! 브랜드에 대해 궁금한 점이나 수정하고 싶은 내용을 말씀해주세요. 대화를 통해 브랜드 프로필을 함께 완성해 드릴게요.
+                  {t('ai_welcome')}
                 </div>
               )}
               <AnimatePresence initial={false}>
@@ -653,7 +656,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             {/* Input */}
             <div className="shrink-0 border-t border-[#e4e4e7] bg-white px-3 py-3">
               {!brandId && (
-                <p className="mb-2 text-[11px] text-[#a1a1aa]">브랜드를 먼저 저장해야 AI와 대화할 수 있습니다.</p>
+                <p className="mb-2 text-[11px] text-[#a1a1aa]">{t('ai_no_brand')}</p>
               )}
               <form onSubmit={handleChatSend} className="flex items-center gap-2">
                 <input
@@ -662,7 +665,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={chatWaiting || !brandId}
-                  placeholder={brandId ? '브랜드에 대해 말씀해주세요...' : '먼저 브랜드를 저장하세요'}
+                  placeholder={brandId ? t('chat_placeholder') : t('chat_placeholder_no_brand')}
                   className="h-10 flex-1 rounded-xl border border-[#e4e4e7] bg-[#fafafa] px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10 disabled:opacity-50"
                 />
                 <button
