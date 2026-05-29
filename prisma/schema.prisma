@@ -25,11 +25,11 @@ model User {
   tossLastPaidAt           DateTime?
   tossCanceledAt           DateTime?
   nicepayBid               String?                @unique
-  nicepaySubscriptionStatus String?               // PENDING, ACTIVE, PAST_DUE, CANCELED
+  nicepaySubscriptionStatus String? // PENDING, ACTIVE, PAST_DUE, CANCELED
   nicepayNextBillingAt     DateTime?
   nicepayLastPaidAt        DateTime?
-  nicepayLastOrderId       String?                @unique
   nicepayCanceledAt        DateTime?
+  nicepayLastOrderId       String?                @unique
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   brands                   Brand[]

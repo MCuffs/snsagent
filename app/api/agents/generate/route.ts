@@ -15,6 +15,7 @@ interface ChatMessage {
 interface GenerateAgentRequest {
   messages: ChatMessage[]
   brandId: string
+  language?: 'ko' | 'en'
 }
 
 interface GenerateParams {
@@ -49,7 +50,8 @@ function buildSystemPrompt(
     brandDna?: string | null
   },
   preferencesText: string,
-  scrapedContext: string
+  scrapedContext: string,
+  language?: 'ko' | 'en'
 ) {
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
 
@@ -115,7 +117,7 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
       { "slideNumber": 5, "role": "Save CTA", "description": "계정 팔로우하고 나의 일상에 질서를 더할 팁 소장하기" }
     ]
   }
-}`
+}${language === 'en' ? '\n\nIMPORTANT: You are operating in English mode. Write ALL your messages, strategy briefs, and JSON fields entirely in English. Do not use Korean in any output.' : ''}`
 }
 
 function validateParams(params: unknown): params is GenerateParams {
@@ -135,7 +137,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as GenerateAgentRequest
-    const { messages, brandId } = body
+    const { messages, brandId, language } = body
 
     if (!brandId) return NextResponse.json({ error: 'brandId가 필요합니다.' }, { status: 400 })
 
@@ -146,10 +148,13 @@ export async function POST(request: Request) {
 
     // 1. If history is empty, immediately return greeting message (minimizes OpenAI API load)
     if (!messages || messages.length === 0) {
-      const greeting: AgentResponse = {
+      const greeting: AgentResponse = language === 'en' ? {
+        message: `Hello! I'm the Creative Content Director for ${brand.name}.\n\nPlease share a product URL or campaign topic you'd like to feature (e.g. "new leather bag launch"). I'll design the most effective card news strategy based on your brand's unique identity and target audience.`,
+        ready: false,
+      } : {
         message: `안녕하세요! ${brand.name}의 크리에이티브 콘텐츠 디렉터입니다.
 
-오늘 인스타그램 피드에 소개하고 싶으신 브랜드의 상품 URL이나 캠페인 주제(예: 신상품 가죽백 출시 정보)를 가볍게 남겨주세요. 
+오늘 인스타그램 피드에 소개하고 싶으신 브랜드의 상품 URL이나 캠페인 주제(예: 신상품 가죽백 출시 정보)를 가볍게 남겨주세요.
 
 남겨주신 내용을 바탕으로 브랜드 고유의 감성과 타겟 고객에게 와닿을 수 있는 가장 효과적인 카드뉴스 구성 전략을 직접 기획해 드리겠습니다.`,
         ready: false,
@@ -219,7 +224,7 @@ export async function POST(request: Request) {
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
 
-    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext)
+    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language)
 
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o',

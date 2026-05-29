@@ -57,6 +57,7 @@ export interface MediaCarouselInput {
   productImageUrls?: string[]
   briefing?: EditorialBriefing
   imageProvider?: ImageProvider
+  language?: 'ko' | 'en'
 }
 
 export interface MediaCarouselSlideResult {
@@ -464,6 +465,10 @@ async function generateMediaSlideCopies(
     ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
     : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'
 
+  const langInstruction = input.language === 'en'
+    ? '\n\nIMPORTANT: Write ALL headlines, body copy, and captions in English only. Do not use Korean in any field.'
+    : ''
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 ${editorialPlanSection}
@@ -498,7 +503,7 @@ ${slideDescriptions}
 - 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
 - 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요
-- 모든 카피는 한국어로 작성
+- 모든 카피는 한국어로 작성${langInstruction}
 
 JSON 응답 형식:
 {

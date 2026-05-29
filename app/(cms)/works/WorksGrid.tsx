@@ -7,6 +7,8 @@ import { AlertTriangle, ArrowRight, Clock, ImageOff, Loader2, Trash2 } from 'luc
 import { useTab } from '../TabContext'
 import { motion } from 'framer-motion'
 import { deleteWorkAction } from './actions'
+import { analytics } from '../../../lib/analytics/thinkingdata'
+import { useTranslations } from 'next-intl'
 
 interface WorkItem {
   id: string
@@ -49,23 +51,9 @@ interface WorksGridProps {
   canUpgradeRetention: boolean
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  generated: { label: '완료', color: 'bg-emerald-100 text-emerald-700' },
-  draft: { label: '임시저장', color: 'bg-[#f4f4f5] text-[#52525b]' },
-  pending_approval: { label: '검토 중', color: 'bg-amber-100 text-amber-700' },
-  scheduled: { label: '보관됨', color: 'bg-blue-100 text-blue-700' },
-  posted: { label: '완료', color: 'bg-purple-100 text-purple-700' },
-  failed: { label: '실패', color: 'bg-red-100 text-red-700' },
-}
-
 function formatDate(iso: string) {
   const d = new Date(iso)
   return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function expiryLabel(item: WorkItem) {
-  if (item.daysUntilDeletion === 0) return '오늘 자동 삭제'
-  return `${item.daysUntilDeletion}일 후 자동 삭제`
 }
 
 export default function WorksGrid({
@@ -76,15 +64,31 @@ export default function WorksGrid({
 }: WorksGridProps) {
   const { setActiveTab } = useTab()
   const router = useRouter()
+  const t = useTranslations('works')
   const [deletedIds, setDeletedIds] = useState<string[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const displayedCampaigns = campaigns.filter(campaign => !deletedIds.includes(campaign.id))
 
-  const deleteCampaign = async (item: WorkItem) => {
-    if (!window.confirm(`"${item.title}" 작업물을 삭제할까요? 삭제 후에는 복구할 수 없습니다.`)) return
+  const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+    generated: { label: t('status_complete'), color: 'bg-emerald-100 text-emerald-700' },
+    draft: { label: t('status_draft'), color: 'bg-[#f4f4f5] text-[#52525b]' },
+    pending_approval: { label: t('status_review'), color: 'bg-amber-100 text-amber-700' },
+    scheduled: { label: t('status_archived'), color: 'bg-blue-100 text-blue-700' },
+    posted: { label: t('status_complete'), color: 'bg-purple-100 text-purple-700' },
+    failed: { label: t('status_failed'), color: 'bg-red-100 text-red-700' },
+  }
 
+  const expiryLabel = (item: WorkItem) => {
+    if (item.daysUntilDeletion === 0) return t('today_delete')
+    return t('days_delete', { days: item.daysUntilDeletion })
+  }
+
+  const deleteCampaign = async (item: WorkItem) => {
+    if (!window.confirm(t('delete_confirm', { title: item.title }))) return
+
+    analytics.campaignDelete(item.id)
     setError(null)
     setDeletingId(item.id)
     const result = await deleteWorkAction(item.id)
@@ -105,8 +109,8 @@ export default function WorksGrid({
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f4f5]">
             <ImageOff className="h-7 w-7 text-[#a1a1aa]" />
           </div>
-          <h2 className="text-lg font-bold text-[#111111]">아직 생성된 카드뉴스가 없습니다</h2>
-          <p className="mt-2 text-sm text-[#71717a]">첫 번째 카드뉴스를 생성해보세요.</p>
+          <h2 className="text-lg font-bold text-[#111111]">{t('empty_title')}</h2>
+          <p className="mt-2 text-sm text-[#71717a]">{t('empty_desc')}</p>
           <Link
             href="/concept?tab=generate"
             onClick={(e) => {
@@ -115,7 +119,7 @@ export default function WorksGrid({
             }}
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#111111] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#333333]"
           >
-            카드뉴스 생성하기
+            {t('create_btn')}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -129,7 +133,7 @@ export default function WorksGrid({
       <div className="mb-8 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Works</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#111111]">작업 히스토리</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#111111]">{t('title')}</h1>
         </div>
         <Link
           href="/concept?tab=generate"
@@ -139,19 +143,18 @@ export default function WorksGrid({
           }}
           className="flex items-center gap-1.5 rounded-lg bg-[#111111] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#333333]"
         >
-          새로 만들기
+          {t('new_btn')}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
       <div className="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e4dc] bg-[#fcfaf6] px-4 py-3">
         <p className="text-xs font-medium text-[#625b53]">
-          <span className="font-bold text-[#111111]">{planName}</span> 플랜은 작업물을 {retentionDays}일 동안 보관합니다.
-          삭제 10일 전부터 카드에 안내됩니다.
+          {t('retention_notice', { plan: planName, days: retentionDays })}
         </p>
         {canUpgradeRetention && (
           <Link href="/billing" className="text-xs font-bold text-[#0066ff] transition hover:text-[#004ec4]">
-            보관 기간 늘리기 →
+            {t('upgrade_retention')}
           </Link>
         )}
       </div>

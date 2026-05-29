@@ -27,6 +27,7 @@ import type { EditorialLayer } from '../../../../src/lib/editor/types'
 import { EditorialCanvas } from './editor/EditorialCanvas'
 import { EditorialInspector } from './editor/EditorialInspector'
 import { useEditorialStore } from './editor/useEditorialStore'
+import { analytics } from '../../../../lib/analytics/thinkingdata'
 
 interface Slide {
   id: string
@@ -163,6 +164,11 @@ export default function CampaignResultView({
   const addLayer = useEditorialStore(state => state.addLayer)
   const markSaved = useEditorialStore(state => state.markSaved)
 
+  useEffect(() => {
+    analytics.campaignView(campaign.id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   let agentReportData: AgentReport | null = null
   if (campaign.agentReport) {
     try {
@@ -233,6 +239,7 @@ export default function CampaignResultView({
       setShowRegenerationOffer(true)
       return
     }
+    analytics.slideRegenerate(campaign.id, activeSlide.slideNumber, 'image')
     setEditorBusy(true)
     setMessage(null)
     try {
@@ -374,6 +381,7 @@ export default function CampaignResultView({
     if (!activeSlide?.imageUrl) return
     setExporting(true)
     setMessage(null)
+    analytics.campaignDownload(campaign.id, 'png', 1)
     try {
       if (activeDocument) {
         const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), 'png', 1)
@@ -408,6 +416,7 @@ export default function CampaignResultView({
   const exportZip = async () => {
     setDownloadingAll(true)
     setMessage(null)
+    analytics.campaignDownload(campaign.id, 'zip', slides.length)
     try {
       const zip = new JSZip()
       for (const slide of slides) {

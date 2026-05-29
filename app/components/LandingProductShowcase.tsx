@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useRef, useState, type PointerEvent } from 'react'
 import { ArrowRight, Check, Download, MessageSquareText, Sparkles } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 const editorialCards = [
   '/front/shuffla-editorial-02.webp',
@@ -12,6 +13,7 @@ const editorialCards = [
 ]
 
 export function ProductShowcase({ authenticated = false }: { authenticated?: boolean }) {
+  const t = useTranslations('landing')
   const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
 
   return (
@@ -19,19 +21,17 @@ export function ProductShowcase({ authenticated = false }: { authenticated?: boo
       <div className="mx-auto max-w-[1380px] px-5 md:px-8">
         <div className="mx-auto mb-16 max-w-3xl text-center md:mb-20">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#847d73]">Product workflow</p>
-          <h2 className="mt-5 text-[clamp(2.3rem,5vw,4.1rem)] font-semibold leading-[1.08] tracking-[-0.06em] text-[#171714]">
-            아이디어에서 게시 가능한
-            <br />
-            카드뉴스까지 한 화면에서
+          <h2 className="mt-5 text-[clamp(2.3rem,5vw,4.1rem)] font-semibold leading-[1.08] tracking-[-0.06em] text-[#171714] whitespace-pre-line">
+            {t('section_title')}
           </h2>
         </div>
 
         <div className="space-y-8">
           <ShowcaseRow
             number="01"
-            title="브랜드를 읽고, 콘텐츠 방향을 제안합니다"
-            body="URL과 주제를 입력하면 브랜드 DNA, 타겟 고객, 콘텐츠 목적을 분석해 슬라이드별 흐름을 먼저 설계합니다."
-            action="AI 기획 경험 살펴보기"
+            title={t('row1_title')}
+            body={t('row1_body')}
+            action={t('row1_action')}
             href={accessHref}
           >
             <DirectorMockup />
@@ -39,9 +39,9 @@ export function ProductShowcase({ authenticated = false }: { authenticated?: boo
           <ShowcaseRow
             reverse
             number="02"
-            title="생성된 결과를 바로 편집하고 완성합니다"
-            body="문구, 배경 이미지, 오버레이와 타이포그래피를 조정하고 4:5 고해상도 이미지로 내려받습니다."
-            action="편집 스튜디오 살펴보기"
+            title={t('row2_title')}
+            body={t('row2_body')}
+            action={t('row2_action')}
             href={accessHref}
           >
             <EditorMockup />
@@ -106,14 +106,15 @@ function BrowserShell({ children, title }: { children: React.ReactNode; title: s
 }
 
 function DirectorMockup() {
+  const t = useTranslations('landing')
   const [phase, setPhase] = useState<'ready' | 'generating' | 'done'>('ready')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slides = [
-    ['01', 'Hook', '매일 바르는 선크림, 기준은?'],
-    ['02', 'Context', '민감한 피부가 확인할 포인트'],
-    ['03', 'Detail', '사용감과 루틴을 정리'],
-    ['04', 'Value', '브랜드의 차별점을 전달'],
-    ['05', 'CTA', '저장하고 상세 정보 확인'],
+    ['01', 'Hook', t('slide_hook')],
+    ['02', 'Context', t('slide_context')],
+    ['03', 'Detail', t('slide_detail')],
+    ['04', 'Value', t('slide_value')],
+    ['05', 'CTA', t('slide_cta')],
   ]
 
   const generate = () => {
@@ -126,26 +127,40 @@ function DirectorMockup() {
     timerRef.current = setTimeout(() => setPhase('done'), 1100)
   }
 
+  const directorMsg = phase === 'generating'
+    ? t('director_thinking')
+    : phase === 'done'
+      ? t('director_done')
+      : t('director_ready')
+
+  const statusLabel = phase === 'generating'
+    ? t('director_status_generating')
+    : phase === 'done'
+      ? t('director_status_done')
+      : t('director_status_ready')
+
+  const btnLabel = phase === 'generating'
+    ? t('btn_generating')
+    : phase === 'done'
+      ? t('btn_done')
+      : t('btn_ready')
+
   return (
     <BrowserShell title="Shuffla / Generate">
       <div className="grid min-h-[440px] md:grid-cols-[0.42fr_0.58fr]">
         <div className="border-b border-[#eee9e1] bg-[#faf8f3] p-5 md:border-b-0 md:border-r">
           <div className="flex items-center gap-2 text-xs font-semibold text-[#362f29]">
             <MessageSquareText className="h-4 w-4 text-[#e95b30]" />
-            AI 콘텐츠 디렉터
+            {t('director_label')}
           </div>
           <div className="mt-6 rounded-xl bg-white p-3 text-[11px] leading-5 text-[#686156] shadow-sm ring-1 ring-[#ebe6dc]">
-            여름 신상품 선크림의 저장형 카드뉴스를 만들어줘.
+            {t('director_user_msg')}
           </div>
           <div className="mt-3 rounded-xl bg-[#302c27] p-3 text-[11px] leading-5 text-white/82">
-            {phase === 'generating'
-              ? '브랜드 DNA와 제품 근거를 분석해 슬라이드 카피를 작성하고 있습니다...'
-              : phase === 'done'
-                ? '5장의 카드뉴스 초안을 완성했습니다. 편집 스튜디오에서 마무리해보세요.'
-                : '민감 피부 고객이 매일 확인할 수 있는 사용 팁 흐름으로 기획하겠습니다.'}
+            {directorMsg}
           </div>
           <div className="mt-5 flex items-center justify-between rounded-xl border border-[#e6e0d6] bg-white px-3 py-2.5 text-[10px] text-[#827a6f]">
-            메시지 입력...
+            {t('msg_input')}
             <button type="button" onClick={generate} className="rounded-lg bg-[#171714] px-2.5 py-1 text-white transition active:scale-95">Send</button>
           </div>
         </div>
@@ -156,7 +171,7 @@ function DirectorMockup() {
               <p className="mt-2 text-lg font-semibold tracking-[-0.04em] text-[#211d19]">Daily UV Archive</p>
             </div>
             <span className={`rounded-full px-3 py-1 text-[10px] font-semibold ${phase === 'done' ? 'bg-[#eaf7ef] text-[#28784a]' : 'bg-[#fff0e9] text-[#e95b30]'}`}>
-              {phase === 'generating' ? '생성 중' : phase === 'done' ? '완료됨' : '저장형'}
+              {statusLabel}
             </span>
           </div>
           <div className="mt-6 grid grid-cols-3 gap-2">
@@ -187,7 +202,7 @@ function DirectorMockup() {
             className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#171714] text-xs font-semibold text-white transition hover:bg-[#302c27] active:scale-[0.99]"
           >
             <Sparkles className={`h-3.5 w-3.5 ${phase === 'generating' ? 'animate-spin' : ''}`} />
-            {phase === 'generating' ? '슬라이드 구성 중...' : phase === 'done' ? '다시 시뮬레이션하기' : '카드뉴스 생성하기'}
+            {btnLabel}
           </button>
         </div>
       </div>
@@ -196,9 +211,17 @@ function DirectorMockup() {
 }
 
 function EditorMockup() {
+  const t = useTranslations('landing')
+  const tabLabels = [t('tab_text'), t('tab_bg'), t('tab_effect')] as const
+  type TabLabel = typeof tabLabels[number]
   const [selectedCard, setSelectedCard] = useState(2)
-  const [tab, setTab] = useState<'글자' | '배경' | '효과'>('글자')
-  const [settings, setSettings] = useState({ 글자: 72, 어둡기: 82, 대비: 106 })
+  const [tab, setTab] = useState<TabLabel>(tabLabels[0])
+  const sliderKeys = [t('slider_text'), t('slider_darkness'), t('slider_contrast')]
+  const [settings, setSettings] = useState<Record<string, number>>({
+    [t('slider_text')]: 72,
+    [t('slider_darkness')]: 82,
+    [t('slider_contrast')]: 106,
+  })
   const [exported, setExported] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -220,43 +243,43 @@ function EditorMockup() {
             ))}
           </div>
           <div className="relative mx-auto aspect-[4/5] max-h-[390px] min-h-[300px] flex-1 overflow-hidden rounded-lg bg-[#121212] shadow-[0_18px_45px_rgba(20,20,20,0.2)]">
-            <Image src={editorialCards[selectedCard]} alt="생성된 Shuffla 카드뉴스 편집 화면" fill sizes="(min-width: 768px) 360px, 55vw" className="object-cover transition duration-500" />
+            <Image src={editorialCards[selectedCard]} alt="Generated Shuffla card news editor" fill sizes="(min-width: 768px) 360px, 55vw" className="object-cover transition duration-500" />
             <div className="absolute inset-[7%] rounded-sm border border-dashed border-white/22" />
-            {exported && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/94 px-3 py-1.5 text-[10px] font-medium text-[#211d19] shadow-lg">PNG 내보내기 완료</div>}
+            {exported && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/94 px-3 py-1.5 text-[10px] font-medium text-[#211d19] shadow-lg">{t('export_done')}</div>}
           </div>
         </div>
         <div className="p-3 md:p-4">
-          <p className="text-xs font-semibold text-[#27231f]">카드 디자인 편집</p>
+          <p className="text-xs font-semibold text-[#27231f]">{t('editor_title')}</p>
           <div className="mt-4 flex gap-1 rounded-lg bg-[#f1ede6] p-1 text-[9px] text-[#82796e]">
-            {(['글자', '배경', '효과'] as const).map(label => (
+            {tabLabels.map(label => (
               <button type="button" key={label} onClick={() => setTab(label)} className={`flex-1 rounded-md py-1.5 text-center transition ${tab === label ? 'bg-white font-semibold text-[#27231f]' : ''}`}>{label}</button>
             ))}
           </div>
-          {tab === '글자' ? (
+          {tab === tabLabels[0] ? (
             <>
-              <p className="mt-5 text-[10px] text-[#91887b]">타이틀</p>
+              <p className="mt-5 text-[10px] text-[#91887b]">Title</p>
               <div className="mt-2 rounded-md border border-[#e6dfd4] bg-white p-2 text-[10px] text-[#3c372f]">Why Shuffla?</div>
             </>
           ) : (
             <div className="mt-5 rounded-md border border-[#e6dfd4] bg-white p-3 text-[10px] leading-5 text-[#6d665c]">
-              {tab === '배경' ? '밝기와 색감을 조정해 텍스트 가독성을 확보합니다.' : '그레인과 대비를 조정해 에디토리얼 무드를 완성합니다.'}
+              {tab === tabLabels[1] ? t('bg_hint') : t('effect_hint')}
             </div>
           )}
-          {Object.entries(settings).map(([label, value]) => (
+          {sliderKeys.map((label) => (
             <label key={label} className="mt-4 block">
-              <span className="mb-2 flex justify-between text-[9px] text-[#847b70]"><span>{label}</span><span>{value}</span></span>
+              <span className="mb-2 flex justify-between text-[9px] text-[#847b70]"><span>{label}</span><span>{settings[label]}</span></span>
               <input
                 type="range"
-                min={label === '대비' ? 80 : 20}
-                max={label === '대비' ? 130 : 100}
-                value={value}
+                min={label === t('slider_contrast') ? 80 : 20}
+                max={label === t('slider_contrast') ? 130 : 100}
+                value={settings[label]}
                 onChange={event => setSettings(current => ({ ...current, [label]: Number(event.target.value) }))}
                 className="h-1 w-full cursor-pointer accent-[#e95b30]"
               />
             </label>
           ))}
           <button type="button" onClick={exportPng} className="mt-6 flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-[#171714] text-[10px] font-medium text-white transition active:scale-[0.98]">
-            <Download className="h-3 w-3" /> PNG 내보내기
+            <Download className="h-3 w-3" /> {t('export_png')}
           </button>
         </div>
       </div>
@@ -265,21 +288,22 @@ function EditorMockup() {
 }
 
 export function CapabilityObjects() {
+  const t = useTranslations('landing')
   const capabilities = [
     {
       figure: <LayerFigure />,
-      title: '브랜드 중심 기획',
-      body: '브랜드 URL, 톤앤매너, 핵심 상품 정보를 기반으로 콘텐츠 방향을 세웁니다.',
+      title: t('capability_1_title'),
+      body: t('capability_1_body'),
     },
     {
       figure: <AgentFigure />,
-      title: 'AI 카피와 이미지',
-      body: '슬라이드 흐름에 맞는 문구와 제품 중심의 비주얼을 함께 생성합니다.',
+      title: t('capability_2_title'),
+      body: t('capability_2_body'),
     },
     {
       figure: <ExportFigure />,
-      title: '편집과 다운로드',
-      body: '텍스트와 배경을 보정한 뒤 4:5 고해상도 PNG/JPG 결과물로 출력합니다.',
+      title: t('capability_3_title'),
+      body: t('capability_3_body'),
     },
   ]
 
@@ -354,32 +378,38 @@ function GalleryCard({ image, index }: { image: string; index: number }) {
       onPointerMove={updateGlow}
       className={`landing-gallery-card relative aspect-[4/5] overflow-hidden rounded-[16px] border border-[#e8e4dc] bg-[#171717] shadow-[0_18px_52px_rgba(22,20,18,0.1)] ${index % 2 === 1 ? 'md:translate-y-8' : ''}`}
     >
-      <Image src={image} alt={`Shuffla가 생성한 브랜드 카드뉴스 ${index + 1}`} fill priority={index < 2} sizes="(min-width: 768px) 24vw, 48vw" className="object-cover transition duration-500" />
+      <Image src={image} alt={`Shuffla card news ${index + 1}`} fill priority={index < 2} sizes="(min-width: 768px) 24vw, 48vw" className="object-cover transition duration-500" />
       <span className="landing-gallery-glow" />
     </figure>
   )
 }
 
 export function ConnectedWorkflow() {
+  const t = useTranslations('landing')
   const stages = [
-    { title: 'Concept', metric: '브랜드 DNA 분석', detail: '톤앤매너와 고객 맥락 수집', progress: '72%' },
-    { title: 'Generate', metric: '5 slides ready', detail: '카피 및 이미지 렌더링', progress: '100%' },
-    { title: 'Export', metric: 'PNG / ZIP', detail: '다운로드 준비 완료', progress: '86%' },
+    { title: 'Concept', metric: t('workflow_stage1_metric'), detail: t('workflow_stage1_detail'), progress: '72%' },
+    { title: 'Generate', metric: '5 slides ready', detail: t('workflow_stage2_detail'), progress: '100%' },
+    { title: 'Export', metric: 'PNG / ZIP', detail: t('workflow_stage3_detail'), progress: '86%' },
   ]
   const [active, setActive] = useState(1)
+
+  const activityItems = [
+    [t('activity_1'), 'now'],
+    [t('activity_2'), '04s'],
+    [t('activity_3'), '12s'],
+    [t('activity_4'), '18s'],
+  ]
 
   return (
     <section id="workflow" className="bg-[#fbfaf7] py-24 md:py-32">
       <div className="mx-auto grid max-w-[1300px] gap-14 px-5 md:px-8 lg:grid-cols-[0.37fr_0.63fr]">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#847d73]">One connected system</p>
-          <h2 className="mt-5 text-[clamp(2.2rem,4vw,3.5rem)] font-semibold leading-[1.12] tracking-[-0.06em]">
-            콘텐츠 운영을
-            <br />
-            하나의 흐름으로
+          <h2 className="mt-5 text-[clamp(2.2rem,4vw,3.5rem)] font-semibold leading-[1.12] tracking-[-0.06em] whitespace-pre-line">
+            {t('workflow_title')}
           </h2>
           <p className="mt-6 max-w-sm text-sm leading-7 text-[#777064]">
-            기획, 생성, 편집 결과가 연결된 상태로 이동합니다. 단계를 눌러 실제 작업 흐름을 확인해보세요.
+            {t('workflow_desc')}
           </p>
         </div>
         <div className="landing-operations-panel overflow-hidden rounded-[24px] border border-[#e5dfd5] bg-white">
@@ -421,12 +451,7 @@ export function ConnectedWorkflow() {
             <div className="p-5">
               <p className="text-[10px] uppercase tracking-[0.18em] text-[#968d80]">Activity stream</p>
               <div className="mt-5 space-y-4">
-                {[
-                  ['카피 구조가 승인되었습니다', 'now'],
-                  ['배경 이미지 렌더링 완료', '04s'],
-                  ['편집 문서를 동기화했습니다', '12s'],
-                  ['PNG 내보내기 준비됨', '18s'],
-                ].map(([message, time], index) => (
+                {activityItems.map(([message, time], index) => (
                   <div key={message} className="landing-activity-item flex gap-3" style={{ animationDelay: `${index * 0.55}s` }}>
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ed6238]" />
                     <div className="flex-1 border-b border-[#f0ebe3] pb-3">

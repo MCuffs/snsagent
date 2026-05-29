@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ArrowRight, 
-  ImagePlus, 
-  Sparkles, 
-  Send, 
-  X, 
-  Target, 
-  Compass, 
+import {
+  ArrowRight,
+  ImagePlus,
+  Sparkles,
+  Send,
+  X,
+  Target,
+  Compass,
   Layers,
   Sparkle
 } from 'lucide-react'
+import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
 interface Brand {
   id: string
@@ -58,14 +60,6 @@ interface GenerateParams {
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
 }
-
-const LOADING_STEPS = [
-  'AI 콘텐츠 디렉터가 브랜드를 분석하고 카드뉴스 콘셉트를 도출하고 있습니다.',
-  '슬라이드별 최적의 마케팅 카피라인과 톤을 조율하고 있습니다.',
-  '이미지 모델용 비주얼 방향과 배경 프롬프트를 설계하고 있습니다.',
-  '헤드라인을 분절하고 타이포그래피 레이아웃을 계산하고 있습니다.',
-  '가독성, safe area, 모바일 저장성을 최종 검수하고 있습니다.',
-]
 
 let msgCounter = 0
 function mkId() { return `m-${++msgCounter}` }
@@ -154,6 +148,17 @@ const formItemVariants = {
 
 export default function GenerateForm({ brand }: GenerateFormProps) {
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('generate')
+  const language = locale === 'en' ? 'en' : 'ko'
+
+  const LOADING_STEPS = [
+    t('loading_step1'),
+    t('loading_step2'),
+    t('loading_step3'),
+    t('loading_step4'),
+    t('loading_step5'),
+  ]
 
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -254,22 +259,22 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, brandId: brand.id }),
+        body: JSON.stringify({ messages: history, brandId: brand.id, language }),
       })
       const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; error?: string }
 
       if (data.error) {
-        appendAiMessage('요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+        appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
         return
       }
 
-      const msg = data.message || '다시 시도해주세요.'
+      const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
       appendAiMessage(msg, data.ready && data.params ? data.params : undefined)
 
       const assistantHistory: ChatMessage = { role: 'assistant', content: msg }
       setChatHistory(prev => [...prev, assistantHistory])
     } catch {
-      appendAiMessage('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setIsWaiting(false)
     }
@@ -283,15 +288,15 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const res = await fetch('/api/agents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [], brandId: brand.id }),
+          body: JSON.stringify({ messages: [], brandId: brand.id, language }),
         })
         const data = await res.json() as { message?: string; error?: string }
         if (!active) return
-        const msg = data.error ? '오류가 발생했습니다. 다시 시도해주세요.' : (data.message || '다시 시도해주세요.')
+        const msg = data.error ? (locale === 'en' ? 'An error occurred. Please try again.' : '오류가 발생했습니다. 다시 시도해주세요.') : (data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.'))
         appendAiMessage(msg)
         setChatHistory([{ role: 'assistant', content: msg }])
       } catch {
-        if (active) appendAiMessage('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
+        if (active) appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
       } finally {
         if (active) setIsWaiting(false)
       }
@@ -324,6 +329,14 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     setGenerating(true)
     setError(null)
 
+    timeEvent('generate_complete')
+    analytics.generateStart({
+      brandId: brand.id,
+      slideCount: readyParams.slideCount,
+      platform: 'card_news',
+      intent: readyParams.objective,
+    })
+
     try {
       let productImageUrls: string[] = []
       if (referenceFiles.length > 0) {
@@ -332,7 +345,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
         const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
         if (!uploadRes.ok || !uploadData.urls?.length) {
-          setError(uploadData.error || '참고 이미지 업로드에 실패했습니다.')
+          setError(uploadData.error || t('error_upload'))
           setGenerating(false)
           return
         }
@@ -347,9 +360,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           brandId: brand.id,
           topic: readyParams.topic,
           category: brand.industry,
-          title: `${readyParams.topic} 카드뉴스`,
+          title: language === 'en' ? `${readyParams.topic} Card News` : `${readyParams.topic} 카드뉴스`,
           keyContent: buildCardCopyContext(readyParams),
-          tone: brand.toneOfVoice || '감성적이고 따뜻하게',
+          tone: brand.toneOfVoice || (language === 'en' ? 'warm and emotional' : '감성적이고 따뜻하게'),
           contentType: readyParams.contentType,
           slideCount: readyParams.slideCount,
           productUrl: readyParams.productUrl || undefined,
@@ -362,19 +375,28 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           reasonForStyle: readyParams.reasonForStyle,
           structurePreview: readyParams.structurePreview,
           productImageUrls,
+          language,
         }),
       })
 
       const data = await res.json() as { campaignId?: string; error?: string }
       if (!res.ok || data.error) {
-        setError(data.error || '생성에 실패했습니다.')
+        analytics.generateFailed(brand.id, data.error || 'api_error')
+        setError(data.error || t('error_generate'))
         setGenerating(false)
         return
       }
 
+      analytics.generateComplete({
+        brandId: brand.id,
+        campaignId: data.campaignId ?? '',
+        slideCount: readyParams.slideCount,
+        durationMs: 0,
+      })
       router.push(`/campaign/${data.campaignId}`)
     } catch {
-      setError('서버 통신 중 오류가 발생했습니다.')
+      analytics.generateFailed(brand.id, 'network_error')
+      setError(t('error_network'))
       setGenerating(false)
     }
   }
@@ -383,10 +405,11 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
     if (files.length > 4) {
-      setError('참고 이미지는 최대 4장까지 선택할 수 있습니다.')
+      setError(t('error_max_images'))
       return
     }
     setReferenceFiles(files)
+    if (files.length > 0) analytics.productImageAdd(files.length)
     setError(null)
   }
 
@@ -413,7 +436,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               <Sparkles className="h-6 w-6 text-[#9E7D68]" />
             </div>
           </motion.div>
-          <h2 className="text-xl font-black tracking-[-0.03em] text-[#2C1E1A]">전략 카드뉴스 기획 빌드 중</h2>
+          <h2 className="text-xl font-black tracking-[-0.03em] text-[#2C1E1A]">{t('building_title')}</h2>
           <p className="mt-3 text-sm text-[#8C7E7A] font-semibold leading-6 min-h-[48px] px-2">{LOADING_STEPS[loadingStep]}</p>
           <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-[#F2EAE1]">
             <motion.div
@@ -422,7 +445,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               transition={{ duration: 3.5, ease: 'easeInOut' }}
             />
           </div>
-          <p className="mt-4 text-xs text-[#C2B5AA] font-bold">잠시만 기다려주세요 (약 1분 소요)</p>
+          <p className="mt-4 text-xs text-[#C2B5AA] font-bold">{t('wait_msg')}</p>
         </motion.div>
       </div>
     )
@@ -555,12 +578,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold text-[#2C1E1A]">실제 상품 이미지 첨부</p>
-                      <p className="text-[10px] text-[#8C7E7A] mt-0.5 font-semibold">AI 배경에 합성할 제품 컷 (선택, 최대 4장)</p>
+                      <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
+                      <p className="text-[10px] text-[#8C7E7A] mt-0.5 font-semibold">{t('attach_image_desc')}</p>
                     </div>
                     <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-bold text-[#2C1E1A] transition-all hover:border-[#9E7D68] hover:bg-[#FFFDFB] shadow-sm active:scale-98">
                       <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
-                      파일 선택
+                      {t('select_file')}
                       <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
                     </label>
                   </div>
@@ -588,7 +611,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                   className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] hover:to-[#7E5E4A] py-4 text-sm font-black text-white transition-all hover:shadow-[0_8px_24px_rgba(158,125,104,0.25)] active:scale-[0.99]"
                 >
                   <Sparkles className="h-4 w-4 text-[#FFFDF8]" />
-                  이 기획안으로 카드뉴스 생성 시작
+                  {t('generate_cta')}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -606,7 +629,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={readyParams ? "피드백을 적어 상세 기획을 조율해보세요 (예: 글자 크기 살짝 줄여서...)" : "소개할 상품명이나 홍보할 주제를 말씀해 주세요..."}
+              placeholder={readyParams ? t('feedback_placeholder') : t('input_placeholder')}
               disabled={isWaiting || isRevealingMessage}
               className="h-12 flex-1 rounded-2xl border border-[#E6DFD5] bg-white px-4 text-sm text-[#2C1E1A] placeholder-[#C2B5AA] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/5 disabled:opacity-50 font-bold transition-all"
               autoFocus
@@ -633,17 +656,17 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               <p className="text-[10px] font-black uppercase tracking-widest text-[#B88E76] flex items-center gap-1">
                 <Sparkle className="h-3 w-3 fill-current" /> AI Content Director
               </p>
-              <h3 className="mt-1 text-base font-black tracking-tight text-[#2C1E1A]">전략 기획 브리핑</h3>
+              <h3 className="mt-1 text-base font-black tracking-tight text-[#2C1E1A]">{t('director_title')}</h3>
             </div>
             {readyParams ? (
               <span className="flex items-center gap-1.5 rounded-full bg-[#EDF7F2] px-2.5 py-1 text-[10px] font-bold text-[#2F7E53] border border-[#C6EBCE]/50 shadow-sm">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#2F7E53] animate-pulse" />
-                기획 완료
+                {t('status_ready')}
               </span>
             ) : (
               <span className="flex items-center gap-1.5 rounded-full bg-[#FEF6EE] px-2.5 py-1 text-[10px] font-bold text-[#C27330] border border-[#FAD8BC]/50 shadow-sm">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#C27330] animate-pulse" />
-                대기 중
+                {t('status_waiting')}
               </span>
             )}
           </div>
@@ -662,25 +685,25 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               className="rounded-2xl border border-[#EFEAE2] bg-white/80 backdrop-blur-sm p-4.5 space-y-3.5 shadow-[0_4px_20px_rgba(158,125,104,0.03)]"
             >
               <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">홍보 주제</span>
+                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('topic_label')}</span>
                 <span className="text-xs font-black text-[#2C1E1A] truncate max-w-[200px]">{readyParams.topic}</span>
               </div>
               <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">비주얼 스타일</span>
+                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('visual_label')}</span>
                 <span className="rounded bg-[#9E7D68]/10 border border-[#9E7D68]/20 px-2 py-0.5 text-[10px] font-black text-[#9E7D68]">
                   {readyParams.visualHint}
                 </span>
               </div>
               <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">콘텐츠 구성 목적</span>
+                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('content_type_label')}</span>
                 <span className="text-xs font-bold text-[#5C4E4B]">{readyParams.contentType}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">슬라이드 분량</span>
-                <span className="text-xs font-bold text-[#5C4E4B]">{readyParams.slideCount}장 구성</span>
+                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('slide_count_label')}</span>
+                <span className="text-xs font-bold text-[#5C4E4B]">{t('slide_count_value', { count: readyParams.slideCount })}</span>
               </div>
               <div className="rounded-xl bg-[#F8F4EE] px-3 py-3">
-                <span className="block text-[10px] font-bold text-[#A69282] mb-1">이번 콘텐츠의 목표</span>
+                <span className="block text-[10px] font-bold text-[#A69282] mb-1">{t('objective_label')}</span>
                 <p className="text-xs font-semibold leading-5 text-[#5C4E4B]">{readyParams.objective}</p>
               </div>
             </motion.div>
@@ -694,18 +717,18 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                   className="space-y-4"
                 >
                   <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-[#B88E76]" /> 핵심 카피 방향
+                    <Target className="h-3.5 w-3.5 text-[#B88E76]" /> {t('hook_section')}
                   </h4>
                   <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-4 space-y-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
                     {readyParams.hookDirection && (
                       <div>
-                        <span className="block text-[9px] font-bold text-[#A69282]">첫 장 후크</span>
+                        <span className="block text-[9px] font-bold text-[#A69282]">{t('hook_label')}</span>
                         <p className="text-xs font-bold text-[#2C1E1A] mt-1 leading-5">{readyParams.hookDirection}</p>
                       </div>
                     )}
                     {readyParams.recommendedCta && (
                       <div className="border-t border-[#F5EFE6] pt-3">
-                        <span className="block text-[9px] font-bold text-[#A69282]">마지막 행동 제안</span>
+                        <span className="block text-[9px] font-bold text-[#A69282]">{t('cta_label')}</span>
                         <p className="text-xs font-bold text-[#C68D6A] mt-1">{readyParams.recommendedCta}</p>
                       </div>
                     )}
@@ -723,7 +746,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 className="space-y-4 pt-2"
               >
                 <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" /> 주요 슬라이드 흐름
+                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" /> {t('flow_section')}
                 </h4>
                 <div className="relative border-l border-dashed border-[#E5DDD3] pl-5 ml-2.5 space-y-5">
                   {compactSlidePreview(readyParams.structurePreview).map((slide, idx) => (
@@ -746,7 +769,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 </div>
                 {readyParams.structurePreview.length > 4 && (
                   <p className="pl-2 text-[10px] font-bold text-[#A69282]">
-                    중간 전개 {readyParams.structurePreview.length - 4}개는 생성 후 편집 화면에서 조정할 수 있습니다.
+                    {t('flow_note', { count: readyParams.structurePreview.length - 4 })}
                   </p>
                 )}
               </motion.div>
@@ -769,9 +792,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               <Compass className="h-6 w-6 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
             </motion.div>
             <div className="relative z-10 space-y-2">
-              <p className="text-sm font-black text-[#2C1E1A]">AI 디렉터 기획 제안 대기 중</p>
+              <p className="text-sm font-black text-[#2C1E1A]">{t('director_waiting')}</p>
               <p className="text-xs leading-5 text-[#8C7E7A] font-semibold max-w-[240px] mx-auto">
-                홍보할 상품명 또는 제품 URL을 대화창에 남겨주시면 브랜드 취향과 마케팅 트렌드를 분석하여 최적의 전략안을 제안합니다.
+                {t('director_waiting_desc')}
               </p>
             </div>
           </div>

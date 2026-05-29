@@ -1,87 +1,85 @@
-import type { ImageProvider } from '../imageProvider'
-import { sanitizeImagePrompt } from '../imageProvider'
+import { GoogleGenerativeAI, type Part } from '@google/generative-ai'
+import { type ImageProvider, sanitizeImagePrompt } from '../imageProvider'
 import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
-const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
+// Nano Banana 2 = Gemini 3.1 Flash Image
+export const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'
 
-const NO_TEXT_INSTRUCTIONS = [
-  'Background photograph only.',
-  'No readable text, branding, signage, watermarks, UI elements, or typographic shapes.',
-  'Keep any printed surfaces blank or out of focus.',
-].join(' ')
+const NO_TEXT_INSTRUCTIONS =
+  'Background photograph only. No readable text, branding, signs, UI, or typography anywhere.'
 
 export class GeminiImageProvider implements ImageProvider {
-  private readonly apiKey: string
+  private client: GoogleGenerativeAI
+  private model: string
 
-  constructor(apiKey = process.env.GEMINI_API_KEY) {
-    if (!apiKey?.trim() || apiKey === 'your-gemini-api-key-here') {
-      throw new Error('GEMINI_API_KEY is not configured.')
-    }
-    this.apiKey = apiKey.trim()
+  constructor(apiKey = process.env.GEMINI_API_KEY, model = GEMINI_IMAGE_MODEL) {
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not configured.')
+    this.client = new GoogleGenerativeAI(apiKey)
+    this.model = model
   }
 
   async generateImage(
     prompt: string,
-    _options?: { size?: string; productImageUrls?: string[] }
+    options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
     const sanitized = sanitizeImagePrompt(prompt)
     const fullPrompt = `${sanitized}\n${NO_TEXT_INSTRUCTIONS}`
 
     try {
-      const url = `${GEMINI_API_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${this.apiKey}`
-
-      const body = {
-        contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-      }
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const genModel = this.client.getGenerativeModel({
+        model: this.model,
+        generationConfig: {
+          // @ts-expect-error — responseModalities not yet in TS types
+          responseModalities: ['IMAGE'],
+          temperature: 1,
+          topP: 0.95,
+          topK: 40,
+        },
       })
 
-      if (!res.ok) {
-        const errText = await res.text()
-        throw new Error(`Gemini API error ${res.status}: ${errText}`)
+      const parts: Part[] = [{ text: fullPrompt }]
+
+      const refUrls = options?.productImageUrls?.filter(Boolean) ?? []
+      for (const url of refUrls.slice(0, 2)) {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) continue
+          const buffer = Buffer.from(await res.arrayBuffer())
+          const mimeType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0] as
+            | 'image/jpeg'
+            | 'image/png'
+            | 'image/webp'
+          parts.push({ inlineData: { data: buffer.toString('base64'), mimeType } })
+        } catch {
+          // skip bad reference
+        }
       }
 
-      const data = await res.json() as GeminiResponse
+      const result = await genModel.generateContent(parts)
+      const response = result.response
 
-      const imagePart = data.candidates?.[0]?.content?.parts?.find(
-        (p): p is GeminiInlineDataPart => 'inlineData' in p
-      )
-
-      if (!imagePart?.inlineData?.data) {
-        throw new Error('Gemini returned no image data')
+      for (const candidate of response.candidates ?? []) {
+        for (const part of candidate.content?.parts ?? []) {
+          if (part.inlineData?.data) {
+            const buffer = Buffer.from(part.inlineData.data, 'base64')
+            const mimeType = part.inlineData.mimeType || 'image/png'
+            const ext = mimeType.endsWith('jpeg') || mimeType.endsWith('jpg') ? 'jpeg' : 'png'
+            const fileName = `gemini-bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+            const persistedUrl = await uploadGeneratedAsset({
+              fileName,
+              content: buffer,
+              contentType: mimeType as 'image/png' | 'image/jpeg',
+            })
+            return { imageUrl: persistedUrl }
+          }
+        }
       }
 
-      const buffer = Buffer.from(imagePart.inlineData.data, 'base64')
-      const mimeType = imagePart.inlineData.mimeType || 'image/png'
-      const ext = mimeType === 'image/jpeg' ? 'jpeg' : 'png'
-
-      const imageUrl = await uploadGeneratedAsset({
-        fileName: `gemini-bg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`,
-        content: buffer,
-        contentType: mimeType as 'image/png' | 'image/jpeg',
-      })
-
-      return { imageUrl }
+      throw new Error('Gemini returned no image data')
     } catch (err) {
-      console.warn('[GeminiImageProvider] Failed, falling back to mock:', err)
+      console.error('[GeminiImageProvider] Generation failed, falling back to mock', err)
       return new MockImageProvider().generateImage(prompt)
     }
   }
-}
-
-interface GeminiTextPart { text: string }
-interface GeminiInlineDataPart { inlineData: { mimeType: string; data: string } }
-type GeminiPart = GeminiTextPart | GeminiInlineDataPart
-
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: { parts?: GeminiPart[] }
-  }>
 }

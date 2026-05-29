@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Check, Loader2, X } from 'lucide-react'
 import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
+import { analytics } from '../../../lib/analytics/thinkingdata'
 
 declare global {
   interface Window {
@@ -96,6 +97,11 @@ function PricingGrid({
   const [canceling, setCanceling] = useState(false)
 
   useEffect(() => {
+    analytics.billingPageView(currentPlan)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     if (!tossClientKey || window.TossPayments) return
 
     const script = document.createElement('script')
@@ -124,6 +130,7 @@ function PricingGrid({
   const cancelSubscription = async () => {
     if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
     setCanceling(true)
+    analytics.subscriptionCancel(currentPlan, paymentProvider ?? 'unknown')
     try {
       const endpoint = paymentProvider === 'toss'
         ? '/api/payments/toss/cancel'
@@ -153,6 +160,8 @@ function PricingGrid({
       setError('토스페이먼츠 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
       return
     }
+    analytics.planSelectClick(planKey, currentPlan)
+    analytics.paymentStart(planKey, 'toss')
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
     const payment = window.TossPayments(tossClientKey).payment({ customerKey: tossCustomerKey })
@@ -178,6 +187,8 @@ function PricingGrid({
       setError('나이스페이 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
       return
     }
+    analytics.planSelectClick(planKey, currentPlan)
+    analytics.paymentStart(planKey, 'nicepay')
 
     const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 19000, UNLIMITED: 45000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
@@ -215,10 +226,13 @@ function PricingGrid({
           })
           const data = await res.json() as { error?: string; offer?: string }
           if (!res.ok) {
+            analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error')
             setError(data.error || '결제 승인에 실패했습니다.')
           } else if (data.offer === 'regeneration') {
+            analytics.paymentSuccess(planKey, 'nicepay')
             router.push('/billing?success=true&offer=regeneration')
           } else {
+            analytics.paymentSuccess(planKey, 'nicepay')
             router.push('/billing?success=true')
           }
         } catch {

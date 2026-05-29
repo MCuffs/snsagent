@@ -5,6 +5,7 @@ import { CreditCard, LogOut } from 'lucide-react'
 import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
 import { TabProvider } from './TabContext'
 import SidebarNav from './SidebarNav'
+import ThinkingDataProvider from '../components/ThinkingDataProvider'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser()
@@ -15,6 +16,12 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
 
   return (
     <TabProvider>
+      <ThinkingDataProvider
+        userId={user.id}
+        userEmail={user.email ?? undefined}
+        userPlan={user.plan ?? 'FREE'}
+        userName={user.name ?? undefined}
+      />
       <div className="flex h-screen overflow-hidden bg-white text-[#111111]">
         {/* Sidebar */}
         <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e4e4e7] bg-[#fafafa] lg:flex">

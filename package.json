@@ -20,10 +20,12 @@
     "jszip": "^3.10.1",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
+    "next-intl": "^4.13.0",
     "openai": "^6.38.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.34.5",
+    "thinkingdata-browser": "^2.5.0",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
