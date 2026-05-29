@@ -1104,7 +1104,7 @@ function readRecommendedKeyContent(value: unknown, fallback: string) {
   return lines.length > 0 ? lines.join('\n') : fallback
 }
 
-function getGenericWebsiteFallback(url: string) {
+function getGenericWebsiteFallback(url: string, locale = 'ko') {
   let host = 'brand'
   try {
     host = new URL(url).hostname.replace(/^www\./, '').split('.')[0] || host
@@ -1115,19 +1115,44 @@ function getGenericWebsiteFallback(url: string) {
     .split(/[-_]/)
     .filter(Boolean)
     .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(' ') || '브랜드'
+    .join(' ') || (locale === 'en' ? 'Brand' : '브랜드')
+
+  const isEn = locale === 'en'
 
   const brandProfile = {
     name: displayName,
-    industry: '온라인 스토어',
-    targetAudience: '온라인에서 상품과 서비스를 비교하고 구매하는 잠재 고객',
-    toneOfVoice: '친근하고 신뢰감 있게',
+    industry: isEn ? 'Online store' : '온라인 스토어',
+    targetAudience: isEn
+      ? 'Potential customers who compare and purchase products online'
+      : '온라인에서 상품과 서비스를 비교하고 구매하는 잠재 고객',
+    toneOfVoice: isEn ? 'Friendly and trustworthy' : '친근하고 신뢰감 있게',
     mainColor: '#1f1512',
-    forbiddenWords: '무조건, 100% 보장, 업계 최고, 한정 수량 과장',
-    ctaStyle: '스토어에서 자세히 보기',
+    forbiddenWords: isEn
+      ? 'guaranteed, 100% promise, best in industry, limited quantity hype'
+      : '무조건, 100% 보장, 업계 최고, 한정 수량 과장',
+    ctaStyle: isEn ? 'See details in store' : '스토어에서 자세히 보기',
   }
 
-  const markdownReport = `# 브랜드 분석 및 구도 기획서
+  const markdownReport = isEn
+    ? `# Brand Analysis Draft
+
+The website could not be scraped directly due to access restrictions, rate limits, or security policies. Shuffla generated this brand draft using its fallback analysis engine.
+
+## 1. Basic Brand Profile
+Brand: ${displayName}
+Industry: Online store
+Main color: #1f1512
+
+## 2. Brand Direction
+Target audience: Potential customers who compare and purchase products online
+Tone of voice: Friendly and trustworthy
+
+## 3. Card News Suggestions
+Highlight key product features, usage scenarios, and customer benefits in a concise card news format.
+Forbidden words: guaranteed, 100% promise, best in industry, limited quantity hype
+CTA: See details in store
+`
+    : `# 브랜드 분석 및 구도 기획서
 
 입력한 웹사이트가 일시적으로 접근 제한, 과도한 요청 제한, 보안 정책 등으로 직접 수집되지 않아 Shuffla의 대체 분석 엔진으로 브랜드 초안을 생성했습니다.
 
@@ -1688,7 +1713,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
       }
     }
 
-    const fallback = getGenericWebsiteFallback(url)
+    const fallback = getGenericWebsiteFallback(url, locale)
     return {
       success: true as const,
       brandProfile: withBrandDna(fallback.brandProfile, url),
