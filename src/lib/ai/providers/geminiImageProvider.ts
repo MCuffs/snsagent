@@ -4,7 +4,7 @@ import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
 // Nano Banana 2 = Gemini 3.1 Flash Image
-export const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation'
+export const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'
 
 const NO_TEXT_INSTRUCTIONS =
   'Background photograph only. No readable text, branding, signs, UI, or typography anywhere.'
