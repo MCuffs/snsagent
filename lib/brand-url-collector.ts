@@ -63,7 +63,57 @@ export async function collectBrandUrlContext(url: string, options?: { isNaverSto
     }
   }
 
+  // Direct fetch failed — try Jina AI Reader (handles JS-rendered pages, bot-blocked sites)
+  diagnostics.push('direct-fetch: all candidates failed, trying jina-reader')
+  try {
+    const jinaResult = await fetchWithJina(url)
+    diagnostics.push(`jina-reader: ok (${jinaResult.length} chars)`)
+    return {
+      requestedUrl: url,
+      finalUrl: url,
+      status: 200,
+      promptContext: buildJinaPromptContext(url, jinaResult),
+      sourceText: jinaResult.slice(0, 12000),
+      diagnostics,
+    }
+  } catch (jinaError) {
+    diagnostics.push(`jina-reader: ${jinaError instanceof Error ? jinaError.message : String(jinaError)}`)
+  }
+
   throw new Error(`웹사이트를 읽지 못했습니다. ${diagnostics.join(' | ') || getErrorMessage(lastError)}`)
+}
+
+async function fetchWithJina(url: string): Promise<string> {
+  const jinaUrl = `https://r.jina.ai/${url}`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 20000)
+  try {
+    const response = await fetch(jinaUrl, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'text/plain',
+        'X-Return-Format': 'text',
+        'X-Remove-Selector': 'header, footer, nav, .cookie-banner, .popup',
+      },
+    })
+    if (!response.ok) throw new Error(`Jina HTTP ${response.status}`)
+    const text = await response.text()
+    if (text.length < 100) throw new Error('Jina returned insufficient content')
+    return text.slice(0, 15000)
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function buildJinaPromptContext(url: string, markdownContent: string): string {
+  return [
+    '[Collection Method: Jina AI Reader]',
+    `Requested URL: ${url}`,
+    `Content length: ${markdownContent.length} chars`,
+    '',
+    '[Page Content (Markdown)]',
+    markdownContent.slice(0, 11000),
+  ].join('\n').slice(0, 12000)
 }
 
 export function extractBrandSignals(html: string, finalUrl: string) {
