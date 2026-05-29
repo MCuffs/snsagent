@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
-import { deleteBillingKey, NicePayError } from '../../../../lib/nicepay'
+import { createNicepayOrderId, expireBillingKey, NicepayError } from '../../../../lib/nicepay'
 
 export const runtime = 'nodejs'
 
@@ -16,10 +16,10 @@ export async function POST() {
   }
 
   try {
-    await deleteBillingKey(user.nicepayBid)
+    await expireBillingKey(user.nicepayBid, createNicepayOrderId('expire', user.nicepayBid))
   } catch (error) {
-    if (error instanceof NicePayError) {
-      console.warn(`[NicePay Cancel] deleteBillingKey failed (continuing): ${error.code} — ${error.message}`)
+    if (error instanceof NicepayError) {
+      console.warn(`[NicePay Cancel] expireBillingKey failed (continuing): ${error.code} — ${error.message}`)
     } else {
       console.error('[NicePay Cancel] Unexpected error', error)
     }

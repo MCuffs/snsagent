@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
 import {
-  registerBillingKey,
-  chargeBillingKey,
-  createNicePayOrderId,
+  issueBillingKey,
+  approveBillingPayment,
+  createNicepayOrderId,
   nextMonthlyBillingDate,
   isPaidPlan,
-  NicePayError,
-  type NicePayPlan,
+  NicepayError,
+  type PaidPlan,
 } from '../../../../lib/nicepay'
 import { normalizePlan } from '../../../../lib/limits-types'
 
@@ -22,17 +22,14 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null)
   const plan = body?.plan as string | undefined
-  const cardNo = body?.cardNo as string | undefined
-  const expYear = body?.expYear as string | undefined
-  const expMonth = body?.expMonth as string | undefined
-  const idNo = body?.idNo as string | undefined
-  const cardPw = body?.cardPw as string | undefined
+  const authToken = body?.authToken as string | undefined
+  const orderId = body?.orderId as string | undefined
 
   if (!isPaidPlan(plan ?? null)) {
     return NextResponse.json({ error: '유효하지 않은 플랜입니다.' }, { status: 400 })
   }
-  if (!cardNo || !expYear || !expMonth || !idNo || !cardPw) {
-    return NextResponse.json({ error: '카드 정보가 불완전합니다.' }, { status: 400 })
+  if (!authToken || !orderId) {
+    return NextResponse.json({ error: '결제 인증 정보가 불완전합니다.' }, { status: 400 })
   }
 
   const currentPlan = normalizePlan(user.plan ?? 'FREE')
@@ -43,28 +40,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이미 사용 가능한 1회권이 있습니다.' }, { status: 409 })
   }
 
-  const orderId = createNicePayOrderId('start', `${user.id}:${plan}:${Date.now()}`)
-
+  let bid: string | null = null
   try {
-    const billing = await registerBillingKey({
-      orderId,
-      amount: 100,
-      goodsName: `Shuffla 구독 등록`,
-      cardNo,
-      expYear,
-      expMonth,
-      idNo,
-      cardPw,
-      buyerEmail: user.email,
-      buyerName: user.name ?? undefined,
-    })
+    const billing = await issueBillingKey(authToken, orderId)
+    bid = billing.bid
 
-    const bid = billing.bid
-    const chargeOrderId = createNicePayOrderId('start', `${user.id}:${plan}:charge`)
-    const payment = await chargeBillingKey({
+    const payOrderId = createNicepayOrderId('start', `${authToken}:${plan}`)
+    const payment = await approveBillingPayment({
       bid,
-      orderId: chargeOrderId,
-      plan: plan as NicePayPlan,
+      orderId: payOrderId,
+      plan: plan as PaidPlan,
       buyerEmail: user.email,
       buyerName: user.name,
     })
@@ -84,7 +69,7 @@ export async function POST(request: NextRequest) {
     console.log(`[NicePay] User ${user.id} subscribed to ${plan}. tid=${payment.tid}`)
     return NextResponse.json({ success: true, plan, nextBillingAt: nextBillingAt.toISOString() })
   } catch (error) {
-    if (error instanceof NicePayError) {
+    if (error instanceof NicepayError) {
       console.error(`[NicePay] Register failed: ${error.code} — ${error.message}`)
       return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
     }

@@ -1,28 +1,12 @@
 import prisma from '../../../../lib/db'
 import { dbService } from '../../../../lib/db-service'
-import {
-  verifyNicePayWebhookSignature,
-  nextMonthlyBillingDate,
-  approveBillingPayment,
-  createNicepayOrderId,
-  isPaidPlan,
-  NicePayError,
-} from '../../../../lib/nicepay'
+import { nextMonthlyBillingDate } from '../../../../lib/nicepay'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   const rawBody = await request.text()
   console.log('[NicePay Webhook] raw body:', rawBody)
-
-  const signature = request.headers.get('x-signature') || request.headers.get('x-nicepay-signature') || ''
-  if (signature) {
-    const valid = verifyNicePayWebhookSignature(rawBody, signature)
-    if (!valid) {
-      console.error('[NicePay Webhook] Invalid signature')
-      return Response.json({ success: false, error: 'invalid_signature' }, { status: 401 })
-    }
-  }
 
   let body: Record<string, unknown>
   try {
@@ -33,15 +17,14 @@ export async function POST(request: Request) {
 
   const eventType = String(body.eventType || body.type || '')
   const tid = String(body.tid || '')
-  const orderId = String(body.orderId || '')
   const resultCode = String(body.resultCode || '')
   const bid = String(body.bid || '')
 
-  console.log(`[NicePay Webhook] eventType=${eventType} tid=${tid} orderId=${orderId} resultCode=${resultCode}`)
+  console.log(`[NicePay Webhook] eventType=${eventType} tid=${tid} resultCode=${resultCode}`)
 
   try {
     if (eventType === 'BILLING' || resultCode === '0000') {
-      await handleBillingSuccess({ tid, orderId, bid, amount: Number(body.amount || 0) })
+      await handleBillingSuccess({ tid, bid, amount: Number(body.amount || 0) })
     }
     if (eventType === 'BILLING_FAIL' || (resultCode && resultCode !== '0000' && bid)) {
       await handleBillingFail({ bid, resultCode, resultMsg: String(body.resultMsg || '') })
@@ -56,9 +39,7 @@ export async function POST(request: Request) {
   return Response.json({ success: true })
 }
 
-async function handleBillingSuccess({ tid, orderId, bid, amount }: {
-  tid: string; orderId: string; bid: string; amount: number
-}) {
+async function handleBillingSuccess({ tid, bid, amount }: { tid: string; bid: string; amount: number }) {
   if (!bid) return
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })
@@ -76,9 +57,7 @@ async function handleBillingSuccess({ tid, orderId, bid, amount }: {
   console.log(`[NicePay Webhook] Billing success — user=${user.id} tid=${tid}`)
 }
 
-async function handleBillingFail({ bid, resultCode, resultMsg }: {
-  bid: string; resultCode: string; resultMsg: string
-}) {
+async function handleBillingFail({ bid, resultCode, resultMsg }: { bid: string; resultCode: string; resultMsg: string }) {
   if (!bid) return
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })
