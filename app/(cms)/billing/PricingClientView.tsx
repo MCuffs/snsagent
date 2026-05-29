@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Check, Loader2, X } from 'lucide-react'
 import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
@@ -58,7 +59,7 @@ interface PricingClientViewProps {
 }
 
 function formatLimit(limit: number) {
-  return `${limit}회`
+  return `${limit}`
 }
 
 export default function PricingClientView(props: PricingClientViewProps) {
@@ -93,6 +94,7 @@ function PricingGrid({
   showRegenerationOffer,
 }: PricingClientViewProps) {
   const router = useRouter()
+  const t = useTranslations('billing')
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
 
@@ -107,12 +109,12 @@ function PricingGrid({
     const script = document.createElement('script')
     script.src = 'https://js.tosspayments.com/v2/standard'
     script.async = true
-    script.onerror = () => setError('토스페이먼츠 결제 모듈을 불러오지 못했습니다.')
+    script.onerror = () => setError(t('toss_load_error'))
     document.body.appendChild(script)
     return () => {
       document.body.removeChild(script)
     }
-  }, [tossClientKey])
+  }, [tossClientKey, t])
 
   useEffect(() => {
     if (!nicepayClientKey || window.AUTHNICE) return
@@ -120,15 +122,15 @@ function PricingGrid({
     const script = document.createElement('script')
     script.src = 'https://pay.nicepay.co.kr/v1/js/'
     script.async = true
-    script.onerror = () => setError('나이스페이 결제 모듈을 불러오지 못했습니다.')
+    script.onerror = () => setError(t('nicepay_load_error'))
     document.body.appendChild(script)
     return () => {
       document.body.removeChild(script)
     }
-  }, [nicepayClientKey])
+  }, [nicepayClientKey, t])
 
   const cancelSubscription = async () => {
-    if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
+    if (!confirm(t('cancel_confirm'))) return
     setCanceling(true)
     analytics.subscriptionCancel(currentPlan, paymentProvider ?? 'unknown')
     try {
@@ -140,12 +142,12 @@ function PricingGrid({
       const res = await fetch(endpoint, { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
-        setError(data.error || '구독 취소에 실패했습니다.')
+        setError(data.error || t('cancel_error'))
       } else {
         router.refresh()
       }
     } catch {
-      setError('네트워크 오류가 발생했습니다.')
+      setError(t('network_error'))
     } finally {
       setCanceling(false)
     }
@@ -153,11 +155,11 @@ function PricingGrid({
 
   const handleTossPayment = async (planKey: string) => {
     if (!tossClientKey) {
-      setError('토스페이먼츠 클라이언트 키가 설정되지 않았습니다.')
+      setError(t('toss_key_missing'))
       return
     }
     if (!window.TossPayments) {
-      setError('토스페이먼츠 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      setError(t('toss_loading'))
       return
     }
     analytics.planSelectClick(planKey, currentPlan)
@@ -174,17 +176,17 @@ function PricingGrid({
         customerEmail,
       })
     } catch {
-      setError('카드 등록을 시작하지 못했습니다. 다시 시도해주세요.')
+      setError(t('card_register_failed'))
     }
   }
 
   const handleNicepayPayment = (planKey: string) => {
     if (!nicepayClientKey) {
-      setError('나이스페이 클라이언트 키가 설정되지 않았습니다.')
+      setError(t('nicepay_key_missing'))
       return
     }
     if (!window.AUTHNICE) {
-      setError('나이스페이 결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      setError(t('nicepay_loading'))
       return
     }
     analytics.planSelectClick(planKey, currentPlan)
@@ -193,7 +195,6 @@ function PricingGrid({
     const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 19000, UNLIMITED: 45000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
-    // Server 승인 방식: returnUrl은 사용하지 않으나 필드 필수라 dummy 처리
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
 
     window.AUTHNICE.requestPay({
@@ -204,12 +205,12 @@ function PricingGrid({
       goodsName: `Shuffla ${planKey} 월 구독`,
       returnUrl: `${appUrl}/api/nicepay/server-auth-dummy`,
       fnError: (result) => {
-        setError(result.errorMsg || '나이스페이 결제를 시작하지 못했습니다.')
+        setError(result.errorMsg || t('nicepay_start_failed'))
       },
       fnClose: async (result) => {
         if (!result.tid || !result.authToken || result.resultCode !== '0000') {
           if (result.resultCode && result.resultCode !== '0000') {
-            setError(result.resultMsg || '결제가 취소되었습니다.')
+            setError(result.resultMsg || t('payment_canceled'))
           }
           return
         }
@@ -227,7 +228,7 @@ function PricingGrid({
           const data = await res.json() as { error?: string; offer?: string }
           if (!res.ok) {
             analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error')
-            setError(data.error || '결제 승인에 실패했습니다.')
+            setError(data.error || t('nicepay_approve_failed'))
           } else if (data.offer === 'regeneration') {
             analytics.paymentSuccess(planKey, 'nicepay')
             router.push('/billing?success=true&offer=regeneration')
@@ -236,7 +237,7 @@ function PricingGrid({
             router.push('/billing?success=true')
           }
         } catch {
-          setError('네트워크 오류가 발생했습니다.')
+          setError(t('network_error'))
         }
       },
     })
@@ -252,7 +253,7 @@ function PricingGrid({
 
       {hasSubscription && (
         <div className="flex items-center justify-between rounded-lg border border-[#ece9e0] bg-[#faf8f4] px-5 py-4">
-          <p className="text-sm font-bold text-[#5d584f]">구독 중입니다. 취소하면 즉시 이용권 없는 상태로 전환됩니다.</p>
+          <p className="text-sm font-bold text-[#5d584f]">{t('active_subscription')}</p>
           <button
             type="button"
             disabled={canceling}
@@ -260,34 +261,30 @@ function PricingGrid({
             className="btn-secondary flex-shrink-0 ml-4"
           >
             {canceling ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-            구독 취소
+            {t('cancel_btn')}
           </button>
         </div>
       )}
 
       {currentPlan === 'FREE' && (
         <div className="rounded-lg border border-[#ece9e0] bg-white px-5 py-4 text-sm font-bold text-[#5d584f]">
-          Free 플랜 사용 중입니다. 하루에 카드뉴스 1개를 생성할 수 있으며 AI 재생성은 포함되지 않습니다.
+          {t('free_plan_notice')}
         </div>
       )}
 
       {(showRegenerationOffer || currentPlan === 'LITE') && (
         <article className="rounded-xl border border-[#f0cdb7] bg-[#fff8f2] p-6">
-          <p className="text-[11px] font-black uppercase tracking-widest text-[#b94718]">One-time option</p>
+          <p className="text-[11px] font-black uppercase tracking-widest text-[#b94718]">{t('one_time_eyebrow')}</p>
           <div className="mt-3 flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
-              <h2 className="text-xl font-black tracking-tight text-[#171411]">AI 재생성 1회 이용권</h2>
-              <p className="mt-2 text-sm font-bold text-[#5d584f]">
-                19,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
-              </p>
-              <p className="mt-2 text-xs leading-5 text-[#746a62]">
-                현재 작업물에서 AI 배경 재생성을 한 번 실행할 수 있습니다. 자동 갱신되지 않습니다.
-              </p>
+              <h2 className="text-xl font-black tracking-tight text-[#171411]">{t('one_time_title')}</h2>
+              <p className="mt-2 text-sm font-bold text-[#5d584f]">{t('one_time_desc')}</p>
+              <p className="mt-2 text-xs leading-5 text-[#746a62]">{t('one_time_detail')}</p>
             </div>
             <div className="w-full shrink-0 md:w-64">
               {currentPlan === 'LITE' ? (
                 <div className="rounded-lg bg-[#f1f0eb] px-4 py-3 text-center text-sm font-bold text-[#5d584f]">
-                  사용 가능한 1회권이 있습니다
+                  {t('one_time_used')}
                 </div>
               ) : tossClientKey ? (
                 <button
@@ -295,7 +292,7 @@ function PricingGrid({
                   onClick={() => void handleTossPayment('LITE')}
                   className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
                 >
-                  3,000원으로 1회 추가 (토스)
+                  {t('one_time_cta_toss')}
                 </button>
               ) : nicepayClientKey ? (
                 <button
@@ -303,10 +300,10 @@ function PricingGrid({
                   onClick={() => handleNicepayPayment('LITE')}
                   className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
                 >
-                  3,000원으로 1회 추가 (나이스페이)
+                  {t('one_time_cta_nicepay')}
                 </button>
               ) : (
-                <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
+                <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
               )}
             </div>
           </div>
@@ -329,7 +326,7 @@ function PricingGrid({
                   <h2 className="text-lg font-black tracking-tight text-neutral-950">{plan.name}</h2>
                   {isCurrentPlan && (
                     <span className="rounded-full bg-[#f1f0eb] px-2 py-1 text-[10px] font-bold text-[#6f6a61]">
-                      현재 플랜
+                      {t('current_plan')}
                     </span>
                   )}
                 </div>
@@ -338,10 +335,10 @@ function PricingGrid({
               </div>
 
               <div className="space-y-3 border-y border-[#ece9e0] py-5 text-sm">
-                <Feature>월 카드뉴스 {formatLimit(plan.monthlyCardLimit)} 생성</Feature>
-                <Feature>작업 히스토리 {plan.historyRetentionDays}일 보관</Feature>
-                <Feature>캠페인별 AI 배경 재생성 1회분</Feature>
-                <Feature>참고 이미지 입력 및 결과 편집</Feature>
+                <Feature>{t('feature_generation_count', { limit: formatLimit(plan.monthlyCardLimit) })}</Feature>
+                <Feature>{t('feature_history_days', { days: plan.historyRetentionDays })}</Feature>
+                <Feature>{t('feature_regen_campaign')}</Feature>
+                <Feature>{t('feature_edit_ref')}</Feature>
               </div>
 
               <div className="mt-6">
@@ -351,11 +348,11 @@ function PricingGrid({
                     disabled
                     className="btn-secondary w-full opacity-60"
                   >
-                    사용 중
+                    {t('in_use')}
                   </button>
                 ) : hasSubscription ? (
                   <button type="button" disabled className="btn-secondary w-full opacity-60">
-                    현재 구독 취소 후 선택
+                    {t('cancel_after_sub')}
                   </button>
                 ) : (
                   <div className="space-y-3">
@@ -365,7 +362,7 @@ function PricingGrid({
                         onClick={() => void handleTossPayment(planKey)}
                         className="w-full rounded-lg bg-[#0064ff] py-2.5 text-sm font-black text-white transition-all hover:bg-[#0054d6] active:scale-[0.98]"
                       >
-                        국내 카드 결제 (토스페이먼츠)
+                        {t('domestic_toss')}
                       </button>
                     )}
                     {nicepayClientKey && !tossClientKey && (
@@ -374,7 +371,7 @@ function PricingGrid({
                         onClick={() => handleNicepayPayment(planKey)}
                         className="w-full rounded-lg bg-[#e8173e] py-2.5 text-sm font-black text-white transition-all hover:bg-[#c90f32] active:scale-[0.98]"
                       >
-                        국내 카드 결제 (나이스페이)
+                        {t('domestic_nicepay')}
                       </button>
                     )}
                     {nicepayClientKey && tossClientKey && (
@@ -383,13 +380,13 @@ function PricingGrid({
                         onClick={() => handleNicepayPayment(planKey)}
                         className="w-full rounded-lg border border-[#e8173e] py-2.5 text-sm font-black text-[#e8173e] transition-all hover:bg-[#fff0f3] active:scale-[0.98]"
                       >
-                        나이스페이로 결제
+                        {t('nicepay_alt')}
                       </button>
                     )}
                     {(tossClientKey || nicepayClientKey) && paypalPlanId && (
                       <div className="flex items-center gap-3 py-1 text-[11px] font-bold text-[#6f6a61]">
                         <span className="h-px flex-1 bg-[#ece9e0]" />
-                        해외 고객
+                        {t('foreign_divider')}
                         <span className="h-px flex-1 bg-[#ece9e0]" />
                       </div>
                     )}
@@ -402,7 +399,7 @@ function PricingGrid({
                       />
                     )}
                     {!tossClientKey && !nicepayClientKey && !paypalPlanId && (
-                      <p className="text-center text-xs font-bold text-[#6f6a61]">결제 설정 준비 중</p>
+                      <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
                     )}
                   </div>
                 )}
@@ -427,6 +424,7 @@ function PayPalSubscribeButton({
   onError: (message: string) => void
 }) {
   const [{ isPending }] = usePayPalScriptReducer()
+  const t = useTranslations('billing')
 
   const createSubscription = useCallback(
     (_data: Record<string, unknown>, actions: { subscription: { create: (options: object) => Promise<string> } }) =>
@@ -443,14 +441,14 @@ function PayPalSubscribeButton({
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) {
-        onError(body.error || 'PayPal 구독 활성화에 실패했습니다.')
+        onError(body.error || t('paypal_activate_failed'))
         return
       }
       onSuccess()
     } catch {
-      onError('네트워크 오류가 발생했습니다.')
+      onError(t('network_error'))
     }
-  }, [onError, onSuccess])
+  }, [onError, onSuccess, t])
 
   if (isPending) {
     return (
@@ -462,12 +460,12 @@ function PayPalSubscribeButton({
 
   return (
     <div>
-      <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">PayPal 해외 결제</p>
+      <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">{t('paypal_label')}</p>
       <PayPalButtons
         style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
         createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
         onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
-        onError={() => onError('PayPal 결제 중 오류가 발생했습니다.')}
+        onError={() => onError(t('paypal_error'))}
       />
     </div>
   )

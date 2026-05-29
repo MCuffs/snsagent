@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { CreditCard, LogOut } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
 import { TabProvider } from './TabContext'
 import SidebarNav from './SidebarNav'
@@ -13,6 +14,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
 
   const brands = await getCachedBrands(user.id)
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
+  const t = await getTranslations('cms_layout')
+  const tCms = await getTranslations('cms')
 
   return (
     <TabProvider>
@@ -28,7 +31,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           {/* Logo */}
           <div className="flex h-[60px] items-center border-b border-[#e4e4e7] px-5">
             <Link href="/concept" className="flex items-center gap-2.5">
-              <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla 로고" />
+              <Image src="/shuffla-logo-mark.png" width={27} height={27} alt={t('logo_alt')} />
               <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
             </Link>
           </div>
@@ -46,7 +49,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
               <CreditCard className="h-3.5 w-3.5" />
               <span className="font-medium uppercase tracking-wide">{user.plan}</span>
             </span>
-            <span className="text-[#0066ff] font-semibold">요금제 →</span>
+            <span className="text-[#0066ff] font-semibold">{t('plan_link')}</span>
           </Link>
 
           <div className="flex items-center justify-between rounded-md px-3 py-2">
@@ -63,7 +66,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
                 serverRedirect('/login')
               }}
             >
-              <button type="submit" className="ml-2 rounded p-1 text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors" title="로그아웃">
+              <button type="submit" className="ml-2 rounded p-1 text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors" title={tCms('logout')}>
                 <LogOut className="h-3.5 w-3.5" />
               </button>
             </form>
