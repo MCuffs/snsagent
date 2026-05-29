@@ -1,24 +1,38 @@
 import Groq from 'groq-sdk'
 
-const BRAND_ANALYSIS_PROMPT = (cleanedText: string) => `
-You are an expert brand consultant and digital marketer.
+const TONE_OPTIONS = (locale: string) => locale === 'en'
+  ? '"Friendly and clear", "Professional and trustworthy", "Young and energetic", "Premium and calm"'
+  : '"친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤"'
+
+const INDUSTRY_OPTIONS = (locale: string) => locale === 'en'
+  ? "'Online store', 'Cafe / F&B', 'Fitness', 'Beauty / Care', 'Education', 'IT / SaaS'"
+  : "'온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'"
+
+const BRAND_ANALYSIS_PROMPT = (cleanedText: string, locale = 'ko') => {
+  const lang = locale === 'en' ? 'English' : '한국어'
+  const reportLang = locale === 'en' ? 'English' : 'Korean (한국어)'
+  const tones = TONE_OPTIONS(locale)
+  const industries = INDUSTRY_OPTIONS(locale)
+  const exampleReport = locale === 'en'
+    ? '# Brand Analysis Report\\n\\n## 1. Brand Identity\\n...'
+    : '# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n...'
+
+  return `You are an expert brand consultant and digital marketer.
 Analyze the following text content scraped from a user's store or brand website, and extract/infer the brand profile fields.
 Also, write a professional brand analysis report in Markdown format.
+
+IMPORTANT: All text values in the JSON (name, targetAudience, toneOfVoice, forbiddenWords, ctaStyle, coreProducts, valueProposition, customerPainPoints, differentiators, visualMood, contentPillars, brandKeywords, avoidVisuals, markdownReport) MUST be written in ${lang}.
 
 [Collected Brand URL Context]
 ${cleanedText}
 
 [Requirements]
-1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style for Instagram. Prioritize Page Metadata, JSON-LD structured data, headings, image alt text, product/category signals, and important body text. Do not overfit to footer/legal/navigation text.
+1. Identify the brand's name, core products/items, target audience, tone of voice, a recommended primary brand color (HEX code), any words to avoid (forbidden words), and a default Call-to-Action (CTA) style. Prioritize Page Metadata, JSON-LD structured data, headings, image alt text, product/category signals, and important body text. Do not overfit to footer/legal/navigation text.
 2. The primary brand color must be a high-quality hex color code (e.g. '#B94718', '#2D3748') that represents the brand's aesthetic.
-3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry.
-4. The tone of voice must match one of these options:
-   - "친근하고 명확한 톤"
-   - "전문적이고 신뢰감 있는 톤"
-   - "젊고 경쾌한 톤"
-   - "고급스럽고 차분한 톤"
-5. The industry must fit one of: '온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'.
-6. Write a brand identity report under "markdownReport" in Korean (한국어). Cover Brand Identity, Key Strengths, and SNS content strategy. Do NOT use markdown bold syntax (**).
+3. Recommend 2-4 forbidden words that are overused or spammy in this brand's industry. Write them in ${lang}.
+4. The tone of voice must match one of these options: ${tones}
+5. The industry must fit one of: ${industries}
+6. Write a brand identity report under "markdownReport" in ${reportLang}. Cover Brand Identity, Key Strengths, and SNS content strategy. Do NOT use markdown bold syntax (**).
 7. Extract brand-specific DNA fields. These must be concrete to the website, not generic industry labels.
 
 Respond ONLY with valid JSON (no code fences) matching this exact structure:
@@ -38,11 +52,12 @@ Respond ONLY with valid JSON (no code fences) matching this exact structure:
   "contentPillars": ["SNS content pillar"],
   "brandKeywords": ["brand-specific keyword"],
   "avoidVisuals": ["visual trope to avoid"],
-  "markdownReport": "# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n..."
+  "markdownReport": "${exampleReport}"
 }
 `
+}
 
-export async function analyzeBrandWithGroq(apiKey: string, cleanedText: string) {
+export async function analyzeBrandWithGroq(apiKey: string, cleanedText: string, locale = 'ko') {
   const groq = new Groq({ apiKey })
 
   const response = await groq.chat.completions.create({
@@ -54,7 +69,7 @@ export async function analyzeBrandWithGroq(apiKey: string, cleanedText: string) 
       },
       {
         role: 'user',
-        content: BRAND_ANALYSIS_PROMPT(cleanedText),
+        content: BRAND_ANALYSIS_PROMPT(cleanedText, locale),
       },
     ],
     temperature: 0.3,
@@ -64,3 +79,4 @@ export async function analyzeBrandWithGroq(apiKey: string, cleanedText: string) 
   const text = response.choices[0].message.content?.trim() || ''
   return JSON.parse(text)
 }
+

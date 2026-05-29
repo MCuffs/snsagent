@@ -84,18 +84,65 @@ async function fetchProductUrlsFromSitemap(baseUrl: string): Promise<string[]> {
   }
 }
 
-// ─── 1차: 브랜드 전체 분석 ────────────────────────────────────────────────────
+const BRAND_ANALYSIS_PROMPT = (url: string, locale = 'ko') => {
+  const lang = locale === 'en' ? 'English' : '한국어'
+  const tones = locale === 'en'
+    ? '"Friendly and clear", "Professional and trustworthy", "Young and energetic", "Premium and calm"'
+    : '"친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤"'
+  const industries = locale === 'en'
+    ? "'Online store', 'Cafe / F&B', 'Fitness', 'Beauty / Care', 'Education', 'IT / SaaS'"
+    : "'온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'"
+  const exampleReport = locale === 'en'
+    ? '# Brand Analysis Report\\n\\n## 1. Brand Identity\\n...'
+    : '# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n...'
 
-const BRAND_ANALYSIS_PROMPT = (url: string) => `
-다음 쇼핑몰 URL을 직접 방문해서 브랜드를 심층 분석해줘: ${url}
+  if (locale === 'en') {
+    return `Visit this brand/store URL and perform an in-depth analysis: ${url}
 
-반드시 무시할 것 (포함하면 안 됨):
-- 푸터(footer)의 저작권 문구, 회사 소개, 고객센터 안내
-- 네비게이션 메뉴 텍스트
-- 로그인/회원가입/장바구니 버튼
-- "무단 복제 금지", "이용약관", "개인정보처리방침" 같은 법적 문구
-- 쇼핑몰 솔루션 업체명(카페24, 메이크샵, 고도몰, Cafe24 등)
-- "CLIENT SERVICES", "COMMUNITY", "CUSTOMER CENTER" 같은 사이트 운영 문구
+IMPORTANT: All text values in the JSON response MUST be written in English.
+
+Ignore: footer copyright text, company info, customer service, navigation menus, login/signup/cart buttons, legal disclaimers, e-commerce platform names (Cafe24, Makeshop, etc).
+
+Analyze:
+1. Brand name, core products/services, target audience, tone of voice, primary brand color (HEX)
+2. Core value proposition — the brand's specific promise
+3. Customer pain points — real problems the brand solves
+4. Competitive differentiators — what makes it concretely different
+5. Brand keywords — top 10 keywords for card news
+6. Forbidden expressions — clichéd or spammy words in this industry
+7. CTA style — a call-to-action phrase matching this brand's tone
+8. Visual mood — image direction for card news
+9. SNS content pillars — 6 recurring themes
+
+Tone options: ${tones}
+Industry options: ${industries}
+
+Return ONLY valid JSON (no code fences, no bold **):
+{
+  "name": "Brand name",
+  "industry": "one of the industries",
+  "targetAudience": "target customers description",
+  "toneOfVoice": "one of the tones",
+  "mainColor": "#HEXCODE",
+  "forbiddenWords": "word1, word2",
+  "ctaStyle": "CTA recommendation",
+  "coreProducts": ["core product/service"],
+  "valueProposition": "core value proposition",
+  "customerPainPoints": ["customer pain point"],
+  "differentiators": ["differentiator"],
+  "visualMood": "visual mood",
+  "contentPillars": ["SNS content pillar (6 items)"],
+  "brandKeywords": ["brand keyword (10 items)"],
+  "avoidVisuals": ["visual to avoid"],
+  "markdownReport": "${exampleReport}"
+}`
+  }
+
+  return `다음 쇼핑몰 URL을 직접 방문해서 브랜드를 심층 분석해줘: ${url}
+
+IMPORTANT: JSON 응답의 모든 텍스트 값은 반드시 ${lang}으로 작성해야 합니다.
+
+반드시 무시할 것: 푸터 저작권, 회사 소개, 고객센터, 네비게이션, 로그인/회원가입/장바구니, 법적 문구, 쇼핑몰 솔루션 업체명(카페24, 메이크샵 등).
 
 분석할 것:
 1. 브랜드명, 핵심 제품/서비스, 타깃 고객, 톤앤매너, 대표 브랜드 컬러(HEX)
@@ -108,8 +155,8 @@ const BRAND_ANALYSIS_PROMPT = (url: string) => `
 8. 비주얼 무드 — 카드뉴스 이미지 방향성
 9. SNS 콘텐츠 기둥 — 6가지 반복 주제
 
-업종: 온라인 스토어, 카페 / F&B, 피트니스, 뷰티 / 케어, 교육 / 강의, IT / SaaS 중 하나
-톤앤매너: 친근하고 명확한 톤, 전문적이고 신뢰감 있는 톤, 젊고 경쾌한 톤, 고급스럽고 차분한 톤 중 하나
+톤앤매너: ${tones} 중 하나
+업종: ${industries} 중 하나
 
 반드시 유효한 JSON만 반환 (코드 펜스 없이, bold ** 절대 금지):
 {
@@ -128,9 +175,9 @@ const BRAND_ANALYSIS_PROMPT = (url: string) => `
   "contentPillars": ["SNS 콘텐츠 기둥 6가지"],
   "brandKeywords": ["브랜드 키워드 10개"],
   "avoidVisuals": ["피해야 할 비주얼"],
-  "markdownReport": "# 브랜드 분석 보고서\\n\\n## 1. 브랜드 정체성\\n..."
+  "markdownReport": "${exampleReport}"
+}`
 }
-`
 
 // ─── 2차-A: 사이트맵으로 찾은 상품 상세페이지 분석 ──────────────────────────
 
@@ -367,10 +414,10 @@ export async function analyzeNaverStoreWithPerplexity(
   return mergeAnalysis(brandResult, productResult)
 }
 
-export async function analyzeBrandWithPerplexity(apiKey: string, url: string) {
+export async function analyzeBrandWithPerplexity(apiKey: string, url: string, locale = 'ko') {
   // 1차: 브랜드 전체 분석
   console.log('[Perplexity] 1차 — 브랜드 분석 시작')
-  const brandRaw = await callPerplexity(apiKey, SYSTEM, BRAND_ANALYSIS_PROMPT(url))
+  const brandRaw = await callPerplexity(apiKey, SYSTEM, BRAND_ANALYSIS_PROMPT(url, locale))
   const brandResult = extractJson(brandRaw)
   console.log('[Perplexity] 1차 완료:', brandResult.name)
 

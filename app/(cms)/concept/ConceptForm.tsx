@@ -7,7 +7,7 @@ import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
 import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
 import { motion, AnimatePresence } from 'framer-motion'
 import { analytics } from '../../../lib/analytics/thinkingdata'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface BrandData {
   id: string
@@ -67,6 +67,7 @@ const analyzeSteps = (t: (key: string) => string) => [
 export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   const { setActiveTab } = useTab()
   const t = useTranslations('concept')
+  const locale = useLocale()
   const steps = analyzeSteps(t)
   const [phase, setPhase] = useState<'url' | 'profile'>(
     existingBrand?.websiteUrl ? 'profile' : 'url'
@@ -193,7 +194,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     setError(null)
 
     try {
-      const res = await analyzeBrandWebsiteAction(url)
+      const res = await analyzeBrandWebsiteAction(url, locale)
       if (!res || !res.success) {
         analytics.brandUrlAnalyzed(url, false)
         setError(('error' in (res ?? {})) ? (res as { error: string }).error : t('error_analyze_failed'))

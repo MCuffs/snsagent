@@ -1220,12 +1220,14 @@ function getNaverSmartstoreFallback(shopId: string, url: string) {
   }
 }
 
-export async function analyzeBrandWebsiteAction(url: string) {
+export async function analyzeBrandWebsiteAction(url: string, locale = 'ko') {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
   if (!url || !url.startsWith('http')) {
-    return failed('올바른 URL 형식(http:// 또는 https://)을 입력해 주세요.')
+    return failed(locale === 'en'
+      ? 'Please enter a valid URL starting with http:// or https://'
+      : '올바른 URL 형식(http:// 또는 https://)을 입력해 주세요.')
   }
 
   const targetUrl = url
@@ -1301,20 +1303,38 @@ export async function analyzeBrandWebsiteAction(url: string) {
       if (usePerplexity) {
         // Perplexity는 URL을 직접 방문하므로 원본 URL을 넘김
         console.log('Using Perplexity sonar-pro for brand analysis')
-        parsed = await analyzeBrandWithPerplexity(perplexityKey, targetUrl)
+        parsed = await analyzeBrandWithPerplexity(perplexityKey, targetUrl, locale)
       } else if (useGroq) {
         console.log('Using Groq (Llama 3.3 70B) for brand analysis')
-        parsed = await analyzeBrandWithGroq(groqKey, cleanedText)
+        parsed = await analyzeBrandWithGroq(groqKey, cleanedText, locale)
       } else if (useGemini) {
         console.log('Using Gemini 1.5 Flash for brand analysis')
-        parsed = await analyzeBrandWithGemini(geminiKey, cleanedText)
+        parsed = await analyzeBrandWithGemini(geminiKey, cleanedText, locale)
       } else {
         // GPT-4o 2단계 harness (신호 추출 → 전체 합성)
         console.log('Using GPT-4o 2-stage harness for brand analysis')
         const openai = new OpenAI({ apiKey: openaiKey })
+        const isEn = locale === 'en'
 
         // STAGE 1: 핵심 신호 추출 (gpt-4o-mini, 빠르고 저렴)
-        const signalPrompt = `당신은 한국 디지털 마케팅 전문가입니다. 아래 웹사이트 스크랩 데이터에서 브랜드 분석에 필요한 핵심 신호를 추출하세요.
+        const signalPrompt = isEn
+          ? `You are a digital marketing expert. Extract brand analysis signals from the following website scraped data.
+
+[Scraped Data]
+${cleanedText.slice(0, 6000)}
+
+Respond ONLY with valid JSON:
+{
+  "brandName": "exact brand name (official name preferred)",
+  "platformType": "smartstore|coupang|brandsite|cafe|instagram|other",
+  "topProducts": ["up to 5 core products/services"],
+  "priceRange": "budget|mid|premium",
+  "primaryColor": "#HEXCODE (extracted from metadata, logo, header)",
+  "targetSignals": "target customer signals (age, gender, lifestyle)",
+  "uniqueSellingPoints": ["up to 3 differentiators"],
+  "categoryKeywords": ["up to 5 industry keywords"]
+}`
+          : `당신은 한국 디지털 마케팅 전문가입니다. 아래 웹사이트 스크랩 데이터에서 브랜드 분석에 필요한 핵심 신호를 추출하세요.
 
 [스크랩 데이터]
 ${cleanedText.slice(0, 6000)}
@@ -1340,8 +1360,47 @@ ${cleanedText.slice(0, 6000)}
         const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
 
         // STAGE 2: 전체 브랜드 프로필 합성 (gpt-4o)
-        const synthPrompt = `당신은 한국 SNS 카드뉴스 전문 브랜드 전략가입니다.
+        const toneOptions = isEn
+          ? '"Friendly and clear", "Professional and trustworthy", "Young and energetic", "Premium and calm"'
+          : '"친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤"'
+        const industryOptions = isEn
+          ? '"Online store", "Cafe / F&B", "Fitness", "Beauty / Care", "Education", "IT / SaaS"'
+          : '"온라인 스토어", "카페 / F&B", "피트니스", "뷰티 / 케어", "교육 / 강의", "IT / SaaS"'
+        const lang = isEn ? 'English' : '한국어'
+
+        const synthPrompt = isEn
+          ? `You are a brand strategist specializing in SNS card news.
+Generate a complete brand profile and content DNA based on the following signal analysis and original data.
+IMPORTANT: All text values in the JSON MUST be written in English.
+
+[Signal Analysis]
+${JSON.stringify(signals, null, 2)}
+
+[Original Website Data (supplemental)]
+${cleanedText.slice(0, 5000)}
+
+Rules:
+- name: official brand name, no platform names (Smartstore, Coupang, etc.)
+- industry: one of: ${industryOptions}
+- targetAudience: age+gender+lifestyle (max 50 chars, e.g. "Working women in their 20s–30s")
+- toneOfVoice: one of: ${toneOptions}
+- mainColor: HEX code matching brand identity (avoid extreme whites/blacks)
+- forbiddenWords: 2–4 overused/spammy words in this industry, comma-separated
+- ctaStyle: short CTA phrase matching brand tone
+- brandDescription: 2–3 sentence brand intro for first-time readers
+- coreProducts: specific product/service names (max 5)
+- valueProposition: core brand promise (1 sentence)
+- customerPainPoints: problems this brand solves (max 4)
+- differentiators: specific competitive advantages (max 4)
+- visualMood: card news image direction
+- contentPillars: SNS card news content themes (max 5)
+- brandKeywords: keywords for AI card news generation (max 8)
+- avoidVisuals: visual styles that don't fit this brand (max 4)
+
+Respond ONLY with valid JSON:`
+          : `당신은 한국 SNS 카드뉴스 전문 브랜드 전략가입니다.
 아래 1차 신호 분석 결과와 원본 데이터를 기반으로 완전한 브랜드 프로필과 콘텐츠 DNA를 생성하세요.
+IMPORTANT: JSON의 모든 텍스트 값은 반드시 ${lang}으로 작성하세요.
 
 [1차 신호 분석 결과]
 ${JSON.stringify(signals, null, 2)}
@@ -1351,11 +1410,9 @@ ${cleanedText.slice(0, 5000)}
 
 [생성 규칙]
 - name: 공식 브랜드명. 플랫폼명(스마트스토어, 쿠팡 등)은 포함하지 않음
-- industry: 반드시 아래 6개 중 하나 선택
-  · 온라인 스토어 · 카페 / F&B · 피트니스 · 뷰티 / 케어 · 교육 / 강의 · IT / SaaS
+- industry: 반드시 아래 6개 중 하나 선택: ${industryOptions}
 - targetAudience: "20~30대 직장인 여성" 처럼 나이+성별+라이프스타일 조합 (50자 이내)
-- toneOfVoice: 반드시 아래 4개 중 하나
-  · "친근하고 명확한 톤" · "전문적이고 신뢰감 있는 톤" · "젊고 경쾌한 톤" · "고급스럽고 차분한 톤"
+- toneOfVoice: 반드시 아래 4개 중 하나: ${toneOptions}
 - mainColor: 브랜드 아이덴티티에 맞는 HEX 코드. 너무 밝거나(#ffffff 계열) 너무 어두운(#000000 계열) 극단값 금지
 - forbiddenWords: 이 업종에서 남용/스팸으로 여겨지는 표현 2~4개, 쉼표 구분
 - ctaStyle: 콘텐츠에서 실제 사용할 짧은 CTA 문구
@@ -1373,30 +1430,34 @@ JSON 형식으로만 응답하세요:`
         const aiResponse = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: '당신은 한국 브랜드 전략 AI입니다. 반드시 유효한 JSON만 반환하세요. 마크다운 볼드(**) 사용 금지.' },
+            { role: 'system', content: isEn
+              ? 'You are a brand strategy AI. Return ONLY valid JSON. No markdown bold (**).'
+              : '당신은 한국 브랜드 전략 AI입니다. 반드시 유효한 JSON만 반환하세요. 마크다운 볼드(**) 사용 금지.' },
             { role: 'user', content: synthPrompt },
           ],
           response_format: { type: 'json_object' },
           temperature: 0.2,
         })
         const rawJson = aiResponse.choices[0].message.content
-        if (!rawJson) throw new Error('AI 분석 실패: 응답이 비어있습니다.')
+        if (!rawJson) throw new Error('AI analysis failed: empty response.')
         parsed = JSON.parse(rawJson)
-        // GPT-4o는 markdownReport를 별도 생성해 붙임
-        parsed.markdownReport = `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
+        // markdownReport 별도 생성
+        parsed.markdownReport = isEn
+          ? `# Brand Analysis Complete\n\nBrand: ${parsed.name || signals.brandName}\nIndustry: ${parsed.industry}\nTarget: ${parsed.targetAudience}\n\nValue Proposition: ${parsed.valueProposition || '-'}\n\nDifferentiators: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
+          : `# 브랜드 분석 완료\n\n브랜드명: ${parsed.name || signals.brandName}\n업종: ${parsed.industry}\n타겟: ${parsed.targetAudience}\n\n가치 제안: ${parsed.valueProposition || '-'}\n\n차별점: ${Array.isArray(parsed.differentiators) ? parsed.differentiators.join(', ') : '-'}`
       }
 
       if (parsed) {
         return {
           success: true as const,
           brandProfile: {
-            name: String(parsed.name || '알 수 없음'),
-            industry: String(parsed.industry || '온라인 스토어'),
-            targetAudience: String(parsed.targetAudience || '대중 고객'),
-            toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
+            name: String(parsed.name || (locale === 'en' ? 'Unknown' : '알 수 없음')),
+            industry: String(parsed.industry || (locale === 'en' ? 'Online store' : '온라인 스토어')),
+            targetAudience: String(parsed.targetAudience || (locale === 'en' ? 'General customers' : '대중 고객')),
+            toneOfVoice: String(parsed.toneOfVoice || (locale === 'en' ? 'Friendly and clear' : '친근하고 명확한 톤')),
             mainColor: String(parsed.mainColor || '#b94718'),
             forbiddenWords: String(parsed.forbiddenWords || ''),
-            ctaStyle: String(parsed.ctaStyle || '프로필 링크에서 확인하기'),
+            ctaStyle: String(parsed.ctaStyle || (locale === 'en' ? 'Learn more via profile link' : '프로필 링크에서 확인하기')),
             brandDna: buildBrandDnaFromProfile({
               name: String(parsed.name || 'Unknown brand'),
               industry: String(parsed.industry || 'Online store'),
@@ -1408,7 +1469,7 @@ JSON 형식으로만 응답하세요:`
               parsed,
             })
           },
-          markdownReport: removeMarkdownBold(String(parsed.markdownReport || '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.'))
+          markdownReport: removeMarkdownBold(String(parsed.markdownReport || (locale === 'en' ? '# Analysis Failed\n\nCould not load AI analysis results.' : '# 분석 실패\n\nAI 분석 결과를 불러오지 못했습니다.')))
         }
       }
 
