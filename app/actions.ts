@@ -1436,9 +1436,13 @@ JSON 형식으로만 응답하세요:`
         if (!rawJson) throw new Error('AI analysis failed: empty response.')
         parsed = JSON.parse(rawJson)
         // markdownReport 별도 생성 — 자연스러운 산문체
+        const industryStr = String(parsed.industry || '')
+        const toneStr = String(parsed.toneOfVoice || '')
+        const diffArr = Array.isArray(parsed.differentiators) ? parsed.differentiators as string[] : []
+        const pillarsArr = Array.isArray(parsed.contentPillars) ? parsed.contentPillars as string[] : []
         parsed.markdownReport = isEn
-          ? `${parsed.name || signals.brandName} is a ${parsed.industry?.toLowerCase() || 'brand'} focused on ${parsed.targetAudience || 'its target customers'}. ${parsed.valueProposition || ''}\n\n${Array.isArray(parsed.differentiators) && parsed.differentiators.length ? parsed.differentiators.join(' ') + ' ' : ''}The brand communicates with a ${parsed.toneOfVoice?.toLowerCase() || 'distinctive'} voice that resonates with its audience.\n\nFor card news, the strongest angle is to lead with ${Array.isArray(parsed.contentPillars) ? parsed.contentPillars[0] : 'product stories'} and close with ${parsed.ctaStyle || 'a clear call to action'}.`
-          : `${parsed.name || signals.brandName}은(는) ${parsed.targetAudience || '고객'}을 위한 ${parsed.industry || '브랜드'}입니다. ${parsed.valueProposition || ''}\n\n${Array.isArray(parsed.differentiators) && parsed.differentiators.length ? parsed.differentiators.join(', ') + ' 등의 차별점이 있으며, ' : ''}${parsed.toneOfVoice || '브랜드만의'} 톤으로 고객과 소통합니다.\n\n카드뉴스는 ${Array.isArray(parsed.contentPillars) ? parsed.contentPillars[0] : '핵심 가치'}를 앞세우고, "${parsed.ctaStyle || '자세히 보기'}"로 마무리하는 구성이 가장 효과적입니다.`
+          ? `${String(parsed.name || signals.brandName)} is a ${industryStr.toLowerCase() || 'brand'} focused on ${String(parsed.targetAudience || 'its target customers')}. ${String(parsed.valueProposition || '')}\n\n${diffArr.length ? diffArr.join(' ') + ' ' : ''}The brand communicates with a ${toneStr.toLowerCase() || 'distinctive'} voice that resonates with its audience.\n\nFor card news, the strongest angle is to lead with ${pillarsArr[0] || 'product stories'} and close with ${String(parsed.ctaStyle || 'a clear call to action')}.`
+          : `${String(parsed.name || signals.brandName)}은(는) ${String(parsed.targetAudience || '고객')}을 위한 ${industryStr || '브랜드'}입니다. ${String(parsed.valueProposition || '')}\n\n${diffArr.length ? diffArr.join(', ') + ' 등의 차별점이 있으며, ' : ''}${toneStr || '브랜드만의'} 톤으로 고객과 소통합니다.\n\n카드뉴스는 ${pillarsArr[0] || '핵심 가치'}를 앞세우고, "${String(parsed.ctaStyle || '자세히 보기')}"로 마무리하는 구성이 가장 효과적입니다.`
       }
 
       if (parsed) {
