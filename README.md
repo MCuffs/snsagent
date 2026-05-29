@@ -114,6 +114,17 @@ npm run dev
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 업로드 |
 | `CRON_SECRET` | 예약 게시 및 월 구독 청구 실행 보호 |
 
+## 배포
+
+Vercel Pro 프로젝트는 private 조직 저장소 `Shuffla-AI/Shuffla_SaaS`와 공식 Git Integration으로 직접 연결되어 있습니다.
+
+- `main` push: Vercel Production 자동 배포 (`https://shuffla.vercel.app`)
+- `dev` 및 feature branch push/PR: Preview 배포
+- 로컬 CLI Production 배포나 GitHub Actions 기반 prebuilt 업로드는 복구 또는 진단 상황 외에는 사용하지 않습니다.
+
+운영 배포는 `main`을 기준으로 하며, 검증된 `dev` 변경을 `main`에 병합한 뒤 Vercel 자동 배포 결과를 확인합니다.
+Private 조직 저장소에서 Git 배포를 실행하는 커밋 작성자는 Vercel 팀 멤버여야 하며, Vercel 계정의 GitHub Login Connection과 GitHub에 연결된 커밋 이메일을 사용해야 합니다.
+
 ## 검증
 
-문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run lint`와 `npm run build`는 통과했으며, 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.
+문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run build`는 통과했으며, `npm run lint`에는 `app/(cms)/TabContext.tsx`와 `src/lib/ai/providers/openAIImageProvider.ts`의 기존 오류가 남아 있습니다. 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.

@@ -1,17 +1,22 @@
 import { ArrowRight, Check } from 'lucide-react'
+import Link from 'next/link'
 import { MarketingFooter } from './components/MarketingFooter'
 import { MarketingNav } from './components/MarketingNav'
 import { CapabilityObjects, ConnectedWorkflow, EditorialGallery, ProductShowcase } from './components/LandingProductShowcase'
+import { getSessionUser } from '../lib/auth/user'
 
 export const metadata = {
   title: 'Shuffla - AI Card News Studio',
   description: '브랜드 분석부터 카드뉴스 생성, 편집, 다운로드까지 이어지는 AI 콘텐츠 스튜디오.',
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const authenticated = Boolean(await getSessionUser())
+  const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
+
   return (
     <main className="min-h-screen bg-[#fbfaf7] text-[#171714] selection:bg-[#ec6238]/15">
-      <MarketingNav />
+      <MarketingNav authenticated={authenticated} />
 
       <section className="relative overflow-hidden pb-24 pt-16 md:pb-32 md:pt-24">
         <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(237,101,57,0.075),transparent_66%)]" />
@@ -26,17 +31,17 @@ export default function LandingPage() {
             더 정확하게, 빠르게.
           </h1>
           <p className="mx-auto mt-7 max-w-2xl text-[16px] leading-8 text-[#746e65] md:text-lg">
-            Shuffla는 브랜드를 이해하고, 흐름 있는 카피와 비주얼을 생성하고,
+            브랜드 URL만 입력하면 SNS 카드뉴스의 기획, 카피, 비주얼을 만들고,
             <br className="hidden sm:block" />
             바로 편집하고 다운로드할 수 있는 AI 콘텐츠 스튜디오입니다.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="/api/auth/google/start"
+            <Link
+              href={accessHref}
               className="inline-flex h-12 items-center gap-2 rounded-full bg-[#171714] px-7 text-sm font-medium text-white transition hover:-translate-y-px hover:bg-[#302c26]"
             >
-              무료로 시작하기 <ArrowRight className="h-4 w-4" />
-            </a>
+              {authenticated ? '작업 계속하기' : '무료로 시작하기'} <ArrowRight className="h-4 w-4" />
+            </Link>
             <a
               href="#product"
               className="inline-flex h-12 items-center rounded-full border border-[#dfd9ce] bg-white px-7 text-sm font-medium text-[#342f29] transition hover:border-[#bfb7ab]"
@@ -57,7 +62,7 @@ export default function LandingPage() {
         <EditorialGallery />
       </section>
 
-      <ProductShowcase />
+      <ProductShowcase authenticated={authenticated} />
       <CapabilityObjects />
       <ConnectedWorkflow />
 
@@ -72,16 +77,16 @@ export default function LandingPage() {
           <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[#756e63]">
             브랜드 설정부터 AI 생성, 편집, 결과물 다운로드까지 한 번의 워크플로우로 진행합니다.
           </p>
-          <a
-            href="/api/auth/google/start"
+          <Link
+            href={accessHref}
             className="mt-9 inline-flex h-12 items-center gap-2 rounded-full bg-[#ed6238] px-8 text-sm font-medium text-white transition hover:-translate-y-px hover:bg-[#db552d]"
           >
-            Google로 시작하기 <ArrowRight className="h-4 w-4" />
-          </a>
+            {authenticated ? '작업 계속하기' : 'Google로 시작하기'} <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
-      <MarketingFooter />
+      <MarketingFooter authenticated={authenticated} />
     </main>
   )
 }

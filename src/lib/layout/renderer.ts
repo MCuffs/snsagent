@@ -45,7 +45,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const headlineToBodyGap = input.layout.spacingRules?.headlineToBodyGap || 36
 
   let currentY = textBox.y
-  const kickerMarkup = renderKicker(input, textBox.x, currentY, textColor)
+  const kickerMarkup = renderKicker(input, textBox.x, currentY, textColor, textBox.align)
   currentY += 24 + badgeToHeadlineGap
 
   const headlineStartBaseline = currentY + typography.headlineFontSize * 0.95
@@ -93,8 +93,21 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
 
 function getTextBox(layout: LayoutDefinition) {
   const left = layout.safeArea.left
-  if (layout.overlayStyle === 'archive-light') return { x: left, y: 940, align: 'left' as const }
-  return { x: left, y: 920, align: 'left' as const }
+  const bottom = layout.overlayStyle === 'archive-light' ? 880 : 860
+  switch (layout.textPosition) {
+    case 'top-left':
+      return { x: left, y: 168, align: 'left' as const }
+    case 'top-center':
+      return { x: 540, y: 196, align: 'center' as const }
+    case 'center':
+      return { x: 540, y: 552, align: 'center' as const }
+    case 'bottom-center':
+      return { x: 540, y: bottom, align: 'center' as const }
+    case 'left-column':
+      return { x: left, y: 520, align: 'left' as const }
+    default:
+      return { x: left, y: bottom, align: 'left' as const }
+  }
 }
 
 function renderTopChrome(source: string, pageNumber: number | undefined, totalPages: number | undefined, fill: string) {
@@ -110,11 +123,12 @@ function renderTopChrome(source: string, pageNumber: number | undefined, totalPa
   `
 }
 
-function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: string) {
+function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: string, align: 'left' | 'center') {
   const label = buildSlideLabel(input)
   const opacity = fill === '#050505' ? 0.34 : 0.46
+  const anchor = align === 'center' ? 'middle' : 'start'
   return `
-    <text xml:space="preserve" x="${x}" y="${y + 22}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="5">${escapeXml(label)}</text>
+    <text xml:space="preserve" x="${x}" y="${y + 22}" text-anchor="${anchor}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="5">${escapeXml(label)}</text>
   `
 }
 
@@ -176,8 +190,8 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
   <rect width="1080" height="1350" fill="url(#cta-bottom-gradient)"/>
   ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, textColor)}
   <text xml:space="preserve" x="540" y="675" text-anchor="middle" font-family="${fontFam}" font-size="52" font-weight="700" fill="${textColor}" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
-  <text xml:space="preserve" x="72" y="970" font-family="${fontFam}" font-size="${typography.headlineFontSize}" font-weight="750" fill="${textColor}" letter-spacing="-0.5">${escapeXml(headline)}</text>
-  ${bodyLines.slice(0, 2).map((line, index) => `<text xml:space="preserve" x="72" y="${1060 + index * (typography.bodyFontSize + 23)}" font-family="${fontFam}" font-size="${typography.bodyFontSize}" font-weight="400" fill="${secondaryTextColor}" fill-opacity="0.64" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
+  <text xml:space="preserve" x="540" y="925" text-anchor="middle" font-family="${fontFam}" font-size="${typography.headlineFontSize}" font-weight="750" fill="${textColor}" letter-spacing="-0.5">${escapeXml(headline)}</text>
+  ${bodyLines.slice(0, 2).map((line, index) => `<text xml:space="preserve" x="540" y="${1018 + index * (typography.bodyFontSize + 23)}" text-anchor="middle" font-family="${fontFam}" font-size="${typography.bodyFontSize}" font-weight="400" fill="${secondaryTextColor}" fill-opacity="0.64" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
   <line x1="72" y1="1188" x2="1008" y2="1188" stroke="#ffffff" stroke-opacity="0.16"/>
   <rect x="72" y="1230" width="936" height="78" fill="#f3f3f3"/>
   <text xml:space="preserve" x="540" y="1280" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="28" font-weight="700" fill="#050505" letter-spacing="0">팔로우 ${escapeXml(sourceHandle)}</text>

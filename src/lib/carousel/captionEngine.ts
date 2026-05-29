@@ -27,6 +27,8 @@ export async function generateCaption(
 - ${brand.toneOfVoice} 어조 유지
 - 자연스럽게 저장·공유 유도
 - CTA: ${brand.ctaStyle || '프로필 링크에서 자세히 보기'}
+- 스마트스토어, 쿠팡, 네이버쇼핑 등 특정 플랫폼명을 포함하지 마세요
+- 타겟 고객 설명 문장을 직접 인용하지 마세요
 
 해시태그 조건:
 - 8~15개
@@ -76,9 +78,8 @@ function buildFallbackCaption(
     selectedHook.text,
     '',
     `${input.productName}을 고르기 전에 확인하면 좋은 포인트를 정리했어요.`,
-    `이번 카드뉴스는 ${strategy.angle} 흐름으로 구성했습니다.`,
     '',
-    '나중에 비교할 수 있게 저장해두고, 필요한 옵션은 상세페이지에서 확인해보세요.',
+    '나중에 비교할 수 있게 저장해두세요.',
     brand.ctaStyle || '프로필 링크에서 자세히 보기',
   ].join('\n')
 
@@ -91,14 +92,14 @@ function buildFallbackCaption(
 
 function buildFallbackHashtags(brand: BrandProfile, input: CampaignInput): string[] {
   const base = [
-    '#스마트스토어',
     '#신상품',
     '#생활꿀템',
     '#구매전필독',
     '#상품추천',
     '#인스타카드뉴스',
-    '#온라인쇼핑',
     '#쇼핑팁',
+    '#카드뉴스',
+    '#추천템',
   ]
 
   const industry = (brand.industry ?? '').replace(/\s+/g, '')

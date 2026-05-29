@@ -1,5 +1,5 @@
 import { uploadGeneratedAsset } from '../storage/upload'
-import type { BrandProfile, SlideCopy, SlideDesignPrompt } from './types'
+import type { BrandProfile, SlideCopy, SlideDesignPrompt, OverlayType } from './types'
 import fs from 'fs'
 import path from 'path'
 import { renderSvgToPng } from '../render/svgToPng'
@@ -12,32 +12,75 @@ export async function renderSlide(params: {
   backgroundImageUrl: string
   showSlideNumber?: boolean
 }) {
-  const y = params.design.textPosition === 'top' ? 250 : params.design.textPosition === 'bottom' ? 700 : 500
+  const { textPosition, overlayType = 'dark_gradient_bottom', overlayStrength = 65 } = params.design
   const escapedHeadline = escapeXml(params.copy.headline)
   const escapedCta = escapeXml(params.copy.ctaText || '')
-  const bodyLines = wrapText(params.copy.body, 30)
-  
+  const bodyLines = wrapText(params.copy.body, 26)
+  const brandColor = escapeXml(params.brand.mainColor || '#ff4f00')
   const backgroundImageDataUri = await toImageDataUri(params.backgroundImageUrl)
+  const imgSrc = escapeXml(backgroundImageDataUri || params.backgroundImageUrl)
+
+  // Text anchor Y based on position
+  const textY = textPosition === 'top' ? 260 : textPosition === 'bottom' ? 780 : 500
+
+  // Overlay opacity derived from strength (0-100)
+  const alpha = (overlayStrength / 100).toFixed(2)
+  const alphaHigh = Math.min(overlayStrength / 100 + 0.25, 1).toFixed(2)
+
+  const bodyStartY = textY + 72
+  const ctaY = textY + 60 + bodyLines.slice(0, 3).length * 50
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="${escapeXml(params.brand.mainColor || '#ff4f00')}" stop-opacity="0.18"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="20" flood-color="#111827" flood-opacity="0.16"/>
+    ${buildOverlayDefs(overlayType, alpha, alphaHigh)}
+    <filter id="textShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+    <filter id="ctaShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
   </defs>
-  <rect width="1080" height="1080" fill="url(#bg)"/>
-  <image href="${escapeXml(backgroundImageDataUri || params.backgroundImageUrl)}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice" opacity="0.24"/>
-  <rect x="110" y="${y - 190}" width="860" height="${escapedCta ? 390 : 320}" rx="34" fill="#ffffff" opacity="0.92" filter="url(#shadow)"/>
-  <text x="540" y="${y - 40}" text-anchor="middle" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="64" font-weight="800" fill="#111827">${escapedHeadline}</text>
-  ${bodyLines.slice(0, 3).map((line, index) => `<text x="540" y="${y + 42 + index * 48}" text-anchor="middle" font-family="Pretendard, sans-serif" font-size="34" font-weight="600" fill="#334155">${escapeXml(line)}</text>`).join('')}
-  ${escapedCta ? `<rect x="350" y="${y + 180}" width="380" height="74" rx="37" fill="${escapeXml(params.brand.mainColor || '#ff4f00')}"/><text x="540" y="${y + 228}" text-anchor="middle" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="28" font-weight="800" fill="#ffffff">${escapedCta}</text>` : ''}
-  <text x="70" y="985" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif" font-size="26" font-weight="800" fill="#111827" opacity="0.72">${escapeXml(params.brand.name)}</text>
-  ${params.showSlideNumber ? `<text x="1010" y="985" text-anchor="end" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#64748b">${params.copy.slideNumber}</text>` : ''}
+
+  <!-- Background image: full opacity, overlay controls darkness -->
+  <image href="${imgSrc}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>
+
+  <!-- Overlay -->
+  ${buildOverlaySvg(overlayType)}
+
+  <!-- Headline -->
+  <text x="540" y="${textY}" text-anchor="middle"
+    font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif"
+    font-size="68" font-weight="800" fill="#ffffff"
+    filter="url(#textShadow)"
+    letter-spacing="-1">${escapedHeadline}</text>
+
+  <!-- Body lines -->
+  ${bodyLines.slice(0, 3).map((line, i) => `
+  <text x="540" y="${bodyStartY + i * 50}" text-anchor="middle"
+    font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif"
+    font-size="34" font-weight="500" fill="rgba(255,255,255,0.88)"
+    filter="url(#textShadow)">${escapeXml(line)}</text>`).join('')}
+
+  <!-- CTA button -->
+  ${escapedCta ? `
+  <rect x="330" y="${ctaY + 24}" width="420" height="78" rx="39"
+    fill="${brandColor}" filter="url(#ctaShadow)"/>
+  <text x="540" y="${ctaY + 74}" text-anchor="middle"
+    font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif"
+    font-size="30" font-weight="800" fill="#ffffff">${escapedCta}</text>` : ''}
+
+  <!-- Brand name -->
+  <text x="70" y="1010"
+    font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, Arial, sans-serif"
+    font-size="26" font-weight="700" fill="#ffffff" opacity="0.75"
+    filter="url(#textShadow)">${escapeXml(params.brand.name)}</text>
+
+  <!-- Slide number -->
+  ${params.showSlideNumber ? `
+  <text x="1010" y="1010" text-anchor="end"
+    font-family="Arial, sans-serif" font-size="24" font-weight="600"
+    fill="#ffffff" opacity="0.60">${params.copy.slideNumber}</text>` : ''}
 </svg>`
 
   try {
@@ -56,6 +99,75 @@ export async function renderSlide(params: {
     })
   }
 }
+
+// ─── Overlay SVG defs ─────────────────────────────────────────────────────────
+
+function buildOverlayDefs(type: OverlayType, alpha: string, alphaHigh: string): string {
+  const mid = (parseFloat(alpha) * 0.4).toFixed(2)
+  const low = (parseFloat(alpha) * 0.2).toFixed(2)
+
+  switch (type) {
+    case 'dark_gradient_bottom':
+      return `<linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="0"/>
+        <stop offset="45%"  stop-color="#000000" stop-opacity="${mid}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="${alphaHigh}"/>
+      </linearGradient>`
+
+    case 'dark_gradient_top':
+      return `<linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="${alphaHigh}"/>
+        <stop offset="55%"  stop-color="#000000" stop-opacity="${mid}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+      </linearGradient>`
+
+    case 'dark_gradient_center':
+      return `<linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="${low}"/>
+        <stop offset="50%"  stop-color="#000000" stop-opacity="${alphaHigh}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="${low}"/>
+      </linearGradient>`
+
+    case 'cinematic_dark':
+      return `<linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="${mid}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="${alpha}"/>
+      </linearGradient>`
+
+    case 'radial_focus':
+      return `<radialGradient id="overlay" cx="50%" cy="50%" r="55%" fx="50%" fy="50%">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="0"/>
+        <stop offset="60%"  stop-color="#000000" stop-opacity="${mid}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="${alphaHigh}"/>
+      </radialGradient>`
+
+    case 'blur_glass':
+      return `<linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#000000" stop-opacity="${low}"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="${mid}"/>
+      </linearGradient>`
+
+    default:
+      return ''
+  }
+}
+
+function buildOverlaySvg(type: OverlayType): string {
+  if (type === 'none') return ''
+
+  if (type === 'blur_glass') {
+    return `
+  <rect x="0" y="0" width="1080" height="1080" fill="url(#overlay)"/>
+  <rect x="80" y="370" width="920" height="340" rx="28"
+    fill="#000000" fill-opacity="0.42"/>
+  <rect x="80" y="370" width="920" height="340" rx="28"
+    fill="#ffffff" fill-opacity="0.06"/>`
+  }
+
+  return `<rect x="0" y="0" width="1080" height="1080" fill="url(#overlay)"/>`
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function wrapText(value: string, maxLength: number) {
   const compact = value.replace(/\s+/g, ' ').trim()
@@ -90,49 +202,40 @@ function escapeXml(value: string) {
 async function toImageDataUri(imageUrl: string) {
   if (!imageUrl || imageUrl.startsWith('data:')) return imageUrl
 
-  // 로컬 파일 경로인 경우 (예: /background-showcase/showcase-1.webp)
   if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
     try {
-      const cleanPath = imageUrl.startsWith('file://') 
-        ? imageUrl.replace('file://', '') 
+      const cleanPath = imageUrl.startsWith('file://')
+        ? imageUrl.replace('file://', '')
         : imageUrl
-      
       const filePath = path.join(process.cwd(), 'public', cleanPath)
       if (fs.existsSync(filePath)) {
         const fileBuffer = fs.readFileSync(filePath)
         const ext = path.extname(filePath).slice(1) || 'png'
         const contentType = ext === 'webp' ? 'image/webp' : `image/${ext}`
-        const base64 = fileBuffer.toString('base64')
-        return `data:${contentType};base64,${base64}`
+        return `data:${contentType};base64,${fileBuffer.toString('base64')}`
       }
     } catch (e) {
       console.warn('[ImageDataUri] Failed to read local file:', imageUrl, e)
     }
   }
 
-  // 원격 URL인 경우 (http, https)
   try {
     const response = await fetch(imageUrl)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const contentType = response.headers.get('content-type') || 'image/jpeg'
     const arrayBuffer = await response.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-    return `data:${contentType};base64,${base64}`
+    return `data:${contentType};base64,${Buffer.from(arrayBuffer).toString('base64')}`
   } catch (error) {
     console.warn('[ImageDataUri] Failed to inline remote background image', error)
-    
-    // 원격 이미지 로드 실패 시, 로컬의 기본 showcase-1.webp 파일을 읽어 base64 폴백
     try {
       const fallbackPath = path.join(process.cwd(), 'public', 'background-showcase', 'showcase-1.webp')
       if (fs.existsSync(fallbackPath)) {
         const fileBuffer = fs.readFileSync(fallbackPath)
-        const base64 = fileBuffer.toString('base64')
-        return `data:image/webp;base64,${base64}`
+        return `data:image/webp;base64,${fileBuffer.toString('base64')}`
       }
     } catch (fallbackErr) {
       console.error('[ImageDataUri] Fallback image read failed', fallbackErr)
     }
-    
     return ''
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import { cancelSubscription } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
+import { formatMissingConfigMessage, getPayPalConfigStatus } from '../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +15,10 @@ export async function POST() {
 
     if (!user.paypalSubscriptionId) {
       return NextResponse.json({ error: '활성 구독이 없습니다.' }, { status: 400 })
+    }
+    const config = getPayPalConfigStatus()
+    if (!config.ready) {
+      return NextResponse.json({ error: formatMissingConfigMessage('PayPal', config.missing) }, { status: 503 })
     }
 
     await cancelSubscription(user.paypalSubscriptionId, '사용자 요청')

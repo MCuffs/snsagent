@@ -5,6 +5,7 @@
 .next
 node_modules
 public/generated
+/Front
 
 dev-server*.log
 npm-debug.log*

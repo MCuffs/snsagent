@@ -26,6 +26,12 @@ export interface User {
   tossNextBillingAt: Date | null
   tossLastPaidAt: Date | null
   tossCanceledAt: Date | null
+  nicepayBid: string | null
+  nicepaySubscriptionStatus: string | null
+  nicepayNextBillingAt: Date | null
+  nicepayLastPaidAt: Date | null
+  nicepayCanceledAt: Date | null
+  nicepayLastOrderId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -176,6 +182,18 @@ function hydrateUser(user: StoredUser | User): User {
     tossNextBillingAt: user.tossNextBillingAt ? new Date(user.tossNextBillingAt) : null,
     tossLastPaidAt: user.tossLastPaidAt ? new Date(user.tossLastPaidAt) : null,
     tossCanceledAt: user.tossCanceledAt ? new Date(user.tossCanceledAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayBid: (user as any).nicepayBid ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepaySubscriptionStatus: (user as any).nicepaySubscriptionStatus ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayNextBillingAt: (user as any).nicepayNextBillingAt ? new Date((user as any).nicepayNextBillingAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayLastPaidAt: (user as any).nicepayLastPaidAt ? new Date((user as any).nicepayLastPaidAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayCanceledAt: (user as any).nicepayCanceledAt ? new Date((user as any).nicepayCanceledAt) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nicepayLastOrderId: (user as any).nicepayLastOrderId ?? null,
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   }
@@ -251,7 +269,7 @@ export const dbService = {
         const user = await prisma.user.findUnique({
           where: { id: userId },
         })
-        if (user) return user
+        if (user) return user as unknown as User
       } catch (err) {
         console.warn('Prisma getUser failed, falling back to mock database', err)
         await saveErrorLog(userId, 'getUser', err)
@@ -270,7 +288,7 @@ export const dbService = {
       try {
         return await prisma.user.findUnique({
           where: { email },
-        })
+        }) as unknown as User
       } catch (err) {
         console.warn('Prisma getUserByEmail failed, falling back to mock database', err)
         await saveErrorLog(null, 'getUserByEmail', err, { email })
@@ -292,7 +310,7 @@ export const dbService = {
           update: { name },
           create: { email, name, plan: 'FREE' },
         })
-        return user
+        return user as unknown as User
       } catch (err) {
         console.warn('Prisma getOrCreateUser failed, falling back to mock database', err)
         await saveErrorLog(null, 'getOrCreateUser', err, { email })
@@ -320,6 +338,12 @@ export const dbService = {
         tossNextBillingAt: null,
         tossLastPaidAt: null,
         tossCanceledAt: null,
+        nicepayBid: null,
+        nicepaySubscriptionStatus: null,
+        nicepayNextBillingAt: null,
+        nicepayLastPaidAt: null,
+        nicepayCanceledAt: null,
+        nicepayLastOrderId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -335,7 +359,7 @@ export const dbService = {
         return await prisma.user.update({
           where: { id: userId },
           data: { plan },
-        })
+        }) as unknown as User
       } catch (err) {
         console.warn('Prisma updateUserPlan failed, falling back to mock database', err)
         await saveErrorLog(userId, 'updateUserPlan', err, { plan })
@@ -424,6 +448,46 @@ export const dbService = {
     }
   },
 
+  async updateUserNicepay(userId: string, data: {
+    nicepayBid?: string | null
+    nicepaySubscriptionStatus?: string | null
+    nicepayNextBillingAt?: Date | null
+    nicepayLastPaidAt?: Date | null
+    nicepayCanceledAt?: Date | null
+    nicepayLastOrderId?: string | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma.user as any).update({
+        where: { id: userId },
+        data,
+      })
+    } else {
+      const db = initMockDb()
+      const userIndex = db.users.findIndex(u => u.id === userId)
+      if (userIndex !== -1) {
+        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        db.users[userIndex].updatedAt = new Date()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (prisma.user as any).findMany({
+        where: {
+          nicepaySubscriptionStatus: 'ACTIVE',
+          nicepayBid: { not: null },
+          nicepayNextBillingAt: { lte: at },
+        },
+      })
+    }
+    return []
+  },
+
   async getDueTossSubscriptions(at: Date): Promise<User[]> {
     if (!isMock()) {
       return prisma.user.findMany({
@@ -433,7 +497,7 @@ export const dbService = {
           tossCustomerKey: { not: null },
           tossNextBillingAt: { lte: at },
         },
-      })
+      }) as unknown as Promise<User[]>
     }
 
     const db = initMockDb()
@@ -447,7 +511,7 @@ export const dbService = {
 
   async getUserByPayPalSubscriptionId(paypalSubscriptionId: string): Promise<User | null> {
     if (!isMock()) {
-      return prisma.user.findUnique({ where: { paypalSubscriptionId } })
+      return prisma.user.findUnique({ where: { paypalSubscriptionId } }) as unknown as Promise<User | null>
     }
     const db = initMockDb()
     return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
@@ -1499,5 +1563,154 @@ export const dbService = {
       return db.posts[idx]
     }
     throw new Error('Post not found')
+  },
+
+  // ─── Intelligence Layer ───────────────────────────────────────────────────
+
+  async createEditLog(data: {
+    userId: string
+    brandId: string
+    campaignId?: string
+    slideId?: string
+    eventType: string
+    editDelta?: string
+    metadata?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.userEditLog.create({ data: {
+          userId: data.userId,
+          brandId: data.brandId,
+          campaignId: data.campaignId ?? null,
+          slideId: data.slideId ?? null,
+          eventType: data.eventType,
+          editDelta: data.editDelta ?? null,
+          metadata: data.metadata ?? null,
+        }})
+        return
+      } catch (err) {
+        console.warn('Prisma createEditLog failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op (no edit log array in mock DB)
+  },
+
+  async getSummarizedPreference(brandId: string): Promise<{
+    summary: string | null
+    preferredHookPatterns: string | null
+    preferredLayouts: string | null
+    avoidPatterns: string | null
+    preferredCopyTone: string | null
+  } | null> {
+    if (!isMock()) {
+      try {
+        const pref = await prisma.summarizedPreference.findUnique({ where: { brandId } })
+        if (!pref) return null
+        return {
+          summary: pref.summary,
+          preferredHookPatterns: pref.preferredHookPatterns,
+          preferredLayouts: pref.preferredLayouts,
+          avoidPatterns: pref.avoidPatterns,
+          preferredCopyTone: pref.preferredCopyTone,
+        }
+      } catch (err) {
+        console.warn('Prisma getSummarizedPreference failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    return null
+  },
+
+  async upsertSummarizedPreference(data: {
+    userId: string
+    brandId: string
+    summary?: string
+    preferredHookPatterns?: string
+    preferredLayouts?: string
+    preferredEmotions?: string
+    preferredCopyTone?: string
+    preferredColorStyle?: string
+    avoidPatterns?: string
+    editLogCountAtCompress?: number
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.summarizedPreference.upsert({
+          where: { brandId: data.brandId },
+          update: {
+            summary: data.summary ?? null,
+            preferredHookPatterns: data.preferredHookPatterns ?? null,
+            preferredLayouts: data.preferredLayouts ?? null,
+            preferredEmotions: data.preferredEmotions ?? null,
+            preferredCopyTone: data.preferredCopyTone ?? null,
+            preferredColorStyle: data.preferredColorStyle ?? null,
+            avoidPatterns: data.avoidPatterns ?? null,
+            editLogCountAtCompress: data.editLogCountAtCompress ?? 0,
+            compressedAt: new Date(),
+          },
+          create: {
+            userId: data.userId,
+            brandId: data.brandId,
+            summary: data.summary ?? null,
+            preferredHookPatterns: data.preferredHookPatterns ?? null,
+            preferredLayouts: data.preferredLayouts ?? null,
+            preferredEmotions: data.preferredEmotions ?? null,
+            preferredCopyTone: data.preferredCopyTone ?? null,
+            preferredColorStyle: data.preferredColorStyle ?? null,
+            avoidPatterns: data.avoidPatterns ?? null,
+            editLogCountAtCompress: data.editLogCountAtCompress ?? 0,
+          },
+        })
+        return
+      } catch (err) {
+        console.warn('Prisma upsertSummarizedPreference failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op
+  },
+
+  async createQualityScoreLog(data: {
+    campaignId: string
+    userId: string
+    passed: boolean
+    score: number
+    narrativeFlowScore: number
+    personaFitScore: number
+    hookPatternScore: number
+    issueCount: number
+    issuesJson?: string
+    hookPatternUsed?: string
+    personaUsed?: string
+    industryUsed?: string
+    trendContextUsed?: boolean
+    memoryContextUsed?: boolean
+  }): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.qualityScoreLog.create({ data: {
+          campaignId: data.campaignId,
+          userId: data.userId,
+          passed: data.passed,
+          score: data.score,
+          narrativeFlowScore: data.narrativeFlowScore,
+          personaFitScore: data.personaFitScore,
+          hookPatternScore: data.hookPatternScore,
+          issueCount: data.issueCount,
+          issuesJson: data.issuesJson ?? null,
+          hookPatternUsed: data.hookPatternUsed ?? null,
+          personaUsed: data.personaUsed ?? null,
+          industryUsed: data.industryUsed ?? null,
+          trendContextUsed: data.trendContextUsed ?? false,
+          memoryContextUsed: data.memoryContextUsed ?? false,
+        }})
+        return
+      } catch (err) {
+        console.warn('Prisma createQualityScoreLog failed', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    // Mock: no-op
   },
 }

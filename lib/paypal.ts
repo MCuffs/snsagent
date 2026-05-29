@@ -76,9 +76,9 @@ export async function verifyWebhookSignature(body: string, headers: Record<strin
 }
 
 export const PAYPAL_PLAN_IDS: Record<'LITE' | 'PRO' | 'UNLIMITED', string | undefined> = {
-  LITE: process.env.NEXT_PUBLIC_PAYPAL_PLAN_LITE?.trim(),
-  PRO: process.env.NEXT_PUBLIC_PAYPAL_PLAN_PRO?.trim(),
-  UNLIMITED: process.env.NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED?.trim(),
+  LITE: readPayPalPlanEnv('NEXT_PUBLIC_PAYPAL_PLAN_LITE', 'NEXT_PUBLIC_PAYPAL_PLAN_STARTER'),
+  PRO: readPayPalPlanEnv('NEXT_PUBLIC_PAYPAL_PLAN_PRO'),
+  UNLIMITED: readPayPalPlanEnv('NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED', 'NEXT_PUBLIC_PAYPAL_PLAN_AGENCY'),
 }
 
 export function planFromPayPalPlanId(planId: string): 'LITE' | 'PRO' | 'UNLIMITED' | null {
@@ -86,4 +86,11 @@ export function planFromPayPalPlanId(planId: string): 'LITE' | 'PRO' | 'UNLIMITE
     if (PAYPAL_PLAN_IDS[plan] === planId) return plan
   }
   return null
+}
+
+function readPayPalPlanEnv(primaryName: string, legacyName?: string) {
+  const primary = process.env[primaryName]?.trim()
+  if (primary) return primary
+
+  return legacyName ? process.env[legacyName]?.trim() || undefined : undefined
 }

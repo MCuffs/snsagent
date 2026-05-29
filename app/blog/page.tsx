@@ -2,6 +2,7 @@ import { MarketingNav } from '../components/MarketingNav'
 import { MarketingFooter } from '../components/MarketingFooter'
 import Link from 'next/link'
 import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react'
+import { getSessionUser } from '../../lib/auth/user'
 
 export const metadata = {
     title: '블로그 — Shuffla',
@@ -83,10 +84,12 @@ const guides = [
     { title: 'AI 프롬프트 잘 쓰는 법', duration: '4:07', accent: 'from-[#2f9e44] to-[#51cf66]' },
 ]
 
-export default function BlogPage() {
+export default async function BlogPage() {
+    const authenticated = Boolean(await getSessionUser())
+
     return (
         <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
-            <MarketingNav />
+            <MarketingNav authenticated={authenticated} />
 
             <main className="flex-1">
                 {/* HEADER */}
@@ -212,7 +215,7 @@ export default function BlogPage() {
                 </section>
             </main>
 
-            <MarketingFooter />
+            <MarketingFooter authenticated={authenticated} />
         </div>
     )
 }

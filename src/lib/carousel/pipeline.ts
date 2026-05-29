@@ -4,16 +4,14 @@ import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers
 import { sanitizeImagePrompt } from '../ai/imageProvider'
 import { generateCaption } from './captionEngine'
 import { generateSlideCopies } from './copyEngine'
-import { generateDesignPrompts } from './designPromptEngine'
+import { runNarrativePipeline } from './narrativePipeline'
 import { generateHooks, selectBestHook } from './hookEngine'
 import { renderSlide } from './renderer'
 import { generateStrategy } from './strategyEngine'
 import { generateStructure } from './structureEngine'
 import { runQualityCheck } from './qualityCheckEngine'
+import { buildCopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import {
-  BrandIdentityAgent,
-  CopywritingAgent,
-  VisualConceptAgent,
   QualityGuardAgent,
   type AgentReport,
   type AgentReportItem,
@@ -48,8 +46,14 @@ export async function generateCarouselCampaign(params: {
     )
     log('Strategy generated')
 
+    const knowledgeCtx = buildCopyKnowledgeContext({
+      brand: params.brandProfile,
+      input: params.campaignInput,
+      strategy,
+    })
+
     const hooks = await runStep('Hook generation', () =>
-      generateHooks(params.brandProfile, params.campaignInput, strategy)
+      generateHooks(params.brandProfile, params.campaignInput, strategy, knowledgeCtx)
     )
     log('Hooks generated')
 
@@ -61,144 +65,107 @@ export async function generateCarouselCampaign(params: {
     )
     log('Structure generated')
 
-    const copies = await runStep('Slide copy generation', () =>
-      generateSlideCopies(params.brandProfile, params.campaignInput, structure, selectedHook)
+    const narrativeResult = await runStep('Narrative pipeline', () =>
+      runNarrativePipeline({
+        brand: params.brandProfile,
+        input: params.campaignInput,
+        strategy,
+        knowledgeCtx,
+        selectedHook,
+        structure,
+      })
     )
-    log('Slide copies generated')
+    const copies = narrativeResult.copies
+    const designPrompts = narrativeResult.designPrompts
+    const copyQualityReport = narrativeResult.copyQualityReport
+    log('Narrative pipeline complete')
 
-    // Initialize Agents
-    const brandAgent = new BrandIdentityAgent()
-    const copyAgent = new CopywritingAgent()
-    const visualAgent = new VisualConceptAgent()
+    // Initialize Agents for report/quality tracking only
     const qualityAgent = new QualityGuardAgent()
-
     const agentReportLogs: AgentReportItem[] = []
 
-    // Convert copies to AgentSlideData for agent chain
-    let agentSlides: AgentSlideData[] = copies.map(c => {
-      const isFirst = c.slideNumber === 1
-      const isLast = c.slideNumber === copies.length
-      const role = isFirst ? 'hook' : isLast ? 'save-cta' : 'key-point'
-      return {
-        slideNumber: c.slideNumber,
-        role,
-        headline: c.headline,
-        body: c.body,
-        layoutType: 'commerce-standard',
-      }
-    })
-
-    // Execute BrandIdentityAgent
-    const brandRes = brandAgent.run({
-      brandName: params.brandProfile.name,
-      brandToneOfVoice: params.brandProfile.toneOfVoice,
-      forbiddenWords: params.brandProfile.forbiddenWords,
-      ctaStyle: params.brandProfile.ctaStyle,
-      brandDna: params.brandProfile.brandDna,
-      slides: agentSlides,
-    })
-    agentSlides = brandRes.slides
-    agentReportLogs.push(...brandRes.logs)
-
-    // Execute CopywritingAgent
-    const copyRes = copyAgent.run({
-      title: `${params.campaignInput.productName} 카드뉴스`,
-      topic: params.campaignInput.productName,
-      category: params.campaignInput.objective,
-      brandName: params.brandProfile.name,
-      slides: agentSlides,
-    })
-    agentSlides = copyRes.slides
-    agentReportLogs.push(...copyRes.logs)
-
-    // Sync adjusted copies back to pipeline copies array
-    copies.forEach((c) => {
-      const updated = agentSlides.find(s => s.slideNumber === c.slideNumber)
-      if (updated) {
-        c.headline = updated.headline
-        c.body = updated.body
-      }
-    })
-
-    // Execute VisualConceptAgent
-    const visualRes = visualAgent.run({
-      category: params.campaignInput.objective,
-      topic: params.campaignInput.productName,
-      tone: params.brandProfile.toneOfVoice || '전문적이고 신뢰감 있게',
-      brandMainColor: params.brandProfile.mainColor,
-      brandIndustry: params.brandProfile.industry,
-      slides: agentSlides,
-    })
-    agentSlides = visualRes.slides
-    agentReportLogs.push(...visualRes.logs)
-
-    const designPrompts = await runStep('Design prompt generation', () =>
-      generateDesignPrompts(params.brandProfile, params.campaignInput, copies, structure)
-    )
-    log('Design prompts generated')
+    // Build AgentSlideData for downstream quality reporting
+    const structureRoleMap = new Map(structure.slides.map(s => [s.slideNumber, s.role]))
+    const agentSlides: AgentSlideData[] = copies.map(c => ({
+      slideNumber: c.slideNumber,
+      role: structureRoleMap.get(c.slideNumber) ?? 'feature',
+      headline: c.headline,
+      body: c.body,
+      layoutType: 'commerce-standard',
+    }))
 
     const imageProvider = getPipelineImageProvider()
     const campaignKey = `cg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const slides: GeneratedSlide[] = []
 
-    for (const copy of copies) {
-      const design = designPrompts.find(item => item.slideNumber === copy.slideNumber)
-      if (!design) {
-        throw new Error(`Design prompt missing for slide ${copy.slideNumber}`)
-      }
+    const [slideResults, captionResult] = await Promise.all([
+      Promise.all(
+        copies.map(async (copy) => {
+          const design = designPrompts.find(item => item.slideNumber === copy.slideNumber)
+          if (!design) {
+            throw new Error(`Design prompt missing for slide ${copy.slideNumber}`)
+          }
 
-      const sanitizedPrompt = sanitizeImagePrompt(design.backgroundPrompt)
-      let backgroundImageUrl = ''
-      try {
-        const image = await imageProvider.generateImage(sanitizedPrompt, {
-          size: '1024x1024',
-          productImageUrls: params.campaignInput.productImageUrls,
+          const sanitizedPrompt = sanitizeImagePrompt(design.backgroundPrompt)
+          let backgroundImageUrl = ''
+          try {
+            const image = await imageProvider.generateImage(sanitizedPrompt, {
+              size: '1024x1024',
+              productImageUrls: params.campaignInput.productImageUrls,
+            })
+            backgroundImageUrl = image.imageUrl
+          } catch (error) {
+            imageFallbackUsed = true
+            log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
+            const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
+            backgroundImageUrl = fallbackImage.imageUrl
+            console.error('[CarouselPipeline] Image generation error', error)
+          }
+
+          design.backgroundPrompt = sanitizedPrompt
+
+          const finalImageUrl = await renderSlide({
+            campaignKey,
+            brand: params.brandProfile,
+            copy,
+            design,
+            backgroundImageUrl,
+            showSlideNumber: true,
+          })
+
+          debugSlideRender(copy.slideNumber, {
+            prompt: sanitizedPrompt,
+            headline: copy.headline,
+            body: copy.body,
+            imageUrl: finalImageUrl,
+          })
+
+          return { copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }
         })
-        backgroundImageUrl = image.imageUrl
-      } catch (error) {
-        imageFallbackUsed = true
-        log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
-        const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
-        backgroundImageUrl = fallbackImage.imageUrl
-        console.error('[CarouselPipeline] Image generation error', error)
-      }
+      ),
+      runStep('Caption generation', () =>
+        generateCaption(params.brandProfile, params.campaignInput, strategy, selectedHook)
+      ),
+    ])
 
-      // Sync sanitized prompt back to design object for renderer
-      design.backgroundPrompt = sanitizedPrompt
-
-      const finalImageUrl = await renderSlide({
-        campaignKey,
-        brand: params.brandProfile,
-        copy,
-        design,
-        backgroundImageUrl,
-        showSlideNumber: true,
+    let slides: GeneratedSlide[] = slideResults
+      .sort((a, b) => a.copy.slideNumber - b.copy.slideNumber)
+      .map(({ copy, sanitizedPrompt, backgroundImageUrl, finalImageUrl }) => {
+        const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
+        if (matchingAgentSlide) {
+          matchingAgentSlide.backgroundImageUrl = backgroundImageUrl
+        }
+        return {
+          slideNumber: copy.slideNumber,
+          headline: copy.headline,
+          body: copy.body,
+          designPrompt: sanitizedPrompt,
+          backgroundImageUrl,
+          finalImageUrl,
+        }
       })
 
-      // [DEBUG LOGGING]
-      console.log(`[DEBUG] Slide ${copy.slideNumber} - Background Prompt: "${sanitizedPrompt}" | Headline: "${copy.headline}" | Body: "${copy.body}" | Final Image URL: "${finalImageUrl}"`)
-
-      // Sync background url to agent slides for diagnostics
-      const matchingAgentSlide = agentSlides.find(s => s.slideNumber === copy.slideNumber)
-      if (matchingAgentSlide) {
-        matchingAgentSlide.backgroundImageUrl = backgroundImageUrl
-      }
-
-      slides.push({
-        slideNumber: copy.slideNumber,
-        headline: copy.headline,
-        body: copy.body,
-        designPrompt: sanitizedPrompt,
-        backgroundImageUrl,
-        finalImageUrl,
-      })
-    }
     log('Images generated')
     log('Slides rendered')
-
-    const captionResult = await runStep('Caption generation', () =>
-      generateCaption(params.brandProfile, params.campaignInput, strategy, selectedHook)
-    )
     log('Caption generated')
 
     qualityCheck = await runStep('Quality check', () =>
@@ -219,6 +186,46 @@ export async function generateCarouselCampaign(params: {
       }
     }
 
+    // Copy-only regeneration for fixable copy issues (no image regeneration cost)
+    const copySlidesWithIssues = extractCopyIssueSlides(qualityCheck.issues)
+    if (copySlidesWithIssues.size > 0) {
+      log(`Copy-only regeneration triggered for ${copySlidesWithIssues.size} slide(s)`)
+      try {
+        const regenResult = await generateSlideCopies(
+          params.brandProfile, params.campaignInput, structure, selectedHook, knowledgeCtx
+        )
+        const regenCopies = regenResult.copies
+        const regenMap = new Map(regenCopies.map(c => [c.slideNumber, c]))
+        slides = await Promise.all(
+          slides.map(async slide => {
+            if (!copySlidesWithIssues.has(slide.slideNumber)) return slide
+            const newCopy = regenMap.get(slide.slideNumber)
+            if (!newCopy) return slide
+            const design = designPrompts.find(d => d.slideNumber === slide.slideNumber)
+            if (!design) return slide
+            const finalImageUrl = await renderSlide({
+              campaignKey,
+              brand: params.brandProfile,
+              copy: newCopy,
+              design,
+              backgroundImageUrl: slide.backgroundImageUrl,
+              showSlideNumber: true,
+            })
+            return { ...slide, headline: newCopy.headline, body: newCopy.body, finalImageUrl }
+          })
+        )
+        qualityCheck = await runQualityCheck({
+          brand: params.brandProfile,
+          input: params.campaignInput,
+          slides,
+          caption: captionResult,
+        })
+        log('Copy-only regeneration complete')
+      } catch {
+        log('Copy-only regeneration failed, keeping original slides')
+      }
+    }
+
     // Populate diagnostics into agent slides
     agentSlides.forEach(as => {
       // Find matching issues/suggestions to record in agent report
@@ -229,6 +236,7 @@ export async function generateCarouselCampaign(params: {
     const qualityRes = qualityAgent.run({
       slides: agentSlides,
       hasFallbackImage: imageFallbackUsed,
+      copyQualityReport,
     })
     agentReportLogs.push(...qualityRes.logs)
 
@@ -320,4 +328,33 @@ function tomorrowAt20() {
   date.setDate(date.getDate() + 1)
   date.setHours(20, 0, 0, 0)
   return date
+}
+
+function extractCopyIssueSlides(issues: string[]): Set<number> {
+  const nums = new Set<number>()
+  for (const issue of issues) {
+    const match = issue.match(/^(\d+)번/)
+    if (match && /headline.*20자|body.*60자|금지어|과장 표현/.test(issue)) {
+      nums.add(parseInt(match[1], 10))
+    }
+  }
+  return nums
+}
+
+function debugSlideRender(
+  slideNumber: number,
+  details: { prompt: string; headline: string; body: string; imageUrl: string }
+) {
+  if (process.env.NODE_ENV === 'production') return
+
+  const summarize = (value: string) => value.length > 120 ? `${value.slice(0, 120)}...` : value
+  console.log(
+    `[DEBUG] Slide ${slideNumber} rendered`,
+    {
+      prompt: summarize(details.prompt),
+      headline: summarize(details.headline),
+      body: summarize(details.body),
+      imageUrl: summarize(details.imageUrl),
+    }
+  )
 }

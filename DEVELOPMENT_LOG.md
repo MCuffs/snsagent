@@ -283,3 +283,85 @@ This file records meaningful development work, fixes, verification commands, and
 ### Operational Note
 - Deployments must run `node scripts/migrate-slide-customization.mjs` before serving this build so Prisma can select the new `CarouselSlide` document and customization fields.
 - Multi-session learned style recommendations beyond the last confirmed brand preference, motion video output and real-time collaboration remain follow-up scopes; the layer document includes metadata needed to extend toward those workflows.
+
+## 2026-05-27 KST - Repository Migration and Development Deployment
+
+### Summary
+- Migrated the current code history to the `Shuffla-AI/Shuffla_SaaS` repository.
+- Configured a CI deployment route for the `dev` branch while the Vercel project remains on the Hobby plan.
+
+### Changes
+- Preserved the previous repository history and the new organization repository's initial commit in migration commit `5b35a2d`.
+- Pushed the same migration baseline to `main` and `dev` in `Shuffla-AI/Shuffla_SaaS`.
+- Confirmed the official Vercel GitHub App is installed for the `Shuffla-AI` organization.
+- Identified that Vercel Hobby cannot directly connect an organization-owned private GitHub repository.
+- Added `.github/workflows/vercel-dev-production.yml` with `actions/checkout@v6` so a push to `dev` builds inside GitHub Actions and uploads prebuilt output to the Vercel production deployment through the CLI.
+- Configured encrypted GitHub Actions repository secrets for the Vercel token, team ID, and project ID.
+- Documented required Actions secrets and the Hobby non-commercial-use limitation in `README.md`.
+
+### Operational Note
+- The CI route intentionally treats `dev` as the current deployment branch. Before commercial operation, deployment must move to a commercially permitted plan or host and the release branch policy should return to `main`.
+
+### Verification
+- `git diff --check` passed.
+- `npx --yes prettier --check .github/workflows/vercel-dev-production.yml` passed.
+- `npm run build` passed with Next.js `16.2.6`.
+- `npm run lint` still reports two pre-existing errors in `app/(cms)/TabContext.tsx` and `src/lib/ai/providers/openAIImageProvider.ts`; these files were not changed by the deployment configuration.
+
+## 2026-05-27 KST - Production Google Login Recovery
+
+### Issue
+- Production Google OAuth failed after the GitHub Actions prebuilt deployment because Prisma Client was generated on the CI runner for `debian-openssl-3.0.x`, while the Vercel function runtime requires `rhel-openssl-3.0.x`.
+- The production schema also required verification against the currently deployed billing and editorial fields before authentication could be considered restored.
+
+### Changes
+- Added `rhel-openssl-3.0.x` to Prisma Client `binaryTargets` so Vercel runtime functions can load the query engine from GitHub Actions prebuilt deployments.
+- Used a temporary bearer-protected production recovery route to execute idempotent schema additions from inside the Vercel runtime, then removed the route and its temporary secret after recovery.
+
+### Verification
+- `npm run build` passed with the Vercel Prisma engine included.
+- The protected runtime recovery request returned HTTP `200` after applying schema changes and verifying current Prisma reads for `User`, `Brand`, `Campaign`, and `CarouselSlide`.
+
+## 2026-05-27 KST - Vercel Pro Git Integration Normalization
+
+### Summary
+- Upgraded the deployment path from the Vercel Hobby workaround to the supported Vercel Pro Git Integration flow.
+- Restored `main` as the production release branch; `dev` is used for preview and validation.
+
+### Changes
+- Connected the Vercel project `snsagent` directly to `Shuffla-AI/Shuffla_SaaS`.
+- Removed `.github/workflows/vercel-dev-production.yml`; Production builds no longer depend on GitHub Actions prebuilt uploads or `VERCEL_*` deployment secrets.
+- Retained the Prisma Vercel runtime binary target and `.vercelignore` asset exclusions because they are runtime and deployment-safety settings, not Hobby routing workarounds.
+
+### Operational Policy
+- Pushes and merges to `main` trigger Production through Vercel Git Integration.
+- Pushes and pull requests from `dev` and feature branches create Preview deployments.
+- Manual CLI Production deployments are reserved for recovery or diagnosis.
+
+### Verification
+- Confirmed the Vercel project Git connection to `Shuffla-AI/Shuffla_SaaS`.
+- `git diff --check` passed.
+- `npm run build` passed with Next.js `16.2.6`.
+- Confirmed that Git pushes are classified correctly as Preview for `dev` and Production for `main`.
+- The first Git-triggered deployments were blocked because commit email `mcuffs@github.com` is not associated with a GitHub user; after switching to the repository's GitHub noreply identity, the subsequent `dev` Preview Git build reached `Ready`.
+
+## 2026-05-27 KST - Editorial Image Prompt Architecture Upgrade
+
+### Summary
+- Replaced the flat image prompt stack with a hierarchy-driven Korean editorial visual brief for media carousel backgrounds.
+- Aligned generated image orientation with the 1080x1350 renderer by switching media image calls to portrait generation.
+
+### Changes
+- Compiles prompts in priority order: contract, primary scene, camera/emotion, crop-safe composition, translated brand materials, and Korean realism.
+- Added role-specific camera and whitespace behavior for hook, context, key-point, detail, stat, summary, and save-CTA slides.
+- Translates abstract brand DNA into concrete material, lighting, color-accent, styling, and environment cues instead of injecting raw brand prose.
+- Reduced repeated negative prompting to a concise provider-level background-only exclusion contract.
+- Preserves Korean scene context in prompt sanitation while removing explicit requests to render text, logos, watermarks, or UI.
+- Uses `1024x1536` image generation for media cards and their regeneration flows, with `medium` quality and 4:5 crop-safe quality validation.
+- Removed an unsafe MIME type cast while persisting generated PNG/JPEG assets.
+
+### Verification
+- `npx eslint 'src/lib/layout/brandHarness.ts' 'src/lib/layout/visualDirectionEngine.ts' 'src/lib/layout/mediaCardHarness.ts' 'src/lib/layout/mediaCarouselPipeline.ts' 'src/lib/layout/mediaCardPipeline.ts' 'src/lib/layout/qualityCheck.ts' 'src/lib/ai/imageProvider.ts' 'src/lib/ai/providers/openAIImageProvider.ts' 'app/actions.ts'` passed.
+- `npx tsc --noEmit --pretty false` passed.
+- `git diff --check` passed.
+- `npm run build` passed with Next.js `16.2.6`.

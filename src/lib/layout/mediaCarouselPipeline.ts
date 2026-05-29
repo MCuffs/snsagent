@@ -4,7 +4,7 @@ import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
-import { buildBrandHarnessPrompt, checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
+import { checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
@@ -21,6 +21,17 @@ import {
   type AgentReportItem,
   type AgentSlideData
 } from '../carousel/agents'
+import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
+import type { BrandProfile, CampaignInput } from '../carousel/types'
+import {
+  buildEditorialDirectorPlan,
+  evaluateEditorialCarousel,
+  formatEditorialPlanForPrompt,
+  type EditorialBriefing,
+  type EditorialDirectorPlan,
+  type EditorialQualityReport,
+  type EditorialSlideRole,
+} from '../editorial/editorialDirector'
 
 export interface MediaCarouselInput {
   userId: string
@@ -29,6 +40,7 @@ export interface MediaCarouselInput {
   brandMainColor?: string
   brandToneOfVoice?: string
   brandIndustry?: string
+  brandTargetAudience?: string
   brandForbiddenWords?: string
   brandCtaStyle?: string
   brandDna?: string | null
@@ -43,6 +55,7 @@ export interface MediaCarouselInput {
   source?: string
   visualHint?: string
   productImageUrls?: string[]
+  briefing?: EditorialBriefing
   imageProvider?: ImageProvider
 }
 
@@ -69,7 +82,7 @@ export interface MediaCarouselPipelineResult {
   qualityCheck: MediaCardQualityResult
 }
 
-type MediaSlideRole = 'hook' | 'context' | 'key-point' | 'detail' | 'stat' | 'summary' | 'save-cta'
+type MediaSlideRole = EditorialSlideRole
 
 interface MediaSlidePlan {
   slideNumber: number
@@ -87,18 +100,59 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
-  let plannedSlides = planMediaSlides(input, slideCount, baseLayoutType)
-
   // LLM copy generation — replaces rule-based placeholder copy with AI-written slide text
-  plannedSlides = await generateMediaSlideCopies(input, plannedSlides)
-
-  const brandHarnessPrompt = buildBrandHarnessPrompt({
-    brandName: input.brandName,
-    brandIndustry: input.brandIndustry,
-    brandToneOfVoice: input.brandToneOfVoice,
-    brandMainColor: input.brandMainColor,
+  // Build knowledge context before copy generation
+  const mediaBrand: BrandProfile = {
+    id: input.brandId,
+    name: input.brandName,
+    industry: input.brandIndustry || '',
+    targetAudience: input.brandTargetAudience || '',
+    toneOfVoice: input.brandToneOfVoice || '',
+    mainColor: input.brandMainColor || '',
+    forbiddenWords: input.brandForbiddenWords || '',
+    ctaStyle: input.brandCtaStyle || '',
     brandDna: input.brandDna,
+  }
+  const mediaCampaignInput: CampaignInput = {
+    productName: input.topic,
+    productDescription: input.keyContent,
+    keyBenefits: input.category,
+    objective: input.objective || input.contentType,
+    slideCount: input.slideCount,
+    productImageUrls: input.productImageUrls || [],
+  }
+  const knowledgeCtx = buildCopyKnowledgeContext({
+    brand: mediaBrand,
+    input: mediaCampaignInput,
+    strategy: {
+      strategyType: 'problem_solution',
+      targetEmotion: input.briefing?.targetEmotion || '',
+      contentGoal: input.objective || input.contentType,
+      angle: input.briefing?.hookDirection || '',
+      recommendedSlideCount: input.slideCount,
+      reason: '',
+    },
   })
+
+  const personalizationMemory = await dbService.getSummarizedPreference(input.brandId)
+  const editorialPlan = buildEditorialDirectorPlan({
+    productName: input.topic,
+    sourceMaterial: input.keyContent,
+    category: input.category,
+    objective: input.objective || input.contentType,
+    contentType: input.contentType,
+    tone: input.tone,
+    brandName: input.brandName,
+    targetAudience: input.brandTargetAudience || '',
+    brandCtaStyle: input.brandCtaStyle,
+    slideCount,
+    baseLayoutType,
+    briefing: input.briefing,
+    memory: personalizationMemory,
+    knowledgeContext: knowledgeCtx,
+  })
+  let plannedSlides = planMediaSlides(input, editorialPlan)
+  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx)
 
   // 1. Initialize Agents
   const brandAgent = new BrandIdentityAgent()
@@ -107,6 +161,14 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const qualityAgent = new QualityGuardAgent()
 
   const agentReportLogs: AgentReportItem[] = []
+  agentReportLogs.push({
+    agentName: 'EditorialDirector',
+    role: 'strategy-orchestration',
+    status: 'info',
+    message: `Editorial plan established: ${editorialPlan.carouselStrategy.emotionCurve.join(' -> ')}.`,
+    details: editorialPlan,
+    timestamp: new Date().toISOString(),
+  })
 
   let agentSlides: AgentSlideData[] = plannedSlides.map(s => ({
     slideNumber: s.slideNumber,
@@ -164,95 +226,106 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   let hasFallbackImage = false
 
   // 5. Render slides and evaluate quality metrics
-  for (const slide of agentSlides) {
-    const layout = LAYOUT_DEFINITIONS[slide.layoutType as LayoutType] || LAYOUT_DEFINITIONS['dark-editorial']
-    const typographyPlan = planTypography({
-      headline: slide.headline,
-      body: slide.body,
-      category: input.category,
-      layout,
-      brandMainColor: input.brandMainColor,
-    })
-    const harness = applyMediaCardHarness({
-      layout,
-      typography: typographyPlan,
-      slideNumber: slide.slideNumber,
-      totalSlides: slideCount,
-      role: slide.role as MediaSlideRole,
-    })
-    const visualDirection = generateVisualDirection({
-      layout: harness.layout,
-      category: input.category,
-      topic: input.topic,
-      tone: input.tone,
-      visualHint: input.visualHint,
-      brandMainColor: input.brandMainColor,
-      brandToneOfVoice: input.brandToneOfVoice,
-      brandIndustry: input.brandIndustry,
-      brandDna: input.brandDna,
-    })
-
-    const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
-
-    let backgroundImageUrl = ''
-    try {
-      const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(`${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`, harness.template), {
-        size: '1024x1024',
-        productImageUrls: input.productImageUrls || [],
+  const slideResults = await Promise.all(
+    agentSlides.map(async (slide) => {
+      const slidePlan = editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)
+      const layout = LAYOUT_DEFINITIONS[slide.layoutType as LayoutType] || LAYOUT_DEFINITIONS['dark-editorial']
+      const typographyPlan = planTypography({
+        headline: slide.headline,
+        body: slide.body,
+        category: input.category,
+        layout,
+        brandMainColor: input.brandMainColor,
       })
-      backgroundImageUrl = background.imageUrl
-    } catch (err) {
-      console.error('[MediaCarouselPipeline] Background image generation failed', err)
-      hasFallbackImage = true
-      // Use mock image fallback
-      const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
-      backgroundImageUrl = fallbackImage.imageUrl
-    }
+      const harness = applyMediaCardHarness({
+        layout,
+        typography: typographyPlan,
+        slideNumber: slide.slideNumber,
+        totalSlides: slideCount,
+        role: slide.role as MediaSlideRole,
+      })
+      const visualDirection = generateVisualDirection({
+        layout: harness.layout,
+        category: input.category,
+        topic: input.topic,
+        tone: input.tone,
+        visualHint: input.visualHint,
+        brandMainColor: input.brandMainColor,
+        brandToneOfVoice: input.brandToneOfVoice,
+        brandIndustry: input.brandIndustry,
+        brandDna: input.brandDna,
+        role: slide.role as MediaSlideRole,
+        editorialDirection: slidePlan?.visualDirection,
+      })
 
-    analyzeReferencePattern({
-      layoutType: harness.layout.layoutType,
-      headlineLength: slide.headline.length,
-      bodyLength: slide.body.length,
-      hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
-    })
+      const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
 
-    const baseSlideQualityCheck = runMediaCardQualityCheck({
-      layout: harness.layout,
-      typography: harness.typography,
-      headline: slide.headline,
-      body: slide.body,
-      backgroundImageUrl,
-      designPrompt: `${sanitizedVisualPrompt}, brand harness: ${brandHarnessPrompt}`,
-      harnessDiagnostics: harness.diagnostics,
+      let backgroundImageUrl = ''
+      let slideFallback = false
+      try {
+        const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection), {
+          size: '1024x1536',
+          productImageUrls: input.productImageUrls || [],
+        })
+        backgroundImageUrl = background.imageUrl
+      } catch (err) {
+        console.error('[MediaCarouselPipeline] Background image generation failed', err)
+        slideFallback = true
+        const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
+        backgroundImageUrl = fallbackImage.imageUrl
+      }
+
+      analyzeReferencePattern({
+        layoutType: harness.layout.layoutType,
+        headlineLength: slide.headline.length,
+        bodyLength: slide.body.length,
+        hasNumericSignal: /[\d%]/.test(`${slide.headline} ${slide.body}`),
+      })
+
+      const baseSlideQualityCheck = runMediaCardQualityCheck({
+        layout: harness.layout,
+        typography: harness.typography,
+        headline: slide.headline,
+        body: slide.body,
+        backgroundImageUrl,
+        designPrompt: sanitizedVisualPrompt,
+        harnessDiagnostics: harness.diagnostics,
+      })
+      const slideQualityCheck = checkBrandFit({
+        headline: slide.headline,
+        body: slide.body,
+        designPrompt: sanitizedVisualPrompt,
+        brandDna: input.brandDna,
+        qualityCheck: baseSlideQualityCheck,
+      })
+
+      const finalImageUrl = await renderMediaCard({
+        id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
+        layout: harness.layout,
+        typography: harness.typography,
+        overlay: harness.overlay,
+        category: input.category,
+        headline: slide.headline,
+        body: slide.body,
+        backgroundImageUrl,
+        source: input.source || input.brandName,
+        pageNumber: slide.slideNumber,
+        totalPages: slideCount,
+      })
+
+      console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
+
+      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback }
     })
-    const slideQualityCheck = checkBrandFit({
-      headline: slide.headline,
-      body: slide.body,
-      designPrompt: sanitizedVisualPrompt,
-      brandDna: input.brandDna,
-      qualityCheck: baseSlideQualityCheck,
-    })
+  )
+
+  for (const result of slideResults) {
+    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback } = result
+    if (slideFallback) hasFallbackImage = true
 
     // Feed slide diagnostics to Quality Agent
     slide.diagnostics = slideQualityCheck.issues
     slide.backgroundImageUrl = backgroundImageUrl
-
-    const finalImageUrl = await renderMediaCard({
-      id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
-      layout: harness.layout,
-      typography: harness.typography,
-      overlay: harness.overlay,
-      category: input.category,
-      headline: slide.headline,
-      body: slide.body,
-      backgroundImageUrl,
-      source: input.source || input.brandName,
-      pageNumber: slide.slideNumber,
-      totalPages: slideCount,
-    })
-
-    // [DEBUG LOGGING]
-    console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
 
     slides.push({
       slideNumber: slide.slideNumber,
@@ -274,11 +347,28 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   agentReportLogs.push(...qualityRes.logs)
 
-  const agentReport: AgentReport = {
+  const editorialQuality = evaluateEditorialCarousel(editorialPlan, slides)
+  for (const issue of editorialQuality.issues) {
+    agentReportLogs.push({
+      agentName: 'EditorialDirector',
+      role: issue.dimension,
+      status: issue.severity === 'block' ? 'error' : 'warn',
+      message: issue.message,
+      timestamp: new Date().toISOString(),
+    })
+  }
+  const qualityPassed = qualityRes.passed && editorialQuality.passed
+
+  const agentReport: AgentReport & {
+    editorialPlan: EditorialDirectorPlan
+    editorialValidation: EditorialQualityReport
+  } = {
     timestamp: new Date().toISOString(),
-    status: qualityRes.passed ? 'passed' : 'needs_review',
-    score: qualityRes.score,
+    status: qualityPassed ? 'passed' : 'needs_review',
+    score: Math.min(qualityRes.score, editorialQuality.score),
     logs: agentReportLogs,
+    editorialPlan,
+    editorialValidation: editorialQuality,
   }
 
   const campaign = await dbService.createCampaign(
@@ -306,12 +396,27 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   )
 
   const qualityCheck: MediaCardQualityResult = {
-    passed: qualityRes.passed,
+    passed: qualityPassed,
     issues: agentReportLogs.filter(l => l.status === 'error' || l.status === 'warn').map(l => l.message),
     suggestions: agentReportLogs.filter(l => l.status === 'info').map(l => l.message),
   }
   const status = qualityCheck.passed ? 'pending_approval' : 'needs_review'
   await dbService.updateCampaignStatus(campaign.id, status)
+  await dbService.createQualityScoreLog({
+    campaignId: campaign.id,
+    userId: input.userId,
+    passed: editorialQuality.passed,
+    score: editorialQuality.score,
+    narrativeFlowScore: editorialQuality.narrativeFlowScore,
+    personaFitScore: editorialQuality.personaFitScore,
+    hookPatternScore: editorialQuality.hookPatternScore,
+    issueCount: editorialQuality.issues.length,
+    issuesJson: JSON.stringify(editorialQuality.issues),
+    hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
+    personaUsed: knowledgeCtx.personaProfile.id,
+    industryUsed: knowledgeCtx.industryToneRule?.industry,
+    memoryContextUsed: editorialPlan.personalization.applied,
+  })
 
   const post = await dbService.createPost(input.userId, input.brandId, campaign.id, {
     caption: buildCaption(input),
@@ -332,7 +437,12 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   }
 }
 
-async function generateMediaSlideCopies(input: MediaCarouselInput, slides: MediaSlidePlan[]): Promise<MediaSlidePlan[]> {
+async function generateMediaSlideCopies(
+  input: MediaCarouselInput,
+  slides: MediaSlidePlan[],
+  editorialPlan: EditorialDirectorPlan,
+  knowledgeCtx?: ReturnType<typeof buildCopyKnowledgeContext>
+): Promise<MediaSlidePlan[]> {
   const client = getLLMClient()
 
   const slideDescriptions = slides
@@ -345,14 +455,25 @@ async function generateMediaSlideCopies(input: MediaCarouselInput, slides: Media
     ? `\n브랜드 DNA (카피에 반드시 반영):\n${formatBrandDnaForPrompt(input.brandDna)}\n`
     : ''
 
+  const knowledgeSection = knowledgeCtx
+    ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
+    : ''
+  const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
+
+  const systemPrompt = knowledgeCtx
+    ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+    : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
+
+${editorialPlanSection}
 
 브랜드 정보:
 - 브랜드명: ${input.brandName}
 - 업종: ${input.brandIndustry || '미지정'}
 - 톤앤매너: ${input.brandToneOfVoice || '전문적이고 신뢰감 있게'}
 - 금지어: ${input.brandForbiddenWords || '없음'}
-${brandDnaSection}
+${brandDnaSection}${knowledgeSection}
 콘텐츠 기획:
 - 주제(상품): ${input.topic}
 - 캠페인 목표: ${input.objective || input.contentType}
@@ -393,7 +514,7 @@ JSON 응답 형식:
     {
       model: getCopywritingModel(),
       temperature: 0.35,
-      systemPrompt: '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.',
+      systemPrompt,
     }
   )
 
@@ -403,13 +524,14 @@ JSON 응답 형식:
 
   return slides.map(slide => {
     const generated = copyMap.get(slide.slideNumber)
+    const constraints = editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)?.copyConstraints
     if (typeof generated?.headline !== 'string' || !generated.headline.trim()) return slide
     const body = typeof generated.body === 'string' ? generated.body.trim() : slide.body
     if (hasUnsupportedNumericClaim(`${generated.headline} ${body}`, groundingText)) return slide
     return {
       ...slide,
-      headline: generated.headline.trim().slice(0, 34),
-      body: body.slice(0, 64) || slide.body,
+      headline: generated.headline.trim().slice(0, constraints?.maxHeadlineChars || 20),
+      body: body.slice(0, constraints?.maxBodyChars || 58) || slide.body,
     }
   })
 }
@@ -437,37 +559,24 @@ function hasUnsupportedNumericClaim(copy: string, groundingText: string) {
   return copySignals.some(signal => !sourceSignals.has(signal.replace(/\s+/g, '').toLowerCase()))
 }
 
-function planMediaSlides(input: MediaCarouselInput, slideCount: number, baseLayoutType: LayoutType): MediaSlidePlan[] {
+function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDirectorPlan): MediaSlidePlan[] {
   const parsed = parseSlideLines(input.keyContent)
-  const first = parsed[0]
-  const plans: MediaSlidePlan[] = [
-    {
-      slideNumber: 1,
-      role: 'hook',
-      headline: trimHeadline(input.title || first?.headline || input.topic),
-      body: first?.body || first?.headline || summarize(input.keyContent, 58),
-      layoutType: firstSlideLayout(input, baseLayoutType),
-    },
-  ]
-
-  for (let index = 2; index <= slideCount; index += 1) {
-    const item = parsed[index - 1] || parsed[index - 2] || parsed[(index - 2) % Math.max(parsed.length, 1)]
-    const fallback = item?.headline || input.topic
-    const body = item?.body || summarize(item?.headline || input.keyContent, 64)
-    const hasStat = /[\d%]/.test(`${fallback} ${body}`)
-    plans.push({
-      slideNumber: index,
-      role: index === slideCount ? 'summary' : hasStat ? 'stat' : index % 2 === 0 ? 'context' : 'key-point',
-      headline: trimHeadline(index === slideCount && !item ? `${input.topic} 핵심 요약` : fallback),
-      body,
-      layoutType: hasStat ? 'stat-highlight' : supportingLayout(baseLayoutType, index),
-    })
-  }
-
-  return plans.slice(0, slideCount).map((slide, index) => ({
-    ...slide,
-    slideNumber: index + 1,
-  }))
+  return editorialPlan.slides.map((slidePlan, index) => {
+    const item = parsed[index] || parsed[index - 1] || parsed[0]
+    const headline = slidePlan.role === 'hook'
+      ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
+      : item?.headline || input.topic
+    const body = slidePlan.role === 'save-cta'
+      ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 58)
+      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 58)
+    return {
+      slideNumber: slidePlan.slideNumber,
+      role: slidePlan.role,
+      headline: trimHeadline(headline).slice(0, slidePlan.copyConstraints.maxHeadlineChars),
+      body: body.slice(0, slidePlan.copyConstraints.maxBodyChars),
+      layoutType: slidePlan.layoutType,
+    }
+  })
 }
 
 function parseSlideLines(content: string) {
@@ -498,21 +607,6 @@ function summarize(value: string, maxLength: number) {
   const clean = value.replace(/\s+/g, ' ').trim()
   if (clean.length <= maxLength) return clean
   return `${clean.slice(0, maxLength).replace(/\s+\S*$/, '')}.`
-}
-
-function firstSlideLayout(input: MediaCarouselInput, baseLayoutType: LayoutType): LayoutType {
-  if (/속보|긴급|정치|사회|논란|이슈/.test(`${input.category} ${input.contentType} ${input.title}`)) return 'breaking-news'
-  if (/통계|수치|데이터|%|\d/.test(`${input.title} ${input.keyContent}`)) return 'stat-highlight'
-  return baseLayoutType === 'minimal-clean' ? 'dark-editorial' : baseLayoutType
-}
-
-function supportingLayout(baseLayoutType: LayoutType, index: number): LayoutType {
-  if (baseLayoutType === 'breaking-news') return index % 2 === 0 ? 'breaking-news' : 'dark-editorial'
-  if (baseLayoutType === 'trend-feed') return index % 2 === 0 ? 'community-style' : 'dark-editorial'
-  if (baseLayoutType === 'stat-highlight') return index % 2 === 0 ? 'dark-editorial' : 'stat-highlight'
-  if (baseLayoutType === 'magazine') return index % 2 === 0 ? 'magazine' : 'dark-editorial'
-  if (baseLayoutType === 'split-comparison') return index % 2 === 0 ? 'split-comparison' : 'dark-editorial'
-  return index % 2 === 0 ? 'dark-editorial' : 'cinematic-headline'
 }
 
 function toMediaLayout(layoutType: LayoutType): LayoutType {

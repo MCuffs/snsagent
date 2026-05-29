@@ -26,6 +26,15 @@ export type SlideRole =
 
 export type TextPosition = 'top' | 'center' | 'bottom'
 
+export type OverlayType =
+  | 'dark_gradient_bottom'
+  | 'dark_gradient_top'
+  | 'dark_gradient_center'
+  | 'cinematic_dark'
+  | 'blur_glass'
+  | 'radial_focus'
+  | 'none'
+
 export interface BrandProfile {
   id: string
   name: string
@@ -83,6 +92,8 @@ export interface SlideDesignPrompt {
   backgroundPrompt: string
   layoutStyle: string
   textPosition: TextPosition
+  overlayType: OverlayType
+  overlayStrength: number  // 0-100
   visualMood: string
 }
 

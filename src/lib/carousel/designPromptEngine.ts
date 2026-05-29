@@ -1,11 +1,46 @@
 import { parseBrandDna } from '../../../lib/brand-dna'
-import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition } from './types'
+import type { BrandProfile, CampaignInput, CarouselStructure, SlideCopy, SlideDesignPrompt, TextPosition, OverlayType } from './types'
+import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
+
+// ─── Overlay + TextPosition co-selection ────────────────────────────────────
+
+interface OverlayConfig {
+  overlayType: OverlayType
+  overlayStrength: number
+  textPosition: TextPosition
+}
+
+const ROLE_OVERLAY_MAP: Record<string, OverlayConfig> = {
+  hook:            { overlayType: 'dark_gradient_bottom', overlayStrength: 72, textPosition: 'bottom' },
+  problem:         { overlayType: 'cinematic_dark',       overlayStrength: 60, textPosition: 'center' },
+  cause:           { overlayType: 'dark_gradient_top',    overlayStrength: 65, textPosition: 'top'    },
+  common_mistake:  { overlayType: 'cinematic_dark',       overlayStrength: 55, textPosition: 'center' },
+  product_solution:{ overlayType: 'dark_gradient_bottom', overlayStrength: 60, textPosition: 'bottom' },
+  feature:         { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  feature_1:       { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  feature_2:       { overlayType: 'blur_glass',           overlayStrength: 50, textPosition: 'center' },
+  benefit_or_proof:{ overlayType: 'dark_gradient_bottom', overlayStrength: 55, textPosition: 'bottom' },
+  proof:           { overlayType: 'dark_gradient_bottom', overlayStrength: 55, textPosition: 'bottom' },
+  offer:           { overlayType: 'radial_focus',         overlayStrength: 45, textPosition: 'center' },
+  cta:             { overlayType: 'dark_gradient_bottom', overlayStrength: 80, textPosition: 'bottom' },
+}
+
+const DEFAULT_OVERLAY: OverlayConfig = {
+  overlayType: 'dark_gradient_bottom',
+  overlayStrength: 60,
+  textPosition: 'bottom',
+}
+
+function getOverlayConfig(role: string): OverlayConfig {
+  return ROLE_OVERLAY_MAP[role] ?? DEFAULT_OVERLAY
+}
 
 export async function generateDesignPrompts(
   brand: BrandProfile,
   input: CampaignInput,
   copies: SlideCopy[],
-  structure?: CarouselStructure
+  structure?: CarouselStructure,
+  knowledgeCtx?: CopyKnowledgeContext
 ): Promise<SlideDesignPrompt[]> {
   const roleMap = new Map(
     structure?.slides.map(s => [s.slideNumber, s.role]) ?? []
@@ -13,17 +48,20 @@ export async function generateDesignPrompts(
   const dna = parseBrandDna(brand.brandDna)
   const visualMood = dna.visualMood || ''
   const avoidVisuals = dna.avoidVisuals.length ? dna.avoidVisuals : []
+  const editorialVisualCues = knowledgeCtx?.editorialCluster?.visualCues ?? []
 
   return copies.map((copy): SlideDesignPrompt => {
     const role = roleMap.get(copy.slideNumber) ?? 'product_solution'
-    const textPosition = pickTextPosition(copy.slideNumber, copies.length)
-    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals)
+    const overlay = getOverlayConfig(role)
+    const backgroundPrompt = buildBackgroundPrompt(role, copy, input, brand, visualMood, avoidVisuals, editorialVisualCues)
 
     return {
       slideNumber: copy.slideNumber,
       backgroundPrompt,
       layoutStyle: 'minimal-commerce',
-      textPosition,
+      textPosition: overlay.textPosition,
+      overlayType: overlay.overlayType,
+      overlayStrength: overlay.overlayStrength,
       visualMood: getVisualMood(role),
     }
   })
@@ -48,13 +86,18 @@ function buildBackgroundPrompt(
   input: CampaignInput,
   brand: BrandProfile,
   visualMood: string,
-  avoidVisuals: string[]
+  avoidVisuals: string[],
+  editorialVisualCues: string[] = []
 ): string {
   const avoidClause = avoidVisuals.length
     ? avoidVisuals.map(v => `no ${v}`).join(', ')
     : ''
 
   const subject = inferSubject(input.productName, brand.industry)
+  // editorial visual cues only applied to the hook/first slide for maximum impact
+  const editorialCue = role === 'hook' && editorialVisualCues.length
+    ? editorialVisualCues.slice(0, 2).join(', ')
+    : ''
 
   const base = [
     'Korean Instagram card news style',
@@ -64,6 +107,7 @@ function buildBackgroundPrompt(
     'no signage, labels, posters, menus, packaging text, screen text, handwriting, or calligraphy',
     `brand accent color ${brand.mainColor}`,
     visualMood ? `visual mood: ${visualMood}` : '',
+    editorialCue,
     avoidClause,
     'clean empty negative space for app-rendered overlay later',
   ].filter(Boolean)
@@ -189,10 +233,4 @@ function getVisualMood(role: string): string {
     cta: 'inviting, energetic, positive',
   }
   return moods[role] ?? 'clean, trustworthy, modern'
-}
-
-function pickTextPosition(slideNumber: number, slideCount: number): TextPosition {
-  if (slideNumber === 1) return 'center'
-  if (slideNumber === slideCount) return 'bottom'
-  return slideNumber % 2 === 0 ? 'top' : 'center'
 }

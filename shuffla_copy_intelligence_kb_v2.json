@@ -1,0 +1,1062 @@
+{
+  "version": "2.0",
+  "name": "Shuffla Copy Intelligence Knowledge Base",
+  "updated_at": "2026-05-27",
+  "description": "Korean editorial carousel/card-news copywriting and layout intelligence. Built for Shuffla's AI-assisted carousel generation pipeline. Stores reusable patterns only; do not copy reference content verbatim.",
+  "core_principles": {
+    "positioning": "Card news is not a poster. It is compressed editorial storytelling.",
+    "copy_priority": [
+      "Stop the scroll",
+      "Create curiosity or emotional tension",
+      "Compress one clear idea per slide",
+      "Make the user want to swipe",
+      "Make the final slide save/share/purchase oriented"
+    ],
+    "avoid_generic_ai_copy": true,
+    "copy_should_feel": [
+      "native Korean Instagram",
+      "editorial",
+      "human-written",
+      "slightly provocative",
+      "specific",
+      "emotionally aware",
+      "short but meaningful"
+    ]
+  },
+  "reference_style_clusters": [
+    {
+      "id": "personal_finance_confession",
+      "name": "개인 금융 고백형",
+      "observed_pattern": "수익/손실 화면 같은 강한 증거 이미지를 먼저 보여주고, 실패/경험/청춘/투자 심리로 연결한다.",
+      "visual_cues": [
+        "dark background",
+        "financial numbers",
+        "red/blue profit-loss contrast",
+        "receipt-like UI",
+        "large white declaration"
+      ],
+      "copy_formula": "{실패/손실/경험}도 {정당화/회복}되는 시기, 우리는 {행동}을 시작했다",
+      "emotions": [
+        "불안",
+        "청춘",
+        "회복",
+        "도전"
+      ],
+      "best_for": [
+        "금융",
+        "투자",
+        "자기계발",
+        "커뮤니티",
+        "교육"
+      ],
+      "sample_headlines": [
+        "실패도 경험으로 남는 나이",
+        "손실보다 더 무서운 건 아무것도 안 하는 것",
+        "처음 잃어본 돈이 기준을 만들었다",
+        "우리는 아직 배워도 되는 나이다"
+      ],
+      "bad_to_avoid": [
+        "투자를 시작해보세요",
+        "수익을 내는 방법",
+        "초보자를 위한 투자 팁"
+      ]
+    },
+    {
+      "id": "essay_closing_slide",
+      "name": "에세이형 마무리 슬라이드",
+      "observed_pattern": "이미지 위에 긴 문단을 중앙 배치해 감성적 결론을 내린다. 카드뉴스 마지막 장이나 브랜드 세계관 정리에 적합.",
+      "visual_cues": [
+        "window",
+        "rainy mood",
+        "grain texture",
+        "centered paragraph",
+        "small brand signature"
+      ],
+      "copy_formula": "{짧은 선언}. {현재 상황} 속에서 {우리/당신}은 {의미 있는 행동}을 하고 있다.",
+      "emotions": [
+        "위로",
+        "응원",
+        "성찰",
+        "잔잔함"
+      ],
+      "best_for": [
+        "브랜드 스토리",
+        "커뮤니티",
+        "마지막 슬라이드",
+        "감성 상품"
+      ],
+      "sample_headlines": [
+        "우리는 아직 젊다",
+        "조급함은 버리고, 안목은 기르고",
+        "오늘도 작은 기준을 만드는 중",
+        "결국 남는 건 나만의 취향이다"
+      ],
+      "body_style": "문장 4~7줄. 너무 광고처럼 쓰지 말고 독백/편지처럼 쓴다."
+    },
+    {
+      "id": "ai_breaking_collab",
+      "name": "AI 트렌드 속보형",
+      "observed_pattern": "유명 인물/기업/상징 이미지를 강하게 배치하고, 짧고 큰 제목으로 '오늘부터 1일', '협업', '공개' 같은 사건성을 만든다.",
+      "visual_cues": [
+        "two famous-looking executives",
+        "AI TREND label",
+        "large lower-left headline",
+        "badge/sticker"
+      ],
+      "copy_formula": "오늘부터 {entityA} X {entityB}",
+      "emotions": [
+        "충격",
+        "궁금증",
+        "기대감",
+        "트렌드"
+      ],
+      "best_for": [
+        "AI 뉴스",
+        "기술",
+        "스타트업",
+        "B2B SaaS",
+        "업계 동향"
+      ],
+      "sample_headlines": [
+        "오늘부터 1일, AI가 손잡은 두 기업",
+        "이 조합은 생각보다 큽니다",
+        "AI 업계가 다시 흔들린 이유",
+        "이 협업, 그냥 이벤트가 아닙니다"
+      ],
+      "layout_recommendation": "breaking-news or dark-editorial"
+    },
+    {
+      "id": "money_result_brag",
+      "name": "숫자 성과 자랑형",
+      "observed_pattern": "돈, 수익, 매출, 수치가 큰 이미지를 배경으로 두고 명확한 숫자 중심 headline을 박는다.",
+      "visual_cues": [
+        "money close-up",
+        "large numeric copy",
+        "AI Trend badge",
+        "dark gradient"
+      ],
+      "copy_formula": "{method}로 {amount} 벌었다 / 줄였다 / 늘렸다",
+      "emotions": [
+        "탐욕",
+        "궁금증",
+        "신뢰",
+        "FOMO"
+      ],
+      "best_for": [
+        "AI 자동화",
+        "비즈니스",
+        "투자",
+        "부업",
+        "마케팅 사례"
+      ],
+      "sample_headlines": [
+        "AI 자동매매로 8억 5천만 원 수익냈다",
+        "한 달 만에 광고비 37% 줄인 이유",
+        "매출보다 먼저 바뀐 건 운영 방식이었다",
+        "이 숫자가 사람들을 멈춰 세웠다"
+      ],
+      "quality_rule": "숫자는 반드시 출처 또는 맥락이 있어야 한다. 허위/과장 금지."
+    },
+    {
+      "id": "career_turning_point",
+      "name": "커리어 전환 서사형",
+      "observed_pattern": "인물 사진 + 현장 배경 + '나를 취업으로 이끈 결정적 한 수' 같은 개인 서사형 headline.",
+      "visual_cues": [
+        "person standing",
+        "career institution background",
+        "soft real photo",
+        "large white text"
+      ],
+      "copy_formula": "나를 {desired_state}로 이끈 결정적 한 수",
+      "emotions": [
+        "동기부여",
+        "희망",
+        "증명",
+        "성장"
+      ],
+      "best_for": [
+        "교육",
+        "부트캠프",
+        "커리어",
+        "취업",
+        "자격증"
+      ],
+      "sample_headlines": [
+        "나를 합격으로 이끈 결정적 한 수",
+        "스펙보다 먼저 바꾼 공부 방식",
+        "면접에서 통했던 건 이 한 문장이었다",
+        "취업 준비가 달라진 순간"
+      ]
+    },
+    {
+      "id": "market_cap_headline",
+      "name": "시장 규모 선언형",
+      "observed_pattern": "주식 전광판/차트/거래소 이미지를 배경으로, '세계를 바꾸는 중' 같은 큰 해석 headline과 기업/수치 강조.",
+      "visual_cues": [
+        "stock board",
+        "market chart",
+        "cyan highlight",
+        "large company name",
+        "crowd silhouette"
+      ],
+      "copy_formula": "{entity}이/가 {market_value}를 넘었다. 이제 {meaning}",
+      "emotions": [
+        "권위",
+        "충격",
+        "거시감",
+        "미래감"
+      ],
+      "best_for": [
+        "경제",
+        "주식",
+        "AI 반도체",
+        "산업 분석",
+        "B2B 리포트"
+      ],
+      "sample_headlines": [
+        "세계를 바꾸는 중, SK하이닉스 시총 1조 달러",
+        "숫자가 말해주는 AI 반도체의 방향",
+        "이제 시장은 이 회사를 다르게 본다",
+        "단순한 상승이 아니라 판이 바뀌는 신호"
+      ],
+      "highlight_rule": "회사명/수치/핵심 키워드만 포인트 컬러 처리."
+    },
+    {
+      "id": "rescue_breaking_news",
+      "name": "긴급 구조/사건형",
+      "observed_pattern": "대형 사건 이미지와 직접 인용문을 사용해 드라마틱한 사건성을 만든다.",
+      "visual_cues": [
+        "night ship",
+        "emergency vehicles",
+        "quoted headline",
+        "news logo",
+        "bottom-left massive text"
+      ],
+      "copy_formula": "\"{quote}\" {who} 위해 {action}한 {subject}",
+      "emotions": [
+        "감동",
+        "긴박감",
+        "휴머니즘",
+        "충격"
+      ],
+      "best_for": [
+        "뉴스",
+        "사건",
+        "사회",
+        "브랜드 스토리",
+        "CSR"
+      ],
+      "sample_headlines": [
+        "\"한 명이라도 더\" 끝까지 기다린 사람들",
+        "\"수천만 원 손해쯤이야\" 승객 위해 돌아선 배",
+        "숫자보다 먼저 움직인 결정",
+        "그날 밤, 매뉴얼보다 사람이 먼저였다"
+      ],
+      "caution": "실제 사건/인명/피해 표현은 정확해야 한다."
+    },
+    {
+      "id": "long_explainer_photo",
+      "name": "롱폼 설명형 카드",
+      "observed_pattern": "현장 사진 위에 노란 박스 헤드라인과 3~5줄 설명을 얹어 한 장 자체가 미니 기사처럼 작동한다.",
+      "visual_cues": [
+        "yellow headline box",
+        "photojournalistic background",
+        "highlighted keywords",
+        "paragraph body"
+      ],
+      "copy_formula": "{문제 상황} + {핵심 수치} + {왜 중요한지} + {해결 방향}",
+      "emotions": [
+        "이해",
+        "문제의식",
+        "전문성"
+      ],
+      "best_for": [
+        "B2B",
+        "기술 설명",
+        "정책",
+        "사회 문제",
+        "리포트"
+      ],
+      "sample_headlines": [
+        "노후화가 심각한 한국 건축물",
+        "상세페이지보다 먼저 봐야 할 전환 구조",
+        "광고비는 늘었는데 매출이 안 나는 이유",
+        "운영자가 놓치는 가장 비싼 빈틈"
+      ],
+      "body_rule": "본문은 최대 4줄. 핵심 숫자나 단어만 컬러 강조."
+    },
+    {
+      "id": "finance_product_briefing",
+      "name": "금융 상품 브리핑형",
+      "observed_pattern": "발표 현장/화면을 배경으로 중앙 정렬된 짧은 브리핑 문장. '오늘 새로운 상품이 등장했어요' 같은 구어체 사용.",
+      "visual_cues": [
+        "conference background",
+        "speaker podium",
+        "center text",
+        "semi-transparent overlay"
+      ],
+      "copy_formula": "{icon} {핵심 발표}. 오늘 {entity}가 {what}을 공개했어요.",
+      "emotions": [
+        "정보성",
+        "신뢰",
+        "뉴스감"
+      ],
+      "best_for": [
+        "금융",
+        "신제품",
+        "업데이트",
+        "B2B",
+        "SaaS 출시"
+      ],
+      "sample_headlines": [
+        "📈 국내 최초, 새 상품이 나왔어요",
+        "오늘 공개된 기능, 핵심만 정리했어요",
+        "이번 업데이트가 중요한 이유",
+        "시장에 새 선택지가 생겼습니다"
+      ]
+    },
+    {
+      "id": "social_issue_statement",
+      "name": "사회 이슈 선언형",
+      "observed_pattern": "큰 현실 사진 위에 짧은 선언형 문장. 감정보다 사실/현장감으로 멈추게 한다.",
+      "visual_cues": [
+        "realistic street/building",
+        "large simple headline",
+        "minimal body",
+        "news editorial"
+      ],
+      "copy_formula": "{problem}이/가 생각보다 심각합니다",
+      "emotions": [
+        "문제의식",
+        "불안",
+        "관심"
+      ],
+      "best_for": [
+        "정책",
+        "공공",
+        "사회문제",
+        "B2B 문제제기"
+      ],
+      "sample_headlines": [
+        "생각보다 심각한 운영 공백",
+        "보이지 않는 비용이 계속 새고 있습니다",
+        "사장님들이 놓치는 첫 번째 문제",
+        "작아 보이지만 매출을 흔드는 요소"
+      ]
+    }
+  ],
+  "hook_patterns": [
+    {
+      "id": "fomo_001",
+      "name": "요즘 다 하는",
+      "intent": "FOMO",
+      "emotion": [
+        "궁금증",
+        "소외 불안"
+      ],
+      "template": "요즘 {persona}들은 다 {object} 씁니다",
+      "examples": [
+        "요즘 감성 좋은 사람들, 다 이 조합 씁니다",
+        "직장인들 사이에서 은근히 유행 중인 물병"
+      ],
+      "best_for": [
+        "패션",
+        "라이프스타일",
+        "뷰티",
+        "소품",
+        "리빙"
+      ],
+      "risk": "너무 흔하게 쓰면 광고 느낌"
+    },
+    {
+      "id": "loss_001",
+      "name": "모르면 손해",
+      "intent": "loss_aversion",
+      "emotion": [
+        "불안",
+        "주의"
+      ],
+      "template": "{persona}가 이걸 모르면 손해보는 이유",
+      "examples": [
+        "스마트스토어 사장님이 이걸 모르면 손해보는 이유",
+        "사기 전에 꼭 봐야 할 체크포인트"
+      ],
+      "best_for": [
+        "교육",
+        "마케팅",
+        "B2B",
+        "쇼핑몰",
+        "비교"
+      ]
+    },
+    {
+      "id": "status_001",
+      "name": "감각 있는 사람",
+      "intent": "status_signal",
+      "emotion": [
+        "동경",
+        "취향 과시"
+      ],
+      "template": "감각 좋은 사람들은 {object}부터 다릅니다",
+      "examples": [
+        "감각 좋은 사람들은 텀블러부터 다릅니다",
+        "책상 위 분위기까지 바꾸는 작은 차이"
+      ],
+      "best_for": [
+        "패션",
+        "리빙",
+        "문구",
+        "인테리어",
+        "프리미엄"
+      ]
+    },
+    {
+      "id": "curiosity_001",
+      "name": "왜 이제 알았지",
+      "intent": "curiosity_gap",
+      "emotion": [
+        "호기심",
+        "아쉬움"
+      ],
+      "template": "왜 이제 알았지? {object} 고르는 기준",
+      "examples": [
+        "왜 이제 알았지? 텀블러 고르는 기준",
+        "후기 보기 전에 먼저 봐야 할 기준"
+      ],
+      "best_for": [
+        "정보형",
+        "가이드",
+        "제품 비교"
+      ]
+    },
+    {
+      "id": "proof_001",
+      "name": "후기 많은 이유",
+      "intent": "social_proof",
+      "emotion": [
+        "신뢰",
+        "확신"
+      ],
+      "template": "후기 좋은 데는 이유가 있습니다",
+      "examples": [
+        "후기 좋은 텀블러는 이유가 있습니다",
+        "재구매가 많은 상품은 디테일이 다릅니다"
+      ],
+      "best_for": [
+        "커머스",
+        "상세페이지",
+        "리뷰 기반 상품"
+      ]
+    },
+    {
+      "id": "confession_001",
+      "name": "고백/선언",
+      "intent": "identity_confession",
+      "emotion": [
+        "진정성",
+        "공감",
+        "자기서사"
+      ],
+      "template": "{subject}가 {experience}로 깨달은 것",
+      "examples": [
+        "첫 손실이 나만의 기준을 만들었다",
+        "작은 실패가 취향을 바꿨다"
+      ],
+      "best_for": [
+        "금융",
+        "교육",
+        "커뮤니티",
+        "브랜드 스토리"
+      ]
+    },
+    {
+      "id": "breaking_001",
+      "name": "오늘부터/방금",
+      "intent": "breaking_news",
+      "emotion": [
+        "긴박감",
+        "새로움"
+      ],
+      "template": "오늘부터 {entity}가 달라집니다",
+      "examples": [
+        "오늘부터 AI 업무 방식이 달라집니다",
+        "방금 공개된 기능, 핵심만 정리"
+      ],
+      "best_for": [
+        "뉴스",
+        "AI",
+        "SaaS",
+        "신제품"
+      ]
+    },
+    {
+      "id": "number_001",
+      "name": "숫자 증거",
+      "intent": "quantified_proof",
+      "emotion": [
+        "신뢰",
+        "충격"
+      ],
+      "template": "{number}가 말해주는 {topic}의 변화",
+      "examples": [
+        "8억 5천만 원이 증명한 자동화의 힘",
+        "44.4%가 말해주는 보이지 않는 위험"
+      ],
+      "best_for": [
+        "금융",
+        "B2B",
+        "마케팅",
+        "리포트",
+        "산업 분석"
+      ]
+    },
+    {
+      "id": "quote_001",
+      "name": "직접 인용",
+      "intent": "dramatic_quote",
+      "emotion": [
+        "몰입",
+        "현장감"
+      ],
+      "template": "\"{quote}\" {context}",
+      "examples": [
+        "\"한 명이라도 더\" 끝까지 기다린 사람들",
+        "\"이건 그냥 기능이 아닙니다\""
+      ],
+      "best_for": [
+        "뉴스",
+        "인터뷰",
+        "후기",
+        "브랜드 스토리"
+      ]
+    },
+    {
+      "id": "contrast_001",
+      "name": "대조",
+      "intent": "contrast",
+      "emotion": [
+        "깨달음",
+        "긴장"
+      ],
+      "template": "{A}보다 무서운 건 {B}입니다",
+      "examples": [
+        "손실보다 무서운 건 아무것도 안 하는 것",
+        "광고비보다 비싼 건 놓친 첫인상"
+      ],
+      "best_for": [
+        "교육",
+        "마케팅",
+        "금융",
+        "자기계발"
+      ]
+    },
+    {
+      "id": "mistake_001",
+      "name": "실수 방지",
+      "intent": "mistake_prevention",
+      "emotion": [
+        "주의",
+        "불안"
+      ],
+      "template": "{persona}가 자주 놓치는 {mistake}",
+      "examples": [
+        "쇼핑몰 사장님이 자주 놓치는 첫 이미지",
+        "상세페이지보다 먼저 고쳐야 할 것"
+      ],
+      "best_for": [
+        "커머스",
+        "B2B",
+        "마케팅",
+        "교육"
+      ]
+    },
+    {
+      "id": "taste_001",
+      "name": "취향 기준",
+      "intent": "taste_curation",
+      "emotion": [
+        "취향",
+        "소유욕"
+      ],
+      "template": "{object} 하나로 분위기가 달라집니다",
+      "examples": [
+        "텀블러 하나로 책상 분위기가 달라집니다",
+        "작은 소품 하나가 취향을 말해줍니다"
+      ],
+      "best_for": [
+        "리빙",
+        "패션",
+        "소품",
+        "라이프스타일"
+      ]
+    }
+  ],
+  "slide_narrative_structures": [
+    {
+      "id": "commerce_editorial_5",
+      "name": "커머스 에디토리얼 5장",
+      "recommended_for": [
+        "스마트스토어",
+        "인스타 상품 소개",
+        "라이프스타일 상품"
+      ],
+      "slides": [
+        {
+          "n": 1,
+          "role": "hook",
+          "goal": "상품이 아니라 상황/욕망으로 멈추게 한다",
+          "copy_style": "짧은 선언형"
+        },
+        {
+          "n": 2,
+          "role": "problem_or_context",
+          "goal": "타겟이 겪는 문제나 원하는 감각을 제시",
+          "copy_style": "공감형"
+        },
+        {
+          "n": 3,
+          "role": "product_meaning",
+          "goal": "상품을 해결책/취향/선택 기준으로 연결",
+          "copy_style": "해석형"
+        },
+        {
+          "n": 4,
+          "role": "proof_or_detail",
+          "goal": "소재, 후기, 사용 장면, 차별점 제시",
+          "copy_style": "구체형"
+        },
+        {
+          "n": 5,
+          "role": "save_cta",
+          "goal": "저장/구매/방문 유도",
+          "copy_style": "행동 유도형"
+        }
+      ]
+    },
+    {
+      "id": "trend_news_7",
+      "name": "트렌드 뉴스 7장",
+      "recommended_for": [
+        "AI 뉴스",
+        "경제",
+        "업계 동향",
+        "사회 이슈"
+      ],
+      "slides": [
+        {
+          "n": 1,
+          "role": "breaking_headline",
+          "goal": "사건성 있는 큰 제목"
+        },
+        {
+          "n": 2,
+          "role": "why_now",
+          "goal": "왜 지금 주목해야 하는지"
+        },
+        {
+          "n": 3,
+          "role": "key_fact",
+          "goal": "핵심 숫자/사실"
+        },
+        {
+          "n": 4,
+          "role": "interpretation",
+          "goal": "이 사실의 의미"
+        },
+        {
+          "n": 5,
+          "role": "impact",
+          "goal": "누구에게 어떤 영향인지"
+        },
+        {
+          "n": 6,
+          "role": "takeaway",
+          "goal": "한 줄 정리"
+        },
+        {
+          "n": 7,
+          "role": "share_save",
+          "goal": "저장/공유 유도"
+        }
+      ]
+    },
+    {
+      "id": "essay_ending_6",
+      "name": "감성 에세이 6장",
+      "recommended_for": [
+        "브랜드 세계관",
+        "커뮤니티",
+        "청춘/취향/라이프스타일"
+      ],
+      "slides": [
+        {
+          "n": 1,
+          "role": "emotional_hook",
+          "goal": "감정 선언"
+        },
+        {
+          "n": 2,
+          "role": "personal_context",
+          "goal": "나/우리 이야기로 좁히기"
+        },
+        {
+          "n": 3,
+          "role": "tension",
+          "goal": "불안/결핍/상황 제시"
+        },
+        {
+          "n": 4,
+          "role": "meaning",
+          "goal": "상품/브랜드 의미 부여"
+        },
+        {
+          "n": 5,
+          "role": "identity",
+          "goal": "소비자를 특정 정체성으로 호명"
+        },
+        {
+          "n": 6,
+          "role": "warm_closing",
+          "goal": "응원/저장/공유"
+        }
+      ]
+    },
+    {
+      "id": "problem_solution_b2b_5",
+      "name": "B2B 문제 해결 5장",
+      "recommended_for": [
+        "SaaS",
+        "AI 자동화",
+        "마케팅 툴",
+        "업무 생산성"
+      ],
+      "slides": [
+        {
+          "n": 1,
+          "role": "pain_hook",
+          "goal": "비용/시간/손실 문제를 직격"
+        },
+        {
+          "n": 2,
+          "role": "hidden_cost",
+          "goal": "보이지 않는 비용을 드러냄"
+        },
+        {
+          "n": 3,
+          "role": "solution_frame",
+          "goal": "해결 방식 제시"
+        },
+        {
+          "n": 4,
+          "role": "example_or_result",
+          "goal": "사례/숫자/전후 비교"
+        },
+        {
+          "n": 5,
+          "role": "action_cta",
+          "goal": "체험/문의/저장 유도"
+        }
+      ]
+    }
+  ],
+  "copy_rules": {
+    "global": {
+      "do": [
+        "한 슬라이드에는 하나의 메시지만 둔다.",
+        "첫 장은 상품명이 아니라 욕망/문제/사건으로 시작한다.",
+        "제목은 짧고 단단하게 쓴다.",
+        "본문은 설명보다 해석에 가깝게 쓴다.",
+        "한국어 구어체 리듬을 살린다.",
+        "수치가 있으면 반드시 맥락을 붙인다.",
+        "마지막 장은 저장/공유/방문 중 하나만 유도한다."
+      ],
+      "dont": [
+        "이번 시즌 핫 트렌드",
+        "독특한 패턴",
+        "특별한 가치",
+        "혁신적인",
+        "최고의",
+        "완벽한",
+        "더 많은 스타일 팁 확인",
+        "고객에게 특별한 가치를 제공합니다",
+        "라이프스타일에 관심이 있는 20대 후반에서 30대 중반의 고객들",
+        "smartstore 기준으로 정리했습니다"
+      ]
+    },
+    "headline": {
+      "max_chars_soft": 28,
+      "max_lines": 3,
+      "preferred_line_break": "의미 단위로 2~3줄",
+      "styles": [
+        "선언형",
+        "질문형",
+        "숫자형",
+        "직접 인용형",
+        "대조형",
+        "정체성 호명형"
+      ]
+    },
+    "body": {
+      "max_chars_soft": 70,
+      "preferred": "1~2문장",
+      "avoid": "길고 추상적인 타겟 설명"
+    },
+    "cta": {
+      "soft_cta": [
+        "저장해두세요",
+        "나중에 다시 보려고 저장",
+        "비교하기 전에 체크",
+        "필요할 때 꺼내보세요"
+      ],
+      "commerce_cta": [
+        "스토어에서 자세히 보기",
+        "오늘 옵션 확인하기",
+        "후기 먼저 확인하기"
+      ],
+      "avoid": [
+        "지금 바로 구매하세요!!!",
+        "놓치지 마세요!!!"
+      ]
+    }
+  },
+  "persona_patterns": [
+    {
+      "id": "korean_smartstore_owner",
+      "name": "스마트스토어 사장님",
+      "pain_points": [
+        "콘텐츠 제작 피로",
+        "광고비 부담",
+        "상세페이지 전환",
+        "디자인 외주 비용"
+      ],
+      "preferred_emotions": [
+        "손해 회피",
+        "효율",
+        "매출",
+        "불안 해소"
+      ],
+      "copy_style": "직접적이고 실용적이며 숫자/전환/시간 절약을 강조",
+      "sample_lines": [
+        "상세페이지보다 먼저 바꿔야 할 첫 이미지",
+        "광고비보다 먼저 새는 건 첫인상입니다",
+        "매일 올릴 콘텐츠, 더 이상 손으로 만들지 마세요"
+      ]
+    },
+    {
+      "id": "korean_genz_lifestyle",
+      "name": "20대 라이프스타일 소비자",
+      "pain_points": [
+        "취향 표현",
+        "남들과 다른 선택",
+        "인스타 감성",
+        "가성비와 개성 사이"
+      ],
+      "preferred_emotions": [
+        "취향",
+        "소유욕",
+        "FOMO",
+        "감각"
+      ],
+      "copy_style": "짧고 감각적인 말, 약간의 과시 욕망",
+      "sample_lines": [
+        "가방에 넣는 순간 분위기가 달라지는 텀블러",
+        "감각 좋은 사람들은 작은 소품부터 다릅니다",
+        "요즘 피드에 자주 보이는 그 무드"
+      ]
+    },
+    {
+      "id": "office_worker_minimal",
+      "name": "직장인 미니멀 소비자",
+      "pain_points": [
+        "책상 정리",
+        "실용",
+        "은근한 취향",
+        "출근 루틴"
+      ],
+      "preferred_emotions": [
+        "정리감",
+        "실용",
+        "은근한 과시"
+      ],
+      "copy_style": "현실적이고 공감형",
+      "sample_lines": [
+        "회사 사람들이 은근 어디서 샀냐고 물어보는 물병",
+        "책상 위 분위기까지 정리되는 작은 선택",
+        "출근 가방에 하나쯤 넣어두고 싶은 물건"
+      ]
+    },
+    {
+      "id": "ai_business_reader",
+      "name": "AI/비즈니스 트렌드 독자",
+      "pain_points": [
+        "트렌드 과잉",
+        "진짜 의미 파악",
+        "업무 적용",
+        "시장 변화 불안"
+      ],
+      "preferred_emotions": [
+        "권위",
+        "긴박감",
+        "미래감",
+        "FOMO"
+      ],
+      "copy_style": "뉴스형, 짧은 해석, 숫자 중심",
+      "sample_lines": [
+        "이 발표가 중요한 건 기능 때문이 아닙니다",
+        "AI 시장이 다시 한 번 방향을 바꿨습니다",
+        "숫자보다 중요한 건 이 회사의 다음 움직임입니다"
+      ]
+    }
+  ],
+  "layout_copy_mapping": [
+    {
+      "layout": "dark-editorial",
+      "best_copy_styles": [
+        "선언형",
+        "대조형",
+        "숫자형",
+        "권위형"
+      ],
+      "headline_position": "bottom-left",
+      "body_amount": "low to medium",
+      "good_for": [
+        "AI",
+        "경제",
+        "프리미엄 상품",
+        "브랜드 스토리"
+      ]
+    },
+    {
+      "layout": "breaking-news",
+      "best_copy_styles": [
+        "속보형",
+        "직접 인용형",
+        "숫자형"
+      ],
+      "headline_position": "bottom-left or center-bottom",
+      "body_amount": "low",
+      "good_for": [
+        "뉴스",
+        "사건",
+        "신제품 공개"
+      ]
+    },
+    {
+      "layout": "essay-magazine",
+      "best_copy_styles": [
+        "감성형",
+        "고백형",
+        "마무리형"
+      ],
+      "headline_position": "center or lower-center",
+      "body_amount": "medium to high",
+      "good_for": [
+        "브랜드 세계관",
+        "커뮤니티",
+        "라이프스타일"
+      ]
+    },
+    {
+      "layout": "long-explainer",
+      "best_copy_styles": [
+        "문제제기",
+        "수치해석",
+        "리포트형"
+      ],
+      "headline_position": "highlight box + body paragraph",
+      "body_amount": "high",
+      "good_for": [
+        "B2B",
+        "정책",
+        "기술 설명",
+        "리포트"
+      ]
+    },
+    {
+      "layout": "commerce-minimal",
+      "best_copy_styles": [
+        "취향형",
+        "실용형",
+        "비교형"
+      ],
+      "headline_position": "bottom-left",
+      "body_amount": "low",
+      "good_for": [
+        "스마트스토어",
+        "제품 소개",
+        "리빙",
+        "패션"
+      ]
+    }
+  ],
+  "copy_quality_checker": {
+    "score_dimensions": [
+      {
+        "name": "specificity",
+        "description": "구체적인 대상/상황/맥락이 있는가"
+      },
+      {
+        "name": "emotional_trigger",
+        "description": "호기심/불안/욕망/공감 중 하나를 자극하는가"
+      },
+      {
+        "name": "native_korean_sns",
+        "description": "한국 인스타 문맥에서 자연스러운가"
+      },
+      {
+        "name": "slide_role_fit",
+        "description": "슬라이드 역할과 문장이 맞는가"
+      },
+      {
+        "name": "non_generic",
+        "description": "AI스러운 뻔한 표현을 피했는가"
+      },
+      {
+        "name": "readability",
+        "description": "모바일에서 한 번에 읽히는가"
+      }
+    ],
+    "auto_reject_if_contains": [
+      "이번 시즌 핫 트렌드",
+      "독특한 패턴",
+      "특별한 가치",
+      "혁신적인",
+      "완벽한",
+      "최고의",
+      "더 많은 스타일 팁",
+      "고객에게",
+      "스마트스토어 기준으로"
+    ],
+    "rewrite_instruction": "If copy fails, rewrite it using a hook pattern, persona context, and slide role. Never simply summarize product features."
+  },
+  "generation_prompt_contract": {
+    "system_instruction": "You are not a product summarizer. You are a Korean SNS editorial copywriter. Generate emotionally sharp, native Korean carousel copy using the knowledge base patterns. Do not copy examples verbatim.",
+    "required_inputs": [
+      "brand_profile",
+      "product_profile",
+      "target_persona",
+      "content_goal",
+      "slide_count",
+      "layout_style",
+      "desired_emotion"
+    ],
+    "required_outputs": [
+      "selected_hook_pattern",
+      "target_emotion",
+      "slide_narrative_structure",
+      "slides",
+      "caption",
+      "quality_score"
+    ],
+    "slide_output_schema": {
+      "slideNumber": "number",
+      "role": "string",
+      "headline": "string",
+      "body": "string",
+      "intent": "string",
+      "emotion": "string",
+      "copyPatternUsed": "string",
+      "visualNote": "string"
+    }
+  }
+}
