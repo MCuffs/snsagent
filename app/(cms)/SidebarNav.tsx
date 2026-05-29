@@ -22,15 +22,18 @@ const navItems: NavItem[] = [
 
 interface SidebarNavProps {
   hasCompleteBrand: boolean
+  locale?: string
 }
 
-export default function SidebarNav({ hasCompleteBrand }: SidebarNavProps) {
+export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
+  const prefix = locale ? `/${locale}` : ''
+  const conceptPath = `${prefix}/concept`
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     analytics.sidebarClick(item.key)
-    if (pathname === '/concept') {
+    if (pathname === conceptPath) {
       e.preventDefault()
       setActiveTab(item.key)
     }
@@ -41,7 +44,8 @@ export default function SidebarNav({ hasCompleteBrand }: SidebarNavProps) {
       {navItems.map((item) => {
         const Icon = item.icon
         const disabled = !hasCompleteBrand && item.key !== 'concept'
-        const isActive = pathname === '/concept' && activeTab === item.key
+        const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`
+        const isActive = pathname === conceptPath && activeTab === item.key
 
         if (disabled) {
           return (
@@ -61,7 +65,7 @@ export default function SidebarNav({ hasCompleteBrand }: SidebarNavProps) {
         return (
           <Link
             key={item.key}
-            href={item.href}
+            href={href}
             onClick={(e) => handleNavClick(e, item)}
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150 ${
               isActive

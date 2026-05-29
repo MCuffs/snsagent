@@ -35,6 +35,7 @@ interface GenerateCampaignRequest {
   recommendedCta?: string
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
+  language?: 'ko' | 'en'
 }
 
 export async function POST(request: Request) {
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
           reasonForStyle: body.reasonForStyle,
           structurePreview: body.structurePreview,
         },
+        language: body.language,
       })
 
       return NextResponse.json({

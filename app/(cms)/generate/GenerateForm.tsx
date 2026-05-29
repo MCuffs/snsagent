@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight,
@@ -155,6 +156,8 @@ const formItemVariants = {
 
 export default function GenerateForm({ brand }: GenerateFormProps) {
   const router = useRouter()
+  const locale = useLocale()
+  const language = locale === 'en' ? 'en' : 'ko'
 
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -255,7 +258,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, brandId: brand.id }),
+        body: JSON.stringify({ messages: history, brandId: brand.id, language }),
       })
       const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; error?: string }
 
@@ -284,7 +287,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const res = await fetch('/api/agents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [], brandId: brand.id }),
+          body: JSON.stringify({ messages: [], brandId: brand.id, language }),
         })
         const data = await res.json() as { message?: string; error?: string }
         if (!active) return
@@ -371,6 +374,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           reasonForStyle: readyParams.reasonForStyle,
           structurePreview: readyParams.structurePreview,
           productImageUrls,
+          language,
         }),
       })
 
