@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowRight, Clock, ImageOff, Loader2, Trash2 } from 'luc
 import { useTab } from '../TabContext'
 import { motion } from 'framer-motion'
 import { deleteWorkAction } from './actions'
+import { analytics } from '../../../lib/analytics/thinkingdata'
 
 interface WorkItem {
   id: string
@@ -85,6 +86,7 @@ export default function WorksGrid({
   const deleteCampaign = async (item: WorkItem) => {
     if (!window.confirm(`"${item.title}" 작업물을 삭제할까요? 삭제 후에는 복구할 수 없습니다.`)) return
 
+    analytics.campaignDelete(item.id)
     setError(null)
     setDeletingId(item.id)
     const result = await deleteWorkAction(item.id)

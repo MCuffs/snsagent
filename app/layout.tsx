@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import ThinkingDataProvider from "./components/ThinkingDataProvider";
 
 const pretendard = localFont({
   variable: "--font-pretendard",
@@ -39,7 +40,10 @@ export default function RootLayout({
       lang="ko"
       className={`${pretendard.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+          <ThinkingDataProvider />
+          {children}
+        </body>
     </html>
   );
 }

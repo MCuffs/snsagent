@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BookOpen, Zap, Grid3X3, LucideIcon } from 'lucide-react'
 import { useTab } from './TabContext'
+import { analytics } from '../../lib/analytics/thinkingdata'
 
 interface NavItem {
   key: string
@@ -28,6 +29,7 @@ export default function SidebarNav({ hasCompleteBrand }: SidebarNavProps) {
   const { activeTab, setActiveTab } = useTab()
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
+    analytics.sidebarClick(item.key)
     if (pathname === '/concept') {
       e.preventDefault()
       setActiveTab(item.key)

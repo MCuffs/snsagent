@@ -3,17 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ArrowRight, 
-  ImagePlus, 
-  Sparkles, 
-  Send, 
-  X, 
-  Target, 
-  Compass, 
+import {
+  ArrowRight,
+  ImagePlus,
+  Sparkles,
+  Send,
+  X,
+  Target,
+  Compass,
   Layers,
   Sparkle
 } from 'lucide-react'
+import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
 interface Brand {
   id: string
@@ -324,6 +325,14 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     setGenerating(true)
     setError(null)
 
+    timeEvent('generate_complete')
+    analytics.generateStart({
+      brandId: brand.id,
+      slideCount: readyParams.slideCount,
+      platform: 'card_news',
+      intent: readyParams.objective,
+    })
+
     try {
       let productImageUrls: string[] = []
       if (referenceFiles.length > 0) {
@@ -367,13 +376,21 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
       const data = await res.json() as { campaignId?: string; error?: string }
       if (!res.ok || data.error) {
+        analytics.generateFailed(brand.id, data.error || 'api_error')
         setError(data.error || '생성에 실패했습니다.')
         setGenerating(false)
         return
       }
 
+      analytics.generateComplete({
+        brandId: brand.id,
+        campaignId: data.campaignId ?? '',
+        slideCount: readyParams.slideCount,
+        durationMs: 0,
+      })
       router.push(`/campaign/${data.campaignId}`)
     } catch {
+      analytics.generateFailed(brand.id, 'network_error')
       setError('서버 통신 중 오류가 발생했습니다.')
       setGenerating(false)
     }
@@ -387,6 +404,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       return
     }
     setReferenceFiles(files)
+    if (files.length > 0) analytics.productImageAdd(files.length)
     setError(null)
   }
 

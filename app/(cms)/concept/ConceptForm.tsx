@@ -6,6 +6,7 @@ import { AlertCircle, ArrowRight, CheckCircle2, Globe, Loader2, MessageCircle, S
 import { analyzeBrandWebsiteAction, saveBrandAction } from '../../actions'
 import { parseBrandDna, stringifyBrandDna } from '../../../lib/brand-dna'
 import { motion, AnimatePresence } from 'framer-motion'
+import { analytics } from '../../../lib/analytics/thinkingdata'
 
 interface BrandData {
   id: string
@@ -191,11 +192,13 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     try {
       const res = await analyzeBrandWebsiteAction(url)
       if (!res || !res.success) {
+        analytics.brandUrlAnalyzed(url, false)
         setError(('error' in (res ?? {})) ? (res as { error: string }).error : 'AI 브랜드 분석에 실패했습니다.')
         setIsAnalyzing(false)
         return
       }
       if (res.success && res.brandProfile) {
+        analytics.brandUrlAnalyzed(url, true)
         const p = res.brandProfile
         setName(p.name)
         setIndustry(p.industry)
@@ -238,6 +241,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
       })
       if (res.success) {
         setBrandId(res.brand.id)
+        analytics.brandCreateComplete(res.brand.id)
         setSuccess('브랜드 프로필이 저장되었습니다.')
       } else {
         setError(res.error || '저장 실패')
