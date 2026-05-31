@@ -49,7 +49,7 @@ export function planTypography(input: TypographyInput): TypographyPlan {
 
   // 3. 지능형 한국어 줄바꿈 적용
   const rawHeadlineLines = breakKoreanLines(input.headline, maxHeadlineChars, 3)
-  const bodyLines = breakKoreanLines(input.body, maxBodyChars, 4)
+  const bodyLines = breakKoreanLines(input.body, maxBodyChars, 6)
 
   // 4. 헤드라인 라인별 토큰 매핑
   const headlineLines: TypographyLine[] = rawHeadlineLines.map(lineText => {
@@ -110,9 +110,9 @@ function getHeadlineLineChars(layout: LayoutDefinition) {
 }
 
 function getBodyLineChars(layout: LayoutDefinition) {
-  if (layout.textPosition.includes('column')) return 22
-  if (layout.textPosition.includes('center')) return 24
-  return 26
+  if (layout.textPosition.includes('column')) return 26
+  if (layout.textPosition.includes('center')) return 28
+  return 30
 }
 
 function getHeadlineFontSize(layout: LayoutDefinition, lineCount: number) {

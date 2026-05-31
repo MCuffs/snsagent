@@ -4,6 +4,7 @@ import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { collectBrandUrlContext } from '../../../../lib/brand-url-collector'
+import { fetchRssForGeneration } from '../../../../src/lib/rss/rssFetcher'
 
 export const runtime = 'nodejs'
 
@@ -53,7 +54,8 @@ function buildSystemPrompt(
   preferencesText: string,
   scrapedContext: string,
   language?: 'ko' | 'en',
-  generationMode?: 'brand' | 'general'
+  generationMode?: 'brand' | 'general',
+  rssContext?: string
 ) {
   const isGeneral = generationMode === 'general'
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
@@ -71,6 +73,7 @@ function buildSystemPrompt(
 ## 사용자의 과거 디자인 선호 스타일 (비주얼/레이아웃 테마용)
 ${preferencesText}
 
+${rssContext ? `## 실시간 수집된 관련 뉴스 (훅 및 슬라이드 기획의 핵심 근거로 활용)\n${rssContext}\n\n위 뉴스 기사들의 실제 이슈, 트렌드 키워드, 구체적 사실을 훅 방향과 슬라이드 흐름에 반드시 반영하세요.\n` : ''}
 ${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n${scrapedContext}\n` : ''}
 
 ## 대화 규칙 및 역할
@@ -258,6 +261,35 @@ export async function POST(request: Request) {
       }
     }
 
+    // 4. Fetch RSS news relevant to the user's topic for real-time grounding
+    let rssContext = ''
+    if (lastUserMessage && generationMode === 'general') {
+      try {
+        const userText = lastUserMessage.content.replace(/https?:\/\/[^\s]+/g, '').trim()
+        const keywords = userText.split(/[\s,]+/).filter(w => w.length > 1).slice(0, 5)
+        const rssResult = await fetchRssForGeneration({
+          category: brand.industry || 'current-affairs',
+          keywords,
+          topic: userText.slice(0, 80),
+          limit: 5,
+        })
+        if (rssResult.articles.length > 0) {
+          const lines = [
+            `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
+            `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,
+            '',
+          ]
+          rssResult.articles.forEach((a, i) => {
+            lines.push(`기사 ${i + 1}: ${a.title}`)
+            if (a.description) lines.push(`  → ${a.description.slice(0, 150)}`)
+          })
+          rssContext = lines.join('\n')
+        }
+      } catch (err) {
+        console.warn('[GenerateAgent] RSS fetch failed:', err)
+      }
+    }
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey || apiKey.length < 10) {
       const fallback: AgentResponse = {
@@ -289,7 +321,7 @@ export async function POST(request: Request) {
       apiKey,
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
-    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language, generationMode)
+    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language, generationMode, rssContext)
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o',
       messages: [
