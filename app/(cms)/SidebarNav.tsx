@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, LucideIcon } from 'lucide-react'
+import { BookOpen, Zap, Grid3X3, Palette, LucideIcon } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { key: 'concept', label: 'Concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
   { key: 'generate', label: 'Generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
   { key: 'works', label: 'Works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
+  { key: 'painter', label: 'Artist', icon: Palette, descKey: 'nav_painter_desc', href: '/concept?tab=painter' },
 ]
 
 interface SidebarNavProps {

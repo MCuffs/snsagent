@@ -163,6 +163,9 @@
     "nav_generate_desc": "카드뉴스 생성",
     "nav_works": "Works",
     "nav_works_desc": "작업 히스토리",
+    "nav_painter": "Artist",
+    "nav_painter_desc": "나만의 화가",
+    "painter_philosophy": "이미지는 생성되는 것이 아니라 그려져야 하는 겁니다.",
     "plan_label": "요금제 →",
     "logout": "로그아웃",
     "language_toggle": "EN"

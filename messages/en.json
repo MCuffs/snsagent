@@ -163,6 +163,9 @@
     "nav_generate_desc": "Create card news",
     "nav_works": "Works",
     "nav_works_desc": "Work history",
+    "nav_painter": "Artist",
+    "nav_painter_desc": "My Artist Status",
+    "painter_philosophy": "Images are not generated; they must be drawn.",
     "plan_label": "Plan →",
     "logout": "Log out",
     "language_toggle": "한국어"

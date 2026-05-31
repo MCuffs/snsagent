@@ -7,6 +7,7 @@ import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
+import PainterDashboard from '../painter/PainterDashboard'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 
@@ -168,6 +169,17 @@ export default function DashboardContainer({
             retentionDays={retentionDays}
             canUpgradeRetention={canUpgradeRetention}
           />
+        </motion.div>
+      )}
+
+      {activeTab === 'painter' && brandToPass && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="h-full"
+        >
+          <PainterDashboard brand={brandToPass} />
         </motion.div>
       )}
     </div>
