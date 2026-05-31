@@ -5,6 +5,7 @@ import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import { formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
 import { checkCopyQuality, type CopyQualityReport } from '../copywriting/copyQualityChecker'
 import { buildNarrativeTransitionInstructions } from '../copywriting/slideNarrativeEngine'
+import { truncateAtSentenceBoundary } from '../copywriting/truncate'
 
 const BANNED_CLICHES = ['혁신적인', '최고의', '완벽한']
 
@@ -194,10 +195,7 @@ function cleanCopy(brand: BrandProfile, copy: SlideCopy, knowledgeCtx?: CopyKnow
       result = result.replaceAll(word, '')
     }
     result = result.trim()
-    if (result.length <= limit) return result
-    const cut = result.slice(0, limit)
-    const lastSpace = cut.lastIndexOf(' ')
-    return lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut
+    return truncateAtSentenceBoundary(result, limit)
   }
 
   return {

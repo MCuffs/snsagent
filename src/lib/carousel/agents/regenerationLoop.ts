@@ -1,6 +1,7 @@
 import { getLLMClient } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
+import { truncateAtSentenceBoundary } from '../../copywriting/truncate'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
 import { runCriticAgent, type CriticResult } from './criticAgent'
@@ -99,8 +100,8 @@ export async function runRegenerationLoop(
         const updated: CompletedSlide = {
           slideNumber,
           role: slide.role,
-          headline: result.headline.slice(0, 25).trim(),
-          body: result.body.slice(0, 120).trim(),
+          headline: truncateAtSentenceBoundary(result.headline.trim(), 25),
+          body: truncateAtSentenceBoundary(result.body.trim(), 120),
         }
         if (idx >= 0) {
           memory.completedSlides[idx] = updated

@@ -1,6 +1,7 @@
 import { getLLMClient } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
+import { truncateAtSentenceBoundary } from '../../copywriting/truncate'
 import type { SlideCopy, SlideRole } from '../types'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
@@ -128,8 +129,8 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       { model: textModel, temperature: 0.45 }
     )
 
-    const headline = result?.headline?.slice(0, 25).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).headline
-    const body = result?.body?.slice(0, 120).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).body
+    const headline = truncateAtSentenceBoundary(result?.headline?.trim() || '', 25) || buildFallbackCopy(memory, slide.slideNumber, slide.role).headline
+    const body = truncateAtSentenceBoundary(result?.body?.trim() || '', 120) || buildFallbackCopy(memory, slide.slideNumber, slide.role).body
 
     const completed: CompletedSlide = {
       slideNumber: slide.slideNumber,

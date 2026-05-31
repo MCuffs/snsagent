@@ -12,6 +12,7 @@ import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
+import { truncateAtSentenceBoundary } from '../copywriting/truncate'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -558,7 +559,7 @@ JSON 응답 형식:
     return {
       ...slide,
       headline: generated.headline.trim().slice(0, constraints?.maxHeadlineChars || 25),
-      body: body.slice(0, constraints?.maxBodyChars || 120) || slide.body,
+      body: truncateAtSentenceBoundary(body, constraints?.maxBodyChars || 120) || slide.body,
     }
   })
 }
@@ -600,7 +601,7 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
       headline: trimHeadline(headline).slice(0, slidePlan.copyConstraints.maxHeadlineChars),
-      body: body.slice(0, slidePlan.copyConstraints.maxBodyChars),
+      body: truncateAtSentenceBoundary(body, slidePlan.copyConstraints.maxBodyChars),
       layoutType: slidePlan.layoutType,
     }
   })
