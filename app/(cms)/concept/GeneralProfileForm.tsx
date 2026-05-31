@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { useTab } from '../TabContext'
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2, Save } from 'lucide-react'
-import { saveBrandAction } from '../../actions'
+import { AlertCircle, ArrowRight, CheckCircle2, Loader2, Save, Sparkles } from 'lucide-react'
+import { saveBrandAction, analyzeGeneralProfileCoreWordAction } from '../../actions'
 import { motion } from 'framer-motion'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface ProfileData {
   id: string
@@ -50,8 +50,13 @@ const itemVariants = {
 export default function GeneralProfileForm({ existingProfile }: GeneralProfileFormProps) {
   const { setActiveTab } = useTab()
   const t = useTranslations('concept')
+  const locale = useLocale()
 
   const [profileId, setProfileId] = useState(existingProfile?.id || null)
+
+  // AI helper state
+  const [coreWord, setCoreWord] = useState('')
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   // Form fields
   const [name, setName] = useState(existingProfile?.name || '')
@@ -60,12 +65,40 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
   const [targetAudience, setTargetAudience] = useState(existingProfile?.targetAudience || '')
   const [toneOfVoice, setToneOfVoice] = useState(existingProfile?.toneOfVoice || '')
   const [mainColor, setMainColor] = useState(existingProfile?.mainColor || '#0f172a')
-  const [ctaStyle, setCtaStyle] = useState(existingProfile?.ctaStyle || '')
 
   // UI state
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const handleAnalyzeCoreWord = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!coreWord.trim() || isAnalyzing) return
+    setIsAnalyzing(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const res = await analyzeGeneralProfileCoreWordAction(coreWord.trim(), locale)
+      if (res.success && res.profile) {
+        const p = res.profile
+        setName(prev => prev.trim() ? prev : `${coreWord.trim()} 리포트`)
+        setCategory(p.industry)
+        setKeywords(p.forbiddenWords)
+        setTargetAudience(p.targetAudience)
+        setToneOfVoice(p.toneOfVoice)
+        setMainColor(p.mainColor)
+        setSuccess(t('ai_analyze_complete'))
+      } else {
+        const errMsg = !res.success && 'error' in res ? (res as { error: string }).error : null
+        setError(errMsg || t('error_analyze_failed'))
+      }
+    } catch {
+      setError(t('error_analyze_failed'))
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,7 +114,7 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
         toneOfVoice,
         mainColor,
         forbiddenWords: keywords, // Save keywords to forbiddenWords
-        ctaStyle,
+        ctaStyle: '', // CTA style is dynamically generated on campaign news generation
         brandDna: null,
         websiteUrl: 'general_profile', // Mark as general profile
       })
@@ -109,7 +142,7 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
   }
 
   return (
-    <div className="flex h-full overflow-y-auto">
+    <div className="flex h-full overflow-y-auto bg-[#fafafa]">
       <div className="flex-1">
         <motion.div
           variants={containerVariants}
@@ -125,6 +158,43 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
             <p className="mt-1.5 text-sm text-[#52525b]">
               {t('general_desc')}
             </p>
+          </motion.div>
+
+          {/* Core Word AI discovery card */}
+          <motion.div
+            variants={itemVariants}
+            className="mb-8 rounded-2xl border border-[#0066ff]/20 bg-[#0066ff]/5 p-5 shadow-sm"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4.5 w-4.5 text-[#0066ff]" />
+              <h3 className="text-sm font-bold text-[#111111]">{t('core_word')} AI 분석</h3>
+            </div>
+            <p className="text-xs text-[#52525b] mb-4 leading-relaxed">
+              {t('core_word_hint')}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={coreWord}
+                onChange={(e) => setCoreWord(e.target.value)}
+                disabled={isAnalyzing}
+                placeholder={t('core_word_placeholder')}
+                className="h-11 flex-1 rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={handleAnalyzeCoreWord}
+                disabled={isAnalyzing || !coreWord.trim()}
+                className="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-[#0066ff] px-4 text-xs font-semibold text-white transition hover:bg-[#0052cc] disabled:cursor-not-allowed disabled:opacity-50 shadow-sm shrink-0"
+              >
+                {isAnalyzing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isAnalyzing ? t('ai_analyzing') : t('ai_analyze_btn')}
+              </button>
+            </div>
           </motion.div>
 
           {error && (
@@ -208,7 +278,7 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
             <Section title={t('section_visual')}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-[#52525b]">{t('brand_color')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-[#52525b]">{t('core_color')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -226,12 +296,6 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
                     />
                   </div>
                 </div>
-                <Field
-                  label={t('field_cta')}
-                  value={ctaStyle}
-                  onChange={setCtaStyle}
-                  placeholder={t('field_cta_placeholder')}
-                />
               </div>
             </Section>
 
