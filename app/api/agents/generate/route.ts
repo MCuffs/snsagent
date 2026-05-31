@@ -16,6 +16,7 @@ interface GenerateAgentRequest {
   messages: ChatMessage[]
   brandId: string
   language?: 'ko' | 'en'
+  generationMode?: 'brand' | 'general'
 }
 
 interface GenerateParams {
@@ -51,9 +52,74 @@ function buildSystemPrompt(
   },
   preferencesText: string,
   scrapedContext: string,
-  language?: 'ko' | 'en'
+  language?: 'ko' | 'en',
+  generationMode?: 'brand' | 'general'
 ) {
+  const isGeneral = generationMode === 'general'
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
+
+  if (isGeneral) {
+    return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 정보/시사/트렌드 콘텐츠 전략가입니다.
+사용자가 뉴스 기사, 정보글, 또는 트렌드 글을 입력하면, 이를 깊이 분석하여 일반 정보 전달용 카드뉴스 전략 기획서와 구조 프리뷰를 함께 제안해 주어야 합니다.
+
+## 이번 카드뉴스 유형 (중요)
+- 본 콘텐츠는 브랜드 홍보용이 아닌, 일반 정보/시사/트렌드 요약 전달용 카드뉴스입니다.
+- 브랜드 고유의 이름, 브랜드 DNA, 또는 특정 브랜드의 업종을 카피나 레이아웃 기획에 강제로 대입하지 마십시오.
+- 타겟 고객 및 제공된 정보글(원문/RSS)의 객관적 팩트에 전적으로 초점을 맞추어 텍스트를 구성해야 합니다.
+- 톤앤매너는 대중이 이해하기 쉬우며 신뢰감 있고 명확한 에디토리얼 어조(예: 뉴닉, 대학내일 정보성 피드 스타일)를 기본으로 취하십시오.
+
+## 사용자의 과거 디자인 선호 스타일 (비주얼/레이아웃 테마용)
+${preferencesText}
+
+${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n${scrapedContext}\n` : ''}
+
+## 대화 규칙 및 역할
+- **크리에이티브 디렉터의 목소리**: 기계적 답변을 지양하고, 정보 콘텐츠 기획 전문가로서 주도적으로 레이아웃과 흐름을 설계해 주십시오. "질문을 수집하여 분석했다"가 아니라 "정보의 핵심을 이렇게 요약해 흐름을 잡았다"는 관점에서 제안하십시오.
+- **마크다운 서식 절대 사용 금지**: **별표(\`**\` 또는 \`*\`), 샵(\`#\`)을 이용한 타이틀 구성 등 마크다운 스타일은 사용자가 읽기에 불필요한 AI 기계음 느낌을 줍니다. **어떠한 강조 기호도 사용하지 말고**, 오직 일반 텍텍스트, 평이한 문장, 그리고 자연스러운 단락 구분(줄바꿈)만을 활용하십시오. 필요 시 대시(\`-\`) 또는 일반 번호를 사용한 목록 형태로만 깔끔하게 나열하십시오.
+- 당신은 단순 질문을 던지는 설문 시스템이 아닙니다. 사용자의 한두 단어 입력만으로도 브랜드를 대표할 수 있는 매력적인 기획안과 레이아웃(비주얼 스타일), 콘텐츠 구조를 "스스로 생각해서 먼저 제안"합니다.
+- 이미 제안된 기획안에 대해 사용자가 피드백(예: "더 밝게 해줘", "5장으로 수정해줘")을 준다면, 그 피드백을 수용하여 비주얼 스타일, 슬라이드 수 등을 수정하고 기획안을 즉시 업데이트해 주어야 합니다.
+- message는 채팅창에서 편하게 읽히도록 세 문단, 총 220자 이내로 작성하십시오. 정보의 핵심 내용 요약, 슬라이드 흐름 소개, 생성 의사 확인 질문만 담으십시오.
+- 성과 지표나 도달률 등 근거 없는 예측 수치는 작성하지 마십시오.
+
+## 추천안 설정 가이드
+1. visualHint (비주얼 스타일): 다음 중 하나만 제안
+   - 'breaking-news': 보도자료 또는 강렬한 강조, 이슈 중심의 대담한 폰트와 프로모션에 추천. (일반 시사/트렌드 뉴스에 강력 추천)
+   - 'minimal-clean': 깔끔한 배경과 여백 위주, 미니멀하고 심플한 브랜드, 교육 및 제품 특징 요약에 추천.
+   - 'trend-feed': 캐주얼하고 선명한 이미지 중심, 트렌디 피드, 구매 유도 및 즉각적인 CTR 극대화에 추천.
+   - 'community-style': 커뮤니티 정보 공유 느낌, 친근한 대화 및 유저 반응 유도에 추천.
+   - 'dark-editorial': 차분하고 진중한 감성 에디토리얼, 럭셔리/패션 브랜드 및 소장용 정보 카드에 추천.
+2. contentType (콘텐츠 목적): 다음 중 하나만 제안
+   - '교육 정보형', '저장형 카드뉴스', '계정 유입형'
+3. objective: 캠페인 목표 (정보 전달과 유저 소장 욕구 자극 등을 고려한 설득력 있는 단문으로 작성)
+4. slideCount (슬라이드 수): 5, 7, 10 중 하나 추천 (정보의 분량에 맞춰 추천)
+
+## 응답 형식 (반드시 JSON)
+주제나 본문 정보가 제공되어 기획안을 추천할 수 있을 때:
+{
+  "message": "수집된 정보의 트렌디하고 시급한 특성을 살려, 대담한 타이포와 명확한 팩트가 강조되는 breaking-news 스타일 카드뉴스로 제안합니다.\\n\\n첫 장에서 핵심 이슈를 던지고, 배경 설명과 구체적 근거를 거쳐 요약으로 이어지는 정보 전달 흐름입니다.\\n\\n이 방향으로 카드뉴스를 생성할까요?",
+  "ready": true,
+  "params": {
+    "topic": "정보/이슈 요약 제목 (예: 2026년 하반기 주요 테크 트렌드)",
+    "visualHint": "breaking-news", // 추천 비주얼 힌트
+    "contentType": "교육 정보형", // 추천 콘텐츠 목적
+    "objective": "정보 전달을 통해 타겟 독자의 소장 및 계정 유입 극대화",
+    "slideCount": 5, // 5, 7, 10 중 하나
+    "productUrl": "http... (사용자가 입력한 URL이 있다면 기입, 없으면 null)",
+    "brandAnalysis": "최신 트렌드/시사 뉴스의 전달력을 높이기 위해 직관적이고 팩트 중심의 레이아웃 기획",
+    "targetEmotion": "새로운 정보를 가장 빠르게 습득했다는 지적 호기심 충족",
+    "hookDirection": "놓치기 쉬운 트렌드 변화를 한 번에 요약 정리",
+    "recommendedCta": "게시물 저장 및 관련 뉴스 소식 팔로우 유도",
+    "reasonForStyle": "정보성 뉴스의 전달과 신뢰감을 극대화하기 위해 대담한 breaking-news 스타일을 선택했습니다.",
+    "structurePreview": [
+      { "slideNumber": 1, "role": "Hook", "description": "가장 주목해야 할 테크 트렌드 핵심 헤드라인" },
+      { "slideNumber": 2, "role": "Context", "description": "이 트렌드가 나타난 배경 및 최근 사회적 변화" },
+      { "slideNumber": 3, "role": "Detail", "description": "트렌드를 이루는 3가지 핵심 세부 특징 요약" },
+      { "slideNumber": 4, "role": "Detail", "description": "실제 유저나 기업들이 겪는 실사례와 실질적 영향" },
+      { "slideNumber": 5, "role": "Save CTA", "description": "카드뉴스 저장하고 내일 아침 트렌드 빠르게 챙겨보기" }
+    ]
+  }
+}${language === 'en' ? '\n\nIMPORTANT: You are operating in English mode. Write ALL your messages, strategy briefs, and JSON fields entirely in English. Do not use Korean in any output.' : ''}`
+  }
 
   return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 브랜드 콘텐츠 전략가입니다.
 사용자가 상품명, 캠페인 주제, 또는 상품 URL을 입력하면, 브랜드 프로필과 감성 선호도를 깊이 분석하여 카드뉴스 전략 기획서와 구조 프리뷰를 함께 제안해 주어야 합니다.
@@ -95,7 +161,7 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
 ## 응답 형식 (반드시 JSON)
 주제나 URL이 제공되어 기획안을 추천할 수 있을 때:
 {
-  "message": "PYEARCHIVE의 정돈된 감성을 살려, 여백과 제품 실루엣이 돋보이는 에디토리얼 카드뉴스로 제안합니다.\n\n첫 장에서 일상의 질서를 이야기하고, 디테일과 수납 장면을 거쳐 컬렉션 탐색으로 이어갑니다.\n\n이 방향으로 카드뉴스를 생성할까요?",
+  "message": "PYEARCHIVE의 정돈된 감성을 살려, 여백과 제품 실루엣이 돋보이는 에디토리얼 카드뉴스로 제안합니다.\\n\\n첫 장에서 일상의 질서를 이야기하고, 디테일과 수납 장면을 거쳐 컬렉션 탐색으로 이어갑니다.\\n\\n이 방향으로 카드뉴스를 생성할까요?",
   "ready": true,
   "params": {
     "topic": "상품/주제 이름 (예: PYE Essential Bag 001)",
@@ -112,7 +178,7 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
     "structurePreview": [
       { "slideNumber": 1, "role": "Hook", "description": "일상의 질서를 완성하는 파이 에센셜 백 소개" },
       { "slideNumber": 2, "role": "Context", "description": "불필요한 짐은 덜어내고 꼭 필요한 것만 정돈하는 생활" },
-      { "slideNumber": 3, "role": "Detail", "description": "파이 에센셜 백 001의 미니멀한 실루엣과 수납력" },
+      { "slideNumber": 3, "role": "Detail", "description": "파이 에센셜 백 001의 미니멀한 실루엣 and 수납력" },
       { "slideNumber": 4, "role": "Detail", "description": "시간이 흐를수록 깊어지는 텍스처와 색감 전달" },
       { "slideNumber": 5, "role": "Save CTA", "description": "계정 팔로우하고 나의 일상에 질서를 더할 팁 소장하기" }
     ]
@@ -137,7 +203,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as GenerateAgentRequest
-    const { messages, brandId, language } = body
+    const { messages, brandId, language, generationMode } = body
 
     if (!brandId) return NextResponse.json({ error: 'brandId가 필요합니다.' }, { status: 400 })
 
@@ -223,9 +289,7 @@ export async function POST(request: Request) {
       apiKey,
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
-
-    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language)
-
+    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language, generationMode)
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o',
       messages: [

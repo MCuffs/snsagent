@@ -58,6 +58,7 @@ export interface MediaCarouselInput {
   briefing?: EditorialBriefing
   imageProvider?: ImageProvider
   language?: 'ko' | 'en'
+  generationMode?: 'brand' | 'general'
 }
 
 export interface MediaCarouselSlideResult {
@@ -179,7 +180,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     layoutType: s.layoutType,
   }))
 
-  // 2. Execute BrandIdentityAgent
   const brandRes = brandAgent.run({
     brandName: input.brandName,
     brandToneOfVoice: input.brandToneOfVoice,
@@ -187,6 +187,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     ctaStyle: input.brandCtaStyle,
     brandDna: input.brandDna,
     slides: agentSlides,
+    isGeneralMode: input.generationMode === 'general',
   })
   agentSlides = brandRes.slides
   agentReportLogs.push(...brandRes.logs)
@@ -452,18 +453,21 @@ async function generateMediaSlideCopies(
     .join('\n')
   const sourceMaterial = input.keyContent.trim().slice(0, 4000)
 
-  const brandDnaSection = input.brandDna
+  const isGeneral = input.generationMode === 'general'
+  const brandDnaSection = (input.brandDna && !isGeneral)
     ? `\n브랜드 DNA (카피에 반드시 반영):\n${formatBrandDnaForPrompt(input.brandDna)}\n`
     : ''
 
-  const knowledgeSection = knowledgeCtx
+  const knowledgeSection = (knowledgeCtx && !isGeneral)
     ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
     : ''
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
 
-  const systemPrompt = knowledgeCtx
-    ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
-    : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'
+  const systemPrompt = isGeneral
+    ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
+    : (knowledgeCtx
+      ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+      : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.')
 
   const langInstruction = input.language === 'en'
     ? '\n\nIMPORTANT: Write ALL headlines, body copy, and captions in English only. Do not use Korean in any field.'
@@ -474,10 +478,10 @@ async function generateMediaSlideCopies(
 ${editorialPlanSection}
 
 브랜드 정보:
-- 브랜드명: ${input.brandName}
-- 업종: ${input.brandIndustry || '미지정'}
-- 톤앤매너: ${input.brandToneOfVoice || '전문적이고 신뢰감 있게'}
-- 금지어: ${input.brandForbiddenWords || '없음'}
+- 브랜드명: ${isGeneral ? '일반 정보/뉴스 전달용' : input.brandName}
+- 업종: ${isGeneral ? '시사/정보/트렌드' : (input.brandIndustry || '미지정')}
+- 톤앤매너: ${isGeneral ? '객관적이고 신뢰감 있게' : (input.brandToneOfVoice || '전문적이고 신뢰감 있게')}
+- 금지어: ${isGeneral ? '없음' : (input.brandForbiddenWords || '없음')}
 ${brandDnaSection}${knowledgeSection}
 콘텐츠 기획:
 - 주제(상품): ${input.topic}

@@ -257,7 +257,16 @@
     "error_upload": "참고 이미지 업로드에 실패했습니다.",
     "error_max_images": "참고 이미지는 최대 4장까지 선택할 수 있습니다.",
     "error_generate": "생성에 실패했습니다.",
-    "error_network": "서버 통신 중 오류가 발생했습니다."
+    "error_network": "서버 통신 중 오류가 발생했습니다.",
+    "mode_brand": "브랜드 카드뉴스",
+    "mode_general": "일반 카드뉴스 (시사/정보/트렌드)",
+    "category_affairs": "시사",
+    "category_info": "정보",
+    "category_trends": "트렌드",
+    "rss_loading": "최신 기사 수집 중...",
+    "rss_empty": "최근 수집된 기사가 없습니다.",
+    "rss_select_cta": "이 기사로 생성",
+    "rss_read_more": "원문 보기"
   },
   "billing": {
     "eyebrow": "Billing",

@@ -36,6 +36,7 @@ interface GenerateCampaignRequest {
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
   language?: 'ko' | 'en'
+  generationMode?: 'brand' | 'general'
 }
 
 export async function POST(request: Request) {
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
           structurePreview: body.structurePreview,
         },
         language: body.language,
+        generationMode: body.generationMode,
       })
 
       return NextResponse.json({

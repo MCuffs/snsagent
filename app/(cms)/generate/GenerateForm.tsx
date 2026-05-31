@@ -13,7 +13,9 @@ import {
   Target,
   Compass,
   Layers,
-  Sparkle
+  Sparkle,
+  ExternalLink,
+  Newspaper
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -172,6 +174,11 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
 
+  const [generationMode, setGenerationMode] = useState<'brand' | 'general'>('brand')
+  const [rssCategory, setRssCategory] = useState<'current-affairs' | 'information' | 'trends'>('current-affairs')
+  const [rssArticles, setRssArticles] = useState<Array<{ title: string; description: string; link: string; pubDate: string }>>([])
+  const [rssLoading, setRssLoading] = useState(false)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -259,7 +266,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, brandId: brand.id, language }),
+        body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode }),
       })
       const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; error?: string }
 
@@ -278,7 +285,18 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     } finally {
       setIsWaiting(false)
     }
-  }, [appendAiMessage, brand.id])
+  }, [appendAiMessage, brand.id, generationMode, locale, language])
+
+  const handleModeChange = useCallback((mode: 'brand' | 'general') => {
+    if (mode === generationMode) return
+    setGenerationMode(mode)
+    setIsWaiting(true)
+    setDisplayMessages([])
+    setChatHistory([])
+    setReadyParams(null)
+    setBriefingStage(0)
+    clearBriefingTimers()
+  }, [generationMode, clearBriefingTimers])
 
   // Load the initial Agent greeting
   useEffect(() => {
@@ -288,7 +306,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const res = await fetch('/api/agents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [], brandId: brand.id, language }),
+          body: JSON.stringify({ messages: [], brandId: brand.id, language, generationMode }),
         })
         const data = await res.json() as { message?: string; error?: string }
         if (!active) return
@@ -303,7 +321,49 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     }
     void loadGreeting()
     return () => { active = false }
-  }, [appendAiMessage, brand.id])
+  }, [appendAiMessage, brand.id, generationMode, language, locale])
+
+  const fetchRssArticles = useCallback(async (cat: typeof rssCategory) => {
+    setRssLoading(true)
+    try {
+      const res = await fetch(`/api/rss?category=${cat}`)
+      const data = await res.json() as { articles?: Array<{ title: string; description: string; link: string; pubDate: string }>; error?: string }
+      if (res.ok && data.articles) {
+        setRssArticles(data.articles)
+      } else {
+        setRssArticles([])
+      }
+    } catch {
+      setRssArticles([])
+    } finally {
+      setRssLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (generationMode === 'general') {
+      const timer = setTimeout(() => {
+        void fetchRssArticles(rssCategory)
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [generationMode, rssCategory, fetchRssArticles])
+
+  const handleSelectArticle = async (article: { title: string; description: string; link: string }) => {
+    if (isWaiting || isRevealingMessage) return
+
+    const userPrompt = `[선택한 기사] ${article.title}\n기사 주소: ${article.link}\n\n이 기사 내용을 바탕으로 시사/정보 카드뉴스를 기획해줘.`
+    const userMsg: ChatMessage = { role: 'user', content: userPrompt }
+    const newHistory = [...chatHistory, userMsg]
+
+    setDisplayMessages(prev => [...prev, userDisplay(userPrompt)])
+    setChatHistory(newHistory)
+    setReadyParams(null)
+    setBriefingStage(0)
+    clearBriefingTimers()
+
+    await callAgent(newHistory)
+  }
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -376,6 +436,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           structurePreview: readyParams.structurePreview,
           productImageUrls,
           language,
+          generationMode,
         }),
       })
 
@@ -481,11 +542,36 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         variants={formItemVariants}
         className="flex min-w-0 flex-1 flex-col bg-[#FFFDFB]/80 backdrop-blur-sm border-r border-[#EFEAE2]"
       >
-        {/* Brand chip */}
-        <div className="shrink-0 border-b border-[#EFEAE2] px-5 py-3.5 bg-[#FCFBF9]/60">
+        {/* Header containing Brand chip & Mode Toggle */}
+        <div className="shrink-0 border-b border-[#EFEAE2] px-5 py-3.5 bg-[#FCFBF9]/60 flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#E5DDD3] bg-white px-3 py-1.5 text-xs font-bold text-[#5C4E4B] shadow-[0_2px_8px_rgba(158,125,104,0.04)]">
             <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#9E7D68' }} />
             {brand.name}
+          </div>
+          
+          <div className="flex bg-[#F2EAE1] p-1 rounded-xl border border-[#E5DDD3] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
+            <button
+              type="button"
+              onClick={() => handleModeChange('brand')}
+              className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all active:scale-[0.98] ${
+                generationMode === 'brand'
+                  ? 'bg-white text-[#2C1E1A] shadow-sm'
+                  : 'text-[#8C7E7A] hover:text-[#5C4E4B]'
+              }`}
+            >
+              {t('mode_brand')}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange('general')}
+              className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all active:scale-[0.98] ${
+                generationMode === 'general'
+                  ? 'bg-white text-[#2C1E1A] shadow-sm'
+                  : 'text-[#8C7E7A] hover:text-[#5C4E4B]'
+              }`}
+            >
+              {t('mode_general')}
+            </button>
           </div>
         </div>
 
@@ -775,6 +861,112 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               </motion.div>
             )}
           </motion.div>
+        ) : generationMode === 'general' ? (
+          <div className="flex-1 flex flex-col min-h-0 bg-[#F5F1E9]/50">
+            {/* Category tabs */}
+            <div className="px-5 py-4 border-b border-[#EFEAE2] flex gap-2 shrink-0 bg-[#FCFBF9]/90 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setRssCategory('current-affairs')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all active:scale-[0.98] ${
+                  rssCategory === 'current-affairs'
+                    ? 'bg-[#9E7D68] text-white border-[#9E7D68] shadow-sm'
+                    : 'bg-white text-[#5C4E4B] border-[#E5DDD3] hover:border-[#C4BCAE]'
+                }`}
+              >
+                {t('category_affairs')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRssCategory('information')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all active:scale-[0.98] ${
+                  rssCategory === 'information'
+                    ? 'bg-[#9E7D68] text-white border-[#9E7D68] shadow-sm'
+                    : 'bg-white text-[#5C4E4B] border-[#E5DDD3] hover:border-[#C4BCAE]'
+                }`}
+              >
+                {t('category_info')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRssCategory('trends')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all active:scale-[0.98] ${
+                  rssCategory === 'trends'
+                    ? 'bg-[#9E7D68] text-white border-[#9E7D68] shadow-sm'
+                    : 'bg-white text-[#5C4E4B] border-[#E5DDD3] hover:border-[#C4BCAE]'
+                }`}
+              >
+                {t('category_trends')}
+              </button>
+            </div>
+
+            {/* Articles List */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 custom-scrollbar">
+              {rssLoading ? (
+                <div className="h-48 flex flex-col items-center justify-center space-y-3">
+                  <Compass className="h-8 w-8 text-[#9E7D68] animate-spin" />
+                  <p className="text-xs font-bold text-[#8C7E7A]">{t('rss_loading')}</p>
+                </div>
+              ) : rssArticles.length === 0 ? (
+                <div className="h-48 flex flex-col items-center justify-center text-center space-y-2 text-[#8C7E7A]">
+                  <Newspaper className="h-8 w-8 text-[#C2B5AA]" />
+                  <p className="text-xs font-bold">{t('rss_empty')}</p>
+                </div>
+              ) : (
+                rssArticles.map((art, idx) => (
+                  <motion.div
+                    key={`${art.link}-${idx}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: Math.min(idx * 0.05, 0.4) }}
+                    className="p-4 bg-white rounded-2xl border border-[#EFEAE2] hover:border-[#9E7D68] transition-all duration-300 shadow-[0_4px_16px_rgba(158,125,104,0.02)] flex flex-col gap-3 group"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-sm font-black text-[#2C1E1A] leading-5 group-hover:text-[#8C6B56] transition-colors line-clamp-2">
+                          {art.title}
+                        </h4>
+                        <a
+                          href={art.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 p-1 rounded-lg hover:bg-[#FDFBF7] text-[#8C7E7A] hover:text-[#2C1E1A] transition-colors"
+                          title={t('rss_read_more')}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                      {art.description && (
+                        <p className="text-xs text-[#8C7E7A] font-semibold leading-5 line-clamp-3">
+                          {art.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-[#FDFBF7] pt-2.5">
+                      <span className="text-[10px] text-[#C2B5AA] font-bold">
+                        {art.pubDate ? new Date(art.pubDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectArticle(art)}
+                        disabled={isWaiting || isRevealingMessage}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-black text-white bg-[#9E7D68] hover:bg-[#8C6B56] rounded-xl transition-all shadow-sm disabled:opacity-50 active:scale-95"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        {t('rss_select_cta')}
+                      </button>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-5 relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-[#E8DCCB]/25 blur-[60px] pointer-events-none" />

@@ -257,7 +257,16 @@
     "error_upload": "Failed to upload reference images.",
     "error_max_images": "You can select up to 4 reference images.",
     "error_generate": "Generation failed.",
-    "error_network": "A server communication error occurred."
+    "error_network": "A server communication error occurred.",
+    "mode_brand": "Brand News",
+    "mode_general": "General News (Current Affairs/Info/Trends)",
+    "category_affairs": "Affairs",
+    "category_info": "Info",
+    "category_trends": "Trends",
+    "rss_loading": "Collecting latest articles...",
+    "rss_empty": "No recent articles found.",
+    "rss_select_cta": "Create with this article",
+    "rss_read_more": "Original Link"
   },
   "billing": {
     "eyebrow": "Billing",

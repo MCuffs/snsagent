@@ -49,6 +49,7 @@ export class BrandIdentityAgent {
     ctaStyle?: string
     brandDna?: string | null
     slides: AgentSlideData[]
+    isGeneralMode?: boolean
   }): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
     this.logs = []
     this.log('info', `브랜드 '${params.brandName}' 가이드라인 분석을 시작합니다.`, {
@@ -59,11 +60,13 @@ export class BrandIdentityAgent {
 
     const forbiddenWords = this.parseForbiddenWords(params.forbiddenWords)
     const dna = parseBrandDna(params.brandDna)
-    const brandSignals = [
-      ...dna.brandKeywords,
-      ...dna.coreProducts,
-      ...dna.differentiators,
-    ].map(k => k.toLowerCase()).filter(Boolean)
+    const brandSignals = params.isGeneralMode
+      ? []
+      : [
+          ...dna.brandKeywords,
+          ...dna.coreProducts,
+          ...dna.differentiators,
+        ].map(k => k.toLowerCase()).filter(Boolean)
 
     const processedSlides = params.slides.map((slide) => {
       let headline = this.normalizeCopy(slide.headline)
@@ -94,12 +97,12 @@ export class BrandIdentityAgent {
       }
 
       // 브랜드 톤앤매너 검증 로그
-      if (params.brandToneOfVoice) {
+      if (params.brandToneOfVoice && !params.isGeneralMode) {
         this.log('info', `슬라이드 ${slide.slideNumber}번: 브랜드 톤앤매너 '${params.brandToneOfVoice}' 적합성 검사 완료.`)
       }
 
       // CTA 스타일 적용 — only when body is missing
-      if (isLast && params.ctaStyle && !body) {
+      if (isLast && params.ctaStyle && !body && !params.isGeneralMode) {
         body = this.normalizeCopy(params.ctaStyle)
         this.log('success', `마지막 슬라이드에 브랜드 지정 CTA 스타일 적용 완료: "${body}"`)
       }
