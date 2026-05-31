@@ -30,8 +30,28 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
         .sort((a, b) => a.zIndex - b.zIndex)
 
   const handleDragEnd = (layer: EditorialLayer, x: number, y: number) => {
-    const snappedX = snap(x / SCALE, [72, 540, 1008 - layer.width], 12)
-    const snappedY = snap(y / SCALE, [72, 675, 1278 - layer.height], 12)
+    const otherLayers = document.layers.filter(l => l.id !== layer.id && l.visible && !['background', 'overlay'].includes(l.type))
+    const xGuides = [72, 540, 1080 - 72 - layer.width]
+    const yGuides = [72, 675, 1350 - 72 - layer.height]
+    for (const other of otherLayers) {
+      xGuides.push(
+        other.x,
+        other.x + other.width,
+        other.x - layer.width,
+        other.x + other.width - layer.width,
+        other.x + other.width / 2 - layer.width / 2
+      )
+      yGuides.push(
+        other.y,
+        other.y + other.height,
+        other.y - layer.height,
+        other.y + other.height - layer.height,
+        other.y + other.height / 2 - layer.height / 2
+      )
+    }
+
+    const snappedX = snap(x / SCALE, xGuides, 12)
+    const snappedY = snap(y / SCALE, yGuides, 12)
     updateLayer(slideId, layer.id, { x: snappedX, y: snappedY })
     setGuides({})
   }
@@ -85,12 +105,38 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
             dragMomentum={false}
             onPointerDown={() => selectLayer(layer.id)}
             onDrag={(_, info) => {
+              const otherLayers = document.layers.filter(l => l.id !== layer.id && l.visible && !['background', 'overlay'].includes(l.type))
               const nextX = (layer.x * SCALE + info.offset.x) / SCALE
               const nextY = (layer.y * SCALE + info.offset.y) / SCALE
-              setGuides({
-                x: nearGuide(nextX, [72, 540, 1008 - layer.width]),
-                y: nearGuide(nextY, [72, 675, 1278 - layer.height]),
-              })
+              
+              let gx: number | undefined
+              let gy: number | undefined
+              
+              // Safe zone boundaries
+              if (Math.abs(nextX - 72) <= 12) gx = 72
+              else if (Math.abs(nextX + layer.width - (1080 - 72)) <= 12) gx = 1080 - 72
+              else if (Math.abs(nextX + layer.width / 2 - 540) <= 12) gx = 540
+              
+              if (Math.abs(nextY - 72) <= 12) gy = 72
+              else if (Math.abs(nextY + layer.height - (1350 - 72)) <= 12) gy = 1350 - 72
+              else if (Math.abs(nextY + layer.height / 2 - 675) <= 12) gy = 675
+
+              // Element boundaries
+              for (const other of otherLayers) {
+                if (Math.abs(nextX - other.x) <= 12) gx = other.x
+                else if (Math.abs(nextX + layer.width - other.x) <= 12) gx = other.x
+                else if (Math.abs(nextX - (other.x + other.width)) <= 12) gx = other.x + other.width
+                else if (Math.abs(nextX + layer.width - (other.x + other.width)) <= 12) gx = other.x + other.width
+                else if (Math.abs(nextX + layer.width / 2 - (other.x + other.width / 2)) <= 12) gx = other.x + other.width / 2
+
+                if (Math.abs(nextY - other.y) <= 12) gy = other.y
+                else if (Math.abs(nextY + layer.height - other.y) <= 12) gy = other.y
+                else if (Math.abs(nextY - (other.y + other.height)) <= 12) gy = other.y + other.height
+                else if (Math.abs(nextY + layer.height - (other.y + other.height)) <= 12) gy = other.y + other.height
+                else if (Math.abs(nextY + layer.height / 2 - (other.y + other.height / 2)) <= 12) gy = other.y + other.height / 2
+              }
+
+              setGuides({ x: gx, y: gy })
             }}
             onDragEnd={(_, info) => handleDragEnd(layer, layer.x * SCALE + info.offset.x, layer.y * SCALE + info.offset.y)}
             className={`absolute cursor-move overflow-visible ${selectedLayerId === layer.id ? 'ring-1 ring-[#29c5ff]' : ''}`}
@@ -173,9 +219,6 @@ function snap(value: number, guides: number[], threshold: number) {
   return guides.find(guide => Math.abs(guide - value) <= threshold) ?? Math.max(0, value)
 }
 
-function nearGuide(value: number, guides: number[]) {
-  return guides.find(guide => Math.abs(guide - value) <= 12)
-}
 
 function hexToRgba(hex: string, alpha: number) {
   const number = Number.parseInt(hex.slice(1), 16)

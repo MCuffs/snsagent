@@ -21,6 +21,7 @@ export function isLikelyAiConfigurationError(error: unknown) {
 
 export function getDatabaseMode() {
   if (process.env.DATABASE_MOCK_FALLBACK === 'true') return 'mock'
+  if (process.env.NODE_ENV === 'production') return 'postgres'
   if (process.env.DATABASE_URL) return 'postgres'
   return 'mock'
 }

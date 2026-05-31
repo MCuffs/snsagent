@@ -251,8 +251,16 @@ function writeMockDb(db: MockDatabase) {
   fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), 'utf8')
 }
 
+// Enforce fail-closed database policy in production
+if (process.env.NODE_ENV === 'production' && process.env.DATABASE_MOCK_FALLBACK !== 'true') {
+  process.env.DATABASE_MOCK_FALLBACK = 'false'
+}
+
 // Check if we should use Prisma database or Local Mock file database
 const isMock = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.DATABASE_MOCK_FALLBACK === 'true'
+  }
   return process.env.DATABASE_MOCK_FALLBACK === 'true' || !process.env.DATABASE_URL
 }
 
