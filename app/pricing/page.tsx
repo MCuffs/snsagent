@@ -17,7 +17,7 @@ const plans = [
         period: '',
         desc: PRICING_PLANS.FREE.description,
         cta: '무료로 시작하기',
-        features: ['하루 1회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
+        features: ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
     },
     {
@@ -61,7 +61,7 @@ const plans = [
 const faqs = [
     {
         q: '무료 플랜에서는 무엇을 만들 수 있나요?',
-        a: 'Free 플랜은 결제 없이 하루에 카드뉴스 1세트를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.',
+        a: 'Free 플랜은 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.',
     },
     {
         q: '무료 결과물을 다시 생성하고 싶으면 어떻게 하나요?',
@@ -94,7 +94,7 @@ const faqs = [
 ]
 
 const compareFeatures = [
-    { feature: '카드뉴스 생성 수', free: '하루 1회', creator: '월 20회', studio: '월 30회' },
+    { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
     { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
     { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },

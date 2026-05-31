@@ -15,38 +15,49 @@ function isSuperUser(email?: string | null): boolean {
 /**
  * Checks if user is allowed to generate a new card news in the active plan window.
  */
-export async function checkCampaignCreationLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'day' | 'month' }> {
+export async function checkCampaignCreationLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'day' | 'month' | 'lifetime' }> {
   const user = await dbService.getUser(userId)
   const plan = normalizePlan(user?.plan || 'FREE')
   const campaigns = await dbService.getCampaigns(userId)
-  const periodStart = getCampaignUsagePeriodStart(plan)
-  const currentCampaigns = campaigns.filter(
-    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
-  )
 
   if (isSuperUser(user?.email)) {
     return {
       allowed: true,
-      current: currentCampaigns.length,
+      current: 0,
       limit: 999999,
       period: 'month',
     }
   }
 
+  if (plan === 'FREE') {
+    const current = campaigns.length
+    const limit = 2
+    return {
+      allowed: current < limit,
+      current,
+      limit,
+      period: 'lifetime',
+    }
+  }
+
+  const periodStart = getCampaignUsagePeriodStart(plan)
+  const currentCampaigns = campaigns.filter(
+    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
+  )
   const limit = PRICING_PLANS[plan].monthlyCardLimit
 
   return {
     allowed: currentCampaigns.length < limit,
     current: currentCampaigns.length,
     limit,
-    period: plan === 'FREE' ? 'day' : 'month',
+    period: 'month',
   }
 }
 
 /**
  * Brand count is fixed at 1 for all plans
  */
-export async function checkBrandCountLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+export async function checkBrandCountLimit(userId: string, isGeneral = false): Promise<{ allowed: boolean; current: number; limit: number }> {
   const user = await dbService.getUser(userId)
   const brands = await dbService.getBrands(userId)
 
@@ -58,9 +69,13 @@ export async function checkBrandCountLimit(userId: string): Promise<{ allowed: b
     }
   }
 
+  const matchingBrands = brands.filter(b => 
+    isGeneral ? b.websiteUrl === 'general_profile' : b.websiteUrl !== 'general_profile'
+  )
+
   return {
-    allowed: brands.length < 1,
-    current: brands.length,
+    allowed: matchingBrands.length < 1,
+    current: matchingBrands.length,
     limit: 1,
   }
 }

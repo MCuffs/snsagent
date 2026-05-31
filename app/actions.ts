@@ -211,11 +211,14 @@ export async function saveBrandAction(brandId: string | null, data: {
   const user = await getSessionUser()
   if (!user) return unauthenticated()
 
+  const isGeneral = data.websiteUrl === 'general_profile'
   // Limit check for new brand creation
   if (!brandId) {
-    const limitCheck = await checkBrandCountLimit(user.id)
+    const limitCheck = await checkBrandCountLimit(user.id, isGeneral)
     if (!limitCheck.allowed) {
-      return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
+      return failed(isGeneral 
+        ? '시사/정보/트렌드 프로필 생성 한도를 초과했습니다.' 
+        : `브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
     }
   }
 
@@ -224,17 +227,22 @@ export async function saveBrandAction(brandId: string | null, data: {
     if (effectiveBrandId) {
       const existingBrand = await dbService.getBrand(effectiveBrandId)
       if (!existingBrand || existingBrand.userId !== user.id) {
-        // Stale or foreign ID: update this user's existing brand if one exists.
-        const [fallbackBrand] = await dbService.getBrands(user.id)
+        // Stale or foreign ID: update this user's existing brand of corresponding type if one exists.
+        const brands = await dbService.getBrands(user.id)
+        const fallbackBrand = brands.find(b => 
+          isGeneral ? b.websiteUrl === 'general_profile' : b.websiteUrl !== 'general_profile'
+        )
         effectiveBrandId = fallbackBrand?.id || null
       }
     }
 
     // Run the creation limit check after stale ID normalization.
     if (!effectiveBrandId) {
-      const limitCheck = await checkBrandCountLimit(user.id)
+      const limitCheck = await checkBrandCountLimit(user.id, isGeneral)
       if (!limitCheck.allowed) {
-        return failed(`브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
+        return failed(isGeneral 
+          ? '시사/정보/트렌드 프로필 생성 한도를 초과했습니다.' 
+          : `브랜드 생성 한도를 초과했습니다. 현재 요금제(${user.plan})의 브랜드 한도는 최대 ${limitCheck.limit}개입니다.`)
       }
     }
 
@@ -261,7 +269,9 @@ export async function createCampaignAction(brandId: string, data: {
   if (!limitCheck.allowed) {
     return failed(normalizePlan(user.plan) === 'LITE'
       ? 'AI 재생성 1회권은 기존 결과물의 배경 재생성에 사용할 수 있습니다. 작업 히스토리에서 결과물을 열어 사용해주세요.'
-      : limitCheck.period === 'day'
+      : (limitCheck.period as string) === 'lifetime'
+      ? '무료 플랜은 최초 2회만 카드뉴스를 생성할 수 있습니다. 계속 생성하시려면 Creator 플랜을 선택해 주세요.'
+      : (limitCheck.period as string) === 'day'
       ? '무료 플랜은 하루에 카드뉴스 1개를 생성할 수 있습니다. 내일 다시 시도하거나 Creator 플랜을 선택해주세요.'
       : `월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
   }

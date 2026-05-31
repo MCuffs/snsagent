@@ -19,10 +19,10 @@ export interface PlanFeature {
 export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
     name: 'Free',
-    monthlyCardLimit: 1,
+    monthlyCardLimit: 2,
     historyRetentionDays: 30,
     hasWatermark: true,
-    description: '하루 한 번 카드뉴스를 생성하는 무료 플랜',
+    description: '최초 2회 카드뉴스를 생성하는 무료 플랜',
     price: '무료',
   },
   LITE: {

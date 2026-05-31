@@ -16,22 +16,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 const faqs = {
   ko: [
-    { q: '무료 플랜에서는 무엇을 만들 수 있나요?', a: 'Free 플랜은 결제 없이 하루에 카드뉴스 1세트를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.' },
+    { q: '무료 플랜에서는 무엇을 만들 수 있나요?', a: 'Free 플랜은 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.' },
     { q: '무료 결과물을 다시 생성하고 싶으면 어떻게 하나요?', a: '결과 화면에서 AI 재생성을 선택하면 3,000원 1회 이용권을 안내합니다.' },
     { q: 'AI가 만든 카드뉴스를 직접 수정할 수 있나요?', a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있습니다.' },
     { q: '브랜드가 여러 개인 경우에도 사용할 수 있나요?', a: '현재는 계정당 브랜드 1개를 지원합니다. 여러 브랜드 도입은 별도 문의로 확인해 주세요.' },
-    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 하루 1회 생성과 30일 보관을 이용합니다. Creator는 월 20회, Studio는 월 30회 생성이 가능하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.' },
-    { q: '로그인만 하면 바로 생성할 수 있나요?', a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 하루 한 번 카드뉴스를 생성할 수 있습니다.' },
+    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. Creator는 월 20회, Studio는 월 30회 생성이 가능하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.' },
+    { q: '로그인만 하면 바로 생성할 수 있나요?', a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다.' },
     { q: '플랜은 언제든지 변경할 수 있나요?', a: '현재 구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 이후 원하는 새 플랜을 선택할 수 있습니다.' },
     { q: '결제는 어디에서 진행되나요?', a: 'Google Login 후 브랜드를 설정하면 요금제 화면에서 결제를 진행할 수 있습니다.' },
   ],
   en: [
-    { q: 'What can I create with the free plan?', a: 'The Free plan lets you create one card news set per day without payment. You can edit and download results, but AI regeneration is not included.' },
+    { q: 'What can I create with the free plan?', a: 'The Free plan lets you create 2 card news in total without payment. You can edit and download results, but AI regeneration is not included.' },
     { q: 'What if I want to regenerate a free result?', a: 'Select AI Regeneration on the result screen to add a single ₩3,000 pass instead of a full subscription.' },
     { q: 'Can I edit the AI-generated card news?', a: 'Yes. You can edit the copy and layout directly after generation.' },
     { q: 'Can I use it with multiple brands?', a: 'Currently one brand per account is supported. Contact us for multi-brand inquiries.' },
-    { q: 'What are the differences between plans?', a: 'Free users get 1 generation per day and 30-day retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
-    { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create one card news per day without payment.' },
+    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
+    { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create 2 card news in total without payment.' },
     { q: 'Can I change plans at any time?', a: 'Canceling your current subscription reverts access immediately. You can then choose a new plan.' },
     { q: 'Where do I complete payment?', a: 'After Google Login and brand setup, the billing screen lets you select and pay for your plan.' },
   ],
@@ -39,7 +39,7 @@ const faqs = {
 
 const compareFeatures = {
   ko: [
-    { feature: '카드뉴스 생성 수', free: '하루 1회', creator: '월 20회', studio: '월 30회' },
+    { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
     { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
     { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
@@ -48,7 +48,7 @@ const compareFeatures = {
     { feature: '결과 편집 및 다운로드', free: '✓', creator: '✓', studio: '✓' },
   ],
   en: [
-    { feature: 'Card news generation', free: '1/day', creator: '20/month', studio: '30/month' },
+    { feature: 'Card news generation', free: '2 in total', creator: '20/month', studio: '30/month' },
     { feature: 'Work history retention', free: '30 days', creator: '90 days', studio: '365 days' },
     { feature: 'Brand URL analysis', free: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI copy & image generation', free: '✓', creator: '✓', studio: '✓' },
@@ -73,8 +73,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       desc: PRICING_PLANS.FREE.description,
       cta: t('free_cta'),
       features: isEn
-        ? ['1 card news per day', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'AI regeneration not included']
-        : ['하루 1회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
+        ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'AI regeneration not included']
+        : ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
       highlight: false,
     },
     {
