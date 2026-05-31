@@ -192,7 +192,7 @@ function PricingGrid({
     analytics.planSelectClick(planKey, currentPlan)
     analytics.paymentStart(planKey, 'nicepay')
 
-    const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 19000, UNLIMITED: 45000 }
+    const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 25000, UNLIMITED: 39000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin

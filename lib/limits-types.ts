@@ -39,7 +39,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     historyRetentionDays: 90,
     hasWatermark: false,
     description: '평일마다 콘텐츠를 제작하는 브랜드 운영 플랜',
-    price: '월 19,000원',
+    price: '월 25,000원',
   },
   UNLIMITED: {
     name: 'Studio',
@@ -47,7 +47,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     historyRetentionDays: 365,
     hasWatermark: false,
     description: '다수 캠페인을 운영하는 팀용 제작 플랜',
-    price: '월 45,000원',
+    price: '월 39,000원',
   },
 }
 

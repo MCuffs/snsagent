@@ -493,7 +493,7 @@ export default function CampaignResultView({
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b94718]">AI Regeneration Pass</p>
             <p className="mt-2 text-base font-black text-[#1f1512]">
-              19,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
+              25,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
             </p>
             <p className="mt-1 text-xs font-semibold text-[#746a62]">
               무료 플랜에는 AI 재생성이 포함되지 않습니다. 1회권으로 현재 결과물의 배경을 한 번 다시 만들 수 있습니다.

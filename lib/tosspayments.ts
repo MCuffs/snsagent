@@ -7,8 +7,8 @@ export type PaidPlan = Exclude<SubscriptionPlan, 'FREE'>
 
 const PLAN_AMOUNTS: Record<PaidPlan, number> = {
   LITE: 3000,
-  PRO: 19000,
-  UNLIMITED: 45000,
+  PRO: 25000,
+  UNLIMITED: 39000,
 }
 
 export function isPaidPlan(plan: string | null): plan is PaidPlan {
