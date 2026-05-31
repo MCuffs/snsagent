@@ -1,24 +1,31 @@
 'use client'
 
+import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
+import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
+import { useTranslations } from 'next-intl'
+
+interface BrandProfileData {
+  id: string
+  name: string
+  industry: string
+  targetAudience: string
+  toneOfVoice: string
+  mainColor: string
+  forbiddenWords: string
+  ctaStyle: string
+  brandDna?: string | null
+  websiteUrl?: string | null
+}
 
 interface DashboardContainerProps {
-  existingBrand: {
-    id: string
-    name: string
-    industry: string
-    targetAudience: string
-    toneOfVoice: string
-    mainColor: string
-    forbiddenWords: string
-    ctaStyle: string
-    brandDna?: string | null
-    websiteUrl?: string | null
-  } | null
+  existingBrand: BrandProfileData | null
+  existingGeneralProfile: BrandProfileData | null
   campaigns: Array<{
     id: string
     title: string
@@ -36,29 +43,95 @@ interface DashboardContainerProps {
 
 export default function DashboardContainer({
   existingBrand,
+  existingGeneralProfile,
   campaigns,
   planName,
   retentionDays,
   canUpgradeRetention,
 }: DashboardContainerProps) {
   const { activeTab: tab } = useTab()
+  const t = useTranslations('concept')
+  const searchParams = useSearchParams()
+  const urlBrandId = searchParams?.get('brandId') || null
 
-  const hasCompleteBrand = existingBrand && Boolean(existingBrand.websiteUrl)
-  const activeTab = (!hasCompleteBrand && tab !== 'concept') ? 'concept' : tab
+  const [subTab, setSubTab] = useState<'brand' | 'general'>(() => {
+    if (!existingBrand && existingGeneralProfile) return 'general'
+    return 'brand'
+  })
+
+  const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || existingGeneralProfile
+  const activeTab = (!hasProfile && tab !== 'concept') ? 'concept' : tab
+
+  let brandToPass = existingBrand
+  if (urlBrandId) {
+    if (existingGeneralProfile && urlBrandId === existingGeneralProfile.id) {
+      brandToPass = existingGeneralProfile
+    } else if (existingBrand && urlBrandId === existingBrand.id) {
+      brandToPass = existingBrand
+    }
+  } else {
+    brandToPass = existingBrand || existingGeneralProfile
+  }
 
   return (
     <div className="h-full">
       {activeTab === 'concept' && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
-          <ConceptForm existingBrand={existingBrand} />
-        </motion.div>
+        <div className="flex h-full flex-col">
+          {/* Sub-tab Switcher */}
+          <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSubTab('brand')}
+                className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  subTab === 'brand'
+                    ? 'bg-[#111111] text-white shadow-sm'
+                    : 'text-[#71717a] hover:bg-[#fafafa] hover:text-[#111111]'
+                }`}
+              >
+                {t('tab_brand')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubTab('general')}
+                className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  subTab === 'general'
+                    ? 'bg-[#111111] text-white shadow-sm'
+                    : 'text-[#71717a] hover:bg-[#fafafa] hover:text-[#111111]'
+                }`}
+              >
+                {t('tab_general')}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            {subTab === 'brand' ? (
+              <motion.div
+                key="brand-profile"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="h-full"
+              >
+                <ConceptForm existingBrand={existingBrand} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="general-profile"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="h-full"
+              >
+                <GeneralProfileForm existingProfile={existingGeneralProfile} />
+              </motion.div>
+            )}
+          </div>
+        </div>
       )}
-      {activeTab === 'generate' && existingBrand && (
+
+      {activeTab === 'generate' && brandToPass && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -67,19 +140,21 @@ export default function DashboardContainer({
         >
           <GenerateForm
             brand={{
-              id: existingBrand.id,
-              name: existingBrand.name,
-              industry: existingBrand.industry,
-              targetAudience: existingBrand.targetAudience,
-              toneOfVoice: existingBrand.toneOfVoice,
-              mainColor: existingBrand.mainColor,
-              forbiddenWords: existingBrand.forbiddenWords,
-              ctaStyle: existingBrand.ctaStyle,
-              brandDna: existingBrand.brandDna || null,
+              id: brandToPass.id,
+              name: brandToPass.name,
+              industry: brandToPass.industry,
+              targetAudience: brandToPass.targetAudience,
+              toneOfVoice: brandToPass.toneOfVoice,
+              mainColor: brandToPass.mainColor,
+              forbiddenWords: brandToPass.forbiddenWords,
+              ctaStyle: brandToPass.ctaStyle,
+              brandDna: brandToPass.brandDna || null,
+              websiteUrl: brandToPass.websiteUrl || null,
             }}
           />
         </motion.div>
       )}
+
       {activeTab === 'works' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}

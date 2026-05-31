@@ -37,20 +37,36 @@ async function DashboardDataLoader() {
     dbService.getCampaignSummaries(user.id),
   ])
 
-  const existingBrand = brands[0] || null
+  const brandProfile = brands.find((b) => b.websiteUrl !== 'general_profile') || null
+  const generalProfile = brands.find((b) => b.websiteUrl === 'general_profile') || null
 
-  const serializedBrand = existingBrand
+  const serializedBrand = brandProfile
     ? {
-        id: existingBrand.id,
-        name: existingBrand.name,
-        industry: existingBrand.industry,
-        targetAudience: existingBrand.targetAudience,
-        toneOfVoice: existingBrand.toneOfVoice,
-        mainColor: existingBrand.mainColor,
-        forbiddenWords: existingBrand.forbiddenWords,
-        ctaStyle: existingBrand.ctaStyle,
-        brandDna: existingBrand.brandDna,
-        websiteUrl: existingBrand.websiteUrl,
+        id: brandProfile.id,
+        name: brandProfile.name,
+        industry: brandProfile.industry,
+        targetAudience: brandProfile.targetAudience,
+        toneOfVoice: brandProfile.toneOfVoice,
+        mainColor: brandProfile.mainColor,
+        forbiddenWords: brandProfile.forbiddenWords,
+        ctaStyle: brandProfile.ctaStyle,
+        brandDna: brandProfile.brandDna,
+        websiteUrl: brandProfile.websiteUrl,
+      }
+    : null
+
+  const serializedGeneralProfile = generalProfile
+    ? {
+        id: generalProfile.id,
+        name: generalProfile.name,
+        industry: generalProfile.industry,
+        targetAudience: generalProfile.targetAudience,
+        toneOfVoice: generalProfile.toneOfVoice,
+        mainColor: generalProfile.mainColor,
+        forbiddenWords: generalProfile.forbiddenWords,
+        ctaStyle: generalProfile.ctaStyle,
+        brandDna: generalProfile.brandDna,
+        websiteUrl: generalProfile.websiteUrl,
       }
     : null
 
@@ -71,6 +87,7 @@ async function DashboardDataLoader() {
   return (
     <DashboardContainer
       existingBrand={serializedBrand}
+      existingGeneralProfile={serializedGeneralProfile}
       campaigns={serializedCampaigns}
       planName={PRICING_PLANS[plan].name}
       retentionDays={PRICING_PLANS[plan].historyRetentionDays}
