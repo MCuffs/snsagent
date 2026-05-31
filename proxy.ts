@@ -4,7 +4,7 @@ import { routing } from './i18n/routing'
 
 const intlMiddleware = createMiddleware(routing)
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Pass through API routes, static files, and Next.js internals
