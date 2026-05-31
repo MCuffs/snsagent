@@ -5,8 +5,7 @@ import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params
+export async function generateMetadata() {
   const t = await getTranslations('pricing')
   return {
     title: t('meta_title'),
