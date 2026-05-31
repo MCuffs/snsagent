@@ -14,9 +14,6 @@ import {
   Compass,
   Layers,
   Sparkle,
-  ExternalLink,
-  Newspaper,
-  AlertCircle
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -177,12 +174,6 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
 
   const generationMode = brand.websiteUrl === 'general_profile' ? 'general' : 'brand'
-  const rssCategory = (brand.websiteUrl === 'general_profile' && brand.industry)
-    ? (brand.industry as 'current-affairs' | 'information' | 'trends')
-    : brand.industry || 'current-affairs'
-  const [selectedArticle, setSelectedArticle] = useState<{ title: string; description: string; link: string; pubDate: string; isFallback?: boolean } | null>(null)
-  const [rssArticles, setRssArticles] = useState<Array<{ title: string; description: string; link: string; pubDate: string }>>([])
-  const [rssStatus, setRssStatus] = useState<'idle' | 'fetching' | 'matched' | 'no_match_fallback' | 'error'>('idle')
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -318,129 +309,33 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     return () => { active = false }
   }, [generationMode, appendAiMessage, brand.id, language, locale])
 
-  // Brand mode: silently pre-fetch RSS news to show in the director panel
-  useEffect(() => {
-    if (generationMode !== 'brand') return
-    let active = true
-    const loadRss = async () => {
-      setRssStatus('fetching')
-      try {
-        const keywords = (brand.forbiddenWords || '')
-          .split(',')
-          .map(k => k.trim())
-          .filter(k => k.length > 0)
-        const kwParam = keywords.length > 0 ? `&keywords=${encodeURIComponent(keywords.join(','))}` : ''
-        const res = await fetch(`/api/rss?category=${encodeURIComponent(rssCategory)}&limit=3${kwParam}`)
-        if (!res.ok || !active) return
-        const data = await res.json() as { articles?: Array<{ title: string; description: string; link: string; pubDate: string }>; matched?: boolean }
-        const articles = data.articles || []
-        if (!active) return
-        setRssArticles(articles)
-        if (articles.length > 0) {
-          setSelectedArticle({ ...articles[0], isFallback: !data.matched })
-          setRssStatus(data.matched ? 'matched' : 'no_match_fallback')
-        } else {
-          setRssStatus('error')
-        }
-      } catch {
-        if (active) setRssStatus('error')
-      }
-    }
-    void loadRss()
-    return () => { active = false }
-  }, [generationMode, rssCategory, brand.forbiddenWords])
-
-  // Automated RSS Feed Matching & Briefing (General Mode only)
+  // Automated General Mode Briefing: greet and let the user enter a topic.
+  // RSS is fetched server-side when the agent processes the user's message.
+  // General Mode: show greeting and wait for user to enter a topic.
+  // The agent route handles RSS fetching server-side when processing messages.
   useEffect(() => {
     if (generationMode !== 'general') return
 
     let active = true
-    const searchAndBrief = async () => {
-      setRssStatus('fetching')
+    const greet = async () => {
       setIsWaiting(true)
 
       const greeting = locale === 'en'
-        ? `Hello! Let's draft your card news. I am scanning the latest feeds for keywords: "${brand.forbiddenWords || 'all'}"...`
-        : `안녕하세요! 카드뉴스 기획을 시작합니다. 설정하신 관심 키워드("${brand.forbiddenWords || '전체'}")에 맞춰 최신 뉴스를 탐색하고 있습니다...`
-      
+        ? `Hello! Let's create your card news.\n\nPlease enter the topic or keyword you want to cover (e.g. "walnut health benefits", "AI trends this week"). I'll plan the best card news structure for you.`
+        : `안녕하세요! 카드뉴스 기획을 시작합니다.\n\n오늘 다루고 싶은 주제나 키워드를 입력해 주세요. (예: "호두 건강 효과", "이번 주 AI 트렌드") 최신 뉴스와 결합해서 가장 효과적인 카드뉴스 구성을 바로 제안해 드리겠습니다.`
+
+      if (!active) return
       appendAiMessage(greeting)
-      const currentHistory: ChatMessage[] = [{ role: 'assistant', content: greeting }]
-      setChatHistory(currentHistory)
-
-      try {
-        const res = await fetch(`/api/rss?category=${rssCategory}`)
-        if (!res.ok) throw new Error('RSS fetch failed')
-        const data = await res.json() as { articles?: Array<{ title: string; description: string; link: string; pubDate: string }> }
-        
-        if (!active) return
-        const articles = data.articles || []
-        
-        if (articles.length === 0) {
-          setRssStatus('error')
-          appendAiMessage(locale === 'en' 
-            ? 'No latest news articles could be fetched at this moment. Please try entering a topic manually in the chat.' 
-            : '현재 최신 뉴스를 수집해오지 못했습니다. 채팅창에 원하시는 주제를 직접 입력해 주시면 기획을 도와드리겠습니다.')
-          setIsWaiting(false)
-          return
-        }
-
-        const keywords = (brand.forbiddenWords || '')
-          .split(',')
-          .map(k => k.trim())
-          .filter(k => k.length > 0)
-
-        let bestArticle = articles[0]
-        let maxScore = 0
-        let isFallback = true
-
-        if (keywords.length > 0) {
-          articles.forEach(art => {
-            let score = 0
-            const searchField = `${art.title} ${art.description}`.toLowerCase()
-            keywords.forEach(keyword => {
-              const kw = keyword.toLowerCase()
-              const occurrences = searchField.split(kw).length - 1
-              score += occurrences
-            })
-            if (score > maxScore) {
-              maxScore = score
-              bestArticle = art
-              isFallback = false
-            }
-          })
-        }
-
-        setSelectedArticle({ ...bestArticle, isFallback })
-        setRssStatus(isFallback ? 'no_match_fallback' : 'matched')
-
-        const userPrompt = locale === 'en'
-          ? `[Auto-collected News] ${bestArticle.title}\nDescription: ${bestArticle.description}\nLink: ${bestArticle.link}\n\nBased on this article, please plan the current affairs/info card news.`
-          : `[자동 수집된 뉴스] ${bestArticle.title}\n기사 설명: ${bestArticle.description}\n기사 주소: ${bestArticle.link}\n\n이 기사 내용을 바탕으로 시사/정보 카드뉴스를 기획해줘.`
-
-        setDisplayMessages(prev => [...prev, userDisplay(bestArticle.title)])
-        const nextHistory: ChatMessage[] = [...currentHistory, { role: 'user', content: userPrompt }]
-        setChatHistory(nextHistory)
-
-        await callAgent(nextHistory)
-      } catch (err) {
-        if (!active) return
-        setRssStatus('error')
-        appendAiMessage(locale === 'en'
-          ? 'Failed to fetch RSS feeds. Please write your card news topic directly in the chat.'
-          : 'RSS 뉴스를 가져오는 데 실패했습니다. 원하시는 카드뉴스 주제를 채팅창에 직접 작성해 주시면 생성을 진행하겠습니다.')
-        setIsWaiting(false)
-      }
+      setChatHistory([{ role: 'assistant', content: greeting }])
+      setIsWaiting(false)
     }
 
-    const timer = setTimeout(() => {
-      void searchAndBrief()
-    }, 150)
-
+    const timer = setTimeout(() => { void greet() }, 150)
     return () => {
       active = false
       clearTimeout(timer)
     }
-  }, [generationMode, rssCategory, brand.forbiddenWords, locale, appendAiMessage, callAgent])
+  }, [generationMode, locale, appendAiMessage])
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -917,156 +812,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               </motion.div>
             )}
           </motion.div>
-        ) : generationMode === 'general' ? (
-          <div className="flex-1 flex flex-col min-h-0 bg-[#F5F1E9]/50 p-5 space-y-6">
-            <div className="rounded-2xl border border-[#EFEAE2] bg-white p-5 space-y-4 shadow-[0_4px_20px_rgba(158,125,104,0.03)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5 border-b border-[#F5EFE6] pb-3">
-                <Newspaper className="h-4 w-4 text-[#B88E76]" />
-                {locale === 'en' ? 'Auto-Collected News' : '자동 수집된 시사 기사'}
-              </h4>
-
-              {rssStatus === 'fetching' && (
-                <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                  <Compass className="h-8 w-8 text-[#9E7D68] animate-spin" />
-                  <p className="text-xs font-bold text-[#8C7E7A]">
-                    {locale === 'en' ? 'Searching for matching news...' : '키워드 매칭 뉴스 탐색 중...'}
-                  </p>
-                </div>
-              )}
-
-              {(rssStatus === 'matched' || rssStatus === 'no_match_fallback') && selectedArticle && (
-                <div className="space-y-4">
-                  {rssStatus === 'no_match_fallback' && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold text-amber-800 leading-relaxed">
-                      ⚠️ {locale === 'en'
-                        ? 'No direct match found for your keywords. Loaded the latest news from the category instead.'
-                        : '관심 키워드와 직접 매치되는 최신 뉴스가 없어, 해당 분야의 가장 최신 뉴스를 가져왔습니다.'}
-                    </div>
-                  )}
-                  {rssStatus === 'matched' && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] font-semibold text-emerald-800 leading-relaxed">
-                      ✨ {locale === 'en'
-                        ? 'Automatically matched a news article matching your profile keywords!'
-                        : '설정하신 관심 키워드와 가장 매칭률이 높은 최신 뉴스를 감지했습니다.'}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <h5 className="text-sm font-black text-[#2C1E1A] leading-relaxed font-black">
-                      {selectedArticle.title}
-                    </h5>
-                    {selectedArticle.description && (
-                      <p className="text-xs text-[#8C7E7A] font-semibold leading-relaxed">
-                        {selectedArticle.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between items-center border-t border-[#F5EFE6] pt-3 text-[10px] text-[#C2B5AA] font-bold">
-                    <span>
-                      {selectedArticle.pubDate ? new Date(selectedArticle.pubDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ko-KR', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : ''}
-                    </span>
-                    <a
-                      href={selectedArticle.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[#9E7D68] hover:text-[#2C1E1A] transition-colors"
-                    >
-                      {locale === 'en' ? 'Read Source' : '기사 원문 보기'}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {rssStatus === 'error' && (
-                <div className="py-6 text-center space-y-2 text-[#8C7E7A]">
-                  <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
-                  <p className="text-xs font-bold">
-                    {locale === 'en' ? 'Failed to auto-collect news.' : '기사 자동 수집에 실패했습니다.'}
-                  </p>
-                  <p className="text-[10px] text-[#C2B5AA] font-semibold">
-                    {locale === 'en' ? 'Please enter your topic in the chat.' : '채팅창에서 카드뉴스 주제를 직접 입력해주세요.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-[#F5F1E9]/50 p-5 space-y-5 custom-scrollbar">
-            {/* Real-time news context for brand mode */}
-            <div className="rounded-2xl border border-[#EFEAE2] bg-white p-5 space-y-4 shadow-[0_4px_20px_rgba(158,125,104,0.03)]">
-              <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5 border-b border-[#F5EFE6] pb-3">
-                <Newspaper className="h-4 w-4 text-[#B88E76]" />
-                {locale === 'en' ? 'Trending News Context' : '실시간 트렌드 뉴스'}
-              </h4>
-              <p className="text-[11px] text-[#8C7E7A] font-semibold leading-relaxed">
-                {locale === 'en'
-                  ? 'These real news articles will be injected into card generation to ground your hooks in actual trending topics.'
-                  : '카드뉴스 생성 시 아래 최신 뉴스가 자동으로 반영되어 실제 트렌드 기반 훅과 카피를 만들어드립니다.'}
-              </p>
-
-              {rssStatus === 'fetching' && (
-                <div className="py-6 flex flex-col items-center justify-center space-y-2">
-                  <Compass className="h-6 w-6 text-[#9E7D68] animate-spin" />
-                  <p className="text-[11px] font-bold text-[#8C7E7A]">
-                    {locale === 'en' ? 'Fetching latest news...' : '최신 뉴스 수집 중...'}
-                  </p>
-                </div>
-              )}
-
-              {(rssStatus === 'matched' || rssStatus === 'no_match_fallback') && rssArticles.length > 0 && (
-                <div className="space-y-3">
-                  {rssStatus === 'matched' && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-[11px] font-semibold text-emerald-800 leading-relaxed">
-                      ✨ {locale === 'en' ? 'Keyword-matched news found!' : '브랜드 키워드 매칭 뉴스 발견!'}
-                    </div>
-                  )}
-                  {rssArticles.slice(0, 3).map((article, i) => (
-                    <div key={i} className="rounded-xl border border-[#EBE2D9] bg-[#FDFBF7] p-3 space-y-1">
-                      <p className="text-xs font-black text-[#2C1E1A] leading-snug">{article.title}</p>
-                      {article.description && (
-                        <p className="text-[11px] text-[#8C7E7A] font-medium leading-relaxed line-clamp-2">
-                          {article.description}
-                        </p>
-                      )}
-                      <a
-                        href={article.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#9E7D68] hover:text-[#2C1E1A] transition-colors"
-                      >
-                        {locale === 'en' ? 'Read source' : '원문 보기'}
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {rssStatus === 'error' && (
-                <div className="py-4 text-center text-[11px] text-[#C2B5AA] font-semibold">
-                  {locale === 'en' ? 'Could not load news. Generation will proceed.' : '뉴스 수집 실패. 생성은 정상 진행됩니다.'}
-                </div>
-              )}
-            </div>
-
-            {/* Compass waiting hint */}
-            <div className="flex flex-col items-center justify-center py-4 text-center space-y-2">
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white border border-[#E6DFD5] shadow-sm"
-              >
-                <Compass className="h-5 w-5 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
-              </motion.div>
-              <p className="text-xs font-black text-[#2C1E1A]">{t('director_waiting')}</p>
-              <p className="text-[11px] leading-5 text-[#8C7E7A] font-semibold max-w-[220px] mx-auto">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-5 relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-[#E8DCCB]/25 blur-[60px] pointer-events-none" />
+            <motion.div
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#E6DFD5] shadow-[0_8px_24px_rgba(158,125,104,0.06)]"
+            >
+              <Compass className="h-6 w-6 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
+            </motion.div>
+            <div className="relative z-10 space-y-2">
+              <p className="text-sm font-black text-[#2C1E1A]">{t('director_waiting')}</p>
+              <p className="text-xs leading-5 text-[#8C7E7A] font-semibold max-w-[240px] mx-auto">
                 {t('director_waiting_desc')}
               </p>
             </div>
