@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI, type Part } from '@google/generative-ai'
 import { type ImageProvider, sanitizeImagePrompt } from '../imageProvider'
-import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
 // Nano Banana 2 = Gemini 3.1 Flash Image
@@ -78,8 +77,8 @@ export class GeminiImageProvider implements ImageProvider {
 
       throw new Error('Gemini returned no image data')
     } catch (err) {
-      console.error('[GeminiImageProvider] Generation failed, falling back to mock', err)
-      return new MockImageProvider().generateImage(prompt)
+      console.error('[GeminiImageProvider] Generation failed', err)
+      throw err
     }
   }
 }

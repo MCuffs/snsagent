@@ -226,7 +226,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
-  let hasFallbackImage = false
 
   // 5. Render slides and evaluate quality metrics
   const slideResults = await Promise.all(
@@ -264,7 +263,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
 
       let backgroundImageUrl = ''
-      let slideFallback = false
       try {
         const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection), {
           size: '1024x1536',
@@ -273,9 +271,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         backgroundImageUrl = background.imageUrl
       } catch (err) {
         console.error('[MediaCarouselPipeline] Background image generation failed', err)
-        slideFallback = true
-        const fallbackImage = await new (await import('../ai/providers/mockImageProvider')).MockImageProvider().generateImage(`fallback ${sanitizedVisualPrompt}`)
-        backgroundImageUrl = fallbackImage.imageUrl
+        throw new Error(`Background image generation failed for slide ${slide.slideNumber}. Please try again.`)
       }
 
       analyzeReferencePattern({
@@ -318,13 +314,12 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
       console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
 
-      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback }
+      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck }
     })
   )
 
   for (const result of slideResults) {
-    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, slideFallback } = result
-    if (slideFallback) hasFallbackImage = true
+    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck } = result
 
     // Feed slide diagnostics to Quality Agent
     slide.diagnostics = slideQualityCheck.issues
@@ -346,7 +341,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   // 6. Execute QualityGuardAgent
   const qualityRes = qualityAgent.run({
     slides: agentSlides,
-    hasFallbackImage,
+    hasFallbackImage: false,
   })
   agentReportLogs.push(...qualityRes.logs)
 

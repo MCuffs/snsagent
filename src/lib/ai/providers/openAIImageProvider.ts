@@ -1,7 +1,6 @@
 import { OpenAI } from 'openai'
 import { isConfiguredOpenAIKey } from '../../../../lib/env'
 import { type ImageProvider, sanitizeImagePrompt } from '../imageProvider'
-import { MockImageProvider } from './mockImageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
 
 const NO_TEXT_IMAGE_INSTRUCTIONS = [
@@ -89,14 +88,13 @@ export class OpenAIImageProvider implements ImageProvider {
           const persistedUrl = await persistImageUrl(fallbackResponse.data?.[0]?.url)
           return { imageUrl: persistedUrl }
         } catch (fallbackErr: unknown) {
-          console.warn('dall-e-2 also failed, falling back to mock image provider', fallbackErr)
-          return new MockImageProvider().generateImage(prompt)
+          console.warn('dall-e-2 image generation also failed', fallbackErr)
+          throw fallbackErr
         }
       }
 
-      // Fallback 2: Any DALL-E / gpt-image error -> Mock SVG Image
-      console.warn(`Image generation failed for model ${this.model}, falling back to mock image provider`, err)
-      return new MockImageProvider().generateImage(prompt)
+      console.warn(`Image generation failed for model ${this.model}`, err)
+      throw err
     }
   }
 

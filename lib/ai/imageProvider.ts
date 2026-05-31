@@ -150,9 +150,8 @@ export class OpenAIImageProvider implements ImageProvider {
       }
       return { imageUrl: image?.url || '' }
     } catch (err) {
-      console.error('OpenAI image generation failed, falling back to mock image', err)
-      const mock = new MockImageProvider()
-      return mock.generateImage(prompt)
+      console.error('OpenAI image generation failed', err)
+      throw err
     }
   }
 }
@@ -169,11 +168,8 @@ export class ByteDanceImageProvider implements ImageProvider {
     // Example endpoint: POST https://open.volcengineapi.com/api/v1/image/generate
     // Headers: Authorization: Bearer <API_KEY>
     // Body: { "model": "doubao-image-v2", "prompt": prompt, "width": 1024, "height": 1024 }
-    console.log('ByteDanceImageProvider placeholder called with prompt:', prompt)
-    
-    // For now, fall back to Mock provider to ensure execution doesn't fail
-    const mock = new MockImageProvider()
-    return mock.generateImage(prompt)
+    void prompt
+    throw new Error('ByteDance image generation is not implemented.')
   }
 }
 
@@ -182,16 +178,20 @@ export class ByteDanceImageProvider implements ImageProvider {
  */
 export function getImageProvider(): ImageProvider {
   const apiKey = process.env.OPENAI_API_KEY
+  const provider = (process.env.IMAGE_PROVIDER || '').toLowerCase()
+
+  if (provider === 'mock') {
+    return new MockImageProvider()
+  }
   
   if (!isConfiguredOpenAIKey(apiKey)) {
-    console.log('Using MockImageProvider (OpenAI Key not set)')
-    return new MockImageProvider()
+    throw new Error('OpenAI image generation is not configured. Set OPENAI_API_KEY, or set IMAGE_PROVIDER=mock for local development.')
   }
 
   try {
     return new OpenAIImageProvider()
   } catch (err) {
-    console.error('Failed to initialize OpenAIImageProvider, using Mock', err)
-    return new MockImageProvider()
+    console.error('Failed to initialize OpenAIImageProvider', err)
+    throw err
   }
 }

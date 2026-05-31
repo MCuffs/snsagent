@@ -1,5 +1,4 @@
 import { dbService } from '../../../lib/db-service'
-import { MockImageProvider } from '../ai/providers/mockImageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { sanitizeImagePrompt } from '../ai/imageProvider'
 import { generateCaption } from './captionEngine'
@@ -31,7 +30,6 @@ export async function generateCarouselCampaign(params: {
   campaignInput: CampaignInput
 }): Promise<CarouselPipelineResult> {
   const logs: string[] = []
-  let imageFallbackUsed = false
   let qualityCheck: QualityCheckResult = { passed: false, issues: [], suggestions: [] }
 
   const log = (message: string) => {
@@ -114,11 +112,8 @@ export async function generateCarouselCampaign(params: {
             })
             backgroundImageUrl = image.imageUrl
           } catch (error) {
-            imageFallbackUsed = true
-            log(`Image generation failed for slide ${copy.slideNumber}; using mock placeholder`)
-            const fallbackImage = await new MockImageProvider().generateImage(`fallback ${sanitizedPrompt}`)
-            backgroundImageUrl = fallbackImage.imageUrl
             console.error('[CarouselPipeline] Image generation error', error)
+            throw new Error(`Image generation failed for slide ${copy.slideNumber}. Please try again.`)
           }
 
           design.backgroundPrompt = sanitizedPrompt
@@ -177,15 +172,6 @@ export async function generateCarouselCampaign(params: {
       })
     )
 
-    if (imageFallbackUsed) {
-      qualityCheck = {
-        ...qualityCheck,
-        passed: false,
-        issues: [...qualityCheck.issues, '이미지 생성 실패로 placeholder가 사용되었습니다.'],
-        suggestions: [...qualityCheck.suggestions, '배경 이미지를 운영자가 확인하세요.'],
-      }
-    }
-
     // Copy-only regeneration for fixable copy issues (no image regeneration cost)
     const copySlidesWithIssues = extractCopyIssueSlides(qualityCheck.issues)
     if (copySlidesWithIssues.size > 0) {
@@ -235,7 +221,7 @@ export async function generateCarouselCampaign(params: {
     // Execute QualityGuardAgent
     const qualityRes = qualityAgent.run({
       slides: agentSlides,
-      hasFallbackImage: imageFallbackUsed,
+      hasFallbackImage: false,
       copyQualityReport,
     })
     agentReportLogs.push(...qualityRes.logs)

@@ -8,6 +8,10 @@ import { ACTIVE_OPENAI_IMAGE_MODEL, OpenAIImageProvider } from './openAIImagePro
 export function getPipelineImageProvider(): ImageProvider {
   const provider = (process.env.IMAGE_PROVIDER || 'auto').toLowerCase()
 
+  if (provider === 'mock') {
+    return new MockImageProvider()
+  }
+
   if (provider === 'gemini' && process.env.GEMINI_API_KEY) {
     return new GeminiImageProvider()
   }
@@ -25,11 +29,13 @@ export function getPipelineImageProvider(): ImageProvider {
     return new GeminiImageProvider()
   }
 
-  return new MockImageProvider()
+  throw new Error('Image generation is not configured. Set OPENAI_API_KEY or GEMINI_API_KEY, or set IMAGE_PROVIDER=mock for local development.')
 }
 
 export function getPipelineImageModel() {
   const provider = (process.env.IMAGE_PROVIDER || 'auto').toLowerCase()
+
+  if (provider === 'mock') return 'mock'
 
   if (provider === 'gemini' && process.env.GEMINI_API_KEY) {
     return GEMINI_IMAGE_MODEL
@@ -45,5 +51,5 @@ export function getPipelineImageModel() {
     return 'gemini-3.1-flash-image'
   }
 
-  return 'mock'
+  return 'unconfigured'
 }
