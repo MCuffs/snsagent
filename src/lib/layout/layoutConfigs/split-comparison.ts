@@ -9,7 +9,7 @@ export const splitComparisonConfig: LayoutConfig = {
   safeArea: { top: 80, bottom: 140, left: 60, right: 60 },
   preferredColorPalette: ['white', 'black', 'blue', 'orange'],
   recommendedHeadlineLength: 22,
-  recommendedBodyLength: 58,
+  recommendedBodyLength: 70,
   visualMood: 'structured, objective, clean, comparative',
   visualDensity: 'medium',
   spacingRules: {

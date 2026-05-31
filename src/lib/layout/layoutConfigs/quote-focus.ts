@@ -9,7 +9,7 @@ export const quoteFocusConfig: LayoutConfig = {
   safeArea: { top: 120, bottom: 160, left: 80, right: 80 },
   preferredColorPalette: ['black', 'white', 'yellow'],
   recommendedHeadlineLength: 28,
-  recommendedBodyLength: 40,
+  recommendedBodyLength: 70,
   visualMood: 'reflective, emotional, focused, premium quality card text area',
   visualDensity: 'low',
   spacingRules: {

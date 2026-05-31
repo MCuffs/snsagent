@@ -8,8 +8,8 @@ export const cinematicHeadlineConfig: LayoutConfig = {
   imageStyle: 'cinematic dramatic composition, realistic strong lighting, epic cinematic portrait backdrop with clear void for text',
   safeArea: { top: 90, bottom: 160, left: 64, right: 64 },
   preferredColorPalette: ['black', 'white', 'orange'],
-  recommendedHeadlineLength: 18,
-  recommendedBodyLength: 42,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'dramatic, epic, story-driven, premium',
   visualDensity: 'medium',
   spacingRules: {

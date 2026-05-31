@@ -406,8 +406,8 @@ function buildSlidePlan(params: {
     emotionalGoal,
     expectedAction: actionByRole[role],
     copyConstraints: {
-      maxHeadlineChars: role === 'hook' ? 18 : 20,
-      maxBodyChars: role === 'hook' ? 42 : 58,
+      maxHeadlineChars: role === 'hook' ? 22 : 25,
+      maxBodyChars: role === 'hook' ? 80 : 120,
       style: role === 'save-cta' ? 'soft and actionable' : role === 'hook' ? 'specific and curiosity-led' : 'specific editorial prose',
       avoid: ['generic slogans', 'unsupported claims', 'repeated emotional beat'],
     },

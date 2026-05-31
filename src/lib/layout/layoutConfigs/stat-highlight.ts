@@ -8,8 +8,8 @@ export const statHighlightConfig: LayoutConfig = {
   imageStyle: 'abstract data visualization, clean futuristic geometric pattern with huge negative space',
   safeArea: { top: 90, bottom: 150, left: 70, right: 70 },
   preferredColorPalette: ['white', 'black', 'cyan'],
-  recommendedHeadlineLength: 16,
-  recommendedBodyLength: 48,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'data-driven, precise, clear, authoritative',
   visualDensity: 'low',
   spacingRules: {

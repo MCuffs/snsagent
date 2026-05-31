@@ -32,18 +32,23 @@ export async function generateHooks(
     ? `\n${buildHookPromptSection(knowledgeCtx)}\n`
     : ''
 
-  const prompt = `한국 인스타그램 카드뉴스 첫 슬라이드에 사용할 훅 문구를 5개 생성해주세요.
+  const hasRssContext = input.productDescription.includes('[실시간 뉴스 컨텍스트') || input.productDescription.includes('[Real-Time News Context')
+  const rssSection = hasRssContext
+    ? `\n[실시간 뉴스 컨텍스트 활용 지시]\n위 상품 설명에 포함된 최신 뉴스 기사들의 키워드·이슈·트렌드를 훅에 반드시 반영하세요.\n실제 사람들이 지금 관심 갖는 이슈로 훅을 만들어야 스크롤을 멈춥니다.\n\n`
+    : ''
 
+  const prompt = `한국 인스타그램 카드뉴스 첫 슬라이드에 사용할 훅 문구를 5개 생성해주세요.
+${rssSection}
 브랜드: ${brand.name} (${brand.industry})
 타겟 고객: ${brand.targetAudience}
 상품명: ${input.productName}
-상품 설명: ${input.productDescription}
+상품 설명: ${input.productDescription.slice(0, 2000)}
 핵심 혜택: ${input.keyBenefits}
 캠페인 목표: ${input.objective}
 콘텐츠 전략: ${strategy.strategyType} — ${strategy.angle}
 ${painSection}${diffSection}${hookPatternSection}
 훅 조건:
-- 반드시 20자 이하 (공백 포함)
+- 반드시 25자 이하 (공백 포함)
 - 스크롤을 멈추게 하는 강렬한 첫 문장
 - 타겟 고객의 공감 또는 호기심 자극
 - 과장·클리셰 금지
@@ -110,6 +115,6 @@ function scoreBoost(hookType: HookType, strategyType: ContentStrategy['strategyT
 }
 
 function fitTwentyChars(text: string) {
-  return text.length > 20 ? text.slice(0, 20) : text
+  return text.length > 25 ? text.slice(0, 25) : text
 }
 

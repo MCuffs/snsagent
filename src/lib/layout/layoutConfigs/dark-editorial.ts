@@ -8,8 +8,8 @@ export const darkEditorialConfig: LayoutConfig = {
   imageStyle: 'cinematic Korean editorial photography, moody atmospheric shadows, realistic raw film texture',
   safeArea: { top: 80, bottom: 160, left: 60, right: 60 },
   preferredColorPalette: ['black', 'white'],
-  recommendedHeadlineLength: 18,
-  recommendedBodyLength: 45,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'serious, immersive, dramatic, clean background for typography',
   visualDensity: 'medium',
   spacingRules: {

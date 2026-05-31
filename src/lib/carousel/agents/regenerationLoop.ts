@@ -48,9 +48,9 @@ ${knowledgeSection}
 
 문제: 이전 슬라이드와 서사가 끊기거나 메시지가 반복되었습니다. 이를 개선하세요.
 규칙:
-- headline: 20자 이하
-- body: 60자 이하
-- ctaText: ${isCta ? '15자 이하 필수' : 'null'}
+- headline: 25자 이하
+- body: 120자 이하 — 정보를 풍성하게 1~3문장으로
+- ctaText: ${isCta ? '20자 이하 필수' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로` : ''}
 - 이전 슬라이드 메시지 반복 금지
 - 확인되지 않은 수치 금지
@@ -99,8 +99,8 @@ export async function runRegenerationLoop(
         const updated: CompletedSlide = {
           slideNumber,
           role: slide.role,
-          headline: result.headline.slice(0, 20).trim(),
-          body: result.body.slice(0, 60).trim(),
+          headline: result.headline.slice(0, 25).trim(),
+          body: result.body.slice(0, 120).trim(),
         }
         if (idx >= 0) {
           memory.completedSlides[idx] = updated

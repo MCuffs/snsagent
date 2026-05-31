@@ -8,8 +8,8 @@ export const trendFeedConfig: LayoutConfig = {
   imageStyle: 'modern social feed snapshot, casual Korean urban vibe, clean negative space around center-right',
   safeArea: { top: 80, bottom: 150, left: 60, right: 60 },
   preferredColorPalette: ['black', 'white', 'orange'],
-  recommendedHeadlineLength: 20,
-  recommendedBodyLength: 50,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'active, modern, timely, viral-optimized',
   visualDensity: 'medium',
   spacingRules: {

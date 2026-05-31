@@ -8,8 +8,8 @@ export const breakingNewsConfig: LayoutConfig = {
   imageStyle: 'documentary news photography, real life journalism, high contrast empty background area',
   safeArea: { top: 80, bottom: 150, left: 60, right: 60 },
   preferredColorPalette: ['black', 'white', 'red'],
-  recommendedHeadlineLength: 16,
-  recommendedBodyLength: 40,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'urgent, informative, direct, bold',
   visualDensity: 'high',
   spacingRules: {

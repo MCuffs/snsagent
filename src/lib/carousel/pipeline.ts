@@ -334,7 +334,7 @@ function extractCopyIssueSlides(issues: string[]): Set<number> {
   const nums = new Set<number>()
   for (const issue of issues) {
     const match = issue.match(/^(\d+)번/)
-    if (match && /headline.*20자|body.*60자|금지어|과장 표현/.test(issue)) {
+    if (match && /headline.*25자|body.*120자|금지어|과장 표현/.test(issue)) {
       nums.add(parseInt(match[1], 10))
     }
   }

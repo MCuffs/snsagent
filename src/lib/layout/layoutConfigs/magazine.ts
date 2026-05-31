@@ -8,8 +8,8 @@ export const magazineConfig: LayoutConfig = {
   imageStyle: 'premium luxury editorial backdrop, minimalist aesthetic studio props, warm ambient glow',
   safeArea: { top: 90, bottom: 160, left: 70, right: 70 },
   preferredColorPalette: ['cream', 'black', 'gold'],
-  recommendedHeadlineLength: 22,
-  recommendedBodyLength: 55,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'luxurious, sophisticated, slow, premium',
   visualDensity: 'low',
   spacingRules: {

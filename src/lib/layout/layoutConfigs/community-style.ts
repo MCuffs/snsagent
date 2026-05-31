@@ -8,8 +8,8 @@ export const communityStyleConfig: LayoutConfig = {
   imageStyle: 'everyday realistic Korean scene, snapshot photography style, clean dark zone for overlay text',
   safeArea: { top: 80, bottom: 140, left: 60, right: 60 },
   preferredColorPalette: ['white', 'black', 'green'],
-  recommendedHeadlineLength: 20,
-  recommendedBodyLength: 52,
+  recommendedHeadlineLength: 25,
+  recommendedBodyLength: 70,
   visualMood: 'relatable, direct, casual, conversational',
   visualDensity: 'high',
   spacingRules: {

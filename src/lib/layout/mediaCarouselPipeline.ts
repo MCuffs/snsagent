@@ -486,6 +486,11 @@ async function generateMediaSlideCopies(
     ? '\n\nIMPORTANT: Write ALL headlines, body copy, and captions in English only. Do not use Korean in any field.'
     : ''
 
+  const hasRssContext = sourceMaterial.includes('[실시간 뉴스 컨텍스트') || sourceMaterial.includes('[Real-Time News Context')
+  const rssInstruction = hasRssContext
+    ? `\n- 실시간 뉴스 컨텍스트의 기사 제목·내용에서 구체적인 키워드·앵글·트렌드를 훅과 body에 반드시 반영하세요\n- 뉴스 기사에 있는 실제 이슈를 다루어야 독자의 공감을 얻습니다\n- 뉴스에 없는 수치나 사실은 만들지 마세요`
+    : ''
+
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 ${editorialPlanSection}
@@ -509,8 +514,8 @@ ${sourceMaterial || '추가 자료 없음'}
 ${slideDescriptions}
 
 규칙:
-- headline: 20자 이하, 강렬하고 구체적 (공백 포함)
-- body: 58자 이하, 핵심 메시지 전달 (공백 포함)
+- headline: 25자 이하, 강렬하고 구체적 (공백 포함)
+- body: 120자 이하, 핵심 정보를 1~3문장으로 풍성하게 전달 (공백 포함) — 너무 짧으면 감점${rssInstruction}
 - 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
 - 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
 - hook 슬라이드: 독자의 시선을 즉시 잡되 사실로 확인되지 않은 효과를 단정하지 마세요
@@ -552,8 +557,8 @@ JSON 응답 형식:
     if (hasUnsupportedNumericClaim(`${generated.headline} ${body}`, groundingText)) return slide
     return {
       ...slide,
-      headline: generated.headline.trim().slice(0, constraints?.maxHeadlineChars || 20),
-      body: body.slice(0, constraints?.maxBodyChars || 58) || slide.body,
+      headline: generated.headline.trim().slice(0, constraints?.maxHeadlineChars || 25),
+      body: body.slice(0, constraints?.maxBodyChars || 120) || slide.body,
     }
   })
 }
@@ -589,8 +594,8 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
       ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
       : item?.headline || input.topic
     const body = slidePlan.role === 'save-cta'
-      ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 58)
-      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 58)
+      ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 80)
+      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 120)
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,

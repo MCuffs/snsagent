@@ -73,9 +73,9 @@ ${brandDnaSection}
 ${knowledgeSection}
 
 규칙:
-- headline: 반드시 20자 이하 (공백 포함)
-- body: 반드시 60자 이하 (공백 포함)
-- ctaText: ${isCta ? '15자 이하로 반드시 작성' : 'null'}
+- headline: 25자 이하 (공백 포함) — 강렬하고 구체적으로
+- body: 120자 이하 (공백 포함) — 핵심 정보를 1~3문장으로 풍성하게 작성. 너무 짧으면 안 됨
+- ctaText: ${isCta ? '20자 이하로 반드시 작성' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로 사용` : ''}
 - 이전 슬라이드와 같은 키워드·메시지를 반복하지 마세요
 - 확인할 수 없는 수치·인증·할인율·순위를 만들지 마세요
@@ -128,8 +128,8 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       { model: textModel, temperature: 0.45 }
     )
 
-    const headline = result?.headline?.slice(0, 20).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).headline
-    const body = result?.body?.slice(0, 60).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).body
+    const headline = result?.headline?.slice(0, 25).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).headline
+    const body = result?.body?.slice(0, 120).trim() || buildFallbackCopy(memory, slide.slideNumber, slide.role).body
 
     const completed: CompletedSlide = {
       slideNumber: slide.slideNumber,

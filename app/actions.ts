@@ -522,7 +522,7 @@ export async function rewriteEditorialCopyAction(
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: '당신은 한국 프리미엄 에디토리얼 카피라이터입니다. 슬라이드 문구만 개선하고 유효한 JSON만 반환하세요.' },
-          { role: 'user', content: `방향: ${intent}\n현재 제목: ${text.headline}\n현재 본문: ${text.body}\n제목 26자 이하, 본문 60자 이하로 headline/body JSON을 반환하세요.` },
+          { role: 'user', content: `방향: ${intent}\n현재 제목: ${text.headline}\n현재 본문: ${text.body}\n제목 25자 이하, 본문 120자 이하로 headline/body JSON을 반환하세요.` },
         ],
       })
       const parsed = JSON.parse(response.choices[0]?.message?.content || '{}') as { headline?: string; body?: string }
@@ -588,7 +588,7 @@ function localCopyRewrite(headline: string, body: string, intent: string) {
       return { headline: `${headline.replace(/[.!?]+$/, '')}, 놓치지 마세요`, body }
     case 'shorter':
     case 'cleaner':
-      return { headline: headline.slice(0, 20), body: body.slice(0, 42) }
+      return { headline: headline.slice(0, 25), body: body.slice(0, 80) }
     case 'premium':
     case 'luxury':
       return { headline: `더 정제된 ${headline}`.slice(0, 28), body: body.slice(0, 56) }

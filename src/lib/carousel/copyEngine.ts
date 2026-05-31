@@ -63,16 +63,16 @@ ${brandDnaSection}${knowledgeSection}
 ${slideDescriptions}
 ${narrativeSection}
 규칙:
-- headline: 반드시 20자 이하, 강렬하고 구체적으로 (공백 포함)
-- body: 반드시 60자 이하, 핵심 메시지 전달 (공백 포함)
-- ctaText: 마지막 슬라이드(cta 역할)에만 작성, 15자 이하. 나머지는 null
+- headline: 25자 이하, 강렬하고 구체적으로 (공백 포함)
+- body: 120자 이하, 핵심 정보를 1~3문장으로 풍성하게 전달 (공백 포함) — 너무 짧으면 감점
+- ctaText: 마지막 슬라이드(cta 역할)에만 작성, 20자 이하. 나머지는 null
 - 금지어와 과장 표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 슬라이드 역할(role)에 맞는 내용으로 작성
 - hook 슬라이드의 headline은 반드시 "${selectedHook.text}" 그대로 사용
 - 브랜드 DNA가 제공된 경우, 핵심 상품·차별점·고객 페인포인트·가치 제안 중 하나 이상이 슬라이드 카피에 반드시 녹아들어야 합니다
 - 일반적인 업종 표현 대신 브랜드 고유의 언어와 키워드를 사용하세요
 - 상품 정보와 브랜드 DNA에서 확인할 수 없는 수치, 할인율, 인증, 순위, 후기, 성분, 성능 또는 효능은 만들지 마세요
-- 타겟 고객 설명 문장을 body에 그대로 사용하지 마세요 (예: "20대 후반에서 40대 초반의 ..." 같은 표현 금지)
+- 타겟 고객 설명 문장을 body에 그대로 사용하지 마세요
 - 스마트스토어, 쿠팡, 네이버쇼핑 등 특정 플랫폼명을 카피에 포함하지 마세요
 - 각 슬라이드는 이전 슬라이드의 내용을 받아 자연스럽게 이어지도록 하고, 같은 메시지를 반복하지 마세요
 - 문제 제기 → 해결 방법 → 근거/혜택 → CTA 흐름이 슬라이드 전체에서 하나의 이야기처럼 연결되어야 합니다
@@ -202,8 +202,8 @@ function cleanCopy(brand: BrandProfile, copy: SlideCopy, knowledgeCtx?: CopyKnow
 
   return {
     ...copy,
-    headline: clean(copy.headline, 20),
-    body: clean(copy.body, 60),
+    headline: clean(copy.headline, 25),
+    body: clean(copy.body, 120),
     ctaText: copy.ctaText ? clean(copy.ctaText, 30) : undefined,
   }
 }

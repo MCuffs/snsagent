@@ -105,8 +105,8 @@ function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplat
       right: 72,
     },
     preferredColorPalette: ['black', 'white', 'gray'],
-    recommendedHeadlineLength: Math.min(layout.recommendedHeadlineLength, 16),
-    recommendedBodyLength: Math.min(layout.recommendedBodyLength, 36),
+    recommendedHeadlineLength: Math.min(layout.recommendedHeadlineLength, 25),
+    recommendedBodyLength: Math.min(layout.recommendedBodyLength, 70),
     visualMood: `${layout.visualMood}, ${template}, muted archive editorial, quiet premium product card`,
     visualDensity: 'low',
     spacingRules: {
