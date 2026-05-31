@@ -1,12 +1,16 @@
-import prisma from '../../../../lib/db'
 import { dbService } from '../../../../lib/db-service'
 import { nextMonthlyBillingDate } from '../../../../lib/nicepay'
 
 export const runtime = 'nodejs'
 
+function webhookString(value: unknown) {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return ''
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text()
-  console.log('[NicePay Webhook] raw body:', rawBody)
 
   let body: Record<string, unknown>
   try {
@@ -15,19 +19,19 @@ export async function POST(request: Request) {
     return Response.json({ success: true })
   }
 
-  const eventType = String(body.eventType || body.type || '')
-  const tid = String(body.tid || '')
-  const resultCode = String(body.resultCode || '')
-  const bid = String(body.bid || '')
+  const eventType = webhookString(body.eventType) || webhookString(body.type)
+  const tid = webhookString(body.tid)
+  const resultCode = webhookString(body.resultCode)
+  const bid = webhookString(body.bid)
 
-  console.log(`[NicePay Webhook] eventType=${eventType} tid=${tid} resultCode=${resultCode}`)
+  console.log(`[NicePay Webhook] eventType=${eventType} resultCode=${resultCode} hasTid=${Boolean(tid)} hasBid=${Boolean(bid)}`)
 
   try {
     if (eventType === 'BILLING' || resultCode === '0000') {
       await handleBillingSuccess({ tid, bid })
     }
     if (eventType === 'BILLING_FAIL' || (resultCode && resultCode !== '0000' && bid)) {
-      await handleBillingFail({ bid, resultCode, resultMsg: String(body.resultMsg || '') })
+      await handleBillingFail({ bid, resultCode, resultMsg: webhookString(body.resultMsg) })
     }
     if (eventType === 'BILLING_EXPIRE') {
       await handleBillingExpire({ bid })
@@ -41,8 +45,7 @@ export async function POST(request: Request) {
 
 async function handleBillingSuccess({ tid, bid }: { tid: string; bid: string }) {
   if (!bid) return
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })
+  const user = await dbService.getUserByNicepayBid(bid)
   if (!user) {
     console.warn(`[NicePay Webhook] No user found for bid=${bid}`)
     return
@@ -59,8 +62,7 @@ async function handleBillingSuccess({ tid, bid }: { tid: string; bid: string }) 
 
 async function handleBillingFail({ bid, resultCode, resultMsg }: { bid: string; resultCode: string; resultMsg: string }) {
   if (!bid) return
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })
+  const user = await dbService.getUserByNicepayBid(bid)
   if (!user) return
   await dbService.updateUserNicepay(user.id, { nicepaySubscriptionStatus: 'PAST_DUE' })
   console.warn(`[NicePay Webhook] Billing failed — user=${user.id} code=${resultCode} msg=${resultMsg}`)
@@ -68,8 +70,7 @@ async function handleBillingFail({ bid, resultCode, resultMsg }: { bid: string; 
 
 async function handleBillingExpire({ bid }: { bid: string }) {
   if (!bid) return
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })
+  const user = await dbService.getUserByNicepayBid(bid)
   if (!user) return
   await dbService.updateUserNicepay(user.id, {
     nicepayBid: null,

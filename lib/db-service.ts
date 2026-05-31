@@ -476,10 +476,27 @@ export const dbService = {
       const userIndex = db.users.findIndex(u => u.id === userId)
       if (userIndex !== -1) {
         if (data.plan !== undefined) db.users[userIndex].plan = data.plan
+        if (data.nicepayBid !== undefined) db.users[userIndex].nicepayBid = data.nicepayBid
+        if (data.nicepaySubscriptionStatus !== undefined) db.users[userIndex].nicepaySubscriptionStatus = data.nicepaySubscriptionStatus
+        if (data.nicepayNextBillingAt !== undefined) db.users[userIndex].nicepayNextBillingAt = data.nicepayNextBillingAt
+        if (data.nicepayLastPaidAt !== undefined) db.users[userIndex].nicepayLastPaidAt = data.nicepayLastPaidAt
+        if (data.nicepayCanceledAt !== undefined) db.users[userIndex].nicepayCanceledAt = data.nicepayCanceledAt
+        if (data.nicepayLastOrderId !== undefined) db.users[userIndex].nicepayLastOrderId = data.nicepayLastOrderId
         db.users[userIndex].updatedAt = new Date()
         writeMockDb(db)
       }
     }
+  },
+
+  async getUserByNicepayBid(nicepayBid: string): Promise<User | null> {
+    if (!isMock()) {
+      return prisma.user.findUnique({
+        where: { nicepayBid },
+      }) as unknown as Promise<User | null>
+    }
+
+    const db = initMockDb()
+    return db.users.find(user => user.nicepayBid === nicepayBid) || null
   },
 
   async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
