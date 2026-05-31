@@ -6,7 +6,6 @@ import { schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGeminiApiKey, isConfiguredGeminiKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi, isProduction } from '../lib/env'
 import { OpenAI } from 'openai'
-import { analyzeBrandWithGemini } from '../lib/gemini'
 import { analyzeBrandWithGroq } from '../lib/groq'
 import { analyzeBrandWithPerplexity, analyzeNaverStoreWithPerplexity } from '../lib/perplexity'
 import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from '../lib/naver-shopping'
@@ -1294,14 +1293,12 @@ export async function analyzeBrandWebsiteAction(url: string, locale = 'ko') {
 
     const perplexityKey = getPerplexityApiKey()
     const groqKey = getGroqApiKey()
-    const geminiKey = getGeminiApiKey()
     const openaiKey = process.env.OPENAI_API_KEY
     const usePerplexity = isConfiguredPerplexityKey(perplexityKey)
     const useGroq = !usePerplexity && isConfiguredGroqKey(groqKey)
-    const useGemini = !usePerplexity && !useGroq && isConfiguredGeminiKey(geminiKey)
-    const useOpenAI = !usePerplexity && !useGroq && !useGemini && isConfiguredOpenAIKey(openaiKey)
+    const useOpenAI = !usePerplexity && !useGroq && isConfiguredOpenAIKey(openaiKey)
 
-    if (usePerplexity || useGroq || useGemini || useOpenAI) {
+    if (usePerplexity || useGroq || useOpenAI) {
       let parsed: Record<string, unknown>
 
       if (usePerplexity) {
@@ -1311,9 +1308,6 @@ export async function analyzeBrandWebsiteAction(url: string, locale = 'ko') {
       } else if (useGroq) {
         console.log('Using Groq (Llama 3.3 70B) for brand analysis')
         parsed = await analyzeBrandWithGroq(groqKey, cleanedText, locale)
-      } else if (useGemini) {
-        console.log('Using Gemini 1.5 Flash for brand analysis')
-        parsed = await analyzeBrandWithGemini(geminiKey, cleanedText, locale)
       } else {
         // GPT-4o 2단계 harness (신호 추출 → 전체 합성)
         console.log('Using GPT-4o 2-stage harness for brand analysis')
@@ -1482,7 +1476,7 @@ JSON 형식으로만 응답하세요:`
       }
 
     } else {
-      console.log('Using Mock Brand Website Analyzer (no AI key configured — set GEMINI_API_KEY in .env)')
+      console.log('Using Mock Brand Website Analyzer (no AI key configured — set OPENAI_API_KEY in .env)')
       await new Promise(resolve => setTimeout(resolve, 2000)) // Simulation delay
 
       if (isSmartStore && shopId) {
@@ -2050,12 +2044,10 @@ Respond ONLY with a valid JSON object matching this structure:
   try {
     const perplexityKey = getPerplexityApiKey()
     const groqKey = getGroqApiKey()
-    const geminiKey = getGeminiApiKey()
     const openaiKey = process.env.OPENAI_API_KEY
     const usePerplexity = isConfiguredPerplexityKey(perplexityKey)
     const useGroq = !usePerplexity && isConfiguredGroqKey(groqKey)
-    const useGemini = !usePerplexity && !useGroq && isConfiguredGeminiKey(geminiKey)
-    const useOpenAI = !usePerplexity && !useGroq && !useGemini && isConfiguredOpenAIKey(openaiKey)
+    const useOpenAI = !usePerplexity && !useGroq && isConfiguredOpenAIKey(openaiKey)
 
     let jsonText = ''
 
@@ -2091,20 +2083,6 @@ Respond ONLY with a valid JSON object matching this structure:
       })
       const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
       jsonText = data.choices?.[0]?.message?.content || ''
-    } else if (useGemini) {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.1
-          }
-        })
-      })
-      const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
-      jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     } else if (useOpenAI) {
       const openai = new OpenAI({ apiKey: openaiKey })
       const response = await openai.chat.completions.create({

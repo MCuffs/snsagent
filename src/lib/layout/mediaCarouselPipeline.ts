@@ -451,7 +451,20 @@ async function generateMediaSlideCopies(
     .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${rolePurpose(s.role)}
   - 기획 단서: ${s.headline}${s.body ? ` / ${s.body}` : ''}`)
     .join('\n')
-  const sourceMaterial = input.keyContent.trim().slice(0, 4000)
+
+  // Separate RSS context block (always include fully) from rest of keyContent
+  const RSS_MARKER = '[실시간 뉴스 컨텍스트'
+  const RSS_MARKER_EN = '[Real-Time News Context'
+  const fullContent = input.keyContent.trim()
+  const rssStart = Math.max(fullContent.indexOf(RSS_MARKER), fullContent.indexOf(RSS_MARKER_EN))
+  const baseContent = rssStart > 0 ? fullContent.slice(0, rssStart).trim() : fullContent
+  const rssContent = rssStart > 0 ? fullContent.slice(rssStart) : ''
+
+  // Keep base content to 2500 chars + full RSS block (up to 2000 chars)
+  const sourceMaterial = [
+    baseContent.slice(0, 2500),
+    rssContent.slice(0, 2000),
+  ].filter(Boolean).join('\n\n')
 
   const isGeneral = input.generationMode === 'general'
   const brandDnaSection = (input.brandDna && !isGeneral)
@@ -464,9 +477,9 @@ async function generateMediaSlideCopies(
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
 
   const systemPrompt = isGeneral
-    ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
+    ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
     : (knowledgeCtx
-      ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+      ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
       : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.')
 
   const langInstruction = input.language === 'en'

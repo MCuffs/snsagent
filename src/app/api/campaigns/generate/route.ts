@@ -8,6 +8,7 @@ import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipel
 import { checkCampaignUsage } from '../../../../lib/usageLimit'
 import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
 import { getUserFacingGenerationError } from '../../../../../lib/runtime-diagnostics'
+import { fetchRssForGeneration, buildRssContext } from '../../../../lib/rss/rssFetcher'
 
 export const runtime = 'nodejs'
 
@@ -91,6 +92,29 @@ export async function POST(request: Request) {
         }
       }
 
+      // Always fetch real-time RSS news as factual grounding for copy/hook generation
+      try {
+        const keywords = (brand.forbiddenWords || '')
+          .split(',')
+          .map((k: string) => k.trim())
+          .filter((k: string) => k.length > 0)
+
+        const rssResult = await fetchRssForGeneration({
+          category: body.category || brand.industry || 'current-affairs',
+          keywords,
+          topic: body.topic,
+          limit: 5,
+        })
+
+        const rssContext = buildRssContext(rssResult, body.language || 'ko')
+        if (rssContext) {
+          enrichedKeyContent = `${enrichedKeyContent}\n\n${rssContext}`
+          console.log(`[RSS] Injected ${rssResult.articles.length} articles (matched: ${rssResult.matched}) into keyContent`)
+        }
+      } catch (rssErr) {
+        console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
+      }
+
       const result = await generateMediaCarousel({
         userId: user.id,
         brandId: brand.id,
@@ -153,9 +177,30 @@ export async function POST(request: Request) {
       brandDna: brand.brandDna,
     }
 
+    // Enrich commerce campaign with RSS news context relevant to the brand industry
+    let productDescription = body.productDescription!
+    try {
+      const keywords = (brand.forbiddenWords || '')
+        .split(',')
+        .map((k: string) => k.trim())
+        .filter((k: string) => k.length > 0)
+      const rssResult = await fetchRssForGeneration({
+        category: brand.industry || 'current-affairs',
+        keywords,
+        topic: body.productName,
+        limit: 3,
+      })
+      const rssContext = buildRssContext(rssResult, body.language || 'ko')
+      if (rssContext) {
+        productDescription = `${productDescription}\n\n${rssContext}`
+      }
+    } catch {
+      // RSS failure is non-fatal
+    }
+
     const campaignInput: CampaignInput = {
       productName: body.productName!,
-      productDescription: body.productDescription!,
+      productDescription,
       keyBenefits: body.keyBenefits!,
       objective: body.objective!,
       slideCount: normalizeSlideCount(body.slideCount),

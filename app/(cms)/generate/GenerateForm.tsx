@@ -179,8 +179,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const generationMode = brand.websiteUrl === 'general_profile' ? 'general' : 'brand'
   const rssCategory = (brand.websiteUrl === 'general_profile' && brand.industry)
     ? (brand.industry as 'current-affairs' | 'information' | 'trends')
-    : 'current-affairs'
+    : brand.industry || 'current-affairs'
   const [selectedArticle, setSelectedArticle] = useState<{ title: string; description: string; link: string; pubDate: string; isFallback?: boolean } | null>(null)
+  const [rssArticles, setRssArticles] = useState<Array<{ title: string; description: string; link: string; pubDate: string }>>([])
   const [rssStatus, setRssStatus] = useState<'idle' | 'fetching' | 'matched' | 'no_match_fallback' | 'error'>('idle')
 
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -316,6 +317,38 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     void loadGreeting()
     return () => { active = false }
   }, [generationMode, appendAiMessage, brand.id, language, locale])
+
+  // Brand mode: silently pre-fetch RSS news to show in the director panel
+  useEffect(() => {
+    if (generationMode !== 'brand') return
+    let active = true
+    const loadRss = async () => {
+      setRssStatus('fetching')
+      try {
+        const keywords = (brand.forbiddenWords || '')
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k.length > 0)
+        const kwParam = keywords.length > 0 ? `&keywords=${encodeURIComponent(keywords.join(','))}` : ''
+        const res = await fetch(`/api/rss?category=${encodeURIComponent(rssCategory)}&limit=3${kwParam}`)
+        if (!res.ok || !active) return
+        const data = await res.json() as { articles?: Array<{ title: string; description: string; link: string; pubDate: string }>; matched?: boolean }
+        const articles = data.articles || []
+        if (!active) return
+        setRssArticles(articles)
+        if (articles.length > 0) {
+          setSelectedArticle({ ...articles[0], isFallback: !data.matched })
+          setRssStatus(data.matched ? 'matched' : 'no_match_fallback')
+        } else {
+          setRssStatus('error')
+        }
+      } catch {
+        if (active) setRssStatus('error')
+      }
+    }
+    void loadRss()
+    return () => { active = false }
+  }, [generationMode, rssCategory, brand.forbiddenWords])
 
   // Automated RSS Feed Matching & Briefing (General Mode only)
   useEffect(() => {
@@ -965,24 +998,75 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-5 relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-[#E8DCCB]/25 blur-[60px] pointer-events-none" />
-            <motion.div
-              animate={{
-                y: [0, -6, 0],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#E6DFD5] shadow-[0_8px_24px_rgba(158,125,104,0.06)]"
-            >
-              <Compass className="h-6 w-6 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
-            </motion.div>
-            <div className="relative z-10 space-y-2">
-              <p className="text-sm font-black text-[#2C1E1A]">{t('director_waiting')}</p>
-              <p className="text-xs leading-5 text-[#8C7E7A] font-semibold max-w-[240px] mx-auto">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-[#F5F1E9]/50 p-5 space-y-5 custom-scrollbar">
+            {/* Real-time news context for brand mode */}
+            <div className="rounded-2xl border border-[#EFEAE2] bg-white p-5 space-y-4 shadow-[0_4px_20px_rgba(158,125,104,0.03)]">
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5 border-b border-[#F5EFE6] pb-3">
+                <Newspaper className="h-4 w-4 text-[#B88E76]" />
+                {locale === 'en' ? 'Trending News Context' : '실시간 트렌드 뉴스'}
+              </h4>
+              <p className="text-[11px] text-[#8C7E7A] font-semibold leading-relaxed">
+                {locale === 'en'
+                  ? 'These real news articles will be injected into card generation to ground your hooks in actual trending topics.'
+                  : '카드뉴스 생성 시 아래 최신 뉴스가 자동으로 반영되어 실제 트렌드 기반 훅과 카피를 만들어드립니다.'}
+              </p>
+
+              {rssStatus === 'fetching' && (
+                <div className="py-6 flex flex-col items-center justify-center space-y-2">
+                  <Compass className="h-6 w-6 text-[#9E7D68] animate-spin" />
+                  <p className="text-[11px] font-bold text-[#8C7E7A]">
+                    {locale === 'en' ? 'Fetching latest news...' : '최신 뉴스 수집 중...'}
+                  </p>
+                </div>
+              )}
+
+              {(rssStatus === 'matched' || rssStatus === 'no_match_fallback') && rssArticles.length > 0 && (
+                <div className="space-y-3">
+                  {rssStatus === 'matched' && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-[11px] font-semibold text-emerald-800 leading-relaxed">
+                      ✨ {locale === 'en' ? 'Keyword-matched news found!' : '브랜드 키워드 매칭 뉴스 발견!'}
+                    </div>
+                  )}
+                  {rssArticles.slice(0, 3).map((article, i) => (
+                    <div key={i} className="rounded-xl border border-[#EBE2D9] bg-[#FDFBF7] p-3 space-y-1">
+                      <p className="text-xs font-black text-[#2C1E1A] leading-snug">{article.title}</p>
+                      {article.description && (
+                        <p className="text-[11px] text-[#8C7E7A] font-medium leading-relaxed line-clamp-2">
+                          {article.description}
+                        </p>
+                      )}
+                      <a
+                        href={article.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#9E7D68] hover:text-[#2C1E1A] transition-colors"
+                      >
+                        {locale === 'en' ? 'Read source' : '원문 보기'}
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {rssStatus === 'error' && (
+                <div className="py-4 text-center text-[11px] text-[#C2B5AA] font-semibold">
+                  {locale === 'en' ? 'Could not load news. Generation will proceed.' : '뉴스 수집 실패. 생성은 정상 진행됩니다.'}
+                </div>
+              )}
+            </div>
+
+            {/* Compass waiting hint */}
+            <div className="flex flex-col items-center justify-center py-4 text-center space-y-2">
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white border border-[#E6DFD5] shadow-sm"
+              >
+                <Compass className="h-5 w-5 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
+              </motion.div>
+              <p className="text-xs font-black text-[#2C1E1A]">{t('director_waiting')}</p>
+              <p className="text-[11px] leading-5 text-[#8C7E7A] font-semibold max-w-[220px] mx-auto">
                 {t('director_waiting_desc')}
               </p>
             </div>
