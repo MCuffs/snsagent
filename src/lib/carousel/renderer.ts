@@ -3,6 +3,7 @@ import type { BrandProfile, SlideCopy, SlideDesignPrompt, OverlayType } from './
 import fs from 'fs'
 import path from 'path'
 import { renderSvgToPng } from '../render/svgToPng'
+import { truncateAtSentenceBoundary } from '../copywriting/truncate'
 
 export async function renderSlide(params: {
   campaignKey: string
@@ -15,7 +16,10 @@ export async function renderSlide(params: {
   const { textPosition, overlayType = 'dark_gradient_bottom', overlayStrength = 65 } = params.design
   const escapedHeadline = escapeXml(params.copy.headline)
   const escapedCta = escapeXml(params.copy.ctaText || '')
-  const bodyLines = wrapText(params.copy.body, 26)
+  // Ensure body is a complete sentence before wrapping — never cut mid-word
+  const safeBody = truncateAtSentenceBoundary(params.copy.body, 150)
+  const bodyLines = wrapText(safeBody, 30)
+  const MAX_BODY_LINES = 5
   const brandColor = escapeXml(params.brand.mainColor || '#ff4f00')
   const backgroundImageDataUri = await toImageDataUri(params.backgroundImageUrl)
   const imgSrc = escapeXml(backgroundImageDataUri || params.backgroundImageUrl)
@@ -28,7 +32,7 @@ export async function renderSlide(params: {
   const alphaHigh = Math.min(overlayStrength / 100 + 0.25, 1).toFixed(2)
 
   const bodyStartY = textY + 72
-  const ctaY = textY + 60 + bodyLines.slice(0, 3).length * 50
+  const ctaY = textY + 60 + bodyLines.slice(0, MAX_BODY_LINES).length * 50
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
@@ -56,7 +60,7 @@ export async function renderSlide(params: {
     letter-spacing="-1">${escapedHeadline}</text>
 
   <!-- Body lines -->
-  ${bodyLines.slice(0, 3).map((line, i) => `
+  ${bodyLines.slice(0, MAX_BODY_LINES).map((line, i) => `
   <text x="540" y="${bodyStartY + i * 50}" text-anchor="middle"
     font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif"
     font-size="34" font-weight="500" fill="rgba(255,255,255,0.88)"
