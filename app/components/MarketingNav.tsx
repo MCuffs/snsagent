@@ -8,6 +8,17 @@ interface MarketingNavProps {
   locale?: string
 }
 
+type NavKey =
+  | 'product'
+  | 'workflow'
+  | 'gallery'
+  | 'pricing'
+  | 'resources'
+  | 'login'
+  | 'back_to_cms'
+  | 'continue'
+  | 'start'
+
 export async function MarketingNav({ authenticated = false, locale }: MarketingNavProps) {
   const prefix = locale ? `/${locale}` : ''
   const accessHref = authenticated ? `${prefix}/concept` : '/api/auth/google/start'
@@ -19,20 +30,8 @@ export async function MarketingNav({ authenticated = false, locale }: MarketingN
     // Outside i18n context (non-locale pages), fall back to Korean
   }
 
-  const label = (ko: string, key: keyof typeof navKeys) =>
+  const label = (ko: string, key: NavKey) =>
     t ? t(key as string) : ko
-
-  const navKeys = {
-    product: 'product',
-    workflow: 'workflow',
-    gallery: 'gallery',
-    pricing: 'pricing',
-    resources: 'resources',
-    login: 'login',
-    back_to_cms: 'back_to_cms',
-    continue: 'continue',
-    start: 'start',
-  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#ede9e2] bg-[#fbfaf7]/88 backdrop-blur-xl">

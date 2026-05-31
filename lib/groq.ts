@@ -10,7 +10,6 @@ const INDUSTRY_OPTIONS = (locale: string) => locale === 'en'
 
 const BRAND_ANALYSIS_PROMPT = (cleanedText: string, locale = 'ko') => {
   const lang = locale === 'en' ? 'English' : '한국어'
-  const reportLang = locale === 'en' ? 'English' : 'Korean (한국어)'
   const tones = TONE_OPTIONS(locale)
   const industries = INDUSTRY_OPTIONS(locale)
   const exampleReport = locale === 'en'

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   try {
     if (eventType === 'BILLING' || resultCode === '0000') {
-      await handleBillingSuccess({ tid, bid, amount: Number(body.amount || 0) })
+      await handleBillingSuccess({ tid, bid })
     }
     if (eventType === 'BILLING_FAIL' || (resultCode && resultCode !== '0000' && bid)) {
       await handleBillingFail({ bid, resultCode, resultMsg: String(body.resultMsg || '') })
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   return Response.json({ success: true })
 }
 
-async function handleBillingSuccess({ tid, bid, amount }: { tid: string; bid: string; amount: number }) {
+async function handleBillingSuccess({ tid, bid }: { tid: string; bid: string }) {
   if (!bid) return
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = await (prisma.user as any).findFirst({ where: { nicepayBid: bid } })

@@ -163,6 +163,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     t('loading_step4'),
     t('loading_step5'),
   ]
+  const loadingStepCount = LOADING_STEPS.length
 
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -196,10 +197,10 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   useEffect(() => {
     if (!generating) return
     loadingIntervalRef.current = setInterval(() => {
-      setLoadingStep(prev => (prev < LOADING_STEPS.length - 1 ? prev + 1 : prev))
+      setLoadingStep(prev => (prev < loadingStepCount - 1 ? prev + 1 : prev))
     }, 4000)
     return () => { if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current) }
-  }, [generating])
+  }, [generating, loadingStepCount])
 
   const clearTypingTimer = useCallback(() => {
     if (typingTimerRef.current !== null) {
@@ -389,7 +390,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         setChatHistory(nextHistory)
 
         await callAgent(nextHistory)
-      } catch (err) {
+      } catch {
         if (!active) return
         setRssStatus('error')
         appendAiMessage(locale === 'en'

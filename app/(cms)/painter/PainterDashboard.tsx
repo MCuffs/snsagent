@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { Sparkles, Palette, Loader2, Award, FileText, Settings, Heart, Brush } from 'lucide-react'
+import { Sparkles, Loader2, Award, FileText, Settings, Heart, Brush } from 'lucide-react'
 import { getPainterStatusAction } from '../../actions'
 
 interface Brand {

@@ -92,10 +92,6 @@ const BRAND_ANALYSIS_PROMPT = (url: string, locale = 'ko') => {
   const industries = locale === 'en'
     ? "'Online store', 'Cafe / F&B', 'Fitness', 'Beauty / Care', 'Education', 'IT / SaaS'"
     : "'온라인 스토어', '카페 / F&B', '피트니스', '뷰티 / 케어', '교육 / 강의', 'IT / SaaS'"
-  const exampleReport = locale === 'en'
-    ? 'This is a brand that... (3–4 natural paragraphs, no headers or bullets)'
-    : '이 브랜드는... (3~4문단 자연스러운 서술, 제목이나 목록 없이)'
-
   if (locale === 'en') {
     return `Visit this brand/store URL and perform an in-depth analysis: ${url}
 
