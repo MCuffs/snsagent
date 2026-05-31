@@ -1,5 +1,6 @@
 import { OpenAI } from 'openai'
 import { isConfiguredOpenAIKey } from '../env'
+import { getCopywritingModel } from '../../src/lib/ai/llmClient'
 
 export interface BrandProfile {
   name: string
@@ -102,7 +103,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 `
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: getCopywritingModel(),
         messages: [
           {
             role: 'system',

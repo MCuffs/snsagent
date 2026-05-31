@@ -1,4 +1,4 @@
-import { getLLMClient } from '../ai/llmClient'
+import { getLLMClient, getTextGenerationModel } from '../ai/llmClient'
 import { parseBrandDna, formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import type { BrandProfile, CampaignInput, ContentStrategy, StrategyType } from './types'
 
@@ -56,7 +56,7 @@ JSON 응답:
     'strategy generation',
     prompt,
     () => buildFallbackStrategy(brand, input, dna),
-    { model: 'gpt-4o-mini', temperature: 0.3 }
+    { model: getTextGenerationModel(), temperature: 0.3 }
   )
 
   const validTypes = new Set<StrategyType>([

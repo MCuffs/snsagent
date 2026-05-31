@@ -12,7 +12,7 @@ import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
-import { truncateAtSentenceBoundary } from '../copywriting/truncate'
+import { repairRenderableCopy, validateRenderableCopy } from '../copywriting/renderableCopy'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -290,6 +290,19 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         designPrompt: sanitizedVisualPrompt,
         harnessDiagnostics: harness.diagnostics,
       })
+      const renderableCheck = validateRenderableCopy({
+        headline: slide.headline,
+        body: slide.body,
+        constraints: {
+          maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
+          maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 120,
+          maxBodyLines: 4,
+          lineLength: 28,
+        },
+      })
+      if (!renderableCheck.passed) {
+        baseSlideQualityCheck.issues.push(...renderableCheck.issues)
+      }
       const slideQualityCheck = checkBrandFit({
         headline: slide.headline,
         body: slide.body,
@@ -551,10 +564,20 @@ JSON 응답 형식:
     if (typeof generated?.headline !== 'string' || !generated.headline.trim()) return slide
     const body = typeof generated.body === 'string' ? generated.body.trim() : slide.body
     if (hasUnsupportedNumericClaim(`${generated.headline} ${body}`, groundingText)) return slide
+    const repaired = repairRenderableCopy({
+      headline: generated.headline.trim(),
+      body,
+      constraints: {
+        maxHeadlineChars: constraints?.maxHeadlineChars || 25,
+        maxBodyChars: constraints?.maxBodyChars || 120,
+        maxBodyLines: 4,
+        lineLength: 28,
+      },
+    })
     return {
       ...slide,
-      headline: generated.headline.trim().slice(0, constraints?.maxHeadlineChars || 25),
-      body: truncateAtSentenceBoundary(body, constraints?.maxBodyChars || 120) || slide.body,
+      headline: repaired.headline || slide.headline,
+      body: repaired.body || slide.body,
     }
   })
 }
@@ -595,8 +618,16 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
-      headline: trimHeadline(headline).slice(0, slidePlan.copyConstraints.maxHeadlineChars),
-      body: truncateAtSentenceBoundary(body, slidePlan.copyConstraints.maxBodyChars),
+      ...repairRenderableCopy({
+        headline: trimHeadline(headline),
+        body,
+        constraints: {
+          maxHeadlineChars: slidePlan.copyConstraints.maxHeadlineChars,
+          maxBodyChars: slidePlan.copyConstraints.maxBodyChars,
+          maxBodyLines: 4,
+          lineLength: 28,
+        },
+      }),
       layoutType: slidePlan.layoutType,
     }
   })

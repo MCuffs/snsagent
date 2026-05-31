@@ -10,6 +10,8 @@ export interface LLMRequestOptions {
   systemPrompt?: string
 }
 
+export const DEFAULT_TEXT_MODEL = 'gpt-5.4'
+
 export class MockLLMClient implements LLMClient {
   async generateJson<T>(_stepName: string, _prompt: string, fallback: () => T): Promise<T> {
     return fallback()
@@ -27,7 +29,7 @@ export class OpenAILLMClient implements LLMClient {
   async generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T> {
     try {
       const response = await this.client.chat.completions.create({
-        model: options?.model || process.env.OPENAI_TEXT_MODEL || 'gpt-4o-mini',
+        model: options?.model || getTextGenerationModel(),
         messages: [
           {
             role: 'system',
@@ -63,7 +65,11 @@ export function getLLMClient(): LLMClient {
 }
 
 export function getCopywritingModel() {
-  return process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o'
+  return process.env.OPENAI_COPY_MODEL?.trim() || getTextGenerationModel()
+}
+
+export function getTextGenerationModel() {
+  return process.env.OPENAI_TEXT_MODEL?.trim() || DEFAULT_TEXT_MODEL
 }
 
 export async function withJsonRetry<T>(

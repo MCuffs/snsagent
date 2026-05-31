@@ -4,7 +4,9 @@ import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { collectBrandUrlContext } from '../../../../lib/brand-url-collector'
+import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../lib/purchase-persuasion'
 import { fetchRssForGeneration } from '../../../../src/lib/rss/rssFetcher'
+import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
 
 export const runtime = 'nodejs'
 
@@ -249,12 +251,26 @@ export async function POST(request: Request) {
     // 3. Detect URL in the latest user message and scrape
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
     let scrapedContext = ''
+    let purchasePersuasionContext = ''
     if (lastUserMessage) {
       const urlMatch = lastUserMessage.content.match(/https?:\/\/[^\s]+/)
       if (urlMatch) {
         try {
           const productContext = await collectBrandUrlContext(urlMatch[0])
-          scrapedContext = productContext.sourceText.slice(0, 3000)
+          scrapedContext = productContext.promptContext.slice(0, 5000)
+          const apiKey = process.env.OPENAI_API_KEY
+          if (apiKey && apiKey.length > 10) {
+            const openai = new OpenAI({
+              apiKey,
+              ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
+            })
+            const persuasion = await analyzePurchasePersuasionWithOpenAI({
+              openai,
+              collected: productContext,
+              locale: language,
+            })
+            purchasePersuasionContext = formatPurchasePersuasionForPrompt(persuasion)
+          }
         } catch (err) {
           console.warn('[GenerateAgent] Scrape failed:', err)
         }
@@ -321,9 +337,16 @@ export async function POST(request: Request) {
       apiKey,
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
-    const systemPrompt = buildSystemPrompt(brand, preferencesText, scrapedContext, language, generationMode, rssContext)
+    const systemPrompt = buildSystemPrompt(
+      brand,
+      preferencesText,
+      [scrapedContext, purchasePersuasionContext].filter(Boolean).join('\n\n'),
+      language,
+      generationMode,
+      rssContext
+    )
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o',
+      model: getCopywritingModel(),
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
@@ -338,7 +361,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: '디렉터 기획 수립에 실패했습니다. 다시 말씀해 주세요.', ready: false })
     }
 
-    const parsed = JSON.parse(content) as AgentResponse
+    let parsed: AgentResponse
+    try {
+      parsed = JSON.parse(content) as AgentResponse
+    } catch (parseError) {
+      console.error('[GenerateAgent] Invalid JSON response:', parseError, content)
+      return NextResponse.json({
+        message: '기획안 응답 형식이 올바르지 않았습니다. 같은 요청으로 한 번만 다시 시도해 주세요.',
+        ready: false,
+      }, { status: 502 })
+    }
 
     // Validate parameters if the agent flagged ready
     if (parsed.ready && parsed.params) {
@@ -354,6 +386,52 @@ export async function POST(request: Request) {
     return NextResponse.json(parsed)
   } catch (error) {
     console.error('[GenerateAgent] Error:', error)
-    return NextResponse.json({ message: '기획안 도출 과정에서 오류가 발생했습니다. 다시 제안 요청을 해주세요.', ready: false }, { status: 500 })
+    const mapped = getOpenAIUserFacingError(error)
+    return NextResponse.json({ message: mapped.message, ready: false }, { status: mapped.status })
+  }
+}
+
+
+function getOpenAIUserFacingError(error: unknown) {
+  const err = error as {
+    status?: number
+    code?: string
+    type?: string
+    message?: string
+    error?: { code?: string; type?: string; message?: string }
+  }
+  const status = err.status || 500
+  const code = err.code || err.error?.code || ''
+  const type = err.type || err.error?.type || ''
+  const message = err.message || err.error?.message || ''
+  const haystack = `${code} ${type} ${message}`.toLowerCase()
+
+  if (status === 401 || haystack.includes('invalid_api_key')) {
+    return {
+      status: 401,
+      message: 'OpenAI API ? ??? ??????. .env? OPENAI_API_KEY? ???? ??? ???.',
+    }
+  }
+  if (status === 429 || haystack.includes('insufficient_quota') || haystack.includes('quota')) {
+    return {
+      status: 429,
+      message: 'OpenAI API ??? ?? ?? ??? ?????. ??/??? ??? ??? ? ?? ??? ???.',
+    }
+  }
+  if (haystack.includes('model') && (haystack.includes('not found') || haystack.includes('does not exist') || haystack.includes('access'))) {
+    return {
+      status: 400,
+      message: 'gpt-5.4 ??? ?? API ??? ??? ? ????. ?? ?? ?? ???? ?? ??? ??? ???.',
+    }
+  }
+  if (status >= 500) {
+    return {
+      status: 502,
+      message: 'OpenAI ??? ????? ??????. ?? ? ?? ??? ???.',
+    }
+  }
+  return {
+    status,
+    message: '??? ?? ? ??? ??????. ?? ??? ?? ?? ?? ??? ???.',
   }
 }

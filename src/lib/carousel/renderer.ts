@@ -20,6 +20,9 @@ export async function renderSlide(params: {
   const safeBody = truncateAtSentenceBoundary(params.copy.body, 150)
   const bodyLines = wrapText(safeBody, 30)
   const MAX_BODY_LINES = 5
+  if (bodyLines.length > MAX_BODY_LINES) {
+    throw new Error(`Slide ${params.copy.slideNumber} body exceeds renderable line limit (${bodyLines.length}/${MAX_BODY_LINES})`)
+  }
   const brandColor = escapeXml(params.brand.mainColor || '#ff4f00')
   const backgroundImageDataUri = await toImageDataUri(params.backgroundImageUrl)
   const imgSrc = escapeXml(backgroundImageDataUri || params.backgroundImageUrl)
@@ -60,7 +63,7 @@ export async function renderSlide(params: {
     letter-spacing="-1">${escapedHeadline}</text>
 
   <!-- Body lines -->
-  ${bodyLines.slice(0, MAX_BODY_LINES).map((line, i) => `
+  ${bodyLines.map((line, i) => `
   <text x="540" y="${bodyStartY + i * 50}" text-anchor="middle"
     font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif"
     font-size="34" font-weight="500" fill="rgba(255,255,255,0.88)"

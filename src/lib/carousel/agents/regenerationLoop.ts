@@ -1,4 +1,4 @@
-import { getLLMClient } from '../../ai/llmClient'
+import { getLLMClient, getTextGenerationModel } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
 import { truncateAtSentenceBoundary } from '../../copywriting/truncate'
@@ -69,7 +69,7 @@ export async function runRegenerationLoop(
   initialCriticResult: CriticResult,
 ): Promise<CriticResult> {
   const client = getLLMClient()
-  const textModel = process.env.OPENAI_TEXT_MODEL || 'gpt-4o-mini'
+  const textModel = getTextGenerationModel()
 
   let criticResult = initialCriticResult
   let retryCount = 0

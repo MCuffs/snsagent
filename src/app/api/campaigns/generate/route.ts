@@ -7,8 +7,10 @@ import type { BrandProfile, CampaignInput } from '../../../../lib/carousel/types
 import { generateMediaCarousel } from '../../../../lib/layout/mediaCarouselPipeline'
 import { checkCampaignUsage } from '../../../../lib/usageLimit'
 import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
+import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../../lib/purchase-persuasion'
 import { getUserFacingGenerationError } from '../../../../../lib/runtime-diagnostics'
 import { fetchRssForGeneration, buildRssContext } from '../../../../lib/rss/rssFetcher'
+import OpenAI from 'openai'
 
 export const runtime = 'nodejs'
 
@@ -85,8 +87,21 @@ export async function POST(request: Request) {
       if (body.productUrl) {
         try {
           const productContext = await collectBrandUrlContext(body.productUrl)
-          const productSummary = productContext.sourceText.slice(0, 2000)
-          enrichedKeyContent = `${enrichedKeyContent}\n\n[상품 페이지 정보]\n${productSummary}`
+          const apiKey = process.env.OPENAI_API_KEY
+          let productSummary = productContext.promptContext.slice(0, 3500)
+          if (apiKey && apiKey.length > 10) {
+            const openai = new OpenAI({
+              apiKey,
+              ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
+            })
+            const persuasion = await analyzePurchasePersuasionWithOpenAI({
+              openai,
+              collected: productContext,
+              locale: body.language || 'ko',
+            })
+            productSummary = formatPurchasePersuasionForPrompt(persuasion)
+          }
+          enrichedKeyContent = `${enrichedKeyContent}\n\n[Product Page Purchase Persuasion]\n${productSummary}`
         } catch {
           // scraping failed — continue without it
         }

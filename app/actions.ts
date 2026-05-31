@@ -6,12 +6,11 @@ import { schedulePost, tokenEncryptor } from '../lib/instagram/client'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi, isProduction } from '../lib/env'
 import { OpenAI } from 'openai'
-import { analyzeBrandWithGroq } from '../lib/groq'
-import { analyzeBrandWithPerplexity, analyzeNaverStoreWithPerplexity } from '../lib/perplexity'
 import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from '../lib/naver-shopping'
 import { isSubscriptionPlan, normalizePlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageModel, getPipelineImageProvider } from '../src/lib/ai/providers'
+import { getCopywritingModel, getTextGenerationModel } from '../src/lib/ai/llmClient'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
@@ -22,6 +21,7 @@ import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
+import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../lib/purchase-persuasion'
 import { logEditEvent } from '../src/lib/intelligence/editLogger'
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -517,7 +517,7 @@ export async function rewriteEditorialCopyAction(
     if (isConfiguredOpenAIKey(apiKey)) {
       const openai = new OpenAI({ apiKey })
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: getTextGenerationModel(),
         temperature: 0.7,
         response_format: { type: 'json_object' },
         messages: [
@@ -1236,52 +1236,25 @@ export async function analyzeBrandWebsiteAction(url: string, locale = 'ko') {
   const targetUrl = url
   const isSmartStore = url.includes('smartstore.naver.com')
   const shopId = isSmartStore ? extractSmartStoreId(url) : null
+  let naverStoreContext = ''
 
   // ── 네이버 스마트스토어 전용 경로 ──────────────────────────────────────────
   if (isSmartStore && shopId) {
     const naverClientId = getNaverClientId()
     const naverClientSecret = getNaverClientSecret()
-    const perplexityKey = getPerplexityApiKey()
     const hasNaverApi = isConfiguredNaverApi(naverClientId, naverClientSecret)
-    const hasPerplexity = isConfiguredPerplexityKey(perplexityKey)
 
-    if (hasNaverApi && hasPerplexity) {
+    if (hasNaverApi) {
       try {
-        console.log(`[SmartStore] 네이버 API + Perplexity로 분석: ${shopId}`)
+        console.log(`[SmartStore] Collecting Naver API context: ${shopId}`)
         const storeData = await fetchNaverStoreProducts(naverClientId, naverClientSecret, shopId)
         const storeContext = buildStoreContext(storeData)
-        const parsed = await analyzeNaverStoreWithPerplexity(perplexityKey, shopId, storeContext) as Record<string, unknown>
-        return {
-          success: true as const,
-          brandProfile: {
-            name: String(parsed.name || storeData.storeName || shopId),
-            industry: String(parsed.industry || '온라인 스토어'),
-            targetAudience: String(parsed.targetAudience || ''),
-            toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
-            mainColor: String(parsed.mainColor || '#b94718'),
-            forbiddenWords: String(parsed.forbiddenWords || ''),
-            ctaStyle: String(parsed.ctaStyle || '스토어에서 확인하기'),
-            brandDna: buildBrandDnaFromProfile({
-              name: String(parsed.name || shopId),
-              industry: String(parsed.industry || '온라인 스토어'),
-              targetAudience: String(parsed.targetAudience || ''),
-              toneOfVoice: String(parsed.toneOfVoice || '친근하고 명확한 톤'),
-              mainColor: String(parsed.mainColor || '#b94718'),
-              ctaStyle: String(parsed.ctaStyle || ''),
-              parsed,
-            }),
-          },
-          markdownReport: removeMarkdownBold(String(parsed.markdownReport || `# ${parsed.name} 브랜드 분석\n\n네이버 스마트스토어 API 기반 분석 완료.`)),
-        }
+        naverStoreContext = storeContext
       } catch (e) {
-        console.error('[SmartStore] 네이버 API 분석 실패, 일반 경로로 폴백:', e)
-        // 실패 시 아래 일반 경로로 계속 진행
+        console.error('[SmartStore] Naver API context failed, continuing with URL collection:', e)
       }
     } else {
-      const missing = []
-      if (!hasNaverApi) missing.push('NAVER_CLIENT_ID / NAVER_CLIENT_SECRET')
-      if (!hasPerplexity) missing.push('PERPLEXITY_API_KEY')
-      console.warn(`[SmartStore] API 키 미설정 (${missing.join(', ')}), 일반 경로로 폴백`)
+      console.warn('[SmartStore] NAVER_CLIENT_ID / NAVER_CLIENT_SECRET not configured, continuing with URL collection')
     }
   }
 
@@ -1291,35 +1264,40 @@ export async function analyzeBrandWebsiteAction(url: string, locale = 'ko') {
     const cleanedText = collected.promptContext
     console.log(`Brand URL collection complete: ${collected.finalUrl} | ${collected.diagnostics.join(', ')}`)
 
-    const perplexityKey = getPerplexityApiKey()
-    const groqKey = getGroqApiKey()
     const openaiKey = process.env.OPENAI_API_KEY
-    const usePerplexity = isConfiguredPerplexityKey(perplexityKey)
-    const useGroq = !usePerplexity && isConfiguredGroqKey(groqKey)
-    const useOpenAI = !usePerplexity && !useGroq && isConfiguredOpenAIKey(openaiKey)
+    const useOpenAI = isConfiguredOpenAIKey(openaiKey)
 
-    if (usePerplexity || useGroq || useOpenAI) {
+    if (useOpenAI) {
       let parsed: Record<string, unknown>
 
-      if (usePerplexity) {
-        // Perplexity는 URL을 직접 방문하므로 원본 URL을 넘김
-        console.log('Using Perplexity sonar-pro for brand analysis')
-        parsed = await analyzeBrandWithPerplexity(perplexityKey, targetUrl, locale)
-      } else if (useGroq) {
-        console.log('Using Groq (Llama 3.3 70B) for brand analysis')
-        parsed = await analyzeBrandWithGroq(groqKey, cleanedText, locale)
-      } else {
+      {
         // GPT-4o 2단계 harness (신호 추출 → 전체 합성)
         console.log('Using GPT-4o 2-stage harness for brand analysis')
         const openai = new OpenAI({ apiKey: openaiKey })
         const isEn = locale === 'en'
+        const purchasePersuasion = await analyzePurchasePersuasionWithOpenAI({
+          openai,
+          collected: {
+            ...collected,
+            promptContext: naverStoreContext
+              ? `${collected.promptContext}\n\n[Naver SmartStore API Context]\n${naverStoreContext}`
+              : collected.promptContext,
+            sourceText: naverStoreContext
+              ? `${collected.sourceText}\n\n${naverStoreContext}`
+              : collected.sourceText,
+          },
+          locale,
+        })
+        const purchasePersuasionText = formatPurchasePersuasionForPrompt(purchasePersuasion)
 
-        // STAGE 1: 핵심 신호 추출 (gpt-4o-mini, 빠르고 저렴)
+        // STAGE 1: 핵심 신호 추출
         const signalPrompt = isEn
           ? `You are a digital marketing expert. Extract brand analysis signals from the following website scraped data.
 
 [Scraped Data]
 ${cleanedText.slice(0, 6000)}
+
+${purchasePersuasionText}
 
 Respond ONLY with valid JSON:
 {
@@ -1337,6 +1315,8 @@ Respond ONLY with valid JSON:
 [스크랩 데이터]
 ${cleanedText.slice(0, 6000)}
 
+${purchasePersuasionText}
+
 다음 JSON 형식으로만 응답하세요:
 {
   "brandName": "정확한 브랜드명 (공식 명칭 우선)",
@@ -1349,7 +1329,7 @@ ${cleanedText.slice(0, 6000)}
   "categoryKeywords": ["업종 관련 키워드 최대 5개"]
 }`
         const signalResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: getTextGenerationModel(),
           messages: [{ role: 'user', content: signalPrompt }],
           response_format: { type: 'json_object' },
           temperature: 0,
@@ -1357,7 +1337,7 @@ ${cleanedText.slice(0, 6000)}
         })
         const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
 
-        // STAGE 2: 전체 브랜드 프로필 합성 (gpt-4o)
+        // STAGE 2: 전체 브랜드 프로필 합성
         const toneOptions = isEn
           ? '"Friendly and clear", "Professional and trustworthy", "Young and energetic", "Premium and calm"'
           : '"친근하고 명확한 톤", "전문적이고 신뢰감 있는 톤", "젊고 경쾌한 톤", "고급스럽고 차분한 톤"'
@@ -1376,6 +1356,9 @@ ${JSON.stringify(signals, null, 2)}
 
 [Original Website Data (supplemental)]
 ${cleanedText.slice(0, 5000)}
+
+[Structured Purchase Persuasion Context]
+${purchasePersuasionText}
 
 Rules:
 - name: official brand name, no platform names (Smartstore, Coupang, etc.)
@@ -1406,6 +1389,9 @@ ${JSON.stringify(signals, null, 2)}
 [원본 웹사이트 데이터 (보충 참고용)]
 ${cleanedText.slice(0, 5000)}
 
+[구매 설득 구조화 정보]
+${purchasePersuasionText}
+
 [생성 규칙]
 - name: 공식 브랜드명. 플랫폼명(스마트스토어, 쿠팡 등)은 포함하지 않음
 - industry: 반드시 아래 6개 중 하나 선택: ${industryOptions}
@@ -1426,7 +1412,7 @@ ${cleanedText.slice(0, 5000)}
 
 JSON 형식으로만 응답하세요:`
         const aiResponse = await openai.chat.completions.create({
-          model: 'gpt-4o',
+          model: getCopywritingModel(),
           messages: [
             { role: 'system', content: isEn
               ? 'You are a brand strategy AI. Return ONLY valid JSON. No markdown bold (**).'
@@ -1439,6 +1425,7 @@ JSON 형식으로만 응답하세요:`
         const rawJson = aiResponse.choices[0].message.content
         if (!rawJson) throw new Error('AI analysis failed: empty response.')
         parsed = JSON.parse(rawJson)
+        parsed.purchasePersuasion = purchasePersuasion
         // markdownReport 별도 생성 — 자연스러운 산문체
         const industryStr = String(parsed.industry || '')
         const toneStr = String(parsed.toneOfVoice || '')
@@ -1635,7 +1622,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 }
 `
           const aiResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: getCopywritingModel(),
             messages: [
               {
                 role: 'system',
@@ -1765,7 +1752,7 @@ You MUST respond ONLY with a valid JSON object matching the following structure:
 `
 
       const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: getCopywritingModel(),
         messages: [
           {
             role: 'system',
@@ -2086,7 +2073,7 @@ Respond ONLY with a valid JSON object matching this structure:
     } else if (useOpenAI) {
       const openai = new OpenAI({ apiKey: openaiKey })
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: getTextGenerationModel(),
         temperature: 0.1,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }]

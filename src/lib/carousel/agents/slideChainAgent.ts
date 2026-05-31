@@ -1,7 +1,7 @@
-import { getLLMClient } from '../../ai/llmClient'
+import { getLLMClient, getTextGenerationModel } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
-import { truncateAtSentenceBoundary } from '../../copywriting/truncate'
+import { repairRenderableCopy } from '../../copywriting/renderableCopy'
 import type { SlideCopy, SlideRole } from '../types'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
@@ -112,7 +112,7 @@ function buildFallbackCopy(memory: NarrativeMemory, slideNumber: number, role: S
 
 export async function runSlideChainAgent(memory: NarrativeMemory): Promise<CompletedSlide[]> {
   const client = getLLMClient()
-  const textModel = process.env.OPENAI_TEXT_MODEL || 'gpt-4o-mini'
+  const textModel = getTextGenerationModel()
 
   for (let i = 0; i < memory.structure.slides.length; i++) {
     const slide = memory.structure.slides[i]
@@ -129,8 +129,19 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       { model: textModel, temperature: 0.45 }
     )
 
-    const headline = truncateAtSentenceBoundary(result?.headline?.trim() || '', 25) || buildFallbackCopy(memory, slide.slideNumber, slide.role).headline
-    const body = truncateAtSentenceBoundary(result?.body?.trim() || '', 120) || buildFallbackCopy(memory, slide.slideNumber, slide.role).body
+    const fallbackCopy = buildFallbackCopy(memory, slide.slideNumber, slide.role)
+    const repaired = repairRenderableCopy({
+      headline: result?.headline?.trim() || fallbackCopy.headline,
+      body: result?.body?.trim() || fallbackCopy.body,
+      constraints: {
+        maxHeadlineChars: 25,
+        maxBodyChars: 120,
+        maxBodyLines: 5,
+        lineLength: 30,
+      },
+    })
+    const headline = repaired.headline || fallbackCopy.headline
+    const body = repaired.body || fallbackCopy.body
 
     const completed: CompletedSlide = {
       slideNumber: slide.slideNumber,

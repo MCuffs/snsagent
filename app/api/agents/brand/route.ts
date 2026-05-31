@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import { parseBrandDna } from '../../../../lib/brand-dna'
+import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
 
 export const runtime = 'nodejs'
 
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     })
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: getCopywritingModel(),
       messages: [
         { role: 'system', content: buildSystemPrompt(brand) },
         ...messages,
