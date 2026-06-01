@@ -6,6 +6,7 @@ import type {
   SlideEditorSeed,
   TypographyPreset,
 } from './types'
+import { repairRenderableCopy } from '../copywriting/renderableCopy'
 
 const FONT_PRESETS: FontPreset[] = ['pretendard', 'suit', 'noto-sans', 'serif', 'magazine']
 const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
@@ -82,7 +83,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
         shadow: 18,
       }),
       layer('subtitle', '본문', 50, {
-        text: seed.body,
+        text: safeSubtitleText(seed.headline, seed.body),
         x: 72,
         y: 1075,
         width: 820,
@@ -135,12 +136,29 @@ export function parseEditorialDocument(raw: string | null | undefined, seed: Sli
       resolveEditableBackgroundImageUrl(documentBackground, seed.imageUrl) ??
       resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
     doc.layers = doc.layers.map(layer =>
-      layer.type === 'background' ? { ...layer, imageUrl: backgroundImageUrl } : layer
+      layer.type === 'background'
+        ? { ...layer, imageUrl: backgroundImageUrl }
+        : layer.type === 'subtitle'
+          ? { ...layer, text: safeSubtitleText(seed.headline, layer.text || seed.body) }
+          : layer
     )
     return doc
   } catch {
     return createEditorialDocument(seed)
   }
+}
+
+function safeSubtitleText(headline: string, body: string) {
+  return repairRenderableCopy({
+    headline,
+    body,
+    constraints: {
+      maxHeadlineChars: 52,
+      maxBodyChars: 220,
+      maxBodyLines: 6,
+      lineLength: 32,
+    },
+  }).body
 }
 
 // A rendered slide already contains copy. It cannot be used as a source layer in the editor.
