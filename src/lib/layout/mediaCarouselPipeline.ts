@@ -14,6 +14,7 @@ import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import { repairRenderableCopy, validateRenderableCopy } from '../copywriting/renderableCopy'
 import { buildSemanticFallback, evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
+import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -485,6 +486,13 @@ async function generateMediaSlideCopies(
     ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
     : ''
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
+  const storyOntology = buildStoryOntology({
+    topic: input.topic,
+    category: input.category,
+    sourceMaterial,
+    editorialPlan,
+  })
+  const storyOntologySection = formatStoryOntologyForPrompt(storyOntology)
 
   const systemPrompt = isGeneral
     ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
@@ -504,6 +512,8 @@ async function generateMediaSlideCopies(
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 ${editorialPlanSection}
+
+${storyOntologySection}
 
 브랜드 정보:
 - 브랜드명: ${isGeneral ? '일반 정보/뉴스 전달용' : input.brandName}
@@ -528,6 +538,8 @@ ${slideDescriptions}
 - body: 90~220자, 핵심 정보를 2~4문장으로 풍성하게 전달 (공백 포함) — 한 문장짜리 요약, 추상적인 원론, 짧은 설명은 실패
 - body에는 반드시 주제의 구체 정보(성분/특징/사용 장면/비교 포인트/주의할 점 중 최소 2개)를 담으세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
+- 각 슬라이드는 STORY ONTOLOGY의 guiding question에 답하고, transition에 맞춰 다음 슬라이드로 의미를 넘기세요.
+- body 첫 문장은 현재 노드의 구체 정보, 둘째 문장은 다음 노드로 넘어갈 이유를 담으세요.
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요. 문장을 줄여야 하면 중간을 자르지 말고 완성 문장 단위로 다시 작성하세요.${rssInstruction}
 - 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
 - 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
@@ -591,6 +603,7 @@ JSON 응답 형식:
     editorialPlan,
     sourceMaterial,
     systemPrompt,
+    storyOntologySection,
   })
 }
 
@@ -600,6 +613,7 @@ async function enforceSemanticMeaning(params: {
   editorialPlan: EditorialDirectorPlan
   sourceMaterial: string
   systemPrompt: string
+  storyOntologySection: string
 }): Promise<MediaSlidePlan[]> {
   const initialReport = evaluateSemanticCopy({
     topic: params.input.topic,
@@ -622,6 +636,8 @@ async function enforceSemanticMeaning(params: {
 
 제공 자료:
 ${params.sourceMaterial || '추가 자료 없음'}
+
+${params.storyOntologySection}
 
 약한 슬라이드와 문제:
 ${weakSlides.map(slide => {
@@ -747,14 +763,21 @@ function hasUnsupportedNumericClaim(copy: string, groundingText: string) {
 
 function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDirectorPlan): MediaSlidePlan[] {
   const parsed = parseSlideLines(input.keyContent)
+  const ontology = buildStoryOntology({
+    topic: input.topic,
+    category: input.category,
+    sourceMaterial: input.keyContent,
+    editorialPlan,
+  })
   return editorialPlan.slides.map((slidePlan, index) => {
     const item = parsed[index] || parsed[index - 1] || parsed[0]
+    const storyNode = getStoryNode(ontology, slidePlan.slideNumber)
     const headline = slidePlan.role === 'hook'
       ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
       : item?.headline || input.topic
     const body = slidePlan.role === 'save-cta'
       ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 140)
-      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 220)
+      : item?.body || slidePlan.briefingInstruction || ontologyFallbackBody(input.topic, storyNode)
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
@@ -801,6 +824,27 @@ function summarize(value: string, maxLength: number) {
   const clean = value.replace(/\s+/g, ' ').trim()
   if (clean.length <= maxLength) return clean
   return `${clean.slice(0, maxLength).replace(/\s+\S*$/, '')}.`
+}
+
+function ontologyFallbackBody(topic: string, node: ReturnType<typeof getStoryNode>) {
+  if (!node) return summarize(topic, 180)
+  const signal = node.mustInclude.find(item => item && !/one |specific |reader |only verified/i.test(item)) || topic
+  switch (node.role) {
+    case 'hook':
+      return `${signal}을(를) 그냥 좋다고 말하면 기억에 남지 않습니다. 첫 장에서는 왜 지금 이 주제를 다시 봐야 하는지 한 가지 장면으로 열어야 합니다.`
+    case 'context':
+      return `${signal}은(는) 독자가 실제로 먹고, 쓰고, 비교하는 순간과 연결될 때 설득력이 생깁니다. 다음 장에서는 그 상황에서 무엇을 먼저 봐야 하는지 좁혀갑니다.`
+    case 'key-point':
+      return `${signal}을(를) 판단할 때는 장점의 개수보다 먼저 볼 기준이 필요합니다. 이 기준이 잡혀야 뒤의 디테일이 단순 정보가 아니라 선택 근거로 읽힙니다.`
+    case 'detail':
+    case 'stat':
+      return `${signal} 같은 구체 요소가 있어야 본문이 설명에서 멈추지 않습니다. 맛, 성분, 사용 장면, 비교 포인트 중 하나를 붙이면 독자가 바로 판단할 수 있습니다.`
+    case 'summary':
+    case 'save-cta':
+      return `${signal}을(를) 기억할 때는 핵심 장면과 확인 포인트를 같이 남겨두는 편이 좋습니다. 저장해두고 실제로 비교할 때 다시 꺼내보세요.`
+    default:
+      return `${signal}을(를) 중심으로 구체적인 상황과 판단 포인트를 함께 보여줘야 합니다. 그래야 슬라이드가 따로 놀지 않고 다음 이야기로 이어집니다.`
+  }
 }
 
 function toMediaLayout(layoutType: LayoutType): LayoutType {
