@@ -23,6 +23,7 @@ import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../lib/purchase-persuasion'
 import { logEditEvent } from '../src/lib/intelligence/editLogger'
+import { repairRenderableCopy } from '../src/lib/copywriting/renderableCopy'
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -522,11 +523,17 @@ export async function rewriteEditorialCopyAction(
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: '당신은 한국 프리미엄 에디토리얼 카피라이터입니다. 슬라이드 문구만 개선하고 유효한 JSON만 반환하세요.' },
-          { role: 'user', content: `방향: ${intent}\n현재 제목: ${text.headline}\n현재 본문: ${text.body}\n제목 25자 이하, 본문 120자 이하로 headline/body JSON을 반환하세요.` },
+          { role: 'user', content: `방향: ${intent}\n현재 제목: ${text.headline}\n현재 본문: ${text.body}\n제목 25자 이하, 본문 220자 이하로 headline/body JSON을 반환하세요. 본문은 반드시 완성된 문장으로 끝내고 중간에서 자르지 마세요.` },
         ],
       })
       const parsed = JSON.parse(response.choices[0]?.message?.content || '{}') as { headline?: string; body?: string }
-      if (parsed.headline && parsed.body) rewrite = { headline: parsed.headline.slice(0, 52), body: parsed.body.slice(0, 120) }
+      if (parsed.headline && parsed.body) {
+        rewrite = repairRenderableCopy({
+          headline: parsed.headline,
+          body: parsed.body,
+          constraints: { maxHeadlineChars: 52, maxBodyChars: 220, maxBodyLines: 6, lineLength: 32 },
+        })
+      }
     }
     document.layers = document.layers.map(layer => {
       if (layer.type === 'title') return { ...layer, text: rewrite.headline }
@@ -588,10 +595,18 @@ function localCopyRewrite(headline: string, body: string, intent: string) {
       return { headline: `${headline.replace(/[.!?]+$/, '')}, 놓치지 마세요`, body }
     case 'shorter':
     case 'cleaner':
-      return { headline: headline.slice(0, 25), body: body.slice(0, 80) }
+      return repairRenderableCopy({
+        headline,
+        body,
+        constraints: { maxHeadlineChars: 25, maxBodyChars: 140, maxBodyLines: 4, lineLength: 32 },
+      })
     case 'premium':
     case 'luxury':
-      return { headline: `더 정제된 ${headline}`.slice(0, 28), body: body.slice(0, 56) }
+      return repairRenderableCopy({
+        headline: `더 정제된 ${headline}`,
+        body,
+        constraints: { maxHeadlineChars: 28, maxBodyChars: 180, maxBodyLines: 5, lineLength: 32 },
+      })
     default:
       return { headline, body }
   }

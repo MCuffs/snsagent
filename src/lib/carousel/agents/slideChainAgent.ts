@@ -75,7 +75,8 @@ ${knowledgeSection}
 
 규칙:
 - headline: 25자 이하 (공백 포함) — 강렬하고 구체적으로
-- body: 120자 이하 (공백 포함) — 핵심 정보를 1~3문장으로 풍성하게 작성. 너무 짧으면 안 됨
+- body: 220자 이하 (공백 포함) — 핵심 정보를 1~4문장으로 풍성하게 작성. 너무 짧으면 안 됨
+- body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하로 반드시 작성' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로 사용` : ''}
 - 이전 슬라이드와 같은 키워드·메시지를 반복하지 마세요
@@ -135,9 +136,9 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       body: result?.body?.trim() || fallbackCopy.body,
       constraints: {
         maxHeadlineChars: 25,
-        maxBodyChars: 120,
-        maxBodyLines: 5,
-        lineLength: 30,
+        maxBodyChars: 220,
+        maxBodyLines: 6,
+        lineLength: 32,
       },
     })
     const headline = repaired.headline || fallbackCopy.headline

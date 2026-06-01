@@ -295,9 +295,9 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         body: slide.body,
         constraints: {
           maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
-          maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 120,
-          maxBodyLines: 4,
-          lineLength: 28,
+          maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 220,
+          maxBodyLines: 6,
+          lineLength: 32,
         },
       })
       if (!renderableCheck.passed) {
@@ -524,7 +524,8 @@ ${slideDescriptions}
 
 규칙:
 - headline: 25자 이하, 강렬하고 구체적 (공백 포함)
-- body: 120자 이하, 핵심 정보를 1~3문장으로 풍성하게 전달 (공백 포함) — 너무 짧으면 감점${rssInstruction}
+- body: 220자 이하, 핵심 정보를 1~4문장으로 풍성하게 전달 (공백 포함) — 너무 짧으면 감점
+- body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요. 문장을 줄여야 하면 중간을 자르지 말고 완성 문장 단위로 다시 작성하세요.${rssInstruction}
 - 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
 - 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
 - hook 슬라이드: 독자의 시선을 즉시 잡되 사실로 확인되지 않은 효과를 단정하지 마세요
@@ -569,9 +570,9 @@ JSON 응답 형식:
       body,
       constraints: {
         maxHeadlineChars: constraints?.maxHeadlineChars || 25,
-        maxBodyChars: constraints?.maxBodyChars || 120,
-        maxBodyLines: 4,
-        lineLength: 28,
+        maxBodyChars: constraints?.maxBodyChars || 220,
+        maxBodyLines: 6,
+        lineLength: 32,
       },
     })
     return {
@@ -613,8 +614,8 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
       ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
       : item?.headline || input.topic
     const body = slidePlan.role === 'save-cta'
-      ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 80)
-      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 120)
+      ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 140)
+      : item?.body || slidePlan.briefingInstruction || summarize(item?.headline || input.keyContent, 220)
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
@@ -624,8 +625,8 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
         constraints: {
           maxHeadlineChars: slidePlan.copyConstraints.maxHeadlineChars,
           maxBodyChars: slidePlan.copyConstraints.maxBodyChars,
-          maxBodyLines: 4,
-          lineLength: 28,
+          maxBodyLines: 6,
+          lineLength: 32,
         },
       }),
       layoutType: slidePlan.layoutType,

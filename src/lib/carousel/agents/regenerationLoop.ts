@@ -1,7 +1,7 @@
 import { getLLMClient, getTextGenerationModel } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
-import { truncateAtSentenceBoundary } from '../../copywriting/truncate'
+import { repairRenderableCopy } from '../../copywriting/renderableCopy'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
 import { runCriticAgent, type CriticResult } from './criticAgent'
@@ -50,7 +50,8 @@ ${knowledgeSection}
 문제: 이전 슬라이드와 서사가 끊기거나 메시지가 반복되었습니다. 이를 개선하세요.
 규칙:
 - headline: 25자 이하
-- body: 120자 이하 — 정보를 풍성하게 1~3문장으로
+- body: 220자 이하 — 정보를 풍성하게 1~4문장으로
+- body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하 필수' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로` : ''}
 - 이전 슬라이드 메시지 반복 금지
@@ -97,11 +98,16 @@ export async function runRegenerationLoop(
       if (result?.headline && result?.body) {
         // Replace the existing completed slide
         const idx = memory.completedSlides.findIndex(s => s.slideNumber === slideNumber)
+        const repaired = repairRenderableCopy({
+          headline: result.headline.trim(),
+          body: result.body.trim(),
+          constraints: { maxHeadlineChars: 25, maxBodyChars: 220, maxBodyLines: 6, lineLength: 32 },
+        })
         const updated: CompletedSlide = {
           slideNumber,
           role: slide.role,
-          headline: truncateAtSentenceBoundary(result.headline.trim(), 25),
-          body: truncateAtSentenceBoundary(result.body.trim(), 120),
+          headline: repaired.headline,
+          body: repaired.body,
         }
         if (idx >= 0) {
           memory.completedSlides[idx] = updated

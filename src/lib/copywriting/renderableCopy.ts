@@ -28,21 +28,19 @@ export function repairRenderableCopy(params: {
   }
 
   if (body.length > params.constraints.maxBodyChars) {
-    body = summarizeBody(body, params.constraints.maxBodyChars)
+    body = fitCompleteSentences(body, params.constraints)
     issues.push('body summarized to fit character constraints')
   }
 
   let lines = wrapForRender(body, params.constraints.lineLength)
   if (lines.length > params.constraints.maxBodyLines) {
-    body = summarizeBody(body, Math.max(40, params.constraints.maxBodyLines * params.constraints.lineLength - 8))
+    body = fitCompleteSentences(body, params.constraints)
     lines = wrapForRender(body, params.constraints.lineLength)
     issues.push('body summarized to fit line constraints')
   }
 
   if (lines.length > params.constraints.maxBodyLines) {
-    body = lines.slice(0, params.constraints.maxBodyLines).join(' ')
-    body = truncateAtSentenceBoundary(body, body.length)
-    issues.push('body could not fit naturally and was reduced to visible lines')
+    issues.push('body exceeds visible lines but was preserved to avoid cutting a sentence')
   }
 
   return { headline, body, issues }
@@ -86,30 +84,34 @@ export function wrapForRender(value: string, maxLength: number) {
   return lines
 }
 
-function summarizeBody(value: string, maxChars: number) {
-  const sentences = normalizeCopy(value).split(/(?<=[.!?。！？]|다\.|요\.|죠\.|니다\.)\s+/).filter(Boolean)
+function fitCompleteSentences(value: string, constraints: RenderableCopyConstraints) {
+  const normalized = normalizeCopy(value)
+  const completeSentences = splitCompleteSentences(normalized)
+  if (completeSentences.length === 0) return normalized
+
   let output = ''
-  for (const sentence of sentences) {
+  for (const sentence of completeSentences) {
     const next = output ? `${output} ${sentence}` : sentence
-    if (next.length > maxChars) break
-    output = next
+    if (
+      next.length <= constraints.maxBodyChars &&
+      wrapForRender(next, constraints.lineLength).length <= constraints.maxBodyLines
+    ) {
+      output = next
+    }
   }
-  if (output.length >= Math.min(36, maxChars)) return output
 
-  const clauses = normalizeCopy(value).split(/\s*(?:,|·|;|그리고|또한|하지만|그래서)\s*/).filter(Boolean)
-  output = ''
-  for (const clause of clauses) {
-    const next = output ? `${output}. ${clause}` : clause
-    if (next.length > maxChars) break
-    output = next
-  }
-  if (output.length >= Math.min(24, maxChars)) return endClean(output)
-
-  return endClean(truncateAtSentenceBoundary(value, maxChars))
+  return output || normalized
 }
 
-function endClean(value: string) {
-  return value.replace(/[,\s]+$/, '').trim()
+function splitCompleteSentences(value: string) {
+  const sentences: string[] = []
+  const pattern = /.+?(?:[.!?。！？]+|(?:습니다|합니다|됩니다|입니다|합니다|주세요|보세요|해보세요|하세요|됩니다|좋습니다|중요합니다|갈립니다|이어집니다|높입니다|돕습니다|있습니다|없습니다|같습니다|됩니다)(?=\s|$))/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(value)) !== null) {
+    const sentence = match[0].trim()
+    if (sentence) sentences.push(sentence)
+  }
+  return sentences
 }
 
 function normalizeCopy(value: string) {

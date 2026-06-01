@@ -407,7 +407,7 @@ function buildSlidePlan(params: {
     expectedAction: actionByRole[role],
     copyConstraints: {
       maxHeadlineChars: role === 'hook' ? 22 : 25,
-      maxBodyChars: role === 'hook' ? 80 : 120,
+      maxBodyChars: role === 'hook' ? 140 : 220,
       style: role === 'save-cta' ? 'soft and actionable' : role === 'hook' ? 'specific and curiosity-led' : 'specific editorial prose',
       avoid: ['generic slogans', 'unsupported claims', 'repeated emotional beat'],
     },
