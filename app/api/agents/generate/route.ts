@@ -352,8 +352,7 @@ export async function POST(request: Request) {
         ...messages,
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 1200,
+      max_completion_tokens: 1200,
     })
 
     const content = response.choices[0]?.message?.content
@@ -422,6 +421,12 @@ function getOpenAIUserFacingError(error: unknown) {
     return {
       status: 400,
       message: '설정된 OpenAI 모델에 접근할 수 없습니다. OPENAI_TEXT_MODEL 또는 OPENAI_COPY_MODEL 값을 사용 가능한 모델로 변경해 주세요.',
+    }
+  }
+  if (haystack.includes('unsupported') || haystack.includes('invalid parameter') || haystack.includes('max_tokens') || haystack.includes('temperature')) {
+    return {
+      status: 400,
+      message: 'OpenAI 요청 형식이 현재 모델과 맞지 않습니다. 서버가 최신 요청 형식으로 배포되었는지 확인한 뒤 다시 시도해 주세요.',
     }
   }
   if (status >= 500) {

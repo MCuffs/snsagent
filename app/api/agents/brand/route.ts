@@ -115,8 +115,7 @@ export async function POST(request: Request) {
         ...messages,
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.6,
-      max_tokens: 800,
+      max_completion_tokens: 800,
     })
 
     const content = response.choices[0]?.message?.content
