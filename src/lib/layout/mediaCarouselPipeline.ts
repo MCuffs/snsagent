@@ -13,6 +13,7 @@ import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import { repairRenderableCopy, validateRenderableCopy } from '../copywriting/renderableCopy'
+import { buildSemanticFallback, evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -559,7 +560,7 @@ JSON 응답 형식:
   const copyMap = new Map(generatedSlides.map(s => [s.slideNumber, s]))
   const groundingText = `${input.topic}\n${input.title}\n${input.keyContent}`
 
-  return slides.map(slide => {
+  const repairedSlides = slides.map(slide => {
     const generated = copyMap.get(slide.slideNumber)
     const constraints = editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)?.copyConstraints
     if (typeof generated?.headline !== 'string' || !generated.headline.trim()) return slide
@@ -580,6 +581,137 @@ JSON 응답 형식:
       headline: repaired.headline || slide.headline,
       body: repaired.body || slide.body,
     }
+  })
+
+  return enforceSemanticMeaning({
+    input,
+    slides: repairedSlides,
+    editorialPlan,
+    sourceMaterial,
+    systemPrompt,
+  })
+}
+
+async function enforceSemanticMeaning(params: {
+  input: MediaCarouselInput
+  slides: MediaSlidePlan[]
+  editorialPlan: EditorialDirectorPlan
+  sourceMaterial: string
+  systemPrompt: string
+}): Promise<MediaSlidePlan[]> {
+  const initialReport = evaluateSemanticCopy({
+    topic: params.input.topic,
+    slides: params.slides.map(slide => ({
+      slideNumber: slide.slideNumber,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })),
+  })
+  const weakSlideNumbers = new Set(initialReport.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
+  if (weakSlideNumbers.size === 0) return params.slides
+
+  const client = getLLMClient()
+  const weakSlides = params.slides.filter(slide => weakSlideNumbers.has(slide.slideNumber))
+  const reviewPrompt = `다음 카드뉴스 슬라이드 중 의미가 완성되지 않은 본문만 다시 작성하세요.
+
+주제: ${params.input.topic}
+목표: ${params.input.objective || params.input.contentType}
+
+제공 자료:
+${params.sourceMaterial || '추가 자료 없음'}
+
+약한 슬라이드와 문제:
+${weakSlides.map(slide => {
+  const issues = initialReport.issues.filter(issue => issue.slideNumber === slide.slideNumber).map(issue => issue.message).join(' / ')
+  return `슬라이드 ${slide.slideNumber} [${slide.role}]
+headline: ${slide.headline}
+body: ${slide.body}
+문제: ${issues}`
+}).join('\n\n')}
+
+재작성 기준:
+- 본문은 단순히 문장처럼 끝나는 것이 아니라, 독자가 이해할 수 있는 하나의 의미를 완성해야 합니다.
+- 문제 제기만 하고 결론을 빼거나, "이유는", "핵심은", "더"처럼 열린 생각으로 끝내지 마세요.
+- 각 슬라이드 역할에 맞게 관찰, 해석, 구체적 의미, 다음 행동 중 하나를 반드시 완성하세요.
+- 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
+- headline은 필요할 때만 다듬고 25자 이하로 유지하세요.
+- body는 220자 이하, 1~4문장으로 작성하세요.
+
+JSON만 반환:
+{
+  "slides": [
+    { "slideNumber": 1, "headline": "...", "body": "..." }
+  ]
+}`
+
+  const result = await client.generateJson<{ slides: Array<{ slideNumber: number; headline: string; body: string }> }>(
+    'semantic slide copy review',
+    reviewPrompt,
+    () => ({ slides: [] }),
+    {
+      model: getCopywritingModel(),
+      temperature: 0.25,
+      systemPrompt: `${params.systemPrompt}\n당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.`,
+    }
+  )
+
+  const rewriteMap = new Map((Array.isArray(result?.slides) ? result.slides : []).map(slide => [slide.slideNumber, slide]))
+  const nextSlides = params.slides.map(slide => {
+    if (!weakSlideNumbers.has(slide.slideNumber)) return slide
+    const rewritten = rewriteMap.get(slide.slideNumber)
+    const constraints = params.editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)?.copyConstraints
+    const repaired = repairRenderableCopy({
+      headline: rewritten?.headline?.trim() || slide.headline,
+      body: rewritten?.body?.trim() || buildSemanticFallback({
+        topic: params.input.topic,
+        role: slide.role,
+        headline: slide.headline,
+      }),
+      constraints: {
+        maxHeadlineChars: constraints?.maxHeadlineChars || 25,
+        maxBodyChars: constraints?.maxBodyChars || 220,
+        maxBodyLines: 6,
+        lineLength: 32,
+      },
+    })
+    return {
+      ...slide,
+      headline: repaired.headline || slide.headline,
+      body: repaired.body || slide.body,
+    }
+  })
+
+  const finalReport = evaluateSemanticCopy({
+    topic: params.input.topic,
+    slides: nextSlides.map(slide => ({
+      slideNumber: slide.slideNumber,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })),
+  })
+
+  if (finalReport.passed) return nextSlides
+
+  const finalWeak = new Set(finalReport.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
+  return nextSlides.map(slide => {
+    if (!finalWeak.has(slide.slideNumber)) return slide
+    const repaired = repairRenderableCopy({
+      headline: slide.headline,
+      body: buildSemanticFallback({
+        topic: params.input.topic,
+        role: slide.role,
+        headline: slide.headline,
+      }),
+      constraints: {
+        maxHeadlineChars: 25,
+        maxBodyChars: 220,
+        maxBodyLines: 6,
+        lineLength: 32,
+      },
+    })
+    return { ...slide, headline: repaired.headline, body: repaired.body }
   })
 }
 
