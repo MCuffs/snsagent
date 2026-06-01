@@ -5,7 +5,7 @@ import { dbService } from '../../../../lib/db-service'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { collectBrandUrlContext } from '../../../../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../lib/purchase-persuasion'
-import { fetchRssForGeneration } from '../../../../src/lib/rss/rssFetcher'
+import { extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
 import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
 
 export const runtime = 'nodejs'
@@ -282,14 +282,14 @@ export async function POST(request: Request) {
     if (lastUserMessage && generationMode === 'general') {
       try {
         const userText = lastUserMessage.content.replace(/https?:\/\/[^\s]+/g, '').trim()
-        const keywords = userText.split(/[\s,]+/).filter(w => w.length > 1).slice(0, 5)
+        const keywords = extractGenerationKeywords(userText)
         const rssResult = await fetchRssForGeneration({
-          category: brand.industry || 'current-affairs',
+          category: inferRssCategory(userText, brand.industry || 'information'),
           keywords,
           topic: userText.slice(0, 80),
           limit: 5,
         })
-        if (rssResult.articles.length > 0) {
+        if (rssResult.matched && rssResult.articles.length > 0) {
           const lines = [
             `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
             `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,

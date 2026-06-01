@@ -32,6 +32,14 @@ export function repairRenderableCopy(params: {
     issues.push('body summarized to fit character constraints')
   }
 
+  if (!isCompleteBodyCopy(body)) {
+    body = fitCompleteSentences(body, params.constraints)
+    if (!isCompleteBodyCopy(body)) {
+      body = completeFallbackBody(body)
+      issues.push('body completed with fallback sentence ending')
+    }
+  }
+
   let lines = wrapForRender(body, params.constraints.lineLength)
   if (lines.length > params.constraints.maxBodyLines) {
     body = fitCompleteSentences(body, params.constraints)
@@ -101,6 +109,27 @@ function fitCompleteSentences(value: string, constraints: RenderableCopyConstrai
   }
 
   return output || normalized
+}
+
+export function isCompleteBodyCopy(value: string) {
+  const normalized = normalizeCopy(value)
+  if (!normalized) return false
+  if (/[.!?。！？]$/.test(normalized)) return true
+  return /(?:습니다|합니다|됩니다|입니다|주세요|보세요|해보세요|하세요|좋습니다|중요합니다|갈립니다|이어집니다|높입니다|돕습니다|있습니다|없습니다|같습니다|입니다)$/.test(normalized)
+}
+
+function completeFallbackBody(value: string) {
+  const normalized = normalizeCopy(value)
+  const withoutDanglingEnding = normalized
+    .replace(/[,，、]\s*$/, '')
+    .replace(/\s+(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|그리고|하지만|그래서|때문에|수록|다면|하면)$/u, '')
+    .trim()
+  if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
+  if (/(은|는|이|가|을|를|에|으로|수록|다면|하면|한|된|적|더|큰|작은|많은|좋은|나쁜)$/.test(withoutDanglingEnding)) {
+    return '핵심은 지금의 선택을 꾸준히 이어가는 것입니다.'
+  }
+  if (withoutDanglingEnding.length >= 18) return `${withoutDanglingEnding}.`
+  return '핵심은 지금의 선택을 꾸준히 이어가는 것입니다.'
 }
 
 function splitCompleteSentences(value: string) {

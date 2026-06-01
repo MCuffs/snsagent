@@ -9,7 +9,7 @@ import { checkCampaignUsage } from '../../../../lib/usageLimit'
 import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../../lib/purchase-persuasion'
 import { getUserFacingGenerationError } from '../../../../../lib/runtime-diagnostics'
-import { fetchRssForGeneration, buildRssContext } from '../../../../lib/rss/rssFetcher'
+import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../lib/rss/rssFetcher'
 import OpenAI from 'openai'
 
 export const runtime = 'nodejs'
@@ -107,15 +107,15 @@ export async function POST(request: Request) {
         }
       }
 
-      // Always fetch real-time RSS news as factual grounding for copy/hook generation
+      // Fetch real-time RSS only when articles match the user's actual topic.
       try {
-        const keywords = (brand.forbiddenWords || '')
-          .split(',')
-          .map((k: string) => k.trim())
-          .filter((k: string) => k.length > 0)
+        const keywords = extractGenerationKeywords(body.topic, [
+          body.category || '',
+          body.contentType || '',
+        ])
 
         const rssResult = await fetchRssForGeneration({
-          category: body.category || brand.industry || 'current-affairs',
+          category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
           keywords,
           topic: body.topic,
           limit: 5,
@@ -125,6 +125,8 @@ export async function POST(request: Request) {
         if (rssContext) {
           enrichedKeyContent = `${enrichedKeyContent}\n\n${rssContext}`
           console.log(`[RSS] Injected ${rssResult.articles.length} articles (matched: ${rssResult.matched}) into keyContent`)
+        } else {
+          console.log(`[RSS] Skipped unrelated articles for topic "${body.topic}"`)
         }
       } catch (rssErr) {
         console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
@@ -195,12 +197,9 @@ export async function POST(request: Request) {
     // Enrich commerce campaign with RSS news context relevant to the brand industry
     let productDescription = body.productDescription!
     try {
-      const keywords = (brand.forbiddenWords || '')
-        .split(',')
-        .map((k: string) => k.trim())
-        .filter((k: string) => k.length > 0)
+      const keywords = extractGenerationKeywords(body.productName, [body.productDescription || ''])
       const rssResult = await fetchRssForGeneration({
-        category: brand.industry || 'current-affairs',
+        category: inferRssCategory(body.productName || body.productDescription, brand.industry || 'information'),
         keywords,
         topic: body.productName,
         limit: 3,

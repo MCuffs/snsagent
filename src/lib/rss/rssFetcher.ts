@@ -53,6 +53,18 @@ const FEEDS: Record<string, string[]> = {
   ],
 }
 
+const TOPIC_STOPWORDS = new Set([
+  '카드뉴스', '카드', '뉴스', '만들어주세요', '만들어줘', '만들어', '제작해주세요', '제작해줘',
+  '대한', '대해', '관련', '정보', '알려주세요', '알려줘', '해주세요', '해줘', '요청',
+  'the', 'a', 'an', 'about', 'for', 'make', 'create', 'carousel', 'card', 'news',
+])
+
+const CATEGORY_HINTS: Array<{ category: string; patterns: RegExp[] }> = [
+  { category: 'information', patterns: [/효능|건강|영양|식단|질병|예방|증상|운동|피로|면역|수면|혈당|콜레스테롤|다이어트/] },
+  { category: 'trends', patterns: [/트렌드|기술|ai|인공지능|it|앱|플랫폼|소셜|콘텐츠|마케팅/i] },
+  { category: 'current-affairs', patterns: [/정책|경제|증시|코스피|금리|환율|선거|사회|국제|정치|사건/] },
+]
+
 function cleanText(text: string): string {
   if (!text) return ''
   return text
@@ -96,6 +108,26 @@ function scoreArticle(article: RssArticle, keywords: string[]): number {
   return score
 }
 
+export function extractGenerationKeywords(topic?: string, extraKeywords: string[] = []): string[] {
+  const source = [topic || '', ...extraKeywords].join(' ')
+  return Array.from(new Set(
+    source
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .map(word => word.trim().toLowerCase())
+      .filter(word => word.length > 1 && !TOPIC_STOPWORDS.has(word))
+  )).slice(0, 8)
+}
+
+export function inferRssCategory(topic?: string, fallback = 'information') {
+  const normalized = (topic || '').toLowerCase()
+  for (const hint of CATEGORY_HINTS) {
+    if (hint.patterns.some(pattern => pattern.test(normalized))) return hint.category
+  }
+  return fallback
+}
+
 export async function fetchRssForGeneration(params: {
   category: string
   keywords: string[]
@@ -137,8 +169,7 @@ export async function fetchRssForGeneration(params: {
       }
     }
 
-    const articles = unique.slice(0, limit)
-    return { articles, matched: false, topArticle: articles[0] ?? null }
+    return { articles: [], matched: false, topArticle: null }
   } catch {
     return { articles: [], matched: false, topArticle: null }
   }
@@ -146,7 +177,7 @@ export async function fetchRssForGeneration(params: {
 
 // Build a rich context string from fetched articles to inject into the LLM pipeline
 export function buildRssContext(result: RssFetchResult, language: 'ko' | 'en' = 'ko'): string {
-  if (result.articles.length === 0) return ''
+  if (!result.matched || result.articles.length === 0) return ''
 
   if (language === 'en') {
     const lines = [
