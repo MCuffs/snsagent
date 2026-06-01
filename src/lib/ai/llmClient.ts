@@ -10,7 +10,7 @@ export interface LLMRequestOptions {
   systemPrompt?: string
 }
 
-export const DEFAULT_TEXT_MODEL = 'gpt-5.1'
+export const DEFAULT_TEXT_MODEL = 'gpt-5.4'
 
 export class MockLLMClient implements LLMClient {
   async generateJson<T>(_stepName: string, _prompt: string, fallback: () => T): Promise<T> {
@@ -66,17 +66,11 @@ export function getLLMClient(): LLMClient {
 }
 
 export function getCopywritingModel() {
-  return normalizeOpenAITextModel(process.env.OPENAI_COPY_MODEL?.trim() || getTextGenerationModel())
+  return process.env.OPENAI_COPY_MODEL?.trim() || getTextGenerationModel()
 }
 
 export function getTextGenerationModel() {
-  return normalizeOpenAITextModel(process.env.OPENAI_TEXT_MODEL?.trim() || DEFAULT_TEXT_MODEL)
-}
-
-export function normalizeOpenAITextModel(model: string) {
-  const trimmed = model.trim()
-  if (trimmed === 'gpt-5.4') return DEFAULT_TEXT_MODEL
-  return trimmed || DEFAULT_TEXT_MODEL
+  return process.env.OPENAI_TEXT_MODEL?.trim() || DEFAULT_TEXT_MODEL
 }
 
 function supportsCustomTemperature(model: string) {
