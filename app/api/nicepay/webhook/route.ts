@@ -1,5 +1,6 @@
 import { dbService } from '../../../../lib/db-service'
 import { nextMonthlyBillingDate } from '../../../../lib/nicepay'
+import { unauthorizedJson, verifyRequestSecret } from '../../../../lib/security'
 
 export const runtime = 'nodejs'
 
@@ -10,13 +11,26 @@ function webhookString(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const webhookSecret = process.env.NICEPAY_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('[NicePay Webhook] NICEPAY_WEBHOOK_SECRET is not configured; refusing to process webhook')
+    return Response.json(
+      { success: false, error: 'NicePay webhook secret is not configured.' },
+      { status: 500 },
+    )
+  }
+
+  if (!verifyRequestSecret(request, webhookSecret)) {
+    return unauthorizedJson('Unauthorized NicePay webhook request.')
+  }
+
   const rawBody = await request.text()
 
   let body: Record<string, unknown>
   try {
     body = JSON.parse(rawBody)
   } catch {
-    return Response.json({ success: true })
+    return Response.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
   const eventType = webhookString(body.eventType) || webhookString(body.type)

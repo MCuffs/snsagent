@@ -68,7 +68,7 @@ Google Login
 ### 결제와 후속 범위
 
 - 내부 `FREE` 상태는 로그인 직후 또는 취소 후의 이용권 없음 상태이며 생성 한도는 0회입니다.
-- 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 19,000원 20회, `UNLIMITED`/Studio 월 45,000원 30회로 매핑됩니다.
+- 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 25,000원 20회, `UNLIMITED`/Studio 월 39,000원 30회로 매핑됩니다.
 - 토스페이먼츠 SDK가 카드 자동결제 인증을 시작하고, 서버 콜백이 저장된 `customerKey`를 검증한 후 내부 플랜 금액으로 빌링키 최초 결제를 승인합니다.
 - 토스페이먼츠는 청구 스케줄을 제공하지 않으므로 `app/api/cron/billing`이 `CRON_SECRET` 인증 하에 국내 카드 구독 만기를 월별 승인합니다.
 - 해외 고객은 PayPal Subscription 버튼을 사용하며, 서버가 PayPal의 `plan_id`와 서명된 웹훅을 검증해 권한을 동기화합니다. 활성 구독이 있으면 다른 공급자의 중복 가입은 허용하지 않습니다.

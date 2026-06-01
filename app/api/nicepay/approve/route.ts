@@ -97,12 +97,15 @@ export async function POST(request: NextRequest) {
     } catch (bidError) {
       console.error('[NicePay BID Issue Failed]', bidError)
       await dbService.updateUserNicepay(user.id, {
-        plan: validPlan,
         nicepayBid: null,
-        nicepaySubscriptionStatus: null,
+        nicepaySubscriptionStatus: 'PENDING',
         nicepayLastPaidAt: paidAt,
         nicepayLastOrderId: orderId,
       })
+      return NextResponse.json(
+        { error: 'NicePay billing key registration failed after payment approval. Manual review is required.' },
+        { status: 502 },
+      )
     }
 
     return NextResponse.json({ success: true })
