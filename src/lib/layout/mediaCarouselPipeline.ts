@@ -297,8 +297,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         constraints: {
           maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
           maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 220,
-          maxBodyLines: 6,
-          lineLength: 32,
+          maxBodyLines: maxRenderableBodyLines(slide.role),
+          lineLength: 24,
         },
       })
       if (!renderableCheck.passed) {
@@ -572,8 +572,8 @@ JSON 응답 형식:
       constraints: {
         maxHeadlineChars: constraints?.maxHeadlineChars || 25,
         maxBodyChars: constraints?.maxBodyChars || 220,
-        maxBodyLines: 6,
-        lineLength: 32,
+        maxBodyLines: maxRenderableBodyLines(slide.role),
+        lineLength: 24,
       },
     })
     return {
@@ -671,8 +671,8 @@ JSON만 반환:
       constraints: {
         maxHeadlineChars: constraints?.maxHeadlineChars || 25,
         maxBodyChars: constraints?.maxBodyChars || 220,
-        maxBodyLines: 6,
-        lineLength: 32,
+        maxBodyLines: maxRenderableBodyLines(slide.role),
+        lineLength: 24,
       },
     })
     return {
@@ -707,8 +707,8 @@ JSON만 반환:
       constraints: {
         maxHeadlineChars: 25,
         maxBodyChars: 220,
-        maxBodyLines: 6,
-        lineLength: 32,
+        maxBodyLines: maxRenderableBodyLines(slide.role),
+        lineLength: 24,
       },
     })
     return { ...slide, headline: repaired.headline, body: repaired.body }
@@ -726,6 +726,10 @@ function rolePurpose(role: MediaSlideRole) {
     'save-cta': '저장 또는 상세 확인 행동을 제안',
   }
   return purposes[role]
+}
+
+function maxRenderableBodyLines(role: MediaSlideRole | string | undefined) {
+  return role === 'save-cta' || role === 'summary' ? 4 : 5
 }
 
 function hasUnsupportedNumericClaim(copy: string, groundingText: string) {
@@ -757,8 +761,8 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
         constraints: {
           maxHeadlineChars: slidePlan.copyConstraints.maxHeadlineChars,
           maxBodyChars: slidePlan.copyConstraints.maxBodyChars,
-          maxBodyLines: 6,
-          lineLength: 32,
+          maxBodyLines: maxRenderableBodyLines(slidePlan.role),
+          lineLength: 24,
         },
       }),
       layoutType: slidePlan.layoutType,

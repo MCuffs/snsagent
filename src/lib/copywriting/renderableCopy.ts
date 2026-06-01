@@ -70,6 +70,9 @@ export function validateRenderableCopy(params: {
   if (lines.length > params.constraints.maxBodyLines) {
     issues.push(`body wraps to ${lines.length} lines; max is ${params.constraints.maxBodyLines}`)
   }
+  if (!isCompleteBodyCopy(params.body)) {
+    issues.push('body does not end as a complete sentence')
+  }
   return { passed: issues.length === 0, issues, lines }
 }
 
@@ -115,26 +118,26 @@ export function isCompleteBodyCopy(value: string) {
   const normalized = normalizeCopy(value)
   if (!normalized) return false
   if (/[.!?。！？]$/.test(normalized)) return true
-  return /(?:습니다|합니다|됩니다|입니다|주세요|보세요|해보세요|하세요|좋습니다|중요합니다|갈립니다|이어집니다|높입니다|돕습니다|있습니다|없습니다|같습니다|입니다)$/.test(normalized)
+  return /(습니다|합니다|됩니다|입니다|주세요|보세요|하세요|좋습니다|중요합니다|필요합니다|가능합니다|분명합니다|이어집니다|낮아집니다|높아집니다|있습니다|없습니다|같습니다|해집니다|줍니다|듭니다|납니다)$/.test(normalized)
 }
 
 function completeFallbackBody(value: string) {
   const normalized = normalizeCopy(value)
   const withoutDanglingEnding = normalized
-    .replace(/[,，、]\s*$/, '')
-    .replace(/\s+(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|그리고|하지만|그래서|때문에|수록|다면|하면)$/u, '')
+    .replace(/[,，、;:]\s*$/, '')
+    .replace(/\s+(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|그리고|하지만|그래서|때문에|도록|라면|하면)$/u, '')
     .trim()
   if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
-  if (/(은|는|이|가|을|를|에|으로|수록|다면|하면|한|된|적|더|큰|작은|많은|좋은|나쁜)$/.test(withoutDanglingEnding)) {
-    return '핵심은 지금의 선택을 꾸준히 이어가는 것입니다.'
+  if (/(은|는|이|가|을|를|으로|도록|라면|하면|필요|중요|좋은|많은|위한)$/.test(withoutDanglingEnding)) {
+    return '지금 선택해야 할 이유가 분명해집니다.'
   }
   if (withoutDanglingEnding.length >= 18) return `${withoutDanglingEnding}.`
-  return '핵심은 지금의 선택을 꾸준히 이어가는 것입니다.'
+  return '지금 선택해야 할 이유가 분명해집니다.'
 }
 
 function splitCompleteSentences(value: string) {
   const sentences: string[] = []
-  const pattern = /.+?(?:[.!?。！？]+|(?:습니다|합니다|됩니다|입니다|합니다|주세요|보세요|해보세요|하세요|됩니다|좋습니다|중요합니다|갈립니다|이어집니다|높입니다|돕습니다|있습니다|없습니다|같습니다|됩니다)(?=\s|$))/g
+  const pattern = /.+?(?:[.!?。！？]+|(?:습니다|합니다|됩니다|입니다|주세요|보세요|하세요|좋습니다|중요합니다|필요합니다|가능합니다|분명합니다|이어집니다|낮아집니다|높아집니다|있습니다|없습니다|같습니다|해집니다|줍니다|듭니다|납니다)(?=\s|$))/g
   let match: RegExpExecArray | null
   while ((match = pattern.exec(value)) !== null) {
     const sentence = match[0].trim()

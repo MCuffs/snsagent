@@ -35,7 +35,7 @@ export async function renderSlide(params: {
   const alphaHigh = Math.min(overlayStrength / 100 + 0.25, 1).toFixed(2)
 
   const bodyStartY = textY + 72
-  const ctaY = textY + 60 + bodyLines.slice(0, MAX_BODY_LINES).length * 50
+  const ctaY = textY + 60 + bodyLines.length * 50
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">

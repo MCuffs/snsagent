@@ -48,8 +48,8 @@ export function planTypography(input: TypographyInput): TypographyPlan {
   const maxBodyChars = getBodyLineChars(input.layout)
 
   // 3. 지능형 한국어 줄바꿈 적용
-  const rawHeadlineLines = breakKoreanLines(input.headline, maxHeadlineChars, 3)
-  const bodyLines = breakKoreanLines(input.body, maxBodyChars, 6)
+  const rawHeadlineLines = breakKoreanLines(input.headline, maxHeadlineChars)
+  const bodyLines = breakKoreanLines(input.body, maxBodyChars)
 
   // 4. 헤드라인 라인별 토큰 매핑
   const headlineLines: TypographyLine[] = rawHeadlineLines.map(lineText => {

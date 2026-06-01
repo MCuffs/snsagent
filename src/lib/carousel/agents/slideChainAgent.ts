@@ -137,8 +137,8 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       constraints: {
         maxHeadlineChars: 25,
         maxBodyChars: 220,
-        maxBodyLines: 6,
-        lineLength: 32,
+        maxBodyLines: 5,
+        lineLength: 30,
       },
     })
     const headline = repaired.headline || fallbackCopy.headline

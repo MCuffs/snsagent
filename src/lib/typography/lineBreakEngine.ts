@@ -41,7 +41,7 @@ const PARTICLES = [
  * 한국어 조사 및 어미 결합 규칙을 기반으로, 텍스트가 임의의 글자 수 경계에서 잘리지 않고
  * 자연스러운 의미 단위(어절/조사 그룹)로 줄바꿈되도록 개행 배열을 반환하는 엔진입니다.
  */
-export function breakKoreanLines(text: string, maxCharsPerLine: number, maxLines: number): string[] {
+export function breakKoreanLines(text: string, maxCharsPerLine: number): string[] {
   const normalized = text.trim().replace(/\s+/g, ' ')
   const words = splitPreservingBrackets(normalized)
   const groupedPhrases: string[] = []
@@ -74,7 +74,7 @@ export function breakKoreanLines(text: string, maxCharsPerLine: number, maxLines
     const nextLine = currentLine ? `${currentLine} ${phrase}` : phrase
     
     // 개행 경계 체크
-    if (currentLine && nextLine.length > maxCharsPerLine && lines.length < maxLines - 1) {
+    if (currentLine && nextLine.length > maxCharsPerLine) {
       lines.push(currentLine)
       currentLine = phrase
     } else {
@@ -86,5 +86,5 @@ export function breakKoreanLines(text: string, maxCharsPerLine: number, maxLines
     lines.push(currentLine)
   }
 
-  return lines.slice(0, maxLines)
+  return lines
 }

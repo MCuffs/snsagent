@@ -101,7 +101,7 @@ export async function runRegenerationLoop(
         const repaired = repairRenderableCopy({
           headline: result.headline.trim(),
           body: result.body.trim(),
-          constraints: { maxHeadlineChars: 25, maxBodyChars: 220, maxBodyLines: 6, lineLength: 32 },
+          constraints: { maxHeadlineChars: 25, maxBodyChars: 220, maxBodyLines: 5, lineLength: 30 },
         })
         const updated: CompletedSlide = {
           slideNumber,
