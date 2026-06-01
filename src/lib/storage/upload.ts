@@ -13,6 +13,7 @@ export async function uploadGeneratedAsset(params: {
     const blob = await put(`carousel/${safeFileName}`, params.content, {
       access: 'public',
       contentType: params.contentType,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     })
     return blob.url
   }

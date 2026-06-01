@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../actions'
 import { dbService } from '../../../../../lib/db-service'
 import { buildMetaOAuthUrl, hasMetaOAuthConfig } from '../../../../../lib/meta/oauth'
+import { isProduction } from '../../../../../lib/env'
 
 export const runtime = 'nodejs'
 
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
   cookieStore.set('meta_oauth_nonce', nonce, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: isProduction(),
     path: '/',
     maxAge: 10 * 60,
   })

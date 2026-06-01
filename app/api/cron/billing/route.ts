@@ -15,6 +15,7 @@ import {
   isPaidPlan as isNicepayPaidPlan,
   nextMonthlyBillingDate as nicepayNextMonth,
 } from '../../../../lib/nicepay'
+import { unauthorizedJson, verifyBearerSecret } from '../../../../lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,21 +57,8 @@ async function handleBillingRenewal(request: NextRequest) {
     )
   }
 
-  const authHeader = request.headers.get('authorization')
-  const querySecret = request.nextUrl.searchParams.get('secret')
-
-  let providedSecret = ''
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    providedSecret = authHeader.substring(7)
-  } else if (querySecret) {
-    providedSecret = querySecret
-  }
-
-  if (providedSecret !== systemSecret) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized. Invalid secret key.' },
-      { status: 401 }
-    )
+  if (!verifyBearerSecret(request.headers.get('authorization'), systemSecret)) {
+    return unauthorizedJson('Unauthorized. Invalid secret key.')
   }
 
   const now = new Date()

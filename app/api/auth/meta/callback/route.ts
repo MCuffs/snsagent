@@ -77,5 +77,13 @@ export async function GET(request: Request) {
 }
 
 function decodeState(value: string): MetaOAuthState {
-  return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as MetaOAuthState
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<MetaOAuthState>
+    if (typeof parsed.nonce !== 'string' || typeof parsed.brandId !== 'string') {
+      return { nonce: '', brandId: '' }
+    }
+    return parsed as MetaOAuthState
+  } catch {
+    return { nonce: '', brandId: '' }
+  }
 }

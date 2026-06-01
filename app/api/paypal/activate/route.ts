@@ -30,6 +30,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '구독이 활성화되지 않았습니다.' }, { status: 400 })
     }
 
+    if (subscription.custom_id !== user.id) {
+      return NextResponse.json({ error: 'Subscription owner does not match the current user.' }, { status: 403 })
+    }
+
+    const existingOwner = await dbService.getUserByPayPalSubscriptionId(body.subscriptionId)
+    if (existingOwner && existingOwner.id !== user.id) {
+      return NextResponse.json({ error: 'Subscription is already linked to another user.' }, { status: 409 })
+    }
+
     const plan = planFromPayPalPlanId(subscription.plan_id || '')
     if (!plan) {
       return NextResponse.json({ error: '등록되지 않은 PayPal 요금제입니다.' }, { status: 400 })

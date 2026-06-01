@@ -30,7 +30,13 @@ export async function getSubscription(subscriptionId: string) {
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`PayPal subscription fetch error: ${res.status}`)
-  return res.json() as Promise<{ id: string; status: string; plan_id?: string; subscriber?: { payer_id?: string } }>
+  return res.json() as Promise<{
+    id: string
+    status: string
+    plan_id?: string
+    custom_id?: string
+    subscriber?: { payer_id?: string; email_address?: string }
+  }>
 }
 
 export async function cancelSubscription(subscriptionId: string, reason = '사용자 요청') {

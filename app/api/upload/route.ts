@@ -4,6 +4,7 @@ import { normalizePlan } from '../../../lib/limits-types'
 import { list } from '@vercel/blob'
 import path from 'path'
 import fs from 'fs'
+import { randomUUID } from 'crypto'
 
 export const runtime = 'nodejs'
 
@@ -33,6 +34,46 @@ const QUOTA_FREE = 20 * 1024 * 1024 // 20MB
 const QUOTA_PAID = 100 * 1024 * 1024 // 100MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days local retention
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
+function detectImageMime(buffer: Buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg'
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png'
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return 'image/webp'
+  }
+  if (
+    buffer.length >= 6 &&
+    (buffer.subarray(0, 6).toString('ascii') === 'GIF87a' ||
+      buffer.subarray(0, 6).toString('ascii') === 'GIF89a')
+  ) {
+    return 'image/gif'
+  }
+  return null
+}
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
@@ -61,7 +102,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Validate formats and individual sizes
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    const allowedTypes = Object.keys(IMAGE_EXTENSIONS)
     let totalIncomingSize = 0
 
     for (const file of files) {
@@ -87,7 +128,10 @@ export async function POST(request: Request) {
         currentUsage = blobs.reduce((sum, b) => sum + b.size, 0)
       } catch (listError) {
         console.error('[Upload Quota] Failed to list Vercel blobs:', listError)
-        // Fail-closed fallback: assume zero but log warning
+        return NextResponse.json(
+          { error: 'Unable to verify storage quota. Upload was not processed.' },
+          { status: 503 }
+        )
       }
     } else {
       // Local FS storage quota calculation
@@ -130,15 +174,21 @@ export async function POST(request: Request) {
     for (const file of files) {
       const bytes = await file.arrayBuffer()
       const buffer = Buffer.from(bytes)
-      const ext = file.type.split('/')[1] || 'jpg'
-      const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const detectedType = detectImageMime(buffer)
+      if (!detectedType || detectedType !== file.type) {
+        return NextResponse.json({ error: 'File type verification failed.' }, { status: 400 })
+      }
+
+      const ext = IMAGE_EXTENSIONS[detectedType] || 'jpg'
+      const fileName = `ref-${randomUUID()}.${ext}`
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
         const { put } = await import('@vercel/blob')
         // Prefix by uploads/${user.id}/ for prefix isolated search/limit scans
         const blob = await put(`uploads/${user.id}/${fileName}`, buffer, {
           access: 'public',
-          contentType: file.type,
+          contentType: detectedType,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
         })
         urls.push(blob.url)
       } else {
