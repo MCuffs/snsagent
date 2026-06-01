@@ -129,10 +129,10 @@ function completeFallbackBody(value: string) {
     .trim()
   if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
   if (/(은|는|이|가|을|를|으로|도록|라면|하면|필요|중요|좋은|많은|위한)$/.test(withoutDanglingEnding)) {
-    return '지금 선택해야 할 이유가 분명해집니다.'
+    return '구체적인 사용 장면과 확인 포인트를 함께 보여줘야 설득력이 살아납니다.'
   }
   if (withoutDanglingEnding.length >= 18) return `${withoutDanglingEnding}.`
-  return '지금 선택해야 할 이유가 분명해집니다.'
+  return '구체적인 사용 장면과 확인 포인트를 함께 보여줘야 설득력이 살아납니다.'
 }
 
 function splitCompleteSentences(value: string) {
