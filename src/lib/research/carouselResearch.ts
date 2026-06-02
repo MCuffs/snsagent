@@ -1,4 +1,12 @@
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../rss/rssFetcher'
+import OpenAI from 'openai'
+import { getTextGenerationModel } from '../ai/llmClient'
+import {
+  getOpenAIBaseURLHost,
+  getOpenAIKeyFingerprint,
+  logAiDiagnostic,
+  readOpenAIError,
+} from '../ai/diagnostics'
 
 export interface ResearchSource {
   title: string
@@ -52,6 +60,11 @@ export async function buildCarouselResearchBrief(input: ResearchInput): Promise<
 
   const userIntent = inferUserIntent(input.topic, input.contentType)
   const queries = buildQueries(subject, userIntent, input.language || 'ko')
+  const openAIWebBrief = await buildOpenAIWebResearchBrief(input, subject, userIntent, queries)
+  if (openAIWebBrief && openAIWebBrief.verifiedFacts.length >= 3) {
+    return openAIWebBrief
+  }
+
   const [wiki, duck, usda, rss] = await Promise.all([
     fetchWikipediaFacts(subject, input.language || 'ko'),
     fetchDuckDuckGoFacts(queries[0], subject),
@@ -90,6 +103,154 @@ export async function buildCarouselResearchBrief(input: ResearchInput): Promise<
     slideEvidence,
     sources,
   }
+}
+
+async function buildOpenAIWebResearchBrief(
+  input: ResearchInput,
+  subject: string,
+  userIntent: string,
+  queries: string[]
+): Promise<CarouselResearchBrief | null> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey || apiKey.length < 10 || apiKey === 'your-openai-api-key-here') return null
+
+  const model = process.env.OPENAI_RESEARCH_MODEL || getTextGenerationModel()
+  const baseURL = getOpenAIBaseURLHost()
+  const keyFingerprint = getOpenAIKeyFingerprint(apiKey)
+  const stepName = 'openai web research brief'
+  logAiDiagnostic({
+    status: 'start',
+    stepName,
+    provider: 'openai',
+    model,
+    baseURL,
+    keyFingerprint,
+  })
+
+  try {
+    const client = new OpenAI({
+      apiKey,
+      ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
+    })
+    const prompt = buildOpenAIWebResearchPrompt(input, subject, userIntent, queries)
+    const response = await client.responses.create({
+      model,
+      tools: [{
+        type: 'web_search',
+        search_context_size: 'low',
+      } as never],
+      tool_choice: 'required' as never,
+      include: ['web_search_call.action.sources'] as never,
+      input: prompt,
+    } as never)
+
+    const outputText = extractResponseOutputText(response)
+    const parsed = parseJsonObject<Partial<CarouselResearchBrief>>(outputText)
+    if (!parsed) {
+      logAiDiagnostic({
+        status: 'fallback',
+        stepName,
+        provider: 'openai',
+        model,
+        baseURL,
+        keyFingerprint,
+        errorMessage: 'web research response did not contain JSON',
+      })
+      return null
+    }
+
+    const brief: CarouselResearchBrief = {
+      subject,
+      userIntent: typeof parsed.userIntent === 'string' ? parsed.userIntent : userIntent,
+      queries,
+      verifiedFacts: uniqueStrings(Array.isArray(parsed.verifiedFacts) ? parsed.verifiedFacts.map(String) : [])
+        .filter(fact => isRelevantFact(fact, subject, input.topic))
+        .slice(0, 12),
+      cautions: uniqueStrings(Array.isArray(parsed.cautions) ? parsed.cautions.map(String) : buildCautions(input.topic, subject, []))
+        .slice(0, 5),
+      slideEvidence: normalizeSlideEvidence(parsed.slideEvidence, input.slideCount, subject),
+      sources: uniqueSources([
+        ...normalizeResearchSources(parsed.sources),
+        ...extractResponseSources(response),
+      ]),
+    }
+
+    if (brief.verifiedFacts.length === 0) return null
+    if (brief.slideEvidence.length === 0) {
+      brief.slideEvidence = buildSlideEvidence({
+        subject,
+        slideCount: input.slideCount,
+        facts: brief.verifiedFacts,
+        cautions: brief.cautions,
+        intent: brief.userIntent,
+      })
+    }
+
+    logAiDiagnostic({
+      status: 'success',
+      stepName,
+      provider: 'openai',
+      model,
+      baseURL,
+      keyFingerprint,
+      errorMessage: `facts=${brief.verifiedFacts.length}; sources=${brief.sources.length}`,
+    })
+    return brief
+  } catch (error) {
+    console.warn('[ResearchBrief] OpenAI web search failed, falling back to direct sources:', error)
+    logAiDiagnostic({
+      status: 'failure',
+      stepName,
+      provider: 'openai',
+      model,
+      baseURL,
+      keyFingerprint,
+      ...readOpenAIError(error),
+    })
+    return null
+  }
+}
+
+function buildOpenAIWebResearchPrompt(input: ResearchInput, subject: string, userIntent: string, queries: string[]) {
+  const slideCount = Math.min(Math.max(Math.round(input.slideCount || 5), 5), 10)
+  const languageRule = input.language === 'en'
+    ? 'Write all JSON string values in English.'
+    : 'JSON 문자열 값은 모두 한국어로 작성하세요.'
+  return `Use web search to build a factual research brief for Instagram card-news copy.
+
+${languageRule}
+
+User topic: ${input.topic}
+Subject: ${subject}
+Intent: ${userIntent}
+Search queries to consider: ${queries.join(' | ')}
+Existing brief/context:
+${input.keyContent?.slice(0, 1200) || 'No additional context.'}
+
+Requirements:
+- Search the web before answering.
+- Only include facts directly related to "${subject}" and the user topic.
+- Reject unrelated economy, stock, politics, celebrity, or random trend information unless the topic explicitly asks for it.
+- For health/food topics, avoid disease-treatment claims. Explain benefits as nutrition, routine, serving, storage, or caution points.
+- Include practical facts that can become card body copy: ingredients/nutrients, use scene, serving/portion, caution, storage, comparison point.
+- Do not include citations inline in facts. Put source URLs in sources.
+- Return JSON only.
+
+JSON schema:
+{
+  "subject": "${subject}",
+  "userIntent": "${userIntent}",
+  "verifiedFacts": ["fact 1", "fact 2"],
+  "cautions": ["caution 1", "caution 2"],
+  "slideEvidence": [
+    { "slideNumber": 1, "role": "hook", "mustUseFacts": ["..."], "avoidClaims": ["..."] }
+  ],
+  "sources": [
+    { "title": "source title", "url": "https://...", "provider": "openai-web" }
+  ]
+}
+
+Create exactly ${slideCount} slideEvidence items.`
 }
 
 export function formatResearchBriefForPrompt(brief: CarouselResearchBrief | null, language: 'ko' | 'en' = 'ko') {
@@ -380,6 +541,77 @@ function splitSentences(value: string) {
     .split(/(?<=[.!?。！？])\s+|(?<=다\.)\s+|(?<=요\.)\s+/u)
     .map(sentence => sentence.trim())
     .filter(Boolean)
+}
+
+function extractResponseOutputText(response: unknown) {
+  const value = response as {
+    output_text?: string
+    output?: Array<{ content?: Array<{ text?: string; type?: string }> }>
+  }
+  if (typeof value.output_text === 'string') return value.output_text
+  return (value.output || [])
+    .flatMap(item => item.content || [])
+    .map(content => content.text || '')
+    .filter(Boolean)
+    .join('\n')
+}
+
+function parseJsonObject<T>(value: string): T | null {
+  if (!value.trim()) return null
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    const match = value.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    try {
+      return JSON.parse(match[0]) as T
+    } catch {
+      return null
+    }
+  }
+}
+
+function normalizeSlideEvidence(value: unknown, slideCount: number, subject: string): SlideEvidence[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item, index) => {
+      const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      const mustUseFacts = Array.isArray(record.mustUseFacts) ? record.mustUseFacts.map(String) : []
+      const avoidClaims = Array.isArray(record.avoidClaims) ? record.avoidClaims.map(String) : []
+      return {
+        slideNumber: Number(record.slideNumber) || index + 1,
+        role: typeof record.role === 'string' ? record.role : inferRoles(slideCount)[index] || 'detail',
+        mustUseFacts: uniqueStrings(mustUseFacts).filter(fact => fact.includes(subject) || fact.length >= 12).slice(0, 2),
+        avoidClaims: uniqueStrings(avoidClaims).slice(0, 3),
+      }
+    })
+    .filter(item => item.slideNumber >= 1 && item.slideNumber <= slideCount && item.mustUseFacts.length > 0)
+    .slice(0, slideCount)
+}
+
+function normalizeResearchSources(value: unknown): ResearchSource[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(item => {
+      const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      const title = typeof record.title === 'string' ? record.title.trim() : ''
+      const url = typeof record.url === 'string' ? record.url.trim() : ''
+      const provider = typeof record.provider === 'string' && ['wikipedia', 'duckduckgo', 'usda', 'rss'].includes(record.provider)
+        ? record.provider as ResearchSource['provider']
+        : 'duckduckgo'
+      return { title, url, provider }
+    })
+    .filter(source => source.title && /^https?:\/\//.test(source.url))
+}
+
+function extractResponseSources(response: unknown): ResearchSource[] {
+  const raw = JSON.stringify(response)
+  const urls = Array.from(new Set(raw.match(/https?:\/\/[^"'\\\s)]+/g) || []))
+  return urls.slice(0, 8).map(url => ({
+    title: new URL(url).hostname,
+    url,
+    provider: 'duckduckgo' as const,
+  }))
 }
 
 function uniqueStrings(values: string[]) {
