@@ -150,11 +150,11 @@ function hasActionCue(value: string) {
 
 function buildActionBody(topic: string) {
   const subject = compactSubject(topic)
-  if (subject === '첫 화면') return '첫 화면 점검 기준을 저장해두고 수정 전 다시 확인하세요.'
-  if (subject === '카드뉴스 제목') return '제목 점검 기준을 저장해두고 발행 전 다시 확인하세요.'
-  if (subject === '아침 루틴') return '아침 루틴 기준을 저장해두고 내일 아침 다시 확인하세요.'
-  if (subject === '비 오는 러닝') return '러닝 기준을 저장해두고 나가기 전 다시 확인하세요.'
-  return `${subject} 기준을 저장해두고 먹기 전 다시 확인하세요.`
+  if (subject === '첫 화면') return '첫 화면 점검 기준을 저장해두고 수정 전에 한 번 더 확인하세요.'
+  if (subject === '카드뉴스 제목') return '제목 점검 기준을 저장해두고 발행 전에 한 번 더 확인하세요.'
+  if (subject === '아침 루틴') return '아침 루틴 기준을 저장해두고 내일 아침 실천 여부를 확인하세요.'
+  if (subject === '비 오는 러닝') return '러닝 안전 기준을 저장해두고 나가기 전에 한 번 더 확인하세요.'
+  return `${subject} 기준을 저장해두고 다음에 고를 때 바로 꺼내서 확인하세요.`
 }
 
 function buildHarnessFallbackBody(topic: string, role: string) {
@@ -164,21 +164,21 @@ function buildHarnessFallbackBody(topic: string, role: string) {
 
   switch (role) {
     case 'hook':
-      return `${subject}는 양과 보관 기준을 함께 봐야 선택이 쉬워집니다.`
+      return `${subject}는 양과 보관 기준을 함께 봐야 일상에서 고르기가 더 쉬워집니다.`
     case 'context':
     case 'problem':
-      return `${subject}는 건강 이슈보다 먹는 양과 상황을 먼저 확인하세요.`
+      return `${subject}는 건강 효과보다 먹는 양과 상황을 먼저 정해두는 게 중요합니다.`
     case 'key-point':
     case 'detail':
     case 'stat':
-      return `${subject}는 한 번에 많이 먹기보다 하루 분량을 정해두세요.`
+      return `${subject}는 한 번에 많이 먹기보다 소량씩 나눠 꾸준히 챙기는 편이 좋습니다.`
     case 'summary':
-      return `${subject}는 양, 보관, 먹는 시간을 함께 보면 충분합니다.`
+      return `${subject}는 양과 보관, 먹는 시간 세 가지를 함께 정해두면 충분합니다.`
     case 'save-cta':
     case 'cta':
       return buildActionBody(subject)
     default:
-      return `${subject}는 기준을 정해두면 일상에서 더 쉽게 활용됩니다.`
+      return `${subject}는 기준을 정해두면 매일 꺼내 쓰기가 훨씬 더 편해집니다.`
   }
 }
 
@@ -186,21 +186,21 @@ function buildContextualFallbackBody(subject: string, role: string) {
   if (/호두|아몬드|캐슈|피스타치오|견과류|견과/u.test(subject)) {
     switch (role) {
       case 'hook':
-        return `${subject}는 건강 뉴스보다 하루 분량과 먹는 상황을 먼저 보세요.`
+        return `${subject}는 건강 뉴스보다 하루 적정 분량과 먹는 상황부터 먼저 확인하세요.`
       case 'context':
       case 'problem':
-        return `${subject}가 자주 언급되는 이유는 일상에서 먹기 쉬운 식품이기 때문입니다.`
+        return `${subject}가 자주 언급되는 건 부담 없이 챙기기 좋은 간식이기 때문입니다.`
       case 'key-point':
       case 'detail':
       case 'stat':
-        return `${subject}는 한 번에 많이 먹기보다 정해둔 양을 꾸준히 먹는 편이 좋습니다.`
+        return `${subject}는 한 번에 많이 먹기보다 정해둔 양을 매일 꾸준히 먹는 편이 좋습니다.`
       case 'summary':
-        return `${subject}는 효능보다 양, 보관, 먹는 시간을 함께 보면 충분합니다.`
+        return `${subject}는 효능보다 양과 보관, 먹는 시간을 함께 정해두는 것이 핵심입니다.`
       case 'save-cta':
       case 'cta':
         return buildActionBody(subject)
       default:
-        return `${subject}는 기준을 정해두면 일상에서 더 쉽게 활용됩니다.`
+        return `${subject}는 기준을 정해두면 매일 꺼내 먹기가 훨씬 더 쉬워집니다.`
     }
   }
 
@@ -311,7 +311,11 @@ function buildHarnessFallbackHeadline(topic: string, role: string) {
 function compactSubject(topic: string) {
   const normalized = normalizeCopy(topic)
   const food = normalized.match(/호두|아몬드|캐슈|피스타치오|견과류|견과/u)
-  if (food?.[0]) return food[0]
+  if (food?.[0]) {
+    // Use up to 8 chars of the topic so the fallback sentence stays natural
+    const trimmed = normalized.slice(0, 8).trim()
+    return trimmed || food[0]
+  }
   if (/비\s*오는|러닝|달리기/u.test(normalized)) return '비 오는 러닝'
   if (/아침|루틴/u.test(normalized)) return '아침 루틴'
   if (/신입|마케터|제목|카드뉴스/u.test(normalized)) return '카드뉴스 제목'
