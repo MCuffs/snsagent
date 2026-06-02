@@ -44,12 +44,22 @@ export function repairCopyToHarness(params: {
 }): { headline: string; body: string; issues: string[] } {
   const contract = getCardHarnessContract(params.role)
   const issues: string[] = []
+  let headline = normalizeCopy(params.headline)
   let body = normalizeCopy(params.body)
-  const headline = normalizeCopy(params.headline)
 
   if (containsMetaToken(`${headline} ${body}`)) {
     body = buildHarnessFallbackBody(params.topic, params.role)
     issues.push('body replaced because it leaked planning metadata')
+  }
+
+  if (hasBrokenHeadline(headline)) {
+    headline = buildHarnessFallbackHeadline(params.topic, params.role)
+    issues.push('headline replaced because it was incomplete')
+  }
+
+  if (hasBrokenKoreanCopy(body)) {
+    body = buildHarnessFallbackBody(params.topic, params.role)
+    issues.push('body replaced because Korean copy was incomplete')
   }
 
   if (contract.requiresAction && !hasActionCue(body)) {
@@ -72,7 +82,9 @@ export function repairCopyToHarness(params: {
   const validation = validateHarnessedCopy(params.role, repaired.headline, repaired.body)
   if (!validation.passed) {
     repaired = repairRenderableCopy({
-      headline: repaired.headline,
+      headline: hasBrokenHeadline(repaired.headline)
+        ? buildHarnessFallbackHeadline(params.topic, params.role)
+        : repaired.headline,
       body: buildHarnessFallbackBody(params.topic, params.role),
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
@@ -81,7 +93,7 @@ export function repairCopyToHarness(params: {
         lineLength: contract.lineLength,
       },
     })
-    issues.push('body replaced with harness fallback')
+    issues.push('copy replaced with harness fallback')
   }
 
   return {
@@ -111,6 +123,12 @@ export function validateHarnessedCopy(role: string | undefined, headline: string
   if (containsMetaToken(`${headline} ${body}`)) {
     issues.push('copy leaks internal planning metadata')
   }
+  if (hasBrokenHeadline(headline)) {
+    issues.push('headline is incomplete or reads like a clipped phrase')
+  }
+  if (hasBrokenKoreanCopy(body)) {
+    issues.push('body has broken Korean spacing, particles, or clipped predicate')
+  }
   if (contract.requiresAction && !hasActionCue(body)) {
     issues.push('closing copy lacks an explicit action cue')
   }
@@ -127,44 +145,66 @@ function containsMetaToken(value: string) {
 }
 
 function hasActionCue(value: string) {
-  return /저장|확인|체크|비교|다시 보기|꺼내보|살펴보|정리해두/.test(value)
+  return /저장|확인|체크|비교|다시 보기|꺼내보기|정리해두/.test(value)
 }
 
 function buildActionBody(topic: string) {
   const subject = compactSubject(topic)
-  return `${subject}: 저장해두고 기준부터 다시 확인하세요.`
+  return `${subject} 기준을 저장해두고 먹기 전 다시 확인하세요.`
 }
 
 function buildHarnessFallbackBody(topic: string, role: string) {
   const subject = compactSubject(topic)
   switch (role) {
     case 'hook':
-      return `${subject}: 첫 선택 기준이 흔들리면 결과도 흔들립니다.`
+      return `${subject}는 양과 보관 기준을 함께 봐야 선택이 쉬워집니다.`
     case 'context':
     case 'problem':
-      return `${subject}: 실제 상황과 기준을 함께 봐야 판단이 쉬워집니다.`
+      return `${subject}는 건강 이슈보다 먹는 양과 상황을 먼저 확인하세요.`
     case 'key-point':
     case 'detail':
     case 'stat':
-      return `${subject}: 핵심 기준 하나를 정해 비교하면 선택이 빨라집니다.`
+      return `${subject}는 한 번에 많이 먹기보다 하루 분량을 정해두세요.`
     case 'summary':
-      return `${subject}: 기준, 상황, 다음 행동만 기억하면 충분합니다.`
+      return `${subject}는 양, 보관, 먹는 시간을 함께 보면 충분합니다.`
     case 'save-cta':
     case 'cta':
       return buildActionBody(subject)
     default:
-      return `${subject}은 바로 적용할 기준을 짧게 남겨야 저장할 이유가 생깁니다.`
+      return `${subject}는 기준을 정해두면 일상에서 더 쉽게 활용됩니다.`
+  }
+}
+
+function buildHarnessFallbackHeadline(topic: string, role: string) {
+  const subject = compactSubject(topic)
+  switch (role) {
+    case 'hook':
+      return trimHeadline(`${subject}, 기준부터 보세요`)
+    case 'context':
+    case 'problem':
+      return trimHeadline(`${subject}가 헷갈린다면`)
+    case 'summary':
+    case 'save-cta':
+    case 'cta':
+      return trimHeadline(`${subject} 기준 저장`)
+    default:
+      return trimHeadline(`${subject} 선택 기준`)
   }
 }
 
 function compactSubject(topic: string) {
   const normalized = normalizeCopy(topic)
-    .replace(/^(초보자를 위한|소상공인을 위한|신입 마케터를 위한)\s*/u, '')
-    .replace(/\s*(고르는 법|작성법|운영법|관리법|보관법|체크할 것|구성법|생활 습관|순서)$/u, '')
-    .replace(/\s*(줄이는|높이는|망치는|위한)$/u, '')
-    .replace(/[은는이가을를]$/u, '')
+  const food = normalized.match(/호두|아몬드|캐슈|피스타치오|견과류|견과/u)
+  if (food?.[0]) return food[0]
+
+  const cleaned = normalized
+    .replace(/카드뉴스|콘텐츠|본문|소개|추천|효능|효과|장점|특징|건강|뉴스|많은데|많아질수록|관리|이야기|기준|방법|가이드/g, ' ')
+    .replace(/\b(왜|자주|언급되는지|언급되는|한|번쯤|볼)\b/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
-  return normalized || topic
+
+  return cleaned.split(/\s+/).find(token => /^[가-힣A-Za-z0-9]{2,12}$/.test(token)) || '핵심'
 }
 
 function normalizeCopy(value: string) {
@@ -172,4 +212,29 @@ function normalizeCopy(value: string) {
     .replace(/\*\*/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function hasBrokenHeadline(value: string) {
+  const normalized = normalizeCopy(value)
+  if (!normalized) return true
+  if (/[,:，]\s*[가-힣A-Za-z0-9]{1,10}$/.test(normalized) && !/[?？!！]$/.test(normalized)) return true
+  if (/(많은데|많아질수록|언급되는|대해|위한|하는|되는|볼|할|둘)\s*$/.test(normalized)) return true
+  if (/(은|는|이|가|을|를|의|와|과|에서|부터|까지|처럼|보다|만|도)\s*$/.test(normalized)) return true
+  return false
+}
+
+function hasBrokenKoreanCopy(value: string) {
+  const normalized = normalizeCopy(value)
+  if (!normalized) return true
+  if (/\b지\s+한\s+번쯤\b/.test(normalized)) return true
+  if (/언급되는\s+지/.test(normalized)) return true
+  if (/(볼|볼게|볼까요|볼 수|확인할|체크할|비교할|먹을|둘|정할|고를|살필|챙길)[.!?。！？]$/.test(normalized)) return true
+  if (/(은|는|이|가|을|를|의|와|과|에서|부터|까지|처럼|보다|만|도)[.!?。！？]$/.test(normalized)) return true
+  if (/(때문에|많아질수록|언급될수록|하려면|한다면|보려면|고르면|먹으면)[.!?。！？]$/.test(normalized)) return true
+  if (/^[가-힣]{1,2}\s/.test(normalized)) return true
+  return false
+}
+
+function trimHeadline(value: string) {
+  return Array.from(normalizeCopy(value)).slice(0, 20).join('')
 }
