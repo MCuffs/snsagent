@@ -34,6 +34,12 @@ const GENERIC_FILLERS = [
   '관점부터',
   '적용해보세요',
   '확인할 기준',
+  '구체적인 사용 장면',
+  '확인 포인트',
+  '설득력이 살아납니다',
+  '자료로 말할 땐',
+  '효능 하나보다',
+  '균형에 있습니다',
 ]
 
 const OPEN_EXPECTATION_PATTERNS = [
@@ -51,6 +57,11 @@ export function evaluateSemanticCopy(params: {
 }): SemanticCopyReport {
   const topicTokens = extractMeaningTokens(params.topic)
   const issues: SemanticIssue[] = []
+  const bodyCounts = new Map<string, number>()
+  for (const slide of params.slides) {
+    const normalizedBody = normalizeForComparison(slide.body)
+    if (normalizedBody) bodyCounts.set(normalizedBody, (bodyCounts.get(normalizedBody) || 0) + 1)
+  }
 
   for (const slide of params.slides) {
     const combined = `${slide.headline} ${slide.body}`.trim()
@@ -84,12 +95,29 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
+    if (hasBrokenKoreanParticle(body) || hasBrokenKoreanParticle(slide.headline)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '본문에 "호두의의", "호두의를"처럼 잘못 결합된 조사가 있습니다. 주어를 자연스러운 명사로 바꿔 다시 작성해야 합니다.',
+      })
+    }
+
     const genericHits = GENERIC_FILLERS.filter(phrase => combined.includes(phrase))
     if (genericHits.length >= 1) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
         message: `본문이 추상적인 표현(${genericHits.join(', ')})에 기대고 있습니다. 주제의 성분, 쓰임, 상황, 판단 포인트를 구체화해야 합니다.`,
+      })
+    }
+
+    const normalizedBody = normalizeForComparison(body)
+    if (normalizedBody && (bodyCounts.get(normalizedBody) || 0) >= 2) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '다른 슬라이드와 본문이 중복됩니다. 각 슬라이드는 새 정보를 제공해야 합니다.',
       })
     }
 
@@ -120,20 +148,20 @@ export function buildSemanticFallback(params: {
   if (category === 'food') {
     switch (params.role) {
       case 'hook':
-        return `${subject}는 익숙한 간식처럼 보이지만, 고소한 맛과 함께 식물성 지방·식감·포만감을 한 번에 주는 재료입니다. 그냥 좋다는 말보다 언제 어떻게 먹기 좋은지가 더 설득력 있게 다가옵니다.`
+        return `${subject}는 익숙한 간식이지만 식물성 지방, 고소한 풍미, 씹는 식감이 함께 있는 견과입니다. 첫 장에서는 왜 자주 추천되는지보다 어떤 식사 장면에서 도움이 되는지부터 열어야 합니다.`
       case 'context':
       case 'problem':
-        return `${subject}를 고를 때는 효능 문구만 보기보다 매일 먹기 쉬운 형태인지 먼저 봐야 합니다. 손이 자주 가는 간식, 샐러드 토핑, 아침 식사처럼 실제 섭취 장면이 분명할수록 꾸준함이 생깁니다.`
+        return `${subject}는 좋다는 말보다 먹는 방식이 분명할 때 오래 이어집니다. 아침 요거트, 샐러드 토핑, 오후 간식처럼 반복 가능한 장면을 정해두면 건강 루틴으로 연결하기 쉽습니다.`
       case 'key-point':
       case 'detail':
       case 'stat':
-        return `${subject}의 장점은 한 가지 성분보다 균형에 있습니다. 불포화지방산이 풍부한 견과류라는 점에 더해 씹는 식감과 고소함이 있어, 달거나 자극적인 간식 대신 두기 좋습니다.`
+        return `${subject}를 설명할 때는 불포화지방산 같은 영양 포인트와 실제 섭취감을 함께 봐야 합니다. 고소함과 포만감이 있어 달거나 자극적인 간식을 줄이고 싶을 때 대안으로 제안하기 좋습니다.`
       case 'summary':
       case 'save-cta':
       case 'cta':
-        return `${subject}를 기억할 때는 효능 하나보다 먹는 순간을 같이 떠올리면 좋습니다. 언제, 얼마나, 어떤 식사와 함께 둘지 정해두면 구매 후에도 자연스럽게 이어집니다.`
+        return `${subject}를 저장할 이유는 효능 목록보다 실천 기준에 있습니다. 하루에 무리 없이 먹을 양, 함께 곁들일 식사, 보관법을 정해두면 구매 후에도 루틴으로 이어집니다.`
       default:
-        return `${subject}는 설명보다 사용 장면이 분명할 때 설득력이 커집니다. 어떤 맛과 식감인지, 언제 먹기 좋은지, 어떤 습관을 대신할 수 있는지까지 함께 보여주세요.`
+        return `${subject}는 성분 설명과 섭취 장면이 함께 있을 때 이해가 빨라집니다. 맛과 식감, 먹기 좋은 시간대, 대신 줄이고 싶은 간식까지 연결하면 정보가 더 실용적으로 읽힙니다.`
     }
   }
 
@@ -167,10 +195,11 @@ function extractMeaningTokens(value: string) {
 }
 
 function extractSubject(topic: string) {
-  return topic
+  const cleaned = topic
     .replace(/추천|효능|장점|카드뉴스|콘텐츠|본문|소개|후킹/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim() || topic
+    .trim()
+  return cleaned.replace(/의$/u, '').trim() || topic.replace(/의$/u, '').trim() || topic
 }
 
 function inferTopicCategory(topic: string) {
@@ -187,4 +216,14 @@ function hasRepeatedNouns(body: string) {
     counts.set(token, (counts.get(token) || 0) + 1)
   }
   return Array.from(counts.values()).some(count => count >= 3)
+}
+
+function hasBrokenKoreanParticle(value: string) {
+  return /[가-힣]{2,}의(?:의|은|는|이|가|을|를)\b/u.test(value)
+}
+
+function normalizeForComparison(value: string) {
+  return value
+    .replace(/[.!?。！？\s]/g, '')
+    .trim()
 }

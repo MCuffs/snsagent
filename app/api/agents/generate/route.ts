@@ -298,6 +298,26 @@ function isBroadTopic(text: string) {
   return broadTopics.has(normalized)
 }
 
+function hasQualityBriefDetails(text: string) {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  const signals = [
+    /타겟|대상|누구|초보자|직장인|주부|학생|부모|고객|구매자|건강 관심|다이어트|운동/u,
+    /목적|저장|교육|구매|전환|인지도|팔로우|공유|체크리스트|정보형/u,
+    /관점|중심|루틴|섭취법|먹는 법|주의점|비교|근거|성분|오메가|식이섬유|포만감|하루/u,
+    /포함|다뤄|설명|균형|구체|실생활|장보기|간식/u,
+  ]
+  return signals.filter(pattern => pattern.test(normalized)).length >= 2
+}
+
+function needsQualityClarification(text: string) {
+  const withoutUrl = text.replace(/https?:\/\/[^\s]+/g, '').trim()
+  if (!withoutUrl || hasQualityBriefDetails(withoutUrl)) return false
+  const infoTopic = /(효능|효과|장점|건강|섭취|먹는 법|추천|비교|주의점|영양|성분)/u.test(withoutUrl)
+  const productOrFood = /(호두|견과|아몬드|캐슈|피스타치오|식품|간식|영양제|비타민|프로틴|선크림|화장품|가방|의류|상품)/u.test(withoutUrl)
+  const shortBrief = withoutUrl.length < 40
+  return infoTopic && (productOrFood || shortBrief)
+}
+
 function buildClarificationResponse(input: {
   userText: string
   brand: { name: string; industry: string }
@@ -305,10 +325,10 @@ function buildClarificationResponse(input: {
   generationMode?: 'brand' | 'general'
 }): AgentResponse | null {
   const hasUrl = /https?:\/\/[^\s]+/.test(input.userText)
-  const textWithoutUrl = input.userText.replace(/https?:\/\/[^\s]+/g, '').trim()
 
-  if (hasUrl && textWithoutUrl.length >= 2) return null
-  if (!isGenericCardNewsRequest(input.userText) && !isBroadTopic(input.userText)) return null
+  if (hasUrl) return null
+  const shouldClarifyForQuality = needsQualityClarification(input.userText)
+  if (!shouldClarifyForQuality && !isGenericCardNewsRequest(input.userText) && !isBroadTopic(input.userText)) return null
 
   if (input.language === 'en') {
     const question = input.generationMode === 'general'
@@ -341,6 +361,24 @@ function buildClarificationResponse(input: {
   const question = input.generationMode === 'general'
     ? '이번 카드뉴스에서 어떤 관점을 가장 강조할까요?'
     : `${input.brand.name} 카드뉴스에서 무엇을 가장 강조할까요?`
+
+  if (shouldClarifyForQuality) {
+    return {
+      ready: false,
+      message: '주제는 좋지만, 이대로 만들면 일반적인 효능 나열에 그칠 가능성이 큽니다.\n\n아래에서 독자와 관점을 먼저 골라주세요. 선택한 정보를 바탕으로 더 구체적인 카드뉴스 기획안을 만들겠습니다.',
+      clarification: {
+        question: '이번 카드뉴스를 어떤 방향으로 깊게 만들까요?',
+        allowCustom: true,
+        skipLabel: 'AI가 최적 방향 선택',
+        options: [
+          { label: '건강 관심 초보자용', value: `${input.userText}를 건강 관심 초보자가 이해하기 쉽게, 주요 성분과 일상 장점을 포함해 교육 정보형 카드뉴스로 기획` },
+          { label: '바쁜 직장인 간식 루틴', value: `${input.userText}를 바쁜 직장인이 식사 사이에 챙기는 간식 루틴 관점으로, 포만감과 섭취 장면을 포함해 저장형 카드뉴스로 기획` },
+          { label: '섭취법과 주의점 균형', value: `${input.userText}를 하루 섭취량, 함께 먹기 좋은 상황, 과다 섭취 주의점까지 균형 있게 설명하는 카드뉴스로 기획` },
+          { label: '구매 전 체크리스트', value: `${input.userText}를 구매 전 확인할 원산지, 신선도, 보관법, 활용법 체크리스트 중심 카드뉴스로 기획` },
+        ],
+      },
+    }
+  }
 
   return {
     ready: false,
