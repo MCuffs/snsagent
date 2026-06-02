@@ -201,7 +201,7 @@ export class CopywritingAgent {
 
       if (body.length > bodyLimit) {
         const oldBody = body
-        body = this.trimToNaturalLength(body, bodyLimit)
+        body = this.trimBodyToCompleteSentences(body, bodyLimit)
         this.log('warn', `슬라이드 ${slide.slideNumber}번: 바디 카피가 한도(${bodyLimit}자)를 초과하여 자동 조율 완료.`, {
           original: oldBody,
           adjusted: body,
@@ -259,28 +259,27 @@ export class CopywritingAgent {
 
   private getBodyLimit(role: string): number {
     const limits: Record<string, number> = {
-      // SlideRole values — match copyEngine.ts cleanCopy() limit of 60
-      hook: 60,
-      problem: 60,
-      cause: 60,
-      common_mistake: 60,
-      product_solution: 60,
-      feature: 60,
-      feature_1: 60,
-      feature_2: 60,
-      benefit_or_proof: 60,
-      proof: 60,
-      offer: 60,
-      cta: 60,
+      hook: 220,
+      problem: 220,
+      cause: 220,
+      common_mistake: 220,
+      product_solution: 220,
+      feature: 220,
+      feature_1: 220,
+      feature_2: 220,
+      benefit_or_proof: 220,
+      proof: 220,
+      offer: 220,
+      cta: 180,
       // Legacy simplified roles
-      context: 60,
-      'key-point': 60,
-      detail: 60,
-      stat: 60,
-      summary: 60,
-      'save-cta': 60,
+      context: 220,
+      'key-point': 220,
+      detail: 220,
+      stat: 220,
+      summary: 180,
+      'save-cta': 180,
     }
-    return limits[role] ?? 60
+    return limits[role] ?? 220
   }
 
   private trimToNaturalLength(value: string, maxLength: number) {
@@ -290,6 +289,20 @@ export class CopywritingAgent {
     const sliced = clean.slice(0, maxLength + 1)
     const trimmed = sliced.replace(/\s+\S*$/, '').replace(/[,.!?…\s]+$/, '')
     return trimmed || clean.slice(0, maxLength)
+  }
+
+  private trimBodyToCompleteSentences(value: string, maxLength: number) {
+    const clean = value.replace(/\s+/g, ' ').trim()
+    if (clean.length <= maxLength) return clean
+
+    const sentences = clean.match(/.+?(?:[.!?。！？]+|(?:습니다|합니다|됩니다|입니다|주세요|보세요|하세요|좋습니다|중요합니다|필요합니다|가능합니다|분명합니다|이어집니다|낮아집니다|높아집니다|있습니다|없습니다|같습니다|해집니다|줍니다|듭니다|납니다)(?=\s|$))/g) || []
+    let output = ''
+    for (const sentence of sentences) {
+      const next = output ? `${output} ${sentence.trim()}` : sentence.trim()
+      if (next.length <= maxLength) output = next
+    }
+    if (output) return output
+    return this.trimToNaturalLength(clean, maxLength)
   }
 }
 

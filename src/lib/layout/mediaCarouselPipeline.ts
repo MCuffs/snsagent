@@ -225,6 +225,13 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     message: 'Brand DNA harness applied to slide copy and visual prompt.',
     timestamp: new Date().toISOString(),
   })
+  const finalCopyGuard = runFinalSemanticCopyGuard({
+    input,
+    slides: agentSlides,
+    editorialPlan,
+  })
+  agentSlides = finalCopyGuard.slides
+  agentReportLogs.push(...finalCopyGuard.logs)
 
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
@@ -749,6 +756,72 @@ function rolePurpose(role: MediaSlideRole) {
 
 function maxRenderableBodyLines(role: MediaSlideRole | string | undefined) {
   return role === 'save-cta' || role === 'summary' ? 4 : 5
+}
+
+function runFinalSemanticCopyGuard(params: {
+  input: MediaCarouselInput
+  slides: AgentSlideData[]
+  editorialPlan: EditorialDirectorPlan
+}): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
+  const report = evaluateSemanticCopy({
+    topic: params.input.topic,
+    slides: params.slides.map(slide => ({
+      slideNumber: slide.slideNumber,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })),
+  })
+  const weakSlideNumbers = new Set(report.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
+  if (weakSlideNumbers.size === 0) {
+    return {
+      slides: params.slides,
+      logs: [{
+        agentName: 'SemanticCopyGuard',
+        role: 'final-copy-quality',
+        status: 'success',
+        message: 'Final slide copy passed semantic quality guard before rendering.',
+        details: { issueCount: report.issues.length },
+        timestamp: new Date().toISOString(),
+      }],
+    }
+  }
+
+  const slides = params.slides.map(slide => {
+    if (!weakSlideNumbers.has(slide.slideNumber)) return slide
+    const slidePlan = params.editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)
+    const repaired = repairRenderableCopy({
+      headline: slide.headline,
+      body: buildSemanticFallback({
+        topic: params.input.topic,
+        role: slide.role,
+        headline: slide.headline,
+      }),
+      constraints: {
+        maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
+        maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 220,
+        maxBodyLines: maxRenderableBodyLines(slide.role),
+        lineLength: 24,
+      },
+    })
+    return {
+      ...slide,
+      headline: repaired.headline,
+      body: repaired.body,
+    }
+  })
+
+  return {
+    slides,
+    logs: [{
+      agentName: 'SemanticCopyGuard',
+      role: 'final-copy-quality',
+      status: 'warn',
+      message: `Final semantic guard repaired ${weakSlideNumbers.size} weak slide copy block(s) before rendering.`,
+      details: report.issues,
+      timestamp: new Date().toISOString(),
+    }],
+  }
 }
 
 function hasUnsupportedNumericClaim(copy: string, groundingText: string) {

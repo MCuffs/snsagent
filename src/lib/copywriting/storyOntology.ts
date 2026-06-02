@@ -129,10 +129,21 @@ export function getStoryNode(ontology: StoryOntology, slideNumber: number) {
 }
 
 function extractSubject(topic: string) {
-  return topic
-    .replace(/추천|효능|장점|카드뉴스|콘텐츠|본문|소개|후킹/g, ' ')
+  const normalized = topic.replace(/\s+/g, ' ').trim()
+  const knownFood = normalized.match(/호두|아몬드|캐슈|피스타치오|견과|견과류|요거트|샐러드/u)
+  if (knownFood?.[0]) return knownFood[0]
+
+  const beforePossessive = normalized.match(/^([가-힣A-Za-z0-9]{2,})의\s*(?:효능|효과|장점|특징|섭취|활용|추천)/u)
+  if (beforePossessive?.[1]) return beforePossessive[1]
+
+  const cleaned = normalized
+    .replace(/효능\s*과|효과\s*와|장점\s*과|특징\s*과/g, ' ')
+    .replace(/추천|효능|효과|장점|특징|카드뉴스|콘텐츠|본문|소개|후킹|올바른|섭취|가이드|건강|균형|실천/g, ' ')
+    .replace(/\b(?:과|와|및)\b/g, ' ')
+    .replace(/의\s*(?:과|와)\b/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim() || topic.trim() || '주제'
+    .trim()
+  return cleaned.replace(/의$/u, '').trim().split(/\s+/)[0] || normalized.replace(/의$/u, '').trim() || '주제'
 }
 
 function extractConcreteSignals(sourceMaterial: string, topic: string, category: string) {
