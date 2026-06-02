@@ -45,7 +45,7 @@ const GENERIC_FILLERS = [
   '먹는 방식이 분명',
   '설명할 때는',
   '가이드는',
-  '실천 기준',
+  '핵심 정보와 실천 기준',
   '상세 정보를 비교',
 ]
 
@@ -62,7 +62,9 @@ const INCOMPLETE_MEANING_PATTERNS = [
   /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지)[.!?。！？]?$/u,
   /(?:식물성 지방|불포화지방산|오메가 계열 지방)[^.!?。！？]{0,30}(?:함께 있는|함께 봐야)[.!?。！？]?$/u,
   /(?:아침 요거트|샐러드|오후 간식)[^.!?。！？]{0,30}$/u,
-  /(?:더|다시|먼저|쓸|봐야|한 줄)[.!?。！？]?$/u,
+  /(?:더|다시|먼저|쓸|봐야|한 줄|보여야|붙여야|이미|다음|신발 밑창|한|바|게|정하|같게|쉽게|시야|많은지|는지|고르고|준비|판단)[.!?。！？]?$/u,
+  /다음\s*장/u,
+  /(?:은|는|이|가|을|를|의|와|과|에서|부터|까지|처럼|보다|만|도|거나|이나|려면|하면|해야)[.!?。！？]$/u,
 ]
 
 const META_COPY_TOKENS = [
@@ -95,7 +97,7 @@ export function evaluateSemanticCopy(params: {
     const bodyTokens = extractMeaningTokens(body)
     const hasTopicAnchor = topicTokens.length === 0 || topicTokens.some(token => combined.includes(token))
     const isClosing = ['summary', 'save-cta', 'cta'].includes(slide.role)
-    const minBodyLength = isClosing ? 34 : 42
+    const minBodyLength = isClosing ? 28 : 30
 
     if (body.length < minBodyLength || bodyTokens.length < 3) {
       issues.push({
@@ -134,6 +136,14 @@ export function evaluateSemanticCopy(params: {
         slideNumber: slide.slideNumber,
         severity: 'block',
         message: '본문이 문장처럼 보이지만 실제 의미가 완성되지 않았습니다. 독자가 이해할 결론까지 다시 작성해야 합니다.',
+      })
+    }
+
+    if (hasIncompleteFinalSentence(body)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '본문 마지막 문장이 자연스러운 한국어 종결형으로 끝나지 않습니다.',
       })
     }
 
@@ -257,7 +267,7 @@ function extractSubject(topic: string) {
 }
 
 function inferTopicCategory(topic: string) {
-  if (/호두|견과|아몬드|캐슈|피스타치오|식품|간식|영양|건강|샐러드|아침|먹/.test(topic)) {
+  if (/호두|견과|아몬드|캐슈|피스타치오|식품|간식|영양|건강|샐러드|먹/.test(topic)) {
     return 'food'
   }
   return 'general'
@@ -276,6 +286,12 @@ function hasBrokenKoreanParticle(value: string) {
   return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
     /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
     /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
+}
+
+function hasIncompleteFinalSentence(value: string) {
+  const normalized = value.trim()
+  if (!/[.!?。！？]$/u.test(normalized)) return false
+  return !/(?:다|요|죠|세요|십시오|니다|습니다)[.!?。！？]$/u.test(normalized)
 }
 
 function normalizeForComparison(value: string) {
