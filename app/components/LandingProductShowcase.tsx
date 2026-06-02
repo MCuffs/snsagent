@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useRef, useState, type PointerEvent } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowRight, Check, Download, MessageSquareText, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -358,29 +358,23 @@ function ExportFigure() {
 
 export function EditorialGallery() {
   return (
-    <div id="gallery" className="mx-auto mt-20 max-w-[1440px] px-4 md:mt-24 md:px-7">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        {editorialCards.map((image, index) => <GalleryCard key={image} image={image} index={index} />)}
+    <div id="gallery" className="mx-auto mt-20 max-w-[1240px] px-4 md:mt-24 md:px-7">
+      <div className="overflow-hidden rounded-[24px] border border-[#e8e4dc] bg-[#171717] shadow-[0_24px_70px_rgba(22,20,18,0.14)]">
+        <video
+          className="block aspect-[1920/1244] w-full bg-[#171717] object-cover"
+          src="/front/shuffla.mp4"
+          aria-label="Shuffla product demo video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          controls
+          preload="metadata"
+        >
+          Your browser does not support the video tag.
+        </video>
       </div>
     </div>
-  )
-}
-
-function GalleryCard({ image, index }: { image: string; index: number }) {
-  const updateGlow = (event: PointerEvent<HTMLElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    event.currentTarget.style.setProperty('--gallery-x', `${event.clientX - bounds.left}px`)
-    event.currentTarget.style.setProperty('--gallery-y', `${event.clientY - bounds.top}px`)
-  }
-
-  return (
-    <figure
-      onPointerMove={updateGlow}
-      className={`landing-gallery-card relative aspect-[4/5] overflow-hidden rounded-[16px] border border-[#e8e4dc] bg-[#171717] shadow-[0_18px_52px_rgba(22,20,18,0.1)] ${index % 2 === 1 ? 'md:translate-y-8' : ''}`}
-    >
-      <Image src={image} alt={`Shuffla card news ${index + 1}`} fill priority={index < 2} sizes="(min-width: 768px) 24vw, 48vw" className="object-cover transition duration-500" />
-      <span className="landing-gallery-glow" />
-    </figure>
   )
 }
 
