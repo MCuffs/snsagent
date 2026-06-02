@@ -117,6 +117,7 @@ function fitCompleteSentences(value: string, constraints: RenderableCopyConstrai
 export function isCompleteBodyCopy(value: string) {
   const normalized = normalizeCopy(value)
   if (!normalized) return false
+  if (hasIncompleteMeaningEnding(normalized)) return false
   if (/[.!?。！？]$/.test(normalized)) return true
   return /(습니다|합니다|됩니다|입니다|주세요|보세요|하세요|좋습니다|중요합니다|필요합니다|가능합니다|분명합니다|이어집니다|낮아집니다|높아집니다|있습니다|없습니다|같습니다|해집니다|줍니다|듭니다|납니다)$/.test(normalized)
 }
@@ -128,6 +129,24 @@ function completeFallbackBody(value: string) {
     .replace(/\s+(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|그리고|하지만|그래서|때문에|도록|라면|하면)$/u, '')
     .trim()
   if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
+  if (/함께 있는$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/함께 있는$/u, '함께 있는 견과라서 식사 사이 간식 선택의 기준이 됩니다.')
+  }
+  if (/함께 봐야$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/함께 봐야$/u, '함께 봐야 식단에 넣을 이유가 분명해집니다.')
+  }
+  if (/대신 분명한$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/대신 분명한$/u, '대신 분명한 섭취 기준을 제시해야 합니다.')
+  }
+  if (/살피는$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/살피는$/u, '살피는 기준까지 함께 제시해야 합니다.')
+  }
+  if (/많이 먹는$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/많이 먹는$/u, '많이 먹는 방식은 피하는 편이 좋습니다.')
+  }
+  if (/한 번에$/u.test(withoutDanglingEnding)) {
+    return withoutDanglingEnding.replace(/한 번에$/u, '한 번에 많이 먹기보다 소량씩 나누는 편이 좋습니다.')
+  }
   if (/불포화지방산이$/u.test(withoutDanglingEnding)) {
     return withoutDanglingEnding.replace(/불포화지방산이$/u, '불포화지방산이 포함되어 있어 식사 사이 간식 선택의 기준이 됩니다.')
   }
@@ -157,6 +176,11 @@ function normalizeCopy(value: string) {
     .replace(/\*\*/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function hasIncompleteMeaningEnding(value: string) {
+  const withoutPunctuation = value.replace(/[.!?。！？]+$/u, '').trim()
+  return /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지)$/u.test(withoutPunctuation)
 }
 
 function visualLength(value: string) {
