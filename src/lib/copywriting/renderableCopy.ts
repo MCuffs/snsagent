@@ -102,12 +102,19 @@ function fitCompleteSentences(value: string, constraints: RenderableCopyConstrai
 
   let output = ''
   for (const sentence of completeSentences) {
-    const next = output ? `${output} ${sentence}` : sentence
+    // If this sentence alone exceeds the char limit, truncate it first
+    const fittedSentence = sentence.length > constraints.maxBodyChars
+      ? truncateAtSentenceBoundary(sentence, constraints.maxBodyChars)
+      : sentence
+    const next = output ? `${output} ${fittedSentence}` : fittedSentence
     if (
       next.length <= constraints.maxBodyChars &&
       wrapForRender(next, constraints.lineLength).length <= constraints.maxBodyLines
     ) {
       output = next
+    } else if (!output && fittedSentence.length <= constraints.maxBodyChars) {
+      // First sentence fits on its own even if adding more would exceed — use it
+      output = fittedSentence
     }
   }
 

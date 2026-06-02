@@ -76,15 +76,24 @@ function buildSystemPrompt(
   scrapedContext: string,
   language?: 'ko' | 'en',
   generationMode?: 'brand' | 'general',
-  rssContext?: string
+  rssContext?: string,
+  userTurnCount?: number
 ) {
   const isGeneral = generationMode === 'general'
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
+  const turnsLeft = Math.max(0, 3 - (userTurnCount ?? 0))
+  const roundGuidance = turnsLeft > 0
+    ? (language === 'en'
+      ? `\n## Briefing Round Control (CRITICAL)\nThe user has answered ${userTurnCount ?? 0} out of 3 required briefing rounds. You MUST NOT set ready:true yet. Ask one more concrete clarifying question with 3-4 specific options that deepen the angle, target reader, or desired action. Remaining rounds before generation is allowed: ${turnsLeft}.\n`
+      : `\n## 브리핑 라운드 제어 (필수 준수)\n사용자가 필수 브리핑 ${userTurnCount ?? 0}/3 라운드를 완료했습니다. 아직 ready:true로 설정하면 안 됩니다. 반드시 clarification을 반환하여 각도·독자·원하는 행동 중 하나를 더 구체화하는 선택지 3~4개를 제시하세요. 생성 허용까지 남은 라운드: ${turnsLeft}.\n`)
+    : (language === 'en'
+      ? `\n## Briefing Round Control\nThe user has completed all 3 required briefing rounds. You may now set ready:true and return the full params.\n`
+      : `\n## 브리핑 라운드 제어\n사용자가 필수 브리핑 3라운드를 모두 완료했습니다. 이제 ready:true와 함께 전체 params를 반환할 수 있습니다.\n`)
 
   if (isGeneral) {
     return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 정보/시사/트렌드 콘텐츠 전략가입니다.
 사용자가 뉴스 기사, 정보글, 또는 트렌드 글을 입력하면, 이를 깊이 분석하여 일반 정보 전달용 카드뉴스 전략 기획서와 구조 프리뷰를 함께 제안해 주어야 합니다.
-
+${roundGuidance}
 ## 이번 카드뉴스 유형 (중요)
 - 본 콘텐츠는 브랜드 홍보용이 아닌, 일반 정보/시사/트렌드 요약 전달용 카드뉴스입니다.
 - 브랜드 고유의 이름, 브랜드 DNA, 또는 특정 브랜드의 업종을 카피나 레이아웃 기획에 강제로 대입하지 마십시오.
@@ -164,7 +173,7 @@ ${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n$
 
   return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 브랜드 콘텐츠 전략가입니다.
 사용자가 상품명, 캠페인 주제, 또는 상품 URL을 입력하면, 브랜드 프로필과 감성 선호도를 깊이 분석하여 카드뉴스 전략 기획서와 구조 프리뷰를 함께 제안해 주어야 합니다.
-
+${roundGuidance}
 ## 브랜드 정보
 브랜드명: ${brand.name}
 업종: ${brand.industry}
@@ -557,13 +566,15 @@ export async function POST(request: Request) {
       baseURL: getOpenAIBaseURLHost(),
       keyFingerprint: getOpenAIKeyFingerprint(apiKey),
     }
+    const userTurnCount = messages.filter(m => m.role === 'user').length
     const systemPrompt = buildSystemPrompt(
       brand,
       preferencesText,
       [scrapedContext, purchasePersuasionContext].filter(Boolean).join('\n\n'),
       language,
       generationMode,
-      rssContext
+      rssContext,
+      userTurnCount
     )
     logAiDiagnostic({ status: 'start', ...diagnosticContext })
     const response = await openai.chat.completions.create({
@@ -609,6 +620,41 @@ export async function POST(request: Request) {
       }
       parsed.params.slideCount = Number(parsed.params.slideCount)
     }
+
+    // Enforce minimum 3 briefing rounds before allowing generation
+    if (parsed.ready && userTurnCount < 3) {
+      const fallbackClarification: ClarificationPrompt = parsed.clarification && validateClarification(parsed.clarification)
+        ? parsed.clarification
+        : (language === 'en'
+          ? {
+              question: 'One more detail before we generate — which outcome matters most to you?',
+              allowCustom: true,
+              skipLabel: 'Proceed with current info',
+              options: [
+                { label: 'Save / bookmark', value: 'Optimise for save rate — make this card news highly saveable and shareable.' },
+                { label: 'Profile visits', value: 'Optimise for profile visits — hook should drive curiosity about the brand.' },
+                { label: 'Direct purchase', value: 'Optimise for purchase intent — highlight value and urgency.' },
+                { label: 'Brand awareness', value: 'Optimise for brand recall — focus on unique identity and storytelling.' },
+              ],
+            }
+          : {
+              question: '생성 전 마지막 확인 — 이번 카드뉴스에서 가장 중요한 성과는 무엇인가요?',
+              allowCustom: true,
+              skipLabel: '현재 정보로 진행',
+              options: [
+                { label: '저장/공유 극대화', value: '저장률을 높이는 방향으로 최적화 — 소장 가치 있는 정보 중심으로 구성해 주세요.' },
+                { label: '프로필 유입', value: '프로필 방문을 유도하는 방향으로 최적화 — 훅이 브랜드 호기심을 자극하게 해 주세요.' },
+                { label: '구매 전환', value: '구매 의도를 높이는 방향으로 최적화 — 가치와 urgency를 강조해 주세요.' },
+                { label: '브랜드 인지도', value: '브랜드 각인을 높이는 방향으로 최적화 — 고유 감성과 스토리텔링 중심으로 해 주세요.' },
+              ],
+            })
+      return NextResponse.json({
+        message: parsed.message,
+        ready: false,
+        clarification: fallbackClarification,
+      })
+    }
+
     if (!parsed.ready && parsed.clarification && !validateClarification(parsed.clarification)) {
       delete parsed.clarification
     }

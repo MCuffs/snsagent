@@ -236,6 +236,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   agentSlides = finalCopyGuard.slides
   agentReportLogs.push(...finalCopyGuard.logs)
   agentSlides = enforceHarnessAgentCopy(input, agentSlides)
+  agentSlides = suppressWordOveruse(agentSlides)
 
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
@@ -545,6 +546,7 @@ ${slideDescriptions}
 규칙:
 - headline: 20자 이하, 강렬하고 구체적 (공백 포함)
 - body: 42~64자, 최대 2문장, 모바일 카드에서 2줄 안에 읽히는 짧은 완성 문장
+- body는 64자를 절대 넘기지 마세요. 수치 2개 이상이 들어가면 문장이 길어지므로 수치 1개만 선택해 집중하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
 - 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
@@ -810,6 +812,55 @@ function enforceHarnessAgentCopy(input: MediaCarouselInput, slides: AgentSlideDa
       headline: repaired.headline,
       body: repaired.body,
     }
+  })
+}
+
+// Detects words repeated 3+ times across all slides and replaces
+// overused words in later slides with a contextual synonym.
+const WORD_SYNONYMS: Record<string, string[]> = {
+  '시작': ['출발', '첫걸음', '첫 단계', '전환'],
+  '확인': ['점검', '체크', '살펴보기', '검토'],
+  '중요': ['핵심', '필수', '결정적', '관건'],
+  '기준': ['원칙', '기본', '조건', '포인트'],
+  '방법': ['방식', '전략', '접근법', '노하우'],
+}
+
+function suppressWordOveruse(slides: AgentSlideData[]): AgentSlideData[] {
+  const wordCount: Record<string, number> = {}
+  // count occurrences across all slides
+  for (const slide of slides) {
+    const text = `${slide.headline} ${slide.body}`
+    for (const word of Object.keys(WORD_SYNONYMS)) {
+      const count = (text.match(new RegExp(word, 'g')) || []).length
+      wordCount[word] = (wordCount[word] || 0) + count
+    }
+  }
+
+  // only act on words appearing 3+ times
+  const overused = Object.entries(wordCount).filter(([, count]) => count >= 3).map(([word]) => word)
+  if (overused.length === 0) return slides
+
+  // for each overused word, keep it in the first 2 occurrences, replace the rest
+  const seen: Record<string, number> = {}
+  return slides.map(slide => {
+    let headline = slide.headline
+    let body = slide.body
+    for (const word of overused) {
+      seen[word] = seen[word] || 0
+      const occurrencesInSlide = ((`${headline} ${body}`).match(new RegExp(word, 'g')) || []).length
+      if (occurrencesInSlide === 0) continue
+      seen[word] += occurrencesInSlide
+      // replace only if this slide pushes us past 2 total occurrences
+      if (seen[word] > 2) {
+        const synonyms = WORD_SYNONYMS[word] || []
+        const synonym = synonyms[(seen[word] - 3) % synonyms.length]
+        if (synonym) {
+          headline = headline.replaceAll(word, synonym)
+          body = body.replaceAll(word, synonym)
+        }
+      }
+    }
+    return { ...slide, headline, body }
   })
 }
 
