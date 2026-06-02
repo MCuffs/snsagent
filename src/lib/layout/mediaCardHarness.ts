@@ -121,7 +121,7 @@ function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplat
 function enforceArchiveTypography(typography: TypographyPlan, template: ArchiveTemplate): TypographyPlan {
   const headlineLines = rebuildHeadlineLines(typography)
   const bodyLines = typography.bodyLines
-  const headlineFontSize = template === 'cta-dark' ? 72 : fitHeadlineFontSize(headlineLines.length)
+  const headlineFontSize = template === 'cta-dark' ? 64 : fitHeadlineFontSize(headlineLines.length)
   const bodyFontSize = template === 'cta-dark' ? 25 : bodyLines.length > 3 ? 22 : bodyLines.length > 1 ? 23 : 25
 
   return {

@@ -62,6 +62,19 @@ const INCOMPLETE_MEANING_PATTERNS = [
   /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지)[.!?。！？]?$/u,
   /(?:식물성 지방|불포화지방산|오메가 계열 지방)[^.!?。！？]{0,30}(?:함께 있는|함께 봐야)[.!?。！？]?$/u,
   /(?:아침 요거트|샐러드|오후 간식)[^.!?。！？]{0,30}$/u,
+  /(?:더|다시|먼저|쓸|봐야|한 줄)[.!?。！？]?$/u,
+]
+
+const META_COPY_TOKENS = [
+  'daily use scene',
+  'mirror audience life',
+  'one defining object',
+  'imagePurpose',
+  'guiding question',
+  'STORY ONTOLOGY',
+  'visualDirection',
+  'LAYOUT PRIORITY',
+  'recognizable daily situation',
 ]
 
 export function evaluateSemanticCopy(params: {
@@ -82,13 +95,21 @@ export function evaluateSemanticCopy(params: {
     const bodyTokens = extractMeaningTokens(body)
     const hasTopicAnchor = topicTokens.length === 0 || topicTokens.some(token => combined.includes(token))
     const isClosing = ['summary', 'save-cta', 'cta'].includes(slide.role)
-    const minBodyLength = isClosing ? 58 : 78
+    const minBodyLength = isClosing ? 34 : 42
 
-    if (body.length < minBodyLength || bodyTokens.length < 5) {
+    if (body.length < minBodyLength || bodyTokens.length < 3) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: `본문이 너무 짧습니다. ${isClosing ? '마무리 슬라이드도' : '각 슬라이드는'} 구체 정보가 담긴 2문장 이상이어야 합니다.`,
+        message: `본문이 너무 짧습니다. ${isClosing ? '마무리 슬라이드도' : '각 슬라이드는'} 구체 기준이 담긴 완성 문장이어야 합니다.`,
+      })
+    }
+
+    if (META_COPY_TOKENS.some(token => combined.includes(token)) || /[A-Za-z]{3,}\s*은\(는\)/.test(combined)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '본문에 내부 기획 토큰이나 영어 메타 표현이 노출되었습니다.',
       })
     }
 
@@ -169,39 +190,39 @@ export function buildSemanticFallback(params: {
   if (category === 'food') {
     switch (params.role) {
       case 'hook':
-        return `${subject}는 식물성 지방, 고소한 풍미, 씹는 식감을 함께 가진 견과입니다. 첫 장에서는 포만감과 간식 대체 효과가 어떤 식사 선택에 연결되는지 보여줍니다.`
+        return `${subject}: 양과 보관 기준부터 봐야 식단에 맞게 챙길 수 있습니다.`
       case 'context':
       case 'problem':
-        return `${subject}는 아침 요거트, 샐러드 토핑, 오후 간식처럼 반복 가능한 장면에 넣기 좋습니다. 먹는 시간을 정해두면 달거나 자극적인 간식 대신 선택하기 쉽습니다.`
+        return `${subject}: 먹는 시간과 양을 정해두면 간식 선택이 쉬워집니다.`
       case 'key-point':
       case 'detail':
       case 'stat':
-        return `${subject}에는 불포화지방산과 식이섬유가 들어 있어 포만감을 주는 간식으로 활용할 수 있습니다. 다만 열량이 높은 편이라 한 번에 많이 먹기보다 소량을 정해두는 편이 좋습니다.`
+        return `${subject}: 장점보다 하루 섭취량을 먼저 정해야 부담을 줄입니다.`
       case 'summary':
       case 'save-cta':
       case 'cta':
-        return `${subject}를 오래 챙기려면 하루 섭취량, 함께 곁들일 식사, 보관법을 함께 정리해야 합니다. 산패를 막도록 밀봉해두고 요거트나 샐러드에 소량씩 더하면 루틴으로 이어집니다.`
+        return `${subject}: 양과 보관법을 저장해두고 먹기 전 다시 확인하세요.`
       default:
-        return `${subject}는 맛과 식감, 먹기 좋은 시간대, 대신 줄이고 싶은 간식까지 함께 제시할 때 이해가 빨라집니다. 독자가 바로 따라 할 수 있도록 양과 보관법까지 넣어야 합니다.`
+        return `${subject}: 양과 보관 기준을 함께 볼 때 선택이 쉬워집니다.`
     }
   }
 
   switch (params.role) {
     case 'hook':
-      return `${subject}는 좋은 제품이라는 말만으로 설득되지 않습니다. 첫 장에서는 누가 어떤 상황에서 필요로 하는지 보여줘 다음 카드의 판단 기준으로 연결해야 합니다.`
+      return `${subject}: 첫 기준이 흔들리면 결과도 쉽게 흔들립니다.`
     case 'context':
     case 'problem':
-      return `${subject}를 고민하는 사람은 보통 가격보다 사용 상황을 먼저 떠올립니다. 언제 쓰고, 무엇이 불편했고, 어떤 차이가 있으면 다시 찾게 되는지 구체적으로 보여줘야 합니다.`
+      return `${subject}: 실제 상황과 기준을 함께 봐야 판단이 쉬워집니다.`
     case 'key-point':
     case 'detail':
     case 'stat':
-      return `${subject}의 설득 포인트는 눈에 보이는 디테일에서 나옵니다. 구성, 사용감, 관리 방식, 비교 기준 중 하나를 잡아 실제 판단에 도움이 되는 문장으로 풀어야 합니다.`
+      return `${subject}: 핵심 기준 하나를 정해 비교하면 선택이 빨라집니다.`
     case 'summary':
     case 'save-cta':
     case 'cta':
-      return `${subject}를 다시 볼 때는 실제로 확인할 항목을 남겨두는 편이 좋습니다. 필요한 구성과 사용 상황을 떠올린 뒤 가격, 관리 방식, 구매 조건을 함께 비교해보세요.`
+      return `${subject}: 저장해두고 기준부터 다시 확인하세요.`
     default:
-      return `${subject}는 한 줄 설명보다 실제 사용 상황이 있을 때 이해가 빨라집니다. 독자가 바로 떠올릴 수 있는 맥락과 판단 기준을 함께 제시하세요.`
+      return `${subject}: 바로 적용할 기준을 짧게 남겨야 저장할 이유가 생깁니다.`
   }
 }
 
@@ -217,6 +238,7 @@ function extractMeaningTokens(value: string) {
 
 function extractSubject(topic: string) {
   const normalized = topic.replace(/\s+/g, ' ').trim()
+    .replace(/^(초보자를 위한|소상공인을 위한|신입 마케터를 위한)\s*/u, '')
   const knownFood = normalized.match(/호두|아몬드|캐슈|피스타치오|견과|견과류|요거트|샐러드/u)
   if (knownFood?.[0]) return knownFood[0]
 
@@ -251,7 +273,9 @@ function hasRepeatedNouns(body: string) {
 }
 
 function hasBrokenKoreanParticle(value: string) {
-  return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value)
+  return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
+    /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
+    /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
 }
 
 function normalizeForComparison(value: string) {

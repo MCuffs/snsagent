@@ -1,4 +1,5 @@
 import { parseBrandDna } from '../../../lib/brand-dna'
+import { getCardHarnessContract, validateHarnessedCopy } from '../layout/cardHarnessContract'
 
 export interface AgentReportItem {
   agentName: string
@@ -395,10 +396,20 @@ export class QualityGuardAgent {
     // 2. 슬라이드별 텍스트 여백 및 가독성 진단
     params.slides.forEach((slide) => {
       const textLen = slide.headline.length + slide.body.length
-      if (textLen > 80) {
+      const contract = getCardHarnessContract(slide.role)
+      if (textLen > contract.maxTotalChars) {
         totalScore -= 5
         issues.push(`${slide.slideNumber}번 슬라이드: 총 글자수(${textLen}자)가 많아 모바일 가독성이 저하될 우려가 있습니다.`)
         this.log('warn', `슬라이드 ${slide.slideNumber}번: 글자수가 다소 많음. 가독성 경고. 감점(-5점)`)
+      }
+
+      const harnessCopy = validateHarnessedCopy(slide.role, slide.headline, slide.body)
+      if (!harnessCopy.passed) {
+        harnessCopy.issues.forEach(issue => {
+          totalScore -= 3
+          issues.push(`${slide.slideNumber}번 슬라이드: ${issue}`)
+          this.log('warn', `슬라이드 ${slide.slideNumber}번: 하네스 계약 위반(${issue}). 감점(-3점)`)
+        })
       }
 
       if (slide.diagnostics && slide.diagnostics.length > 0) {

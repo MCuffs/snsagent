@@ -9,14 +9,19 @@ export async function uploadGeneratedAsset(params: {
   const safeFileName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import('@vercel/blob')
-    const blob = await put(`carousel/${safeFileName}`, params.content, {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: params.contentType,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    })
-    return blob.url
+    try {
+      const { put } = await import('@vercel/blob')
+      const blob = await put(`carousel/${safeFileName}`, params.content, {
+        access: 'public',
+        addRandomSuffix: true,
+        contentType: params.contentType,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      })
+      return blob.url
+    } catch (error) {
+      if (process.env.NODE_ENV === 'production') throw error
+      console.warn('[uploadGeneratedAsset] Blob upload failed; using local file fallback.', error)
+    }
   }
 
   // 로컬 개발: public/ 폴더에 저장

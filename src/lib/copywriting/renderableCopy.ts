@@ -98,7 +98,7 @@ export function wrapForRender(value: string, maxLength: number) {
 function fitCompleteSentences(value: string, constraints: RenderableCopyConstraints) {
   const normalized = normalizeCopy(value)
   const completeSentences = splitCompleteSentences(normalized)
-  if (completeSentences.length === 0) return normalized
+  if (completeSentences.length === 0) return hardFitCompleteCopy(normalized, constraints)
 
   let output = ''
   for (const sentence of completeSentences) {
@@ -111,7 +111,19 @@ function fitCompleteSentences(value: string, constraints: RenderableCopyConstrai
     }
   }
 
-  return output || normalized
+  return output || hardFitCompleteCopy(normalized, constraints)
+}
+
+function hardFitCompleteCopy(value: string, constraints: RenderableCopyConstraints) {
+  let fitted = truncateAtSentenceBoundary(value, constraints.maxBodyChars)
+  while (
+    fitted.length > 8 &&
+    wrapForRender(fitted, constraints.lineLength).length > constraints.maxBodyLines
+  ) {
+    fitted = truncateAtSentenceBoundary(fitted, Math.max(8, fitted.length - 6))
+  }
+  if (isCompleteBodyCopy(fitted)) return fitted
+  return completeFallbackBody(fitted)
 }
 
 export function isCompleteBodyCopy(value: string) {
@@ -125,8 +137,8 @@ export function isCompleteBodyCopy(value: string) {
 function completeFallbackBody(value: string) {
   const normalized = normalizeCopy(value)
   const withoutDanglingEnding = normalized
-    .replace(/[,，、;:]\s*$/, '')
-    .replace(/\s+(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|그리고|하지만|그래서|때문에|도록|라면|하면)$/u, '')
+    .replace(/[.!?。！？,，、;:]\s*$/, '')
+    .replace(/\s*(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|이나|거나|그리고|하지만|그래서|때문에|도록|라면|하면)$/u, '')
     .trim()
   if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
   if (/함께 있는$/u.test(withoutDanglingEnding)) {
@@ -153,10 +165,10 @@ function completeFallbackBody(value: string) {
   if (/어떤 식사와 함께$/u.test(withoutDanglingEnding)) {
     return `${withoutDanglingEnding} 먹을지 정해두면 루틴으로 이어가기 쉽습니다.`
   }
-  if (/(은|는|이|가|을|를|으로|도록|라면|하면|필요|중요|좋은|많은|위한)$/.test(withoutDanglingEnding)) {
+  if (/(은|는|이|가|을|를|으로|도록|라면|하면|필요|중요|좋은|많은|위한|더|다시|먼저|쓸|봐야|한 줄)$/.test(withoutDanglingEnding)) {
     return '핵심 정보와 실천 기준을 함께 정리하면 독자가 바로 저장해둘 이유가 생깁니다.'
   }
-  if (withoutDanglingEnding.length >= 18) return `${withoutDanglingEnding}.`
+  if (withoutDanglingEnding.length >= 18 && !hasIncompleteMeaningEnding(withoutDanglingEnding)) return `${withoutDanglingEnding}.`
   return '핵심 정보와 실천 기준을 함께 정리하면 독자가 바로 저장해둘 이유가 생깁니다.'
 }
 
@@ -180,7 +192,7 @@ function normalizeCopy(value: string) {
 
 function hasIncompleteMeaningEnding(value: string) {
   const withoutPunctuation = value.replace(/[.!?。！？]+$/u, '').trim()
-  return /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지)$/u.test(withoutPunctuation)
+  return /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지|은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|이나|거나|더|다시|먼저|쓸|봐야|한 줄)$/u.test(withoutPunctuation)
 }
 
 function visualLength(value: string) {

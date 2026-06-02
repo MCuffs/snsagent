@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TabContextType {
   activeTab: string
@@ -11,6 +11,7 @@ interface TabContextType {
 const TabContext = createContext<TabContextType | null>(null)
 
 export function TabProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'concept'
@@ -24,8 +25,7 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     }
     const query = params.toString()
     const newUrl = query ? `${pathname}?${query}` : pathname
-    // Native history calls update useSearchParams through the Next.js router.
-    window.history.pushState(null, '', newUrl)
+    router.push(newUrl, { scroll: false })
   }
 
   return (

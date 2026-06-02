@@ -4,6 +4,7 @@ import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers
 import { selectLayout } from './layoutEngine'
 import { LAYOUT_DEFINITIONS, type LayoutType } from './layoutTypes'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from './mediaCardHarness'
+import { getCardHarnessContract, repairCopyToHarness, validateHarnessedCopy } from './cardHarnessContract'
 import { checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
@@ -12,7 +13,7 @@ import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
-import { repairRenderableCopy, validateRenderableCopy } from '../copywriting/renderableCopy'
+import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { buildSemanticFallback, evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
 import {
@@ -158,6 +159,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   let plannedSlides = planMediaSlides(input, editorialPlan)
   plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx)
+  plannedSlides = enforceHarnessCopy(input, plannedSlides)
 
   // 1. Initialize Agents
   const brandAgent = new BrandIdentityAgent()
@@ -205,6 +207,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   agentSlides = copyRes.slides
   agentReportLogs.push(...copyRes.logs)
+  agentSlides = enforceHarnessAgentCopy(input, agentSlides)
 
   // 4. Execute VisualConceptAgent
   const visualRes = visualAgent.run({
@@ -232,6 +235,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   agentSlides = finalCopyGuard.slides
   agentReportLogs.push(...finalCopyGuard.logs)
+  agentSlides = enforceHarnessAgentCopy(input, agentSlides)
 
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
@@ -299,16 +303,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         designPrompt: sanitizedVisualPrompt,
         harnessDiagnostics: harness.diagnostics,
       })
-      const renderableCheck = validateRenderableCopy({
-        headline: slide.headline,
-        body: slide.body,
-        constraints: {
-          maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
-          maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 220,
-          maxBodyLines: maxRenderableBodyLines(slide.role),
-          lineLength: 24,
-        },
-      })
+      const renderableCheck = validateHarnessedCopy(slide.role, slide.headline, slide.body)
       if (!renderableCheck.passed) {
         baseSlideQualityCheck.issues.push(...renderableCheck.issues)
       }
@@ -548,23 +543,24 @@ ${sourceMaterial || '추가 자료 없음'}
 ${slideDescriptions}
 
 규칙:
-- headline: 25자 이하, 강렬하고 구체적 (공백 포함)
-- body: 90~220자, 핵심 정보를 2~4문장으로 풍성하게 전달 (공백 포함) — 한 문장짜리 요약, 추상적인 원론, 짧은 설명은 실패
-- body에는 반드시 주제의 구체 정보(성분/특징/사용 장면/비교 포인트/주의할 점 중 최소 2개)를 담으세요.
+- headline: 20자 이하, 강렬하고 구체적 (공백 포함)
+- body: 42~64자, 최대 2문장, 모바일 카드에서 2줄 안에 읽히는 짧은 완성 문장
+- body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
-- 각 슬라이드는 STORY ONTOLOGY의 guiding question에 답하고, transition에 맞춰 다음 슬라이드로 의미를 넘기세요.
-- body 첫 문장은 현재 노드의 구체 정보, 둘째 문장은 다음 노드로 넘어갈 이유를 담으세요.
+- 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
+- body는 하나의 구체 기준 또는 행동만 담고, 긴 설명은 다음 슬라이드로 넘기세요.
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요. 문장을 줄여야 하면 중간을 자르지 말고 완성 문장 단위로 다시 작성하세요.${rssInstruction}
 - 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
 - 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
 - hook 슬라이드: 독자의 시선을 즉시 잡되 사실로 확인되지 않은 효과를 단정하지 마세요
 - stat 슬라이드: 제공된 사실 및 기획 자료에 있는 수치만 사용하세요
-- save-cta / summary 슬라이드: 핵심 내용을 짧게 정리한 뒤 저장·확인을 자연스럽게 유도하세요
+- save-cta / summary 슬라이드: 핵심 내용을 짧게 정리한 뒤 "저장", "확인", "체크", "비교" 중 하나의 행동을 반드시 포함하세요
 - 제공된 사실 및 브랜드 DNA에 없는 수치, 할인율, 순위, 인증, 성분, 후기, 성능 또는 효능을 새로 만들지 마세요
 - 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
 - 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요${researchInstruction}
 - 모든 카피는 한국어로 작성${langInstruction}
+- "daily use scene", "mirror audience life", "one defining object", "imagePurpose", "guiding question", "STORY ONTOLOGY", "visualDirection" 같은 영어 기획 토큰은 절대 출력하지 마세요.
 
 JSON 응답 형식:
 {
@@ -590,24 +586,30 @@ JSON 응답 형식:
 
   const repairedSlides = slides.map(slide => {
     const generated = copyMap.get(slide.slideNumber)
-    const constraints = editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)?.copyConstraints
     if (typeof generated?.headline !== 'string' || !generated.headline.trim()) return slide
     const body = typeof generated.body === 'string' ? generated.body.trim() : slide.body
     if (hasUnsupportedNumericClaim(`${generated.headline} ${body}`, groundingText)) return slide
+    const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: generated.headline.trim(),
       body,
       constraints: {
-        maxHeadlineChars: constraints?.maxHeadlineChars || 25,
-        maxBodyChars: constraints?.maxBodyChars || 220,
-        maxBodyLines: maxRenderableBodyLines(slide.role),
-        lineLength: 24,
+        maxHeadlineChars: contract.maxHeadlineChars,
+        maxBodyChars: contract.maxBodyChars,
+        maxBodyLines: contract.maxBodyLines,
+        lineLength: contract.lineLength,
       },
+    })
+    const harnessed = repairCopyToHarness({
+      topic: input.topic,
+      role: slide.role,
+      headline: repaired.headline || slide.headline,
+      body: repaired.body || slide.body,
     })
     return {
       ...slide,
-      headline: repaired.headline || slide.headline,
-      body: repaired.body || slide.body,
+      headline: harnessed.headline,
+      body: harnessed.body,
     }
   })
 
@@ -668,8 +670,9 @@ body: ${slide.body}
 - 각 슬라이드 역할에 맞게 관찰, 해석, 구체적 의미, 다음 행동 중 하나를 반드시 완성하세요.
 - 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
 - headline은 필요할 때만 다듬고 25자 이하로 유지하세요.
-- body는 90~220자, 2~4문장으로 작성하세요. 짧은 한 문장이나 추상적인 기준 설명은 실패입니다.
-- 각 body에는 주제의 구체 정보와 실제 장면을 모두 넣으세요.
+- body는 42~64자, 최대 2문장으로 작성하세요. 모바일 카드에서 2줄 안에 읽혀야 합니다.
+- 각 body에는 주제의 구체 기준 또는 실제 행동을 하나만 넣으세요.
+- 영어 기획 토큰이나 내부 계획 용어를 본문에 쓰지 마세요.
 
 JSON만 반환:
 {
@@ -693,7 +696,7 @@ JSON만 반환:
   const nextSlides = params.slides.map(slide => {
     if (!weakSlideNumbers.has(slide.slideNumber)) return slide
     const rewritten = rewriteMap.get(slide.slideNumber)
-    const constraints = params.editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)?.copyConstraints
+    const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: rewritten?.headline?.trim() || slide.headline,
       body: rewritten?.body?.trim() || buildSemanticFallback({
@@ -702,16 +705,22 @@ JSON만 반환:
         headline: slide.headline,
       }),
       constraints: {
-        maxHeadlineChars: constraints?.maxHeadlineChars || 25,
-        maxBodyChars: constraints?.maxBodyChars || 220,
-        maxBodyLines: maxRenderableBodyLines(slide.role),
-        lineLength: 24,
+        maxHeadlineChars: contract.maxHeadlineChars,
+        maxBodyChars: contract.maxBodyChars,
+        maxBodyLines: contract.maxBodyLines,
+        lineLength: contract.lineLength,
       },
+    })
+    const harnessed = repairCopyToHarness({
+      topic: params.input.topic,
+      role: slide.role,
+      headline: repaired.headline || slide.headline,
+      body: repaired.body || slide.body,
     })
     return {
       ...slide,
-      headline: repaired.headline || slide.headline,
-      body: repaired.body || slide.body,
+      headline: harnessed.headline,
+      body: harnessed.body,
     }
   })
 
@@ -730,6 +739,7 @@ JSON만 반환:
   const finalWeak = new Set(finalReport.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
   return nextSlides.map(slide => {
     if (!finalWeak.has(slide.slideNumber)) return slide
+    const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
       body: buildSemanticFallback({
@@ -738,13 +748,19 @@ JSON만 반환:
         headline: slide.headline,
       }),
       constraints: {
-        maxHeadlineChars: 25,
-        maxBodyChars: 220,
-        maxBodyLines: maxRenderableBodyLines(slide.role),
-        lineLength: 24,
+        maxHeadlineChars: contract.maxHeadlineChars,
+        maxBodyChars: contract.maxBodyChars,
+        maxBodyLines: contract.maxBodyLines,
+        lineLength: contract.lineLength,
       },
     })
-    return { ...slide, headline: repaired.headline, body: repaired.body }
+    const harnessed = repairCopyToHarness({
+      topic: params.input.topic,
+      role: slide.role,
+      headline: repaired.headline,
+      body: repaired.body,
+    })
+    return { ...slide, headline: harnessed.headline, body: harnessed.body }
   })
 }
 
@@ -762,7 +778,39 @@ function rolePurpose(role: MediaSlideRole) {
 }
 
 function maxRenderableBodyLines(role: MediaSlideRole | string | undefined) {
-  return role === 'save-cta' || role === 'summary' ? 4 : 5
+  return getCardHarnessContract(role).maxBodyLines
+}
+
+function enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[]): MediaSlidePlan[] {
+  return slides.map(slide => {
+    const repaired = repairCopyToHarness({
+      topic: input.topic,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })
+    return {
+      ...slide,
+      headline: repaired.headline,
+      body: repaired.body,
+    }
+  })
+}
+
+function enforceHarnessAgentCopy(input: MediaCarouselInput, slides: AgentSlideData[]): AgentSlideData[] {
+  return slides.map(slide => {
+    const repaired = repairCopyToHarness({
+      topic: input.topic,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })
+    return {
+      ...slide,
+      headline: repaired.headline,
+      body: repaired.body,
+    }
+  })
 }
 
 function runFinalSemanticCopyGuard(params: {
@@ -796,7 +844,7 @@ function runFinalSemanticCopyGuard(params: {
 
   const slides = params.slides.map(slide => {
     if (!weakSlideNumbers.has(slide.slideNumber)) return slide
-    const slidePlan = params.editorialPlan.slides.find(plan => plan.slideNumber === slide.slideNumber)
+    const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
       body: buildSemanticFallback({
@@ -805,16 +853,22 @@ function runFinalSemanticCopyGuard(params: {
         headline: slide.headline,
       }),
       constraints: {
-        maxHeadlineChars: slidePlan?.copyConstraints.maxHeadlineChars || 25,
-        maxBodyChars: slidePlan?.copyConstraints.maxBodyChars || 220,
-        maxBodyLines: maxRenderableBodyLines(slide.role),
-        lineLength: 24,
+        maxHeadlineChars: contract.maxHeadlineChars,
+        maxBodyChars: contract.maxBodyChars,
+        maxBodyLines: contract.maxBodyLines,
+        lineLength: contract.lineLength,
       },
+    })
+    const harnessed = repairCopyToHarness({
+      topic: params.input.topic,
+      role: slide.role,
+      headline: repaired.headline,
+      body: repaired.body,
     })
     return {
       ...slide,
-      headline: repaired.headline,
-      body: repaired.body,
+      headline: harnessed.headline,
+      body: harnessed.body,
     }
   })
 

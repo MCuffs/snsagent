@@ -1348,7 +1348,7 @@ ${purchasePersuasionText}
           messages: [{ role: 'user', content: signalPrompt }],
           response_format: { type: 'json_object' },
           temperature: 0,
-          max_tokens: 600,
+          max_completion_tokens: 600,
         })
         const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
 
