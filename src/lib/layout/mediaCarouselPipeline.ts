@@ -515,6 +515,13 @@ async function generateMediaSlideCopies(
   const rssInstruction = hasRssContext
     ? `\n- 실시간 뉴스 컨텍스트의 기사 제목·내용에서 구체적인 키워드·앵글·트렌드를 훅과 body에 반드시 반영하세요\n- 뉴스 기사에 있는 실제 이슈를 다루어야 독자의 공감을 얻습니다\n- 뉴스에 없는 수치나 사실은 만들지 마세요`
     : ''
+  const hasResearchBrief = sourceMaterial.includes('[외부 리서치 브리프') || sourceMaterial.includes('[EXTERNAL RESEARCH BRIEF')
+  const researchInstruction = hasResearchBrief
+    ? `\n- 외부 리서치 브리프가 있으면 가장 우선되는 사실 근거로 사용하세요.
+- 각 슬라이드는 리서치 브리프의 "슬라이드별 근거 배분"에서 지정된 mustUseFacts 중 최소 1개를 body에 반영하세요.
+- 리서치 브리프의 "주의할 표현"에 걸리는 치료 효과, 질병 예방, 검증되지 않은 수치, 주제와 무관한 시사/경제 정보는 쓰지 마세요.
+- 출처명이나 URL을 카드 본문에 노출하지 말고, 근거에서 얻은 의미만 자연스러운 카피로 바꾸세요.`
+    : ''
 
   const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
@@ -556,7 +563,7 @@ ${slideDescriptions}
 - 제공된 사실 및 브랜드 DNA에 없는 수치, 할인율, 순위, 인증, 성분, 후기, 성능 또는 효능을 새로 만들지 마세요
 - 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
 - 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
-- 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요
+- 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요${researchInstruction}
 - 모든 카피는 한국어로 작성${langInstruction}
 
 JSON 응답 형식:

@@ -10,6 +10,7 @@ import { collectBrandUrlContext } from '../../../../../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../../lib/purchase-persuasion'
 import { getUserFacingGenerationError } from '../../../../../lib/runtime-diagnostics'
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../lib/rss/rssFetcher'
+import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../lib/research/carouselResearch'
 import OpenAI from 'openai'
 
 export const runtime = 'nodejs'
@@ -130,6 +131,26 @@ export async function POST(request: Request) {
         }
       } catch (rssErr) {
         console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
+      }
+
+      try {
+        const researchBrief = await buildCarouselResearchBrief({
+          topic: body.topic!,
+          category: body.category,
+          keyContent: enrichedKeyContent,
+          contentType: body.contentType,
+          slideCount: normalizeSlideCount(body.slideCount),
+          language: body.language || 'ko',
+        })
+        const researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
+        if (researchContext) {
+          enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
+          console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}"`)
+        } else {
+          console.log(`[ResearchBrief] No topic-matched external research found for "${body.topic}"`)
+        }
+      } catch (researchErr) {
+        console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
       }
 
       const result = await generateMediaCarousel({
