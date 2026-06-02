@@ -4,6 +4,13 @@ import { unauthorizedJson, verifyRequestSecret } from '../../../../lib/security'
 
 export const runtime = 'nodejs'
 
+function nicepayOk() {
+  return new Response('OK', {
+    status: 200,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  })
+}
+
 function webhookString(value: unknown) {
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -30,7 +37,8 @@ export async function POST(request: Request) {
   try {
     body = JSON.parse(rawBody)
   } catch {
-    return Response.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
+    console.warn('[NicePay Webhook] Received non-JSON webhook verification request')
+    return nicepayOk()
   }
 
   const eventType = webhookString(body.eventType) || webhookString(body.type)
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
     console.error('[NicePay Webhook] Handler error', error)
   }
 
-  return Response.json({ success: true })
+  return nicepayOk()
 }
 
 async function handleBillingSuccess({ tid, bid }: { tid: string; bid: string }) {
