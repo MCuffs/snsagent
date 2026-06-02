@@ -43,10 +43,23 @@ interface GenerateParams {
   structurePreview?: { slideNumber: number; role: string; description: string }[]
 }
 
+interface ClarificationOption {
+  label: string
+  value: string
+}
+
+interface ClarificationPrompt {
+  question: string
+  options: ClarificationOption[]
+  allowCustom?: boolean
+  skipLabel?: string
+}
+
 interface AgentResponse {
   message: string
   ready: boolean
   params?: GenerateParams
+  clarification?: ClarificationPrompt
 }
 
 const VISUAL_HINT_OPTIONS = ['dark-editorial', 'trend-feed', 'community-style', 'minimal-clean', 'breaking-news']
@@ -88,6 +101,7 @@ ${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n$
 - **크리에이티브 디렉터의 목소리**: 기계적 답변을 지양하고, 정보 콘텐츠 기획 전문가로서 주도적으로 레이아웃과 흐름을 설계해 주십시오. "질문을 수집하여 분석했다"가 아니라 "정보의 핵심을 이렇게 요약해 흐름을 잡았다"는 관점에서 제안하십시오.
 - **마크다운 서식 절대 사용 금지**: **별표(\`**\` 또는 \`*\`), 샵(\`#\`)을 이용한 타이틀 구성 등 마크다운 스타일은 사용자가 읽기에 불필요한 AI 기계음 느낌을 줍니다. **어떠한 강조 기호도 사용하지 말고**, 오직 일반 텍텍스트, 평이한 문장, 그리고 자연스러운 단락 구분(줄바꿈)만을 활용하십시오. 필요 시 대시(\`-\`) 또는 일반 번호를 사용한 목록 형태로만 깔끔하게 나열하십시오.
 - 당신은 단순 질문을 던지는 설문 시스템이 아닙니다. 사용자의 한두 단어 입력만으로도 브랜드를 대표할 수 있는 매력적인 기획안과 레이아웃(비주얼 스타일), 콘텐츠 구조를 "스스로 생각해서 먼저 제안"합니다.
+- 단, 사용자의 입력에 주제·대상·관점이 거의 없어 실제 카드뉴스 품질이 낮아질 경우에는 무리하게 생성하지 말고 ready를 false로 두고 clarification을 반환하세요. clarification은 사용자가 바로 고를 수 있는 3~4개의 구체 선택지를 포함해야 합니다.
 - 이미 제안된 기획안에 대해 사용자가 피드백(예: "더 밝게 해줘", "5장으로 수정해줘")을 준다면, 그 피드백을 수용하여 비주얼 스타일, 슬라이드 수 등을 수정하고 기획안을 즉시 업데이트해 주어야 합니다.
 - message는 채팅창에서 편하게 읽히도록 세 문단, 총 220자 이내로 작성하십시오. 정보의 핵심 내용 요약, 슬라이드 흐름 소개, 생성 의사 확인 질문만 담으십시오.
 - 성과 지표나 도달률 등 근거 없는 예측 수치는 작성하지 마십시오.
@@ -129,6 +143,22 @@ ${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n$
       { "slideNumber": 5, "role": "Save CTA", "description": "카드뉴스 저장하고 내일 아침 트렌드 빠르게 챙겨보기" }
     ]
   }
+}
+
+정보가 부족해 추가 수집이 필요할 때:
+{
+  "message": "좋은 카드뉴스를 만들기에는 정보가 아직 조금 넓습니다.\n\n아래 방향 중 하나를 고르거나 직접 답변해 주세요. 선택한 내용을 바탕으로 훅과 슬라이드 흐름을 더 정확하게 잡겠습니다.",
+  "ready": false,
+  "clarification": {
+    "question": "이번 카드뉴스에서 어떤 관점을 가장 강조할까요?",
+    "allowCustom": true,
+    "skipLabel": "현재 정보로 진행",
+    "options": [
+      { "label": "효능/장점 정리", "value": "주제의 효능과 장점을 구체적으로 정리한 카드뉴스" },
+      { "label": "체크리스트", "value": "실생활에서 확인할 체크리스트형 카드뉴스" },
+      { "label": "요즘 이슈 연결", "value": "최근 트렌드와 연결한 정보성 카드뉴스" }
+    ]
+  }
 }${language === 'en' ? '\n\nIMPORTANT: You are operating in English mode. Write ALL your messages, strategy briefs, and JSON fields entirely in English. Do not use Korean in any output.' : ''}`
   }
 
@@ -153,6 +183,7 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
 - **인간 크리에이티브 디렉터의 목소리**: 기계적이거나 정형화된 챗봇 문투는 피하고, 전문 에이전시의 든든한 파트너로서 예의를 갖추되 정답을 주도적으로 제시하는 전문가 톤을 취하십시오. "질문을 수집하여 분석했다"는 형태가 아니라, "브랜드의 매력을 이렇게 해석했다"는 관점에서 제안하십시오.
 - **마크다운 서식 절대 사용 금지**: **별표(\`**\` 또는 \`*\`), 샵(\`#\`)을 이용한 타이틀 구성 등 마크다운 스타일은 사용자가 읽기에 불필요한 AI 기계음 느낌을 줍니다. **어떠한 강조 기호도 사용하지 말고**, 오직 일반 텍텍스트, 평이한 문장, 그리고 자연스러운 단락 구분(줄바꿈)만을 활용하십시오. 필요 시 대시(\`-\`) 또는 일반 번호를 사용한 목록 형태로만 깔끔하게 나열하십시오.
 - 당신은 단순 질문을 던지는 설문 시스템이 아닙니다. 사용자의 한두 단어 입력만으로도 브랜드를 대표할 수 있는 매력적인 기획안과 레이아웃(비주얼 스타일), 콘텐츠 구조를 "스스로 생각해서 먼저 제안"합니다.
+- 단, 사용자의 입력에 상품·캠페인·고객 문제·핵심 관점이 거의 없어 실제 카드뉴스 품질이 낮아질 경우에는 무리하게 생성하지 말고 ready를 false로 두고 clarification을 반환하세요. clarification은 사용자가 바로 고를 수 있는 3~4개의 구체 선택지를 포함해야 합니다.
 - 이미 제안된 기획안에 대해 사용자가 피드백(예: "더 밝게 해줘", "5장으로 수정해줘")을 준다면, 그 피드백을 수용하여 비주얼 스타일, 슬라이드 수 등을 수정하고 기획안을 즉시 업데이트해 주어야 합니다.
 - message는 채팅창에서 편하게 읽히도록 세 문단, 총 220자 이내로 작성하십시오. 콘셉트 해석, 슬라이드 흐름 요약, 생성 여부 확인 질문만 담으십시오.
 - 성과 증가율, 저장 확률 등 확인할 근거가 없는 수치나 예측 지표는 message와 params 어디에도 작성하지 마십시오.
@@ -194,6 +225,22 @@ ${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\
       { "slideNumber": 5, "role": "Save CTA", "description": "계정 팔로우하고 나의 일상에 질서를 더할 팁 소장하기" }
     ]
   }
+}
+
+정보가 부족해 추가 수집이 필요할 때:
+{
+  "message": "좋은 카드뉴스를 만들기에는 정보가 아직 조금 넓습니다.\n\n아래 방향 중 하나를 고르거나 직접 답변해 주세요. 선택한 내용을 바탕으로 훅과 슬라이드 흐름을 더 정확하게 잡겠습니다.",
+  "ready": false,
+  "clarification": {
+    "question": "이번 카드뉴스에서 무엇을 가장 강조할까요?",
+    "allowCustom": true,
+    "skipLabel": "현재 정보로 진행",
+    "options": [
+      { "label": "신상품 소개", "value": "신상품 또는 대표 상품을 소개하는 카드뉴스" },
+      { "label": "고객 고민 해결", "value": "고객의 고민을 해결하는 정보형 카드뉴스" },
+      { "label": "브랜드 스토리", "value": "브랜드 차별점과 스토리를 보여주는 카드뉴스" }
+    ]
+  }
 }${language === 'en' ? '\n\nIMPORTANT: You are operating in English mode. Write ALL your messages, strategy briefs, and JSON fields entirely in English. Do not use Korean in any output.' : ''}`
 }
 
@@ -206,6 +253,117 @@ function validateParams(params: unknown): params is GenerateParams {
   if (!p.objective || typeof p.objective !== 'string') return false
   if (!p.slideCount || ![5, 7, 10].includes(Number(p.slideCount))) return false
   return true
+}
+
+function validateClarification(clarification: unknown): clarification is ClarificationPrompt {
+  if (!clarification || typeof clarification !== 'object') return false
+  const value = clarification as Record<string, unknown>
+  if (typeof value.question !== 'string' || !value.question.trim()) return false
+  if (!Array.isArray(value.options) || value.options.length < 2) return false
+  return value.options.every(option => {
+    if (!option || typeof option !== 'object') return false
+    const item = option as Record<string, unknown>
+    return typeof item.label === 'string' && item.label.trim().length > 0 &&
+      typeof item.value === 'string' && item.value.trim().length > 0
+  })
+}
+
+function isGenericCardNewsRequest(text: string) {
+  const normalized = text
+    .replace(/https?:\/\/[^\s]+/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+  if (!normalized) return true
+  const genericOnly = normalized
+    .replace(/카드뉴스|카드 뉴스|콘텐츠|컨텐츠|인스타그램|인스타|피드|릴스|sns|만들어줘|만들어|생성|제작|기획|추천|홍보|마케팅|브랜드|상품|주제|해줘|해주세요|부탁/g, '')
+    .replace(/\s+/g, '')
+
+  if (genericOnly.length === 0) return true
+  if (normalized.length <= 3) return true
+  return false
+}
+
+function isBroadTopic(text: string) {
+  const normalized = text
+    .replace(/https?:\/\/[^\s]+/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+  const broadTopics = new Set(['건강', '뷰티', '패션', '음식', '푸드', '운동', '다이어트', 'ai', '트렌드', '경제', '주식', '마케팅', '공부', '여행'])
+  return broadTopics.has(normalized)
+}
+
+function buildClarificationResponse(input: {
+  userText: string
+  brand: { name: string; industry: string }
+  language?: 'ko' | 'en'
+  generationMode?: 'brand' | 'general'
+}): AgentResponse | null {
+  const hasUrl = /https?:\/\/[^\s]+/.test(input.userText)
+  const textWithoutUrl = input.userText.replace(/https?:\/\/[^\s]+/g, '').trim()
+
+  if (hasUrl && textWithoutUrl.length >= 2) return null
+  if (!isGenericCardNewsRequest(input.userText) && !isBroadTopic(input.userText)) return null
+
+  if (input.language === 'en') {
+    const question = input.generationMode === 'general'
+      ? 'Which angle should this card news focus on?'
+      : `What should ${input.brand.name}'s card news focus on?`
+    return {
+      ready: false,
+      message: 'I need one more detail to make the card news useful instead of generic. Pick a direction below or type your own answer.',
+      clarification: {
+        question,
+        allowCustom: true,
+        skipLabel: 'Use current info',
+        options: input.generationMode === 'general'
+          ? [
+              { label: 'Benefits summary', value: `${input.userText} benefits and key points` },
+              { label: 'Checklist', value: `${input.userText} checklist and practical tips` },
+              { label: 'Trend angle', value: `${input.userText} recent trend and context` },
+              { label: 'Cautions', value: `${input.userText} cautions and balanced explanation` },
+            ]
+          : [
+              { label: 'New product', value: `${input.brand.name} new product launch card news` },
+              { label: 'Customer problem', value: `${input.brand.name} customer pain point solution card news` },
+              { label: 'Brand story', value: `${input.brand.name} brand story and differentiation card news` },
+              { label: 'Promotion', value: `${input.brand.name} promotion or event card news` },
+            ],
+      },
+    }
+  }
+
+  const question = input.generationMode === 'general'
+    ? '이번 카드뉴스에서 어떤 관점을 가장 강조할까요?'
+    : `${input.brand.name} 카드뉴스에서 무엇을 가장 강조할까요?`
+
+  return {
+    ready: false,
+    message: '좋은 카드뉴스를 만들기에는 정보가 아직 조금 넓습니다.\n\n아래 방향 중 하나를 고르거나, 직접 답변해 주세요. 선택한 내용을 바탕으로 훅과 슬라이드 흐름을 더 정확하게 잡겠습니다.',
+    clarification: {
+      question,
+      allowCustom: true,
+      skipLabel: '현재 정보로 진행',
+      options: input.generationMode === 'general'
+        ? [
+            { label: '효능/장점 정리', value: `${input.userText}의 효능과 장점을 구체적으로 정리한 카드뉴스` },
+            { label: '체크리스트', value: `${input.userText}를 실생활에서 확인할 체크리스트형 카드뉴스` },
+            { label: '요즘 이슈 연결', value: `${input.userText}를 최근 트렌드와 연결한 정보성 카드뉴스` },
+            { label: '주의점까지 균형 있게', value: `${input.userText}의 장점과 주의점을 균형 있게 설명한 카드뉴스` },
+          ]
+        : [
+            { label: '신상품 소개', value: `${input.brand.name}의 신상품 또는 대표 상품을 소개하는 카드뉴스` },
+            { label: '고객 고민 해결', value: `${input.brand.name} 고객의 고민을 해결하는 정보형 카드뉴스` },
+            { label: '브랜드 스토리', value: `${input.brand.name}의 차별점과 브랜드 스토리를 보여주는 카드뉴스` },
+            { label: '이벤트/프로모션', value: `${input.brand.name}의 이벤트 또는 프로모션을 안내하는 카드뉴스` },
+          ],
+    },
+  }
 }
 
 export async function POST(request: Request) {
@@ -256,6 +414,16 @@ export async function POST(request: Request) {
 
     // 3. Detect URL in the latest user message and scrape
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
+    if (lastUserMessage) {
+      const clarification = buildClarificationResponse({
+        userText: lastUserMessage.content,
+        brand,
+        language,
+        generationMode,
+      })
+      if (clarification) return NextResponse.json(clarification)
+    }
+
     let scrapedContext = ''
     let purchasePersuasionContext = ''
     if (lastUserMessage) {
@@ -402,6 +570,9 @@ export async function POST(request: Request) {
         })
       }
       parsed.params.slideCount = Number(parsed.params.slideCount)
+    }
+    if (!parsed.ready && parsed.clarification && !validateClarification(parsed.clarification)) {
+      delete parsed.clarification
     }
 
     return NextResponse.json(parsed)

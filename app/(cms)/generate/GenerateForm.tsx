@@ -39,12 +39,25 @@ interface ChatMessage {
   content: string
 }
 
+interface ClarificationOption {
+  label: string
+  value: string
+}
+
+interface ClarificationPrompt {
+  question: string
+  options: ClarificationOption[]
+  allowCustom?: boolean
+  skipLabel?: string
+}
+
 interface DisplayMessage {
   id: string
   role: 'ai' | 'user'
   content: string
   revealedContent: string
   isTyping: boolean
+  clarification?: ClarificationPrompt
 }
 
 interface GenerateParams {
@@ -65,8 +78,8 @@ interface GenerateParams {
 let msgCounter = 0
 function mkId() { return `m-${++msgCounter}` }
 
-function aiDisplay(content: string): DisplayMessage {
-  return { id: mkId(), role: 'ai', content, revealedContent: '', isTyping: true }
+function aiDisplay(content: string, clarification?: ClarificationPrompt): DisplayMessage {
+  return { id: mkId(), role: 'ai', content, revealedContent: '', isTyping: true, clarification }
 }
 
 function userDisplay(content: string): DisplayMessage {
@@ -218,9 +231,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     ]
   }, [clearBriefingTimers])
 
-  const appendAiMessage = useCallback((content: string, params?: GenerateParams) => {
+  const appendAiMessage = useCallback((content: string, params?: GenerateParams, clarification?: ClarificationPrompt) => {
     clearTypingTimer()
-    const message = aiDisplay(content)
+    const message = aiDisplay(content, clarification)
     let cursor = 0
 
     setDisplayMessages(prev => [...prev, message])
@@ -265,7 +278,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode }),
       })
-      const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; error?: string }
+      const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }
 
       if (data.error) {
         appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
@@ -273,7 +286,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       }
 
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
-      appendAiMessage(msg, data.ready && data.params ? data.params : undefined)
+      appendAiMessage(msg, data.ready && data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
 
       const assistantHistory: ChatMessage = { role: 'assistant', content: msg }
       setChatHistory(prev => [...prev, assistantHistory])
@@ -347,6 +360,28 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     const newHistory = [...chatHistory, userMsg]
 
     setDisplayMessages(prev => [...prev, userDisplay(text)])
+    setChatHistory(newHistory)
+    setInput('')
+    setReadyParams(null)
+    setBriefingStage(0)
+    clearBriefingTimers()
+
+    await callAgent(newHistory)
+  }
+
+  const handleClarificationSelect = async (option: ClarificationOption | null) => {
+    if (isWaiting || isRevealingMessage) return
+
+    const text = option
+      ? option.value
+      : (locale === 'en'
+        ? 'Proceed with the current information and choose the best concrete direction yourself.'
+        : '현재 정보만으로 가장 적절한 구체 방향을 선택해서 진행해 주세요.')
+    const userLabel = option?.label || (locale === 'en' ? 'Use current info' : '현재 정보로 진행')
+    const userMsg: ChatMessage = { role: 'user', content: text }
+    const newHistory = [...chatHistory, userMsg]
+
+    setDisplayMessages(prev => [...prev, userDisplay(userLabel)])
     setChatHistory(newHistory)
     setInput('')
     setReadyParams(null)
@@ -573,6 +608,59 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                       <span className="ml-0.5 inline-block h-[1em] w-px align-middle bg-[#B88E76] animate-pulse" />
                     )}
                   </div>
+                  {msg.role === 'ai' && msg.clarification && !msg.isTyping && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
+                      className="w-full rounded-2xl border border-[#E0D7CC] bg-white/95 p-3.5 shadow-[0_10px_30px_rgba(158,125,104,0.08)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-black leading-6 text-[#2C1E1A]">{msg.clarification.question}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleClarificationSelect(null)}
+                          disabled={isWaiting || isRevealingMessage}
+                          className="shrink-0 rounded-full p-1 text-[#8C7E7A] transition-colors hover:bg-[#F2EAE1] disabled:opacity-40"
+                          aria-label={locale === 'en' ? 'Skip question' : '질문 건너뛰기'}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {msg.clarification.options.map((option, index) => (
+                          <button
+                            key={`${msg.id}-${option.label}-${index}`}
+                            type="button"
+                            onClick={() => handleClarificationSelect(option)}
+                            disabled={isWaiting || isRevealingMessage}
+                            className="group flex w-full items-center gap-3 rounded-xl border border-transparent bg-[#F7F4EF] px-3 py-3 text-left transition-all hover:border-[#C9B29F] hover:bg-[#FFFDFB] disabled:opacity-50"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#8C7E7A] shadow-sm group-hover:text-[#9E7D68]">
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0 flex-1 text-sm font-bold leading-5 text-[#3B302C]">{option.label}</span>
+                            <ArrowRight className="h-4 w-4 shrink-0 text-[#A69282] opacity-0 transition-opacity group-hover:opacity-100" />
+                          </button>
+                        ))}
+                      </div>
+                      {msg.clarification.allowCustom && (
+                        <p className="mt-3 text-[11px] font-semibold text-[#9A8C80]">
+                          {locale === 'en' ? 'Or type your own answer in the input below.' : '또는 아래 입력창에 직접 답변해도 됩니다.'}
+                        </p>
+                      )}
+                      {msg.clarification.skipLabel && (
+                        <button
+                          type="button"
+                          onClick={() => handleClarificationSelect(null)}
+                          disabled={isWaiting || isRevealingMessage}
+                          className="mt-3 rounded-xl border border-[#D8CEC1] bg-white px-3 py-2 text-xs font-black text-[#5C4E4B] transition hover:border-[#9E7D68] disabled:opacity-40"
+                        >
+                          {msg.clarification.skipLabel}
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             ))}
