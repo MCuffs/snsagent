@@ -4,6 +4,12 @@ import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
 import { parseBrandDna } from '../../../../lib/brand-dna'
 import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
+import {
+  getOpenAIBaseURLHost,
+  getOpenAIKeyFingerprint,
+  logAiDiagnostic,
+  readOpenAIError,
+} from '../../../../src/lib/ai/diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -107,15 +113,31 @@ export async function POST(request: Request) {
       apiKey,
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
+    const model = getCopywritingModel()
+    const diagnosticContext = {
+      stepName: 'brand agent profile',
+      provider: 'openai' as const,
+      model,
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(apiKey),
+    }
 
+    logAiDiagnostic({ status: 'start', ...diagnosticContext })
     const response = await openai.chat.completions.create({
-      model: getCopywritingModel(),
+      model,
       messages: [
         { role: 'system', content: buildSystemPrompt(brand) },
         ...messages,
       ],
       response_format: { type: 'json_object' },
       max_completion_tokens: 800,
+    })
+    logAiDiagnostic({
+      status: 'success',
+      ...diagnosticContext,
+      promptTokens: response.usage?.prompt_tokens,
+      completionTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
     })
 
     const content = response.choices[0]?.message?.content
@@ -125,6 +147,15 @@ export async function POST(request: Request) {
     return NextResponse.json(parsed)
   } catch (error) {
     console.error('[BrandAgent]', error)
+    logAiDiagnostic({
+      status: 'failure',
+      stepName: 'brand agent profile',
+      provider: 'openai',
+      model: getCopywritingModel(),
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(),
+      ...readOpenAIError(error),
+    })
     return NextResponse.json({ message: '오류가 발생했습니다. 다시 시도해주세요.' }, { status: 500 })
   }
 }

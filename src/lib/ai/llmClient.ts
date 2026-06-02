@@ -1,4 +1,11 @@
 import OpenAI from 'openai'
+import {
+  getOpenAIBaseURLHost,
+  getOpenAIKeyFingerprint,
+  logAiDiagnostic,
+  normalizeModelName,
+  readOpenAIError,
+} from './diagnostics'
 
 export interface LLMClient {
   generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T>
@@ -13,7 +20,13 @@ export interface LLMRequestOptions {
 export const DEFAULT_TEXT_MODEL = 'gpt-5.4'
 
 export class MockLLMClient implements LLMClient {
-  async generateJson<T>(_stepName: string, _prompt: string, fallback: () => T): Promise<T> {
+  async generateJson<T>(stepName: string, _prompt: string, fallback: () => T): Promise<T> {
+    logAiDiagnostic({
+      status: 'fallback',
+      stepName,
+      provider: 'mock',
+      model: 'mock',
+    })
     return fallback()
   }
 }
@@ -27,8 +40,19 @@ export class OpenAILLMClient implements LLMClient {
   }
 
   async generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T> {
+    const model = options?.model || getTextGenerationModel()
+    const baseURL = getOpenAIBaseURLHost()
+    const keyFingerprint = getOpenAIKeyFingerprint()
+    logAiDiagnostic({
+      status: 'start',
+      stepName,
+      provider: 'openai',
+      model,
+      baseURL,
+      keyFingerprint,
+    })
+
     try {
-      const model = options?.model || getTextGenerationModel()
       const response = await this.client.chat.completions.create({
         model,
         messages: [
@@ -46,12 +70,44 @@ export class OpenAILLMClient implements LLMClient {
       const content = response.choices[0]?.message?.content
       if (!content) {
         console.warn(`[LLMClient] ${stepName}: empty response, using fallback`)
+        logAiDiagnostic({
+          status: 'fallback',
+          stepName,
+          provider: 'openai',
+          model,
+          baseURL,
+          keyFingerprint,
+          promptTokens: response.usage?.prompt_tokens,
+          completionTokens: response.usage?.completion_tokens,
+          totalTokens: response.usage?.total_tokens,
+          errorMessage: 'empty response',
+        })
         return fallback()
       }
 
+      logAiDiagnostic({
+        status: 'success',
+        stepName,
+        provider: 'openai',
+        model,
+        baseURL,
+        keyFingerprint,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens,
+      })
       return JSON.parse(content) as T
     } catch (error) {
       console.warn(`[LLMClient] ${stepName} failed, using fallback`, error)
+      logAiDiagnostic({
+        status: 'failure',
+        stepName,
+        provider: 'openai',
+        model,
+        baseURL,
+        keyFingerprint,
+        ...readOpenAIError(error),
+      })
       return fallback()
     }
   }
@@ -66,11 +122,11 @@ export function getLLMClient(): LLMClient {
 }
 
 export function getCopywritingModel() {
-  return process.env.OPENAI_COPY_MODEL?.trim() || getTextGenerationModel()
+  return normalizeModelName(process.env.OPENAI_COPY_MODEL, getTextGenerationModel())
 }
 
 export function getTextGenerationModel() {
-  return process.env.OPENAI_TEXT_MODEL?.trim() || DEFAULT_TEXT_MODEL
+  return normalizeModelName(process.env.OPENAI_TEXT_MODEL, DEFAULT_TEXT_MODEL)
 }
 
 function supportsCustomTemperature(model: string) {

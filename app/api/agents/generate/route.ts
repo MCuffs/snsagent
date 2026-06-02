@@ -7,6 +7,12 @@ import { collectBrandUrlContext } from '../../../../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../lib/purchase-persuasion'
 import { extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
 import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
+import {
+  getOpenAIBaseURLHost,
+  getOpenAIKeyFingerprint,
+  logAiDiagnostic,
+  readOpenAIError,
+} from '../../../../src/lib/ai/diagnostics'
 
 export const runtime = 'nodejs'
 
@@ -337,6 +343,14 @@ export async function POST(request: Request) {
       apiKey,
       ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     })
+    const model = getCopywritingModel()
+    const diagnosticContext = {
+      stepName: 'generate agent strategy',
+      provider: 'openai' as const,
+      model,
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(apiKey),
+    }
     const systemPrompt = buildSystemPrompt(
       brand,
       preferencesText,
@@ -345,14 +359,22 @@ export async function POST(request: Request) {
       generationMode,
       rssContext
     )
+    logAiDiagnostic({ status: 'start', ...diagnosticContext })
     const response = await openai.chat.completions.create({
-      model: getCopywritingModel(),
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
       ],
       response_format: { type: 'json_object' },
       max_completion_tokens: 1200,
+    })
+    logAiDiagnostic({
+      status: 'success',
+      ...diagnosticContext,
+      promptTokens: response.usage?.prompt_tokens,
+      completionTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
     })
 
     const content = response.choices[0]?.message?.content
@@ -385,6 +407,15 @@ export async function POST(request: Request) {
     return NextResponse.json(parsed)
   } catch (error) {
     console.error('[GenerateAgent] Error:', error)
+    logAiDiagnostic({
+      status: 'failure',
+      stepName: 'generate agent strategy',
+      provider: 'openai',
+      model: getCopywritingModel(),
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(),
+      ...readOpenAIError(error),
+    })
     const mapped = getOpenAIUserFacingError(error)
     return NextResponse.json({ message: mapped.message, ready: false }, { status: mapped.status })
   }

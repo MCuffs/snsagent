@@ -1,6 +1,12 @@
 import type { OpenAI } from 'openai'
 import type { BrandUrlCollection } from './brand-url-collector'
 import { getTextGenerationModel } from '../src/lib/ai/llmClient'
+import {
+  getOpenAIBaseURLHost,
+  getOpenAIKeyFingerprint,
+  logAiDiagnostic,
+  readOpenAIError,
+} from '../src/lib/ai/diagnostics'
 
 export interface PurchasePersuasionContext {
   brand: {
@@ -179,8 +185,17 @@ Required JSON shape:
 }`
 
   try {
+    const model = getTextGenerationModel()
+    const diagnosticContext = {
+      stepName: 'purchase persuasion analysis',
+      provider: 'openai' as const,
+      model,
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(),
+    }
+    logAiDiagnostic({ status: 'start', ...diagnosticContext })
     const response = await params.openai.chat.completions.create({
-      model: getTextGenerationModel(),
+      model,
       messages: [
         {
           role: 'system',
@@ -192,10 +207,36 @@ Required JSON shape:
       max_completion_tokens: 1800,
     })
     const raw = response.choices[0]?.message?.content
-    if (!raw) return fallback
+    if (!raw) {
+      logAiDiagnostic({
+        status: 'fallback',
+        ...diagnosticContext,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens,
+        errorMessage: 'empty response',
+      })
+      return fallback
+    }
+    logAiDiagnostic({
+      status: 'success',
+      ...diagnosticContext,
+      promptTokens: response.usage?.prompt_tokens,
+      completionTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
+    })
     return normalizePurchasePersuasion(JSON.parse(raw), fallback)
   } catch (error) {
     console.warn('[PurchasePersuasion] analysis failed, using fallback', error)
+    logAiDiagnostic({
+      status: 'failure',
+      stepName: 'purchase persuasion analysis',
+      provider: 'openai',
+      model: getTextGenerationModel(),
+      baseURL: getOpenAIBaseURLHost(),
+      keyFingerprint: getOpenAIKeyFingerprint(),
+      ...readOpenAIError(error),
+    })
     return fallback
   }
 }
