@@ -1,3 +1,5 @@
+import { buildDomainFallbackBody, getDomainBannedTerms, getDomainProfileForText } from '../content/domainProfile'
+
 export interface SemanticSlideInput {
   slideNumber: number
   role: string
@@ -84,6 +86,8 @@ export function evaluateSemanticCopy(params: {
   slides: SemanticSlideInput[]
 }): SemanticCopyReport {
   const topicTokens = extractMeaningTokens(params.topic)
+  const domainProfile = getDomainProfileForText(params.topic)
+  const domainBannedTerms = getDomainBannedTerms(domainProfile.domain)
   const issues: SemanticIssue[] = []
   const bodyCounts = new Map<string, number>()
   for (const slide of params.slides) {
@@ -98,6 +102,23 @@ export function evaluateSemanticCopy(params: {
     const hasTopicAnchor = topicTokens.length === 0 || topicTokens.some(token => combined.includes(token))
     const isClosing = ['summary', 'save-cta', 'cta'].includes(slide.role)
     const minBodyLength = isClosing ? 28 : 30
+    const domainBannedHits = domainBannedTerms.filter(term => term && combined.includes(term))
+
+    if (domainBannedHits.length > 0) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: `copy uses terms outside the ${domainProfile.label} domain: ${domainBannedHits.join(', ')}`,
+      })
+    }
+
+    if (!isClosing && !hasDomainAnchor(combined, domainProfile.requiredCopyAnchors)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'warn',
+        message: `copy should include a concrete ${domainProfile.label} anchor such as ${domainProfile.requiredCopyAnchors.slice(0, 4).join(', ')}`,
+      })
+    }
 
     if (body.length < minBodyLength || bodyTokens.length < 3) {
       issues.push({
@@ -194,6 +215,8 @@ export function buildSemanticFallback(params: {
   headline: string
 }) {
   const topic = params.topic.replace(/\s+/g, ' ').trim() || params.headline
+  const domainFallback = buildDomainFallbackBody(topic, params.role)
+  if (domainFallback) return domainFallback
   const subject = extractSubject(topic)
   const category = inferTopicCategory(topic)
 
@@ -244,6 +267,11 @@ function extractMeaningTokens(value: string) {
       .map(token => token.trim())
       .filter(token => token.length > 1 && !STOPWORDS.has(token))
   )).slice(0, 12)
+}
+
+function hasDomainAnchor(value: string, anchors: string[]) {
+  if (anchors.length === 0) return true
+  return anchors.some(anchor => value.includes(anchor))
 }
 
 function extractSubject(topic: string) {

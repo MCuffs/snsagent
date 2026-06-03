@@ -7,6 +7,7 @@ import {
   logAiDiagnostic,
   readOpenAIError,
 } from '../ai/diagnostics'
+import { formatDomainCopyGuidance, getDomainProfileForText } from '../content/domainProfile'
 
 export interface ResearchSource {
   title: string
@@ -58,17 +59,19 @@ export async function buildCarouselResearchBrief(input: ResearchInput): Promise<
   const subject = extractResearchSubject(input.topic)
   if (!subject || subject.length < 2) return null
 
+  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
   const userIntent = inferUserIntent(input.topic, input.contentType)
-  const queries = buildQueries(subject, userIntent, input.language || 'ko')
+  const queries = buildQueries(subject, userIntent, input.language || 'ko', domainProfile)
   const openAIWebBrief = await buildOpenAIWebResearchBrief(input, subject, userIntent, queries)
   if (openAIWebBrief && openAIWebBrief.verifiedFacts.length >= 3) {
     return openAIWebBrief
   }
 
+  const shouldFetchFoodData = domainProfile.domain === 'food' || domainProfile.domain === 'health'
   const [wiki, duck, usda, rss] = await Promise.all([
     fetchWikipediaFacts(subject, input.language || 'ko'),
     fetchDuckDuckGoFacts(queries[0], subject),
-    fetchUsdaFacts(subject),
+    shouldFetchFoodData ? fetchUsdaFacts(subject) : Promise.resolve({ facts: [] as string[], sources: [] as ResearchSource[] }),
     fetchRssFacts(input, subject),
   ])
 
@@ -213,6 +216,7 @@ async function buildOpenAIWebResearchBrief(
 
 function buildOpenAIWebResearchPrompt(input: ResearchInput, subject: string, userIntent: string, queries: string[]) {
   const slideCount = Math.min(Math.max(Math.round(input.slideCount || 5), 5), 10)
+  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
   const languageRule = input.language === 'en'
     ? 'Write all JSON string values in English.'
     : 'JSON 문자열 값은 모두 한국어로 작성하세요.'
@@ -231,8 +235,10 @@ Requirements:
 - Search the web before answering.
 - Only include facts directly related to "${subject}" and the user topic.
 - Reject unrelated economy, stock, politics, celebrity, or random trend information unless the topic explicitly asks for it.
-- For health/food topics, avoid disease-treatment claims. Explain benefits as nutrition, routine, serving, storage, or caution points.
-- Include practical facts that can become card body copy: ingredients/nutrients, use scene, serving/portion, caution, storage, comparison point.
+- Follow the domain-specific guidance below. Do not borrow angles, terms, or claims from unrelated domains.
+${formatDomainCopyGuidance(domainProfile)}
+- For health/food topics only, avoid disease-treatment claims. Explain benefits as nutrition, routine, serving, storage, or caution points.
+- Include practical facts that can become card body copy using the domain angles above.
 - Do not include citations inline in facts. Put source URLs in sources.
 - Return JSON only.
 
@@ -330,8 +336,28 @@ function inferUserIntent(topic: string, contentType?: string) {
   return '주제와 관련된 핵심 정보를 카드뉴스로 설명'
 }
 
-function buildQueries(subject: string, intent: string, language: 'ko' | 'en') {
+function buildQueries(
+  subject: string,
+  intent: string,
+  language: 'ko' | 'en',
+  domainProfile: ReturnType<typeof getDomainProfileForText>
+) {
   const translated = FOOD_TRANSLATIONS[subject] || subject
+  if (domainProfile.domain !== 'food' && domainProfile.domain !== 'health') {
+    const angles = domainProfile.searchAngles.slice(0, 4)
+    if (language === 'en') {
+      return uniqueStrings([
+        `${translated} ${domainProfile.label} ${angles.join(' ')}`,
+        `${translated} ${intent}`,
+        `${translated} practical ${domainProfile.label} guide`,
+      ])
+    }
+    return uniqueStrings([
+      `${subject} ${intent}`,
+      `${subject} ${domainProfile.requiredCopyAnchors.slice(0, 4).join(' ')}`,
+      `${subject} ${domainProfile.label} 실전 가이드`,
+    ])
+  }
   if (language === 'en') {
     return uniqueStrings([
       `${translated} nutrition facts benefits cautions`,
@@ -461,11 +487,13 @@ async function fetchRssFacts(input: ResearchInput, subject: string) {
 }
 
 function buildCautions(topic: string, subject: string, facts: string[]) {
+  const domainProfile = getDomainProfileForText(topic, subject)
   const cautions = [
     '외부 자료에 없는 수치, 순위, 치료 효과, 질병 예방 효과를 새로 만들지 않는다.',
-    `${subject}의 장점은 식단 안에서의 활용으로 설명하고 의학적 치료처럼 단정하지 않는다.`,
+    `${subject}는 ${domainProfile.label} 맥락 안에서만 설명하고 다른 분야의 표현을 끌어오지 않는다.`,
+    ...domainProfile.cautionRules,
   ]
-  if (/효능|건강|섭취|영양|성분|식품|간식|호두|견과/u.test(topic)) {
+  if (domainProfile.domain === 'food' || domainProfile.domain === 'health') {
     cautions.push('열량, 과다 섭취, 알레르기, 보관법처럼 실제 섭취 시 확인할 주의점을 함께 다룬다.')
   }
   if (facts.some(fact => /\d/.test(fact))) {
@@ -482,10 +510,11 @@ function buildSlideEvidence(params: {
   intent: string
 }) {
   const roles = inferRoles(params.slideCount)
+  const domainProfile = getDomainProfileForText(params.subject, params.intent)
   const fallbackFacts = [
-    `${params.subject}의 핵심 특징`,
-    `${params.subject}를 실제 생활에서 활용하는 장면`,
-    `${params.subject}를 선택하거나 섭취할 때 확인할 기준`,
+    `${params.subject}의 ${domainProfile.requiredCopyAnchors[0] || '핵심'} 특징`,
+    `${params.subject}를 ${domainProfile.label} 맥락에서 활용하는 장면`,
+    `${params.subject}를 선택할 때 확인할 ${domainProfile.requiredCopyAnchors[1] || '기준'}`,
   ]
   const facts = params.facts.length > 0 ? params.facts : fallbackFacts
   return roles.map((role, index) => ({
