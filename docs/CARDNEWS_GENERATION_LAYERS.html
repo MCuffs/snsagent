@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Shuffla 카드뉴스 생성 레이어 구조</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #161616;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.62;
+      background: #fff;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.28; }
+    h1 { font-size: 25px; letter-spacing: 0; }
+    h2 {
+      margin-top: 24px;
+      padding-top: 14px;
+      border-top: 1px solid #ddd;
+      font-size: 18px;
+    }
+    h3 { margin-top: 15px; font-size: 14px; }
+    p { margin: 7px 0; }
+    ul, ol { margin: 6px 0 9px 18px; padding: 0; }
+    li { margin: 2px 0; }
+    code {
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: #f3f4f6;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+    }
+    pre {
+      margin: 8px 0 12px;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #f8fafc;
+      white-space: pre-wrap;
+      word-break: keep-all;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10.5px;
+      line-height: 1.48;
+    }
+    table {
+      width: 100%;
+      margin: 8px 0 12px;
+      border-collapse: collapse;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #e3e3e3;
+      padding: 6px 7px;
+      vertical-align: top;
+    }
+    th { background: #f4f4f5; font-weight: 700; }
+    .cover {
+      padding-bottom: 14px;
+      border-bottom: 3px solid #111;
+      margin-bottom: 16px;
+    }
+    .subtitle { margin-top: 8px; color: #555; font-size: 13px; }
+    .meta { margin-top: 12px; color: #777; font-size: 11px; }
+    .callout {
+      margin: 10px 0 12px;
+      padding: 9px 11px;
+      border-left: 4px solid #111;
+      background: #f7f7f8;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 14px;
+    }
+    .box {
+      padding: 8px 9px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+    .box strong { display: block; margin-bottom: 3px; }
+    .arrow {
+      margin: 8px 0;
+      padding: 8px;
+      border-radius: 8px;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      font-weight: 700;
+    }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>Shuffla 카드뉴스 생성 레이어 구조</h1>
+    <p class="subtitle">입력부터 리서치, 도메인 정책, 카피 생성, 이미지 생성, 렌더링, 저장까지의 전체 흐름</p>
+    <p class="meta">작성 기준: Shuffla SaaS dev 브랜치 / 팀원 공유용</p>
+  </section>
+
+  <div class="callout">
+    이 문서는 “어디를 수정해야 카드뉴스 품질이 좋아지는지”를 빠르게 찾기 위한 구조 설명서입니다.
+    현재 생성은 단순히 GPT가 본문을 쓰고 이미지를 만드는 구조가 아니라, 입력 보강, 도메인 정책, 에디토리얼 기획, LLM 생성, 검수, 이미지 프롬프트, 렌더링이 단계적으로 연결된 파이프라인입니다.
+  </div>
+
+  <h2>1. 전체 생성 흐름</h2>
+  <div class="flow">
+    <div class="box"><strong>1. 사용자 입력</strong><code>/generate</code>에서 주제, 목적, URL, 참고 이미지, 슬라이드 수 입력</div>
+    <div class="box"><strong>2. 생성 API</strong><code>/api/campaigns/generate</code>에서 인증, 브랜드, 사용량 확인</div>
+    <div class="box"><strong>3. 컨텍스트 보강</strong>URL 수집, RSS, 외부 리서치 브리프를 <code>keyContent</code>에 추가</div>
+    <div class="box"><strong>4. 메인 파이프라인</strong><code>generateMediaCarousel()</code>이 전체 생성 순서 제어</div>
+    <div class="box"><strong>5. 도메인 정책</strong><code>domainProfile</code>로 리서치, 카피, 이미지 규칙 결정</div>
+    <div class="box"><strong>6. 기획/카피 생성</strong>Editorial Director Plan과 LLM으로 슬라이드별 카피 생성</div>
+    <div class="box"><strong>7. 검수/수리</strong>글자 수, 의미, 도메인 이탈, 금지어, CTA 누락 검사</div>
+    <div class="box"><strong>8. 이미지/렌더링</strong>배경 이미지 생성 후 앱 렌더러가 텍스트 합성</div>
+    <div class="box"><strong>9. DB 저장</strong>Campaign, CarouselSlide, Post, 품질 로그 저장</div>
+    <div class="box"><strong>10. 결과 화면</strong><code>/campaign/[id]</code>에서 최종 카드 확인/편집</div>
+  </div>
+
+  <pre>사용자 입력
+→ URL/RSS/외부 리서치 보강
+→ 도메인 정책 판정
+→ 카피 인텔리전스
+→ 에디토리얼 기획
+→ LLM 카피 생성
+→ 카피 검수/수리
+→ 도메인 이미지 프롬프트 생성
+→ AI 배경 생성
+→ 앱 렌더러로 텍스트 합성
+→ DB 저장
+→ 결과 화면</pre>
+
+  <h2>2. 사용자 입력 레이어</h2>
+  <p><strong>파일:</strong> <code>app/(cms)/generate/GenerateForm.tsx</code></p>
+  <p>사용자가 생성 화면에서 카드뉴스 조건을 입력하는 레이어입니다.</p>
+  <table>
+    <tr><th>입력값</th><th>역할</th></tr>
+    <tr><td><code>topic</code></td><td>카드뉴스 주제</td></tr>
+    <tr><td><code>contentType</code></td><td>콘텐츠 유형</td></tr>
+    <tr><td><code>objective</code></td><td>캠페인 목표</td></tr>
+    <tr><td><code>slideCount</code></td><td>생성할 슬라이드 수</td></tr>
+    <tr><td><code>visualHint</code></td><td>사용자가 원하는 비주얼 방향</td></tr>
+    <tr><td><code>productUrl</code></td><td>참고 URL. 기본적으로 텍스트/메타데이터 수집용</td></tr>
+    <tr><td><code>productImageUrls</code></td><td>업로드된 참고 이미지 URL. 이미지 생성 reference로 사용 가능</td></tr>
+    <tr><td><code>generationMode</code></td><td>브랜드 기반 또는 일반 생성 모드</td></tr>
+  </table>
+  <div class="callout">
+    URL과 참고 이미지는 다릅니다. URL은 주로 텍스트 컨텍스트 수집용이고, 이미지 모델이 강하게 참고하는 것은 사용자가 업로드한 이미지입니다.
+  </div>
+
+  <h2>3. 생성 API 진입 레이어</h2>
+  <p><strong>파일:</strong> <code>src/app/api/campaigns/generate/route.ts</code></p>
+  <p>생성 요청을 받는 서버 진입점입니다. 로그인/브랜드/사용량 확인 후, 생성에 필요한 컨텍스트를 보강하고 메인 파이프라인으로 넘깁니다.</p>
+  <pre>if (body.campaignType === 'media') {
+  let enrichedKeyContent = body.keyContent
+
+  if (body.productUrl) {
+    // URL 텍스트/메타데이터 수집
+  }
+
+  // RSS 보강
+  // 외부 리서치 브리프 보강
+
+  const result = await generateMediaCarousel(...)
+}</pre>
+  <p>이 레이어에서 핵심적으로 만들어지는 값은 <code>enrichedKeyContent</code>입니다. 사용자 입력 원문에 URL, RSS, 리서치 결과가 붙은 확장 컨텍스트입니다.</p>
+
+  <h2>4. URL 수집 레이어</h2>
+  <p><strong>파일:</strong> <code>lib/brand-url-collector.ts</code></p>
+  <p>외부 URL에서 페이지 제목, 설명, 본문, 이미지 alt, 메타데이터를 수집합니다.</p>
+  <ul>
+    <li>직접 HTML fetch 시도</li>
+    <li>실패 시 Jina Reader fallback</li>
+    <li>내부망/사설 IP 차단</li>
+    <li>redirect 제한</li>
+    <li>응답 크기 제한</li>
+  </ul>
+  <p>중요한 점은 이 레이어가 외부 이미지를 자동으로 이미지 생성 reference로 넘기지는 않는다는 것입니다. 외부 이미지 자동 참조는 저작권, 권한, 보안 이슈 때문에 별도 설계가 필요합니다.</p>
+
+  <h2>5. 외부 리서치 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/research/carouselResearch.ts</code></p>
+  <p>주제에 대한 외부 사실 근거를 만들고, 슬라이드별로 어떤 근거를 쓸지 배분합니다.</p>
+  <table>
+    <tr><th>필드</th><th>의미</th></tr>
+    <tr><td><code>subject</code></td><td>리서치 중심 주제</td></tr>
+    <tr><td><code>queries</code></td><td>검색 쿼리</td></tr>
+    <tr><td><code>verifiedFacts</code></td><td>카피에 쓸 수 있는 확인된 정보</td></tr>
+    <tr><td><code>cautions</code></td><td>피해야 할 주장/표현</td></tr>
+    <tr><td><code>slideEvidence</code></td><td>슬라이드별로 쓸 근거와 피할 주장</td></tr>
+    <tr><td><code>sources</code></td><td>출처 목록</td></tr>
+  </table>
+  <p>현재는 <code>domainProfile</code>을 사용해서 비푸드 주제에서 영양, 섭취, USDA 같은 푸드/건강 표현으로 새지 않도록 막습니다.</p>
+
+  <h2>6. 도메인 프로파일 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/content/domainProfile.ts</code></p>
+  <p>앞으로 품질 개선의 중심이 되는 도메인별 생성 정책 파일입니다.</p>
+  <pre>domain
+label
+searchAngles
+requiredCopyAnchors
+bannedCopyTerms
+cautionRules
+imageSubject
+imageScene
+imageExclusions
+fallbackBodies</pre>
+  <p>현재 도메인은 다음과 같습니다.</p>
+  <pre>fashion, food, beauty, living, tech, health, news,
+finance, commerce, education, travel, general</pre>
+  <table>
+    <tr><th>속성</th><th>쓰이는 위치</th></tr>
+    <tr><td><code>searchAngles</code></td><td>리서치 쿼리 생성</td></tr>
+    <tr><td><code>requiredCopyAnchors</code></td><td>카피 프롬프트와 검수</td></tr>
+    <tr><td><code>bannedCopyTerms</code></td><td>도메인 이탈/위험 표현 차단</td></tr>
+    <tr><td><code>cautionRules</code></td><td>리서치와 카피 생성 주의사항</td></tr>
+    <tr><td><code>imageSubject</code>, <code>imageScene</code></td><td>이미지 프롬프트</td></tr>
+    <tr><td><code>imageExclusions</code></td><td>이미지에서 피해야 할 장면</td></tr>
+    <tr><td><code>fallbackBodies</code></td><td>AI 카피 검수 실패 시 대체문구</td></tr>
+  </table>
+  <div class="callout">
+    특정 브랜드명은 도메인 판정 키워드에 넣지 않습니다. 도메인은 장르/형태/콘텐츠 목적 기준으로 판정하고, 브랜드명은 URL, 사용자 입력, 브랜드 DNA, 리서치 컨텍스트에서만 다룹니다.
+  </div>
+
+  <h2>7. Media Carousel Pipeline</h2>
+  <p><strong>파일:</strong> <code>src/lib/layout/mediaCarouselPipeline.ts</code></p>
+  <p>카드뉴스 생성의 메인 오케스트레이션입니다.</p>
+  <pre>generateMediaCarousel(input)
+  → layout 선택
+  → brand/profile/context 구성
+  → copyKnowledgeContext 생성
+  → EditorialDirectorPlan 생성
+  → slide plan 생성
+  → LLM 카피 생성
+  → 카피 보정/검수
+  → Agent 보정
+  → 이미지 프롬프트 생성
+  → 이미지 생성
+  → 렌더링
+  → DB 저장</pre>
+  <p>주요 함수는 <code>generateMediaCarousel()</code>, <code>generateMediaSlideCopies()</code>, <code>enforceSemanticMeaning()</code>, <code>runFinalSemanticCopyGuard()</code>, <code>planMediaSlides()</code>입니다.</p>
+
+  <h2>8. 카피 인텔리전스 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/copywriting/copyKnowledgeBase.ts</code></p>
+  <p>훅 패턴, 페르소나, 감정 트리거, 서사 구조, 업종 톤 규칙을 제공합니다.</p>
+  <table>
+    <tr><th>구분</th><th>역할</th></tr>
+    <tr><td>Hook Patterns</td><td>관심을 끄는 훅 구조 선택</td></tr>
+    <tr><td>Persona</td><td>독자 유형과 톤 결정</td></tr>
+    <tr><td>Narrative Arc</td><td>슬라이드 흐름 구조 결정</td></tr>
+    <tr><td>Industry Tone Rule</td><td>업종별 어조와 금지 표현</td></tr>
+  </table>
+  <p><code>copyKnowledgeBase</code>는 훅/톤/서사 중심이고, <code>domainProfile</code>은 리서치/도메인 금지어/이미지/fallback 정책 중심입니다. 둘은 같이 사용됩니다.</p>
+
+  <h2>9. Editorial Director Plan 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/editorial/editorialDirector.ts</code></p>
+  <p>LLM이 마음대로 카드뉴스를 쓰지 않도록 먼저 기획서를 만드는 레이어입니다.</p>
+  <pre>EDITORIAL DIRECTOR PLAN
+Product category
+Target audience
+Audience pain points
+Use cases
+Buying triggers
+Campaign goal
+Emotional progression
+Hook psychology
+CTA direction
+Slide 1 [hook] ...
+Slide 2 [context] ...
+Slide 3 [key-point] ...</pre>
+  <p>여기서 슬라이드별 역할, 감정 흐름, CTA 방향, 레이아웃 힌트, 이미지 방향 힌트가 결정됩니다.</p>
+
+  <h2>10. 슬라이드 Role 구조</h2>
+  <table>
+    <tr><th>Role</th><th>역할</th></tr>
+    <tr><td><code>hook</code></td><td>첫 장/초반에서 관심을 잡음</td></tr>
+    <tr><td><code>context</code></td><td>왜 이 주제가 중요한지 배경 설명</td></tr>
+    <tr><td><code>key-point</code></td><td>가장 중요한 핵심 기준 제시</td></tr>
+    <tr><td><code>detail</code></td><td>구체 정보, 사용 장면, 비교 포인트, 주의점 설명</td></tr>
+    <tr><td><code>stat</code></td><td>근거/수치가 있을 때 사용</td></tr>
+    <tr><td><code>summary</code></td><td>앞 내용을 짧게 정리</td></tr>
+    <tr><td><code>save-cta</code></td><td>저장/확인/비교 등 행동 유도</td></tr>
+  </table>
+  <pre>hook → context → key-point → detail → stat/detail → summary → save-cta</pre>
+  <p><code>domainProfile.fallbackBodies</code>의 <code>hook/detail/summary/save-cta</code> 문구는 정상 생성 때 기본으로 쓰이는 문구가 아닙니다. AI 문구가 검수 실패했을 때만 사용하는 안전 대체문구입니다.</p>
+
+  <h2>11. 카피 생성 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/layout/mediaCarouselPipeline.ts</code></p>
+  <p><strong>함수:</strong> <code>generateMediaSlideCopies()</code></p>
+  <p>실제 LLM 카피 생성 프롬프트를 만드는 위치입니다.</p>
+  <pre>프롬프트 구성:
+- Editorial Director Plan
+- Domain Guidance
+- Story Ontology
+- 브랜드 정보
+- 브랜드 DNA
+- 카피 인텔리전스
+- 콘텐츠 기획
+- 제공된 사실 및 기획 자료
+- 슬라이드 구성
+- 작성 규칙
+- JSON 응답 형식</pre>
+  <p>현재 도메인 규칙으로는 각 슬라이드 body가 <code>requiredCopyAnchors</code> 중 최소 1개를 반영하도록 지시하고, 도메인 금지 표현을 쓰지 못하게 합니다.</p>
+
+  <h2>12. 카피 검수/수리 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/copywriting/semanticCopyCritic.ts</code>, <code>src/lib/layout/cardHarnessContract.ts</code>, <code>src/lib/copywriting/renderableCopy.ts</code></p>
+  <p>생성된 카피를 바로 렌더링하지 않고 검수합니다.</p>
+  <ul>
+    <li>글자 수와 줄 수</li>
+    <li>본문 길이</li>
+    <li>중복 본문</li>
+    <li>주제 연결성</li>
+    <li>문장 미완성</li>
+    <li>내부 프롬프트 토큰 유출</li>
+    <li>도메인 금지어</li>
+    <li>CTA 누락</li>
+  </ul>
+  <pre>예:
+패션 결과에 "섭취", "영양", "효능" → block
+금융 결과에 "매수하세요", "수익 보장" → block
+뷰티 결과에 "질병 치료", "완치" → block</pre>
+  <p>검수 실패 시 약한 슬라이드만 LLM으로 재작성하고, 그래도 실패하면 <code>domainProfile.fallbackBodies</code>로 대체합니다.</p>
+
+  <h2>13. 레이아웃 선택 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/layout/layoutEngine.ts</code></p>
+  <p>입력 텍스트의 키워드를 보고 카드 레이아웃 타입을 선택합니다.</p>
+  <table>
+    <tr><th>키워드</th><th>레이아웃</th></tr>
+    <tr><td>뉴스, 이슈, 속보</td><td><code>breaking-news</code></td></tr>
+    <tr><td>통계, 수치, 데이터</td><td><code>stat-highlight</code></td></tr>
+    <tr><td>트렌드, 화제</td><td><code>trend-feed</code></td></tr>
+    <tr><td>비교, vs</td><td><code>split-comparison</code></td></tr>
+    <tr><td>브랜드, 패션, 뷰티, 매거진</td><td><code>magazine</code></td></tr>
+    <tr><td>가이드, 체크리스트</td><td><code>dark-editorial</code></td></tr>
+  </table>
+  <p>세부 레이아웃 config는 <code>src/lib/layout/layoutConfigs</code> 아래에 있습니다.</p>
+
+  <h2>14. 이미지 프롬프트 생성 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/layout/visualDirectionEngine.ts</code></p>
+  <p>AI 이미지 생성용 프롬프트를 만듭니다. 여기서 만들어지는 것은 최종 카드가 아니라 “텍스트 없는 배경 이미지”입니다.</p>
+  <pre>프롬프트 구성:
+CONTRACT
+PRIMARY SCENE
+CAMERA AND EMOTION
+COMPOSITION
+DOMAIN VISUAL MODE
+BRAND TRANSLATION
+KOREAN REALISM
+REFERENCE DIRECTION</pre>
+  <p>현재 <code>domainProfile</code>의 <code>imageSubject</code>, <code>imageScene</code>, <code>imageExclusions</code>가 이미지 프롬프트에 들어갑니다.</p>
+  <table>
+    <tr><th>도메인</th><th>이미지 방향 예시</th></tr>
+    <tr><td>패션</td><td>착장, 실루엣, 신발, 액세서리 중심. 빈 방/소품컷 금지</td></tr>
+    <tr><td>금융</td><td>금융 문서, 계산기, 읽을 수 없는 차트 형태. 현금더미/수익 암시 금지</td></tr>
+    <tr><td>뷰티</td><td>제품 제형, 화장대, 손 사용 장면</td></tr>
+    <tr><td>리빙</td><td>공간, 수납, 가구 배치, 생활 동선</td></tr>
+  </table>
+
+  <h2>15. 이미지 생성 Provider 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/ai/providers/openAIImageProvider.ts</code>, <code>geminiImageProvider.ts</code>, <code>index.ts</code></p>
+  <p>OpenAI, Gemini, mock 중 어떤 이미지 provider를 쓸지 선택하고 실제 배경 이미지를 생성합니다.</p>
+  <ul>
+    <li>OpenAI 기본 모델: <code>gpt-image-1</code></li>
+    <li>참고 이미지가 있으면 reference 기반 생성 시도</li>
+    <li>참고 이미지는 업로드된 Shuffla/Vercel Blob 이미지여야 함</li>
+    <li>외부 URL 이미지를 바로 reference로 쓰지 않음</li>
+  </ul>
+
+  <h2>16. 렌더링 레이어</h2>
+  <p><strong>파일:</strong> <code>src/lib/layout/renderer.ts</code>, <code>typographyEngine.ts</code>, <code>overlayEngine.ts</code></p>
+  <p>AI가 만든 배경 이미지 위에 앱이 직접 headline, body, source, page number를 얹습니다.</p>
+  <pre>backgroundImageUrl = AI가 만든 텍스트 없는 배경
+finalImageUrl      = 텍스트까지 합성된 최종 카드</pre>
+
+  <h2>17. DB 저장 레이어</h2>
+  <p><strong>파일:</strong> <code>lib/db-service.ts</code></p>
+  <p>생성 결과를 DB에 저장합니다.</p>
+  <ul>
+    <li><code>Campaign</code></li>
+    <li><code>CarouselSlide</code></li>
+    <li><code>Post</code></li>
+    <li><code>QualityScoreLog</code></li>
+  </ul>
+  <p>슬라이드에는 <code>slideNumber</code>, <code>headline</code>, <code>body</code>, <code>designPrompt</code>, <code>imageUrl</code>, <code>backgroundImageUrl</code>이 저장됩니다.</p>
+
+  <h2>18. 수정 위치 가이드</h2>
+  <table>
+    <tr><th>문제</th><th>먼저 볼 파일</th></tr>
+    <tr><td>문구가 이상함</td><td><code>domainProfile.ts</code>, <code>mediaCarouselPipeline.ts</code>, <code>semanticCopyCritic.ts</code></td></tr>
+    <tr><td>이미지가 이상함</td><td><code>domainProfile.ts</code>, <code>visualDirectionEngine.ts</code>, image provider</td></tr>
+    <tr><td>주제와 다른 정보가 섞임</td><td><code>carouselResearch.ts</code>, <code>domainProfile.ts</code>, RSS/URL 컨텍스트</td></tr>
+    <tr><td>레이아웃이 이상함</td><td><code>layoutEngine.ts</code>, <code>layoutConfigs</code>, <code>typographyEngine.ts</code></td></tr>
+    <tr><td>검수 기준을 바꾸고 싶음</td><td><code>semanticCopyCritic.ts</code>, <code>cardHarnessContract.ts</code></td></tr>
+  </table>
+
+  <h2>19. 앞으로의 개선 원칙</h2>
+  <ol>
+    <li>브랜드명을 도메인 분류 키워드에 하드코딩하지 않는다.</li>
+    <li>도메인 판정은 장르, 사용 장면, 콘텐츠 목적 기준으로 한다.</li>
+    <li>리서치, 카피, 이미지, 검수는 같은 도메인 정책을 공유한다.</li>
+    <li>URL 수집 신뢰도가 낮으면 추측을 줄이고 참고 이미지 업로드를 유도한다.</li>
+    <li>도메인별 금지어와 필수 앵커는 실제 실패 사례를 보고 계속 보강한다.</li>
+  </ol>
+
+  <div class="callout">
+    핵심 요약: 카드뉴스 품질을 올릴 때는 먼저 <code>domainProfile.ts</code>를 보고 도메인 정책을 고친 뒤, 그 정책이 <code>carouselResearch.ts</code>, <code>mediaCarouselPipeline.ts</code>, <code>semanticCopyCritic.ts</code>, <code>visualDirectionEngine.ts</code>에 제대로 반영되는지 확인하는 순서가 가장 안전합니다.
+  </div>
+</body>
+</html>

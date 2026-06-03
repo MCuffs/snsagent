@@ -1,6 +1,7 @@
 import { LAYOUT_DEFINITIONS, type LayoutDefinition } from './layoutTypes'
 import { formatVisualBrandLanguage, translateBrandToVisualLanguage } from './brandHarness'
 import type { EditorialSlideRole, EditorialVisualDirection } from '../editorial/editorialDirector'
+import { formatDomainVisualGuidance, getDomainProfileForText } from '../content/domainProfile'
 
 export interface VisualDirectionInput {
   layout: LayoutDefinition
@@ -26,6 +27,9 @@ export interface VisualDirection {
 }
 
 function inferSubject(topic: string, category: string): string {
+  const profile = getDomainProfileForText(topic, category)
+  if (profile.domain !== 'general') return profile.imageSubject
+
   const text = `${topic} ${category}`.toLowerCase()
   if (text.includes('bag') || text.includes('백') || text.includes('가방')) return 'a premium designer bag'
   if (text.includes('shoe') || text.includes('슈즈') || text.includes('스니커즈') || text.includes('신발')) return 'designer shoes'
@@ -41,9 +45,10 @@ function inferSubject(topic: string, category: string): string {
 
 export function generateVisualDirection(input: VisualDirectionInput): VisualDirection {
   const context = `${input.brandIndustry || ''} ${input.category} ${input.topic} ${input.tone}`.toLowerCase()
+  const domainProfile = getDomainProfileForText(input.topic, input.category, input.tone, input.brandIndustry, input.visualHint, input.brandDna)
   const role = input.role || 'detail'
   const roleDirection = roleVisualLanguage(role)
-  const scene = inferScene(context)
+  const scene = inferScene(context, domainProfile.imageScene)
   const subject = inferSubject(input.topic, input.category)
   const brandLanguage = translateBrandToVisualLanguage({
     brandIndustry: input.brandIndustry,
@@ -59,6 +64,7 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
     `PRIMARY SCENE: ${scene}; feature ${subject} in a single believable moment. ${roleDirection.narrativeBeat}.`,
     `CAMERA AND EMOTION: ${roleDirection.camera}; ${roleDirection.emotion}. ${input.editorialDirection?.imagePurpose || ''}`.trim(),
     `COMPOSITION: Portrait source intended for a final 4:5 crop; ${subjectPosition}; reserve ${safeTypographyArea} as quiet low-detail negative space; keep essential details inside the central crop-safe region.`,
+    formatDomainVisualGuidance(domainProfile),
     `BRAND TRANSLATION: ${formatVisualBrandLanguage(brandLanguage)}.`,
     `KOREAN REALISM: ${roleDirection.realism}; subtle sensor grain, natural surface wear, believable reflections, restrained retouching.`,
     input.visualHint ? `REFERENCE DIRECTION: ${input.visualHint}.` : '',
@@ -78,7 +84,8 @@ export function getLayoutDefinition(layoutType: keyof typeof LAYOUT_DEFINITIONS)
   return LAYOUT_DEFINITIONS[layoutType]
 }
 
-function inferScene(text: string) {
+function inferScene(text: string, domainScene?: string) {
+  if (domainScene) return domainScene
   if (/정치|사회|뉴스|시장|금융|vc|스타트업|투자|tech|it|business/.test(text)) {
     return 'weekday Seoul office or startup meeting table with glass reflections, notebook edge, and a lived-in working trace'
   }

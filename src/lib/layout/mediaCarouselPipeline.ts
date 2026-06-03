@@ -26,6 +26,7 @@ import {
   type AgentSlideData
 } from '../carousel/agents'
 import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
+import { formatDomainCopyGuidance, getDomainProfileForText } from '../content/domainProfile'
 import type { BrandProfile, CampaignInput } from '../carousel/types'
 import {
   buildEditorialDirectorPlan,
@@ -489,6 +490,8 @@ async function generateMediaSlideCopies(
     ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
     : ''
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
+  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
+  const domainGuidanceSection = formatDomainCopyGuidance(domainProfile)
   const storyOntology = buildStoryOntology({
     topic: input.topic,
     category: input.category,
@@ -523,6 +526,8 @@ async function generateMediaSlideCopies(
 
 ${editorialPlanSection}
 
+${domainGuidanceSection}
+
 ${storyOntologySection}
 
 브랜드 정보:
@@ -548,6 +553,8 @@ ${slideDescriptions}
 - body: 42~64자, 최대 2문장, 모바일 카드에서 2줄 안에 읽히는 짧은 완성 문장
 - body는 64자를 절대 넘기지 마세요. 수치 2개 이상이 들어가면 문장이 길어지므로 수치 1개만 선택해 집중하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
+- body에는 DOMAIN GUIDANCE의 required copy anchors 중 최소 1개를 자연스럽게 반영하세요.
+- DOMAIN GUIDANCE의 금지 표현이나 다른 업종의 표현을 쓰지 마세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
 - 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
 - body는 하나의 구체 기준 또는 행동만 담고, 긴 설명은 다음 슬라이드로 넘기세요.
