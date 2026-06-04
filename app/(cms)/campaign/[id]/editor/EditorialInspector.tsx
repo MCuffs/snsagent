@@ -12,17 +12,19 @@ interface SavedTemplate {
   id: string
   name: string
   document: string
+  slideNumber: number | null
   createdAt: string
 }
 
 interface Props {
   slideId: string
+  slideNumber: number
   busy: boolean
   onUpload: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onImageUpload }: Props) {
   const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
@@ -62,11 +64,15 @@ export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: P
     setSavingTemplate(true)
     try {
       const styleDoc = stripContentFromDocument(document)
-      await fetch('/api/templates', {
+      const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: templateName.trim(), document: JSON.stringify(styleDoc) }),
+        body: JSON.stringify({ name: templateName.trim(), document: JSON.stringify(styleDoc), slideNumber }),
       })
+      const data = await res.json() as { template?: SavedTemplate }
+      if (data.template) {
+        setTemplates(prev => [data.template!, ...prev])
+      }
       setTemplateName('')
       setShowTemplateInput(false)
     } finally {
@@ -150,6 +156,7 @@ export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: P
           <TemplatesPanel
             templates={templates}
             loading={loadingTemplates}
+            currentSlideNumber={slideNumber}
             onApply={tmpl => {
               try {
                 const styleDoc = JSON.parse(tmpl.document) as EditorialDocument
@@ -345,11 +352,13 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
 function TemplatesPanel({
   templates,
   loading,
+  currentSlideNumber,
   onApply,
   onDelete,
 }: {
   templates: SavedTemplate[]
   loading: boolean
+  currentSlideNumber: number
   onApply: (t: SavedTemplate) => void
   onDelete: (id: string) => void
 }) {
@@ -369,29 +378,39 @@ function TemplatesPanel({
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
         <p>적용하면 텍스트·배경 이미지는 유지되고, 폰트·오버레이·레이아웃만 교체됩니다.</p>
       </div>
-      {templates.map(tmpl => (
-        <div key={tmpl.id} className="flex items-center gap-2 rounded-lg border border-[#e8dfd4] p-3">
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-xs font-bold text-[#1f1512]">{tmpl.name}</p>
-            <p className="text-[10px] text-[#9a8d82]">{new Date(tmpl.createdAt).toLocaleDateString('ko-KR')}</p>
+      {templates.map(tmpl => {
+        const isSameSlide = tmpl.slideNumber == null || tmpl.slideNumber === currentSlideNumber
+        return (
+          <div key={tmpl.id} className={`flex items-center gap-2 rounded-lg border p-3 ${isSameSlide ? 'border-[#e8dfd4]' : 'border-amber-200 bg-amber-50/50'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-xs font-bold text-[#1f1512]">{tmpl.name}</p>
+                {tmpl.slideNumber != null && (
+                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isSameSlide ? 'bg-[#0066ff]/10 text-[#0066ff]' : 'bg-amber-100 text-amber-700'}`}>
+                    {tmpl.slideNumber}번 카드
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-[#9a8d82]">{new Date(tmpl.createdAt).toLocaleDateString('ko-KR')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onApply(tmpl)}
+              className="rounded-md bg-[#111318] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#0066ff]"
+            >
+              적용
+            </button>
+            <button
+              type="button"
+              aria-label="템플릿 삭제"
+              onClick={() => onDelete(tmpl.id)}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onApply(tmpl)}
-            className="rounded-md bg-[#111318] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#0066ff]"
-          >
-            적용
-          </button>
-          <button
-            type="button"
-            aria-label="템플릿 삭제"
-            onClick={() => onDelete(tmpl.id)}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

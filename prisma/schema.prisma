@@ -147,14 +147,15 @@ model Post {
 }
 
 model Template {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  document  String   // EditorialDocument JSON (text/image stripped)
-  thumbnail String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  document    String   // EditorialDocument JSON (text/image stripped)
+  slideNumber Int?     // which slide number this style is for (null = any)
+  thumbnail   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model ErrorLog {

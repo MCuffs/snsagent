@@ -136,6 +136,7 @@ export interface Template {
   userId: string
   name: string
   document: string
+  slideNumber: number | null
   thumbnail: string | null
   createdAt: Date
   updatedAt: Date
@@ -1773,12 +1774,12 @@ export const dbService = {
     return (db.templates || []).filter(t => t.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   },
 
-  async createTemplate(userId: string, data: { name: string; document: string; thumbnail?: string | null }): Promise<Template> {
+  async createTemplate(userId: string, data: { name: string; document: string; slideNumber?: number | null; thumbnail?: string | null }): Promise<Template> {
     if (!isMock()) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const template = await (prisma as any).template.create({
-          data: { userId, name: data.name, document: data.document, thumbnail: data.thumbnail ?? null },
+          data: { userId, name: data.name, document: data.document, slideNumber: data.slideNumber ?? null, thumbnail: data.thumbnail ?? null },
         })
         return template as Template
       } catch (err) {
@@ -1792,6 +1793,7 @@ export const dbService = {
       userId,
       name: data.name,
       document: data.document,
+      slideNumber: data.slideNumber ?? null,
       thumbnail: data.thumbnail ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),

@@ -211,7 +211,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
             <LayerContent
               layer={layer}
               selected={selectedLayerId === layer.id}
-              onText={(text) => updateLayer(slideId, layer.id, { text })}
+              onText={(text, style) => updateLayer(slideId, layer.id, { text, ...style })}
             />
           </motion.div>
         ))}
@@ -220,7 +220,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   )
 }
 
-function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; selected: boolean; onText: (text: string) => void }) {
+function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; selected: boolean; onText: (text: string, style?: Partial<EditorialLayer>) => void }) {
   if (layer.imageUrl) {
     const radius = layer.borderRadius ?? 0
     const fade = layer.edgeFade ?? 0
@@ -252,7 +252,20 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
       <div
         contentEditable={!layer.locked}
         suppressContentEditableWarning
-        onBlur={event => onText(event.currentTarget.innerText)}
+        onBlur={event => {
+          const el = event.currentTarget
+          const computed = window.getComputedStyle(el)
+          const fontWeightNum = parseInt(computed.fontWeight, 10)
+          const isItalic = computed.fontStyle === 'italic' || computed.fontStyle === 'oblique'
+          const isUnderline = computed.textDecorationLine?.includes('underline') ?? false
+          const styleUpdate: Partial<EditorialLayer> = {}
+          if (!isNaN(fontWeightNum) && fontWeightNum !== (layer.fontWeight ?? 400)) {
+            styleUpdate.fontWeight = fontWeightNum
+          }
+          if (isItalic !== (layer.italic ?? false)) styleUpdate.italic = isItalic
+          if (isUnderline !== (layer.underline ?? false)) styleUpdate.underline = isUnderline
+          onText(el.innerText, Object.keys(styleUpdate).length > 0 ? styleUpdate : undefined)
+        }}
         className="h-full whitespace-pre-wrap outline-none"
         style={{
           color: layer.color,
