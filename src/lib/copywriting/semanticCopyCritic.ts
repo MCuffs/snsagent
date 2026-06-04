@@ -84,8 +84,10 @@ const META_COPY_TOKENS = [
 export function evaluateSemanticCopy(params: {
   topic: string
   slides: SemanticSlideInput[]
+  language?: 'ko' | 'en'
 }): SemanticCopyReport {
-  const topicTokens = extractMeaningTokens(params.topic)
+  const language = params.language === 'en' ? 'en' : 'ko'
+  const topicTokens = extractMeaningTokens(params.topic, language)
   const domainProfile = getDomainProfileForText(params.topic)
   const domainBannedTerms = getDomainBannedTerms(domainProfile.domain)
   const issues: SemanticIssue[] = []
@@ -98,7 +100,7 @@ export function evaluateSemanticCopy(params: {
   for (const slide of params.slides) {
     const combined = `${slide.headline} ${slide.body}`.trim()
     const body = slide.body.trim()
-    const bodyTokens = extractMeaningTokens(body)
+    const bodyTokens = extractMeaningTokens(body, language)
     const hasTopicAnchor = topicTokens.length === 0 || topicTokens.some(token => combined.includes(token))
     const isClosing = ['summary', 'save-cta', 'cta'].includes(slide.role)
     const minBodyLength = isClosing ? 28 : 30
@@ -144,7 +146,7 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (OPEN_EXPECTATION_PATTERNS.some(pattern => pattern.test(body))) {
+    if (language === 'ko' && OPEN_EXPECTATION_PATTERNS.some(pattern => pattern.test(body))) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
@@ -152,7 +154,7 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (INCOMPLETE_MEANING_PATTERNS.some(pattern => pattern.test(body))) {
+    if (language === 'ko' && INCOMPLETE_MEANING_PATTERNS.some(pattern => pattern.test(body))) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
@@ -160,7 +162,7 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (hasIncompleteFinalSentence(body)) {
+    if (language === 'ko' && hasIncompleteFinalSentence(body)) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
@@ -168,7 +170,7 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (hasBrokenKoreanParticle(body) || hasBrokenKoreanParticle(slide.headline)) {
+    if (language === 'ko' && (hasBrokenKoreanParticle(body) || hasBrokenKoreanParticle(slide.headline))) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
@@ -176,7 +178,9 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    const genericHits = GENERIC_FILLERS.filter(phrase => combined.includes(phrase))
+    const genericHits = language === 'en'
+      ? EN_GENERIC_FILLERS.filter(phrase => combined.toLowerCase().includes(phrase))
+      : GENERIC_FILLERS.filter(phrase => combined.includes(phrase))
     if (genericHits.length >= 1) {
       issues.push({
         slideNumber: slide.slideNumber,
@@ -194,7 +198,15 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (hasRepeatedNouns(body)) {
+    if (language === 'en' && hasIncompleteEnglishEnding(body)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: 'Body copy ends with an incomplete English thought and needs a clear takeaway.',
+      })
+    }
+
+    if (hasRepeatedNouns(body, language)) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'warn',
@@ -209,13 +221,32 @@ export function evaluateSemanticCopy(params: {
   }
 }
 
-function extractMeaningTokens(value: string) {
+const EN_STOPWORDS = new Set([
+  'card', 'news', 'carousel', 'content', 'about', 'with', 'that', 'this', 'from', 'into',
+  'your', 'their', 'there', 'what', 'when', 'where', 'which', 'more', 'most', 'good',
+  'great', 'important', 'benefit', 'benefits', 'guide', 'tips',
+])
+
+const EN_GENERIC_FILLERS = [
+  'specific use case',
+  'clear checking point',
+  'more convincing',
+  'worth remembering',
+  'better choice',
+  'important standard',
+  'everyday choice',
+  'key point',
+  'practical value',
+]
+
+function extractMeaningTokens(value: string, language: 'ko' | 'en' = 'ko') {
+  const stopwords = language === 'en' ? EN_STOPWORDS : STOPWORDS
   return Array.from(new Set(
     value
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
       .map(token => token.trim())
-      .filter(token => token.length > 1 && !STOPWORDS.has(token))
+      .filter(token => token.length > 1 && !stopwords.has(token.toLowerCase()))
   )).slice(0, 12)
 }
 
@@ -224,13 +255,20 @@ function hasDomainAnchor(value: string, anchors: string[]) {
   return anchors.some(anchor => value.includes(anchor))
 }
 
-function hasRepeatedNouns(body: string) {
-  const tokens = extractMeaningTokens(body).filter(token => token.length >= 2)
+function hasRepeatedNouns(body: string, language: 'ko' | 'en' = 'ko') {
+  const tokens = extractMeaningTokens(body, language).filter(token => token.length >= 2)
   const counts = new Map<string, number>()
   for (const token of tokens) {
     counts.set(token, (counts.get(token) || 0) + 1)
   }
   return Array.from(counts.values()).some(count => count >= 3)
+}
+
+function hasIncompleteEnglishEnding(value: string) {
+  const normalized = value.trim()
+  if (!normalized) return true
+  if (!/[.!?]$/.test(normalized)) return true
+  return /\b(and|or|but|because|with|for|to|from|than|that|which|when|where|while|by)\W*$/i.test(normalized)
 }
 
 function hasBrokenKoreanParticle(value: string) {

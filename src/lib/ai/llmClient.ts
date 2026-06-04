@@ -15,6 +15,12 @@ export interface LLMRequestOptions {
   model?: string
   temperature?: number
   systemPrompt?: string
+  diagnostics?: {
+    userId?: string
+    campaignId?: string
+    brandId?: string
+    metadata?: Record<string, unknown>
+  }
 }
 
 export const DEFAULT_TEXT_MODEL = 'gpt-5.4'
@@ -50,6 +56,10 @@ export class OpenAILLMClient implements LLMClient {
       model,
       baseURL,
       keyFingerprint,
+      userId: options?.diagnostics?.userId,
+      campaignId: options?.diagnostics?.campaignId,
+      brandId: options?.diagnostics?.brandId,
+      metadata: options?.diagnostics?.metadata,
     })
 
     try {
@@ -81,6 +91,10 @@ export class OpenAILLMClient implements LLMClient {
           completionTokens: response.usage?.completion_tokens,
           totalTokens: response.usage?.total_tokens,
           errorMessage: 'empty response',
+          userId: options?.diagnostics?.userId,
+          campaignId: options?.diagnostics?.campaignId,
+          brandId: options?.diagnostics?.brandId,
+          metadata: options?.diagnostics?.metadata,
         })
         return fallback()
       }
@@ -95,6 +109,10 @@ export class OpenAILLMClient implements LLMClient {
         promptTokens: response.usage?.prompt_tokens,
         completionTokens: response.usage?.completion_tokens,
         totalTokens: response.usage?.total_tokens,
+        userId: options?.diagnostics?.userId,
+        campaignId: options?.diagnostics?.campaignId,
+        brandId: options?.diagnostics?.brandId,
+        metadata: options?.diagnostics?.metadata,
       })
       return JSON.parse(content) as T
     } catch (error) {
@@ -106,6 +124,10 @@ export class OpenAILLMClient implements LLMClient {
         model,
         baseURL,
         keyFingerprint,
+        userId: options?.diagnostics?.userId,
+        campaignId: options?.diagnostics?.campaignId,
+        brandId: options?.diagnostics?.brandId,
+        metadata: options?.diagnostics?.metadata,
         ...readOpenAIError(error),
       })
       return fallback()

@@ -382,6 +382,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const agentReport: AgentReport & {
     editorialPlan: EditorialDirectorPlan
     editorialValidation: EditorialQualityReport
+    groundingSources?: Array<{ title: string; provider?: string; url: string }>
   } = {
     timestamp: new Date().toISOString(),
     status: qualityPassed ? 'passed' : 'needs_review',
@@ -389,6 +390,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     logs: agentReportLogs,
     editorialPlan,
     editorialValidation: editorialQuality,
+    groundingSources: extractGroundingSources(input.keyContent),
   }
 
   const campaign = await dbService.createCampaign(
@@ -435,6 +437,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
     personaUsed: knowledgeCtx.personaProfile.id,
     industryUsed: knowledgeCtx.industryToneRule?.industry,
+    trendContextUsed: hasExternalGrounding(input.keyContent),
     memoryContextUsed: editorialPlan.personalization.applied,
   })
 
@@ -461,6 +464,24 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     hashtags: buildHashtags(input),
     qualityCheck,
   }
+}
+
+function hasExternalGrounding(value: string) {
+  return /\[(?:외부 리서치 브리프|EXTERNAL RESEARCH BRIEF|실시간|Real-Time News Context)/i.test(value)
+}
+
+function extractGroundingSources(value: string) {
+  const sources: Array<{ title: string; provider?: string; url: string }> = []
+  for (const line of value.split(/\r?\n/)) {
+    const match = line.match(/^-\s*(.+?)(?:\s+\(([^)]+)\))?\s+(https?:\/\/\S+)/)
+    if (!match) continue
+    sources.push({
+      title: match[1].trim().slice(0, 160),
+      provider: match[2]?.trim(),
+      url: match[3].trim(),
+    })
+  }
+  return sources.slice(0, 12)
 }
 
 async function generateMediaSlideCopies(
@@ -600,6 +621,16 @@ JSON 응답 형식:
       model: getCopywritingModel(),
       temperature: 0.35,
       systemPrompt,
+      diagnostics: {
+        userId: input.userId,
+        brandId: input.brandId,
+        metadata: {
+          language: input.language,
+          generationMode: input.generationMode,
+          topic: input.topic,
+          slideCount: slides.length,
+        },
+      },
     }
   )
 
@@ -656,6 +687,7 @@ async function enforceSemanticMeaning(params: {
 }): Promise<MediaSlidePlan[]> {
   const initialReport = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -668,7 +700,44 @@ async function enforceSemanticMeaning(params: {
 
   const client = getLLMClient()
   const weakSlides = params.slides.filter(slide => weakSlideNumbers.has(slide.slideNumber))
-  const reviewPrompt = `다음 카드뉴스 슬라이드 중 의미가 완성되지 않은 본문만 다시 작성하세요.
+  const isEnglish = params.input.language === 'en'
+  const reviewPrompt = isEnglish
+    ? `Rewrite only the weak Instagram carousel slides below.
+
+Topic: ${params.input.topic}
+Goal: ${params.input.objective || params.input.contentType}
+
+Source material:
+${params.sourceMaterial || 'No additional source material.'}
+
+${params.storyOntologySection}
+
+Weak slides and issues:
+${weakSlides.map(slide => {
+  const issues = initialReport.issues.filter(issue => issue.slideNumber === slide.slideNumber).map(issue => issue.message).join(' / ')
+  return `Slide ${slide.slideNumber} [${slide.role}]
+headline: ${slide.headline}
+body: ${slide.body}
+issues: ${issues}`
+}).join('\n\n')}
+
+Rewrite rules:
+- Body copy must complete one useful meaning, not merely sound like a sentence.
+- Do not end with an open setup such as "because", "the reason is", "more", or a dangling comparison.
+- Each slide must add a concrete fact, reason, use case, caution, or action.
+- Never include news, stock, politics, or unrelated trend information unless the user topic explicitly asks for it.
+- Keep headline under 25 characters when possible.
+- Body should normally be 80-150 characters, closing slides 70-120 characters, and must fit 3-5 mobile-readable lines.
+- Do not use planning tokens or internal terms in card copy.
+- Write all output in English.
+
+Return JSON only:
+{
+  "slides": [
+    { "slideNumber": 1, "headline": "...", "body": "..." }
+  ]
+}`
+    : `다음 카드뉴스 슬라이드 중 의미가 완성되지 않은 본문만 다시 작성하세요.
 
 주제: ${params.input.topic}
 목표: ${params.input.objective || params.input.contentType}
@@ -711,7 +780,12 @@ JSON만 반환:
     {
       model: getCopywritingModel(),
       temperature: 0.25,
-      systemPrompt: `${params.systemPrompt}\n당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.`,
+      systemPrompt: `${params.systemPrompt}\n${isEnglish ? 'You are an English social carousel editorial desk. Judge whether each slide completes a useful meaning and rewrite weak slides. Return JSON only.' : '당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.'}`,
+      diagnostics: {
+        userId: params.input.userId,
+        brandId: params.input.brandId,
+        metadata: { language: params.input.language, weakSlideCount: weakSlides.length },
+      },
     }
   )
 
@@ -745,6 +819,7 @@ JSON만 반환:
 
   const finalReport = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: nextSlides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -884,6 +959,7 @@ function runFinalSemanticCopyGuard(params: {
 }): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
   const report = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -1092,6 +1168,11 @@ ${slidesSummary}
       {
         model: getCopywritingModel(),
         temperature: 0.7,
+        diagnostics: {
+          userId: input.userId,
+          brandId: input.brandId,
+          metadata: { language: input.language, topic: input.topic, slideCount: slides.length },
+        },
       }
     )
     return result?.caption?.trim() && result.caption.trim().length > 20
