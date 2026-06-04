@@ -265,6 +265,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         layout: harness.layout,
         category: input.category,
         topic: input.topic,
+        headline: slide.headline,
+        body: slide.body,
         tone: input.tone,
         visualHint: input.visualHint,
         brandMainColor: input.brandMainColor,

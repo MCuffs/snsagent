@@ -62,6 +62,8 @@ export async function generateMediaCard(input: GenerateMediaCardInput): Promise<
     layout: harness.layout,
     category: input.category,
     topic: input.topic,
+    headline: input.title,
+    body: input.keyContent,
     tone: input.tone,
     visualHint: input.visualHint,
   })
