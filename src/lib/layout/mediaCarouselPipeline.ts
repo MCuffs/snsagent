@@ -13,6 +13,7 @@ import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
+import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
@@ -445,6 +446,10 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     scheduledAt: tomorrowAt20(),
   })
   await dbService.updatePostStatus(post.id, 'pending_approval')
+
+  // Fire-and-forget: update brand intelligence after each successful generation.
+  // Never awaited — never blocks the response.
+  void runBrandIntelligenceCompression(input.brandId, input.userId)
 
   return {
     campaignId: campaign.id,
