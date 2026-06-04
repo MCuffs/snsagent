@@ -53,6 +53,15 @@ function inferSubject(topic: string, category: string): string {
 export function generateVisualDirection(input: VisualDirectionInput): VisualDirection {
   const context = `${input.brandIndustry || ''} ${input.category} ${input.topic} ${input.tone}`.toLowerCase()
   const domainProfile = getDomainProfileForText(input.topic, input.category, input.tone, input.brandIndustry, input.visualHint, input.brandDna)
+  console.info('[DomainProfile:visual]', {
+    topic: input.topic,
+    category: input.category,
+    brandIndustry: input.brandIndustry,
+    visualHint: input.visualHint,
+    domain: domainProfile.domain,
+    label: domainProfile.label,
+    imageSubject: domainProfile.imageSubject,
+  })
   const role = input.role || 'detail'
   const roleDirection = roleVisualLanguage(role)
   const scene = inferScene(context, domainProfile.imageScene)

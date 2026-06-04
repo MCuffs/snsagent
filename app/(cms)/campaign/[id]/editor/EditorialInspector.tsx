@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
@@ -52,9 +52,10 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
     }
   }, [])
 
-  useEffect(() => {
-    if (tab === 'templates') fetchTemplates()
-  }, [tab, fetchTemplates])
+  const handleTabChange = (nextTab: EditorTab) => {
+    setTab(nextTab)
+    if (nextTab === 'templates') void fetchTemplates()
+  }
 
   if (!document) return null
   const copyLayer = document.layers.find(item => item.type === copyTarget)!
@@ -120,11 +121,11 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
       </header>
 
       <nav className="grid grid-cols-5 border-b border-[#f0e8de] p-2">
-        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label={t('tab_text')} />
-        <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label={t('tab_background')} />
-        <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label={t('tab_overlay')} />
-        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label={t('tab_image')} />
-        <TabButton active={tab === 'templates'} onClick={() => setTab('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label="템플릿" />
+        <TabButton active={tab === 'text'} onClick={() => handleTabChange('text')} icon={<Type className="h-4 w-4" />} label={t('tab_text')} />
+        <TabButton active={tab === 'background'} onClick={() => handleTabChange('background')} icon={<ImageIcon className="h-4 w-4" />} label={t('tab_background')} />
+        <TabButton active={tab === 'overlay'} onClick={() => handleTabChange('overlay')} icon={<Sparkles className="h-4 w-4" />} label={t('tab_overlay')} />
+        <TabButton active={tab === 'image'} onClick={() => handleTabChange('image')} icon={<Layers className="h-4 w-4" />} label={t('tab_image')} />
+        <TabButton active={tab === 'templates'} onClick={() => handleTabChange('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label="템플릿" />
       </nav>
 
       <div className="p-4">

@@ -521,6 +521,14 @@ async function generateMediaSlideCopies(
     : ''
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
   const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
+  console.info('[DomainProfile:copy]', {
+    topic: input.topic,
+    category: input.category,
+    contentType: input.contentType,
+    domain: domainProfile.domain,
+    label: domainProfile.label,
+    anchors: domainProfile.requiredCopyAnchors,
+  })
   const domainGuidanceSection = formatDomainCopyGuidance(domainProfile)
   const storyOntology = buildStoryOntology({
     topic: input.topic,

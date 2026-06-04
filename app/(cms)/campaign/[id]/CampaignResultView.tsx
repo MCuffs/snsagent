@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import JSZip from 'jszip'
@@ -159,6 +159,49 @@ export default function CampaignResultView({
   const activeSlide = slides[activeSlideIndex]
   const activeDocument = activeSlide ? documents[activeSlide.id] : undefined
 
+  const uploadAndAddImageLayer = useCallback(async (file: File) => {
+    if (!activeSlide || !activeDocument) return
+    setEditorBusy(true)
+    setMessage(null)
+    try {
+      const formData = new FormData()
+      formData.append('files', file)
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+      const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
+      const imageUrl = uploadData.urls?.[0]
+      if (!uploadRes.ok || !imageUrl) {
+        setMessage({ type: 'error', text: uploadData.error || t('message_upload_error') })
+        return
+      }
+      const newLayerId = `img-${Date.now()}`
+      const newLayer: EditorialLayer = {
+        id: newLayerId,
+        type: 'sticker',
+        name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || t('message_image_layer_name'),
+        visible: true,
+        locked: false,
+        opacity: 100,
+        zIndex: 80,
+        x: 340,
+        y: 475,
+        width: 400,
+        height: 400,
+        scale: 1,
+        rotation: 0,
+        blur: 0,
+        shadow: 0,
+        imageUrl,
+      }
+      addLayer(activeSlide.id, newLayer)
+      selectLayer(newLayerId)
+      setMessage({ type: 'success', text: t('message_image_layer_added') })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_image_layer_error')) })
+    } finally {
+      setEditorBusy(false)
+    }
+  }, [activeDocument, activeSlide, addLayer, selectLayer, t])
+
   useEffect(() => {
     const pasteHandler = async (e: ClipboardEvent) => {
       if (!activeSlide || !activeDocument) return
@@ -201,8 +244,7 @@ export default function CampaignResultView({
       window.removeEventListener('paste', pasteHandler)
       window.removeEventListener('keydown', keyHandler)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSlide, activeDocument])
+  }, [activeSlide, activeDocument, uploadAndAddImageLayer])
 
   useEffect(() => {
     const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
@@ -270,49 +312,6 @@ export default function CampaignResultView({
     } finally {
       setEditorBusy(false)
       if (bgFileInputRef.current) bgFileInputRef.current.value = ''
-    }
-  }
-
-  const uploadAndAddImageLayer = async (file: File) => {
-    if (!activeSlide || !activeDocument) return
-    setEditorBusy(true)
-    setMessage(null)
-    try {
-      const formData = new FormData()
-      formData.append('files', file)
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
-      const imageUrl = uploadData.urls?.[0]
-      if (!uploadRes.ok || !imageUrl) {
-        setMessage({ type: 'error', text: uploadData.error || t('message_upload_error') })
-        return
-      }
-      const newLayerId = `img-${Date.now()}`
-      const newLayer: EditorialLayer = {
-        id: newLayerId,
-        type: 'sticker',
-        name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || t('message_image_layer_name'),
-        visible: true,
-        locked: false,
-        opacity: 100,
-        zIndex: 80,
-        x: 340,
-        y: 475,
-        width: 400,
-        height: 400,
-        scale: 1,
-        rotation: 0,
-        blur: 0,
-        shadow: 0,
-        imageUrl,
-      }
-      addLayer(activeSlide.id, newLayer)
-      selectLayer(newLayerId)
-      setMessage({ type: 'success', text: t('message_image_layer_added') })
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, t('message_image_layer_error')) })
-    } finally {
-      setEditorBusy(false)
     }
   }
 
