@@ -465,12 +465,7 @@ function buildClarificationResponse(input: {
         question: '이번 카드뉴스를 어떤 방향으로 깊게 만들까요?',
         allowCustom: true,
         skipLabel: 'AI가 최적 방향 선택',
-        options: [
-          { label: '건강 관심 초보자용', value: `${input.userText}를 건강 관심 초보자가 이해하기 쉽게, 주요 성분과 일상 장점을 포함해 교육 정보형 카드뉴스로 기획` },
-          { label: '바쁜 직장인 간식 루틴', value: `${input.userText}를 바쁜 직장인이 식사 사이에 챙기는 간식 루틴 관점으로, 포만감과 섭취 장면을 포함해 저장형 카드뉴스로 기획` },
-          { label: '섭취법과 주의점 균형', value: `${input.userText}를 하루 섭취량, 함께 먹기 좋은 상황, 과다 섭취 주의점까지 균형 있게 설명하는 카드뉴스로 기획` },
-          { label: '구매 전 체크리스트', value: `${input.userText}를 구매 전 확인할 원산지, 신선도, 보관법, 활용법 체크리스트 중심 카드뉴스로 기획` },
-        ],
+        options: buildTopicAwareClarificationOptions(input.userText, input.generationMode),
       },
     }
   }
@@ -497,6 +492,132 @@ function buildClarificationResponse(input: {
           ],
     },
   }
+}
+
+function buildTopicAwareClarificationOptions(
+  topic: string,
+  generationMode?: 'brand' | 'general',
+): { label: string; value: string }[] {
+  const t = topic.trim()
+
+  // Category detection
+  const isFood = /(호두|견과|아몬드|캐슈|피스타치오|식품|간식|영양제|비타민|프로틴|음식|푸드|요리|레시피|다이어트|칼로리|영양|식이)/u.test(t)
+  const isBeauty = /(선크림|화장품|스킨케어|뷰티|향수|세럼|토너|로션|크림|마스크팩)/u.test(t)
+  const isFashion = /(가방|의류|패션|옷|신발|악세서리|코디|스타일)/u.test(t)
+  const isPolitic = /(선거|정치|후보|투표|정당|공약|지방선거|대선|총선|국회|정부|정책)/u.test(t)
+  const isEcon = /(주식|경제|금리|부동산|투자|환율|코스피|증시|재테크|펀드)/u.test(t)
+  const isTech = /(ai|인공지능|it|기술|앱|소프트웨어|챗gpt|llm|반도체|스타트업)/ui.test(t)
+  const isHealth = /(건강|운동|헬스|요가|필라테스|수면|스트레스|면역|의료|병원)/u.test(t)
+  const isTravel = /(여행|관광|해외|국내여행|숙소|항공|제주|서울|부산)/u.test(t)
+  const isCulture = /(영화|드라마|음악|공연|전시|책|독서|문화|콘텐츠)/u.test(t)
+
+  // Politics / elections
+  if (isPolitic) {
+    return [
+      { label: '핵심 이슈 정리', value: `${t}의 핵심 이슈를 유권자가 빠르게 파악할 수 있도록 중립적으로 정리한 정보형 카드뉴스` },
+      { label: '후보/정책 비교', value: `${t}에서 주요 후보나 정책을 비교해 유권자가 판단하기 쉽게 정리한 카드뉴스` },
+      { label: '투표 방법 안내', value: `${t} 관련 투표 일정·방법·절차를 알기 쉽게 안내하는 실용 정보형 카드뉴스` },
+      { label: '배경과 맥락 설명', value: `${t}가 왜 중요한지 역사적 맥락과 사회적 의미를 쉽게 설명한 교육 정보형 카드뉴스` },
+    ]
+  }
+
+  // Economy / finance
+  if (isEcon) {
+    return [
+      { label: '핵심 용어 해설', value: `${t}의 핵심 개념과 용어를 일반인도 이해할 수 있게 풀어 설명한 교육형 카드뉴스` },
+      { label: '실생활 영향 분석', value: `${t}가 일반 소비자와 직장인의 실생활에 어떤 영향을 주는지 분석한 카드뉴스` },
+      { label: '전문가 관점 정리', value: `${t}에 대한 전문가 분석과 향후 전망을 중립적으로 정리한 시사 카드뉴스` },
+      { label: '체크리스트형', value: `${t} 관련해서 내가 지금 당장 확인해야 할 것들을 체크리스트로 정리한 저장형 카드뉴스` },
+    ]
+  }
+
+  // Tech / AI
+  if (isTech) {
+    return [
+      { label: '초보자 입문 설명', value: `${t}를 기술에 익숙하지 않은 일반인도 이해할 수 있게 쉽게 풀어 설명한 카드뉴스` },
+      { label: '실사용 사례 중심', value: `${t}가 실제 업무와 일상에서 어떻게 쓰이는지 사례 중심으로 소개하는 카드뉴스` },
+      { label: '트렌드와 전망', value: `${t} 최신 트렌드와 앞으로의 방향을 정리한 시사 정보형 카드뉴스` },
+      { label: '비교/선택 가이드', value: `${t} 관련 주요 서비스·도구를 비교해 선택 기준을 제시하는 저장형 카드뉴스` },
+    ]
+  }
+
+  // Food / nutrition
+  if (isFood) {
+    return [
+      { label: '효능·장점 정리', value: `${t}의 주요 효능과 일상적 장점을 교육 정보형으로 정리한 카드뉴스` },
+      { label: '올바른 섭취법 가이드', value: `${t}의 하루 권장량, 섭취 타이밍, 주의점을 균형 있게 담은 저장형 카드뉴스` },
+      { label: '구매 전 체크리스트', value: `${t} 고를 때 확인할 원산지·성분·보관법 체크리스트 카드뉴스` },
+      { label: '일상 루틴 연결', value: `${t}를 바쁜 일상 속 루틴에 자연스럽게 녹이는 방법을 소개하는 라이프스타일 카드뉴스` },
+    ]
+  }
+
+  // Beauty
+  if (isBeauty) {
+    return [
+      { label: '성분·효과 분석', value: `${t}의 핵심 성분과 피부 효과를 전문적으로 분석한 교육형 카드뉴스` },
+      { label: '올바른 사용법', value: `${t}의 사용 순서, 양, 주의사항을 단계별로 정리한 저장형 카드뉴스` },
+      { label: '피부 타입별 추천', value: `${t}가 어떤 피부 타입에 맞는지 비교 정리한 선택 가이드형 카드뉴스` },
+      { label: '구매 전 비교', value: `${t}와 유사 제품을 비교해 구매 결정에 도움을 주는 카드뉴스` },
+    ]
+  }
+
+  // Health / fitness
+  if (isHealth) {
+    return [
+      { label: '초보자 입문 가이드', value: `${t}를 처음 시작하는 분들을 위한 핵심 정보와 시작 방법 안내 카드뉴스` },
+      { label: '효과적인 실천법', value: `${t}를 일상에서 꾸준히 실천할 수 있는 구체적인 방법과 루틴 카드뉴스` },
+      { label: '주의점과 균형', value: `${t}의 효과와 함께 알아야 할 주의사항을 균형 있게 다룬 카드뉴스` },
+      { label: '전문가 팁 정리', value: `${t}에 대한 전문가 조언과 흔히 하는 실수를 정리한 저장형 카드뉴스` },
+    ]
+  }
+
+  // Fashion
+  if (isFashion) {
+    return [
+      { label: '스타일링 가이드', value: `${t}를 활용한 다양한 스타일링 방법을 소개하는 라이프스타일 카드뉴스` },
+      { label: '구매 전 체크포인트', value: `${t} 구매 전 확인할 소재·사이즈·관리법 체크리스트 카드뉴스` },
+      { label: '트렌드 분석', value: `${t} 관련 이번 시즌 트렌드와 키 아이템을 정리한 정보형 카드뉴스` },
+      { label: '실착 활용법', value: `${t}를 다양한 상황에서 실제로 활용하는 방법을 담은 저장형 카드뉴스` },
+    ]
+  }
+
+  // Travel
+  if (isTravel) {
+    return [
+      { label: '필수 정보 가이드', value: `${t} 여행을 위한 일정·예산·준비물 핵심 정보를 정리한 저장형 카드뉴스` },
+      { label: '숨은 명소 소개', value: `${t}의 알려지지 않은 숨은 명소와 현지인 추천 코스를 소개하는 카드뉴스` },
+      { label: '주의사항·팁 정리', value: `${t} 여행 시 주의할 점과 알면 유용한 팁을 정리한 실용 카드뉴스` },
+      { label: '비용 절약 방법', value: `${t} 여행 비용을 절약하는 구체적인 방법과 꿀팁을 담은 저장형 카드뉴스` },
+    ]
+  }
+
+  // Culture / entertainment
+  if (isCulture) {
+    return [
+      { label: '핵심 내용 정리', value: `${t}의 주요 내용과 관전 포인트를 쉽게 정리한 입문형 카드뉴스` },
+      { label: '추천 이유 소개', value: `${t}를 꼭 봐야·읽어야 하는 이유를 구체적으로 소개하는 카드뉴스` },
+      { label: '배경·맥락 설명', value: `${t}를 더 깊이 이해하기 위한 배경 지식과 맥락을 설명한 교육형 카드뉴스` },
+      { label: '비교·선택 가이드', value: `${t}와 유사 작품·콘텐츠를 비교해 취향에 맞게 선택할 수 있도록 안내하는 카드뉴스` },
+    ]
+  }
+
+  // Generic brand mode
+  if (generationMode === 'brand') {
+    return [
+      { label: '신상품·대표 상품 소개', value: `${t} 신상품 또는 대표 상품을 소개하는 카드뉴스` },
+      { label: '고객 고민 해결', value: `${t} 고객의 고민을 해결하는 정보형 카드뉴스` },
+      { label: '브랜드 스토리', value: `${t}의 차별점과 브랜드 스토리를 보여주는 카드뉴스` },
+      { label: '이벤트/프로모션', value: `${t} 관련 이벤트 또는 프로모션을 안내하는 카드뉴스` },
+    ]
+  }
+
+  // General fallback
+  return [
+    { label: '핵심 정보 요약', value: `${t}의 핵심 정보를 빠르게 파악할 수 있도록 정리한 교육 정보형 카드뉴스` },
+    { label: '체크리스트형', value: `${t}와 관련해 알아야 할 핵심을 체크리스트로 정리한 저장형 카드뉴스` },
+    { label: '요즘 이슈 연결', value: `${t}를 최신 트렌드 및 사회적 이슈와 연결한 시사 정보형 카드뉴스` },
+    { label: '주의점·균형 있게', value: `${t}의 장점과 함께 알아야 할 주의사항을 균형 있게 다룬 카드뉴스` },
+  ]
 }
 
 function buildEnglishClarification(input: {
