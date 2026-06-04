@@ -14,7 +14,7 @@ import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
-import { buildSemanticFallback, evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
+import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
 import {
   BrandIdentityAgent,
@@ -708,11 +708,7 @@ JSON만 반환:
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: rewritten?.headline?.trim() || slide.headline,
-      body: rewritten?.body?.trim() || buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: rewritten?.body?.trim() || slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,
@@ -751,11 +747,7 @@ JSON만 반환:
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
-      body: buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,
@@ -905,11 +897,7 @@ function runFinalSemanticCopyGuard(params: {
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
-      body: buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,

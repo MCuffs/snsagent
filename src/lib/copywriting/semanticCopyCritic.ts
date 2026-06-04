@@ -1,4 +1,4 @@
-import { buildDomainFallbackBody, getDomainBannedTerms, getDomainProfileForText } from '../content/domainProfile'
+import { getDomainBannedTerms, getDomainProfileForText } from '../content/domainProfile'
 
 export interface SemanticSlideInput {
   slideNumber: number
@@ -209,56 +209,6 @@ export function evaluateSemanticCopy(params: {
   }
 }
 
-export function buildSemanticFallback(params: {
-  topic: string
-  role: string
-  headline: string
-}) {
-  const topic = params.topic.replace(/\s+/g, ' ').trim() || params.headline
-  const domainFallback = buildDomainFallbackBody(topic, params.role)
-  if (domainFallback) return domainFallback
-  const subject = extractSubject(topic)
-  const category = inferTopicCategory(topic)
-
-  if (category === 'food') {
-    switch (params.role) {
-      case 'hook':
-        return `${subject}: 양과 보관 기준부터 봐야 식단에 맞게 챙길 수 있습니다.`
-      case 'context':
-      case 'problem':
-        return `${subject}: 먹는 시간과 양을 정해두면 간식 선택이 쉬워집니다.`
-      case 'key-point':
-      case 'detail':
-      case 'stat':
-        return `${subject}: 장점보다 하루 섭취량을 먼저 정해야 부담을 줄입니다.`
-      case 'summary':
-      case 'save-cta':
-      case 'cta':
-        return `${subject}: 양과 보관법을 저장해두고 먹기 전 다시 확인하세요.`
-      default:
-        return `${subject}: 양과 보관 기준을 함께 볼 때 선택이 쉬워집니다.`
-    }
-  }
-
-  switch (params.role) {
-    case 'hook':
-      return `${subject}: 첫 기준이 흔들리면 결과도 쉽게 흔들립니다.`
-    case 'context':
-    case 'problem':
-      return `${subject}: 실제 상황과 기준을 함께 봐야 판단이 쉬워집니다.`
-    case 'key-point':
-    case 'detail':
-    case 'stat':
-      return `${subject}: 핵심 기준 하나를 정해 비교하면 선택이 빨라집니다.`
-    case 'summary':
-    case 'save-cta':
-    case 'cta':
-      return `${subject}: 저장해두고 기준부터 다시 확인하세요.`
-    default:
-      return `${subject}: 바로 적용할 기준을 짧게 남겨야 저장할 이유가 생깁니다.`
-  }
-}
-
 function extractMeaningTokens(value: string) {
   return Array.from(new Set(
     value
@@ -272,33 +222,6 @@ function extractMeaningTokens(value: string) {
 function hasDomainAnchor(value: string, anchors: string[]) {
   if (anchors.length === 0) return true
   return anchors.some(anchor => value.includes(anchor))
-}
-
-function extractSubject(topic: string) {
-  const normalized = topic.replace(/\s+/g, ' ').trim()
-    .replace(/^(초보자를 위한|소상공인을 위한|신입 마케터를 위한)\s*/u, '')
-  const knownFood = normalized.match(/호두|아몬드|캐슈|피스타치오|견과|견과류|요거트|샐러드/u)
-  if (knownFood?.[0]) return knownFood[0]
-
-  const beforePossessive = normalized.match(/^([가-힣A-Za-z0-9]{2,})의\s*(?:효능|효과|장점|특징|섭취|활용|추천)/u)
-  if (beforePossessive?.[1]) return beforePossessive[1]
-
-  const cleaned = normalized
-    .replace(/효능\s*과|효과\s*와|장점\s*과|특징\s*과/g, ' ')
-    .replace(/추천|효능|효과|장점|특징|카드뉴스|콘텐츠|본문|소개|후킹|올바른|섭취|가이드|건강|균형|실천/g, ' ')
-    .replace(/\b(?:과|와|및)\b/g, ' ')
-    .replace(/의\s*(?:과|와)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  const firstToken = cleaned.replace(/의$/u, '').trim().split(/\s+/)[0]
-  return firstToken || normalized.replace(/의$/u, '').trim() || normalized
-}
-
-function inferTopicCategory(topic: string) {
-  if (/호두|견과|아몬드|캐슈|피스타치오|식품|간식|영양|건강|샐러드|먹/.test(topic)) {
-    return 'food'
-  }
-  return 'general'
 }
 
 function hasRepeatedNouns(body: string) {
