@@ -27,7 +27,7 @@ import {
   type AgentSlideData
 } from '../carousel/agents'
 import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
-import { formatDomainCopyGuidance, getDomainProfileForText } from '../content/domainProfile'
+import { formatDomainCopyGuidance, getGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
 import type { BrandProfile, CampaignInput } from '../carousel/types'
 import {
   buildEditorialDirectorPlan,
@@ -108,6 +108,22 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
+  const domainProfile = getGenerationDomainProfile({
+    topic: input.topic,
+    category: input.category,
+    brandIndustry: input.brandIndustry,
+    contentType: input.contentType,
+  })
+  console.info('[DomainProfile:resolved]', {
+    topic: input.topic,
+    category: input.category,
+    brandIndustry: input.brandIndustry,
+    contentType: input.contentType,
+    domain: domainProfile.domain,
+    label: domainProfile.label,
+    anchors: domainProfile.requiredCopyAnchors,
+    imageSubject: domainProfile.imageSubject,
+  })
   // LLM copy generation — replaces rule-based placeholder copy with AI-written slide text
   // Build knowledge context before copy generation
   const mediaBrand: BrandProfile = {
@@ -160,7 +176,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     knowledgeContext: knowledgeCtx,
   })
   let plannedSlides = planMediaSlides(input, editorialPlan)
-  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx)
+  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
   plannedSlides = enforceHarnessCopy(input, plannedSlides)
 
   // 1. Initialize Agents
@@ -234,6 +250,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     input,
     slides: agentSlides,
     editorialPlan,
+    domainProfile,
   })
   agentSlides = finalCopyGuard.slides
   agentReportLogs.push(...finalCopyGuard.logs)
@@ -276,6 +293,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         brandDna: input.brandDna,
         role: slide.role as MediaSlideRole,
         editorialDirection: slidePlan?.visualDirection,
+        domainProfile,
       })
 
       const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
@@ -488,7 +506,8 @@ async function generateMediaSlideCopies(
   input: MediaCarouselInput,
   slides: MediaSlidePlan[],
   editorialPlan: EditorialDirectorPlan,
-  knowledgeCtx?: ReturnType<typeof buildCopyKnowledgeContext>
+  knowledgeCtx: ReturnType<typeof buildCopyKnowledgeContext> | undefined,
+  domainProfile: DomainProfile
 ): Promise<MediaSlidePlan[]> {
   const client = getLLMClient()
 
@@ -520,10 +539,11 @@ async function generateMediaSlideCopies(
     ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
     : ''
   const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
-  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
   console.info('[DomainProfile:copy]', {
+    source: 'resolved',
     topic: input.topic,
     category: input.category,
+    brandIndustry: input.brandIndustry,
     contentType: input.contentType,
     domain: domainProfile.domain,
     label: domainProfile.label,
@@ -596,7 +616,7 @@ ${slideDescriptions}
 - body: 일반 슬라이드는 80~150자, 마무리 슬라이드는 70~120자 권장. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
 - body는 글자수를 억지로 줄이기보다 의미 있는 정보량을 우선하세요. 단, 한 슬라이드에 수치가 너무 많아지면 읽기 어려우므로 핵심 수치 1~2개만 선택하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
-- body에는 DOMAIN GUIDANCE의 required copy anchors 중 최소 1개를 자연스럽게 반영하세요.
+- DOMAIN GUIDANCE는 참고하되, 상품 맥락에 맞는 표현만 자연스럽게 사용하세요.
 - DOMAIN GUIDANCE의 금지 표현이나 다른 업종의 표현을 쓰지 마세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
 - 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
@@ -679,6 +699,7 @@ JSON 응답 형식:
     input,
     slides: repairedSlides,
     editorialPlan,
+    domainProfile,
     sourceMaterial,
     systemPrompt,
     storyOntologySection,
@@ -689,6 +710,7 @@ async function enforceSemanticMeaning(params: {
   input: MediaCarouselInput
   slides: MediaSlidePlan[]
   editorialPlan: EditorialDirectorPlan
+  domainProfile: DomainProfile
   sourceMaterial: string
   systemPrompt: string
   storyOntologySection: string
@@ -696,6 +718,7 @@ async function enforceSemanticMeaning(params: {
   const initialReport = evaluateSemanticCopy({
     topic: params.input.topic,
     language: params.input.language,
+    domainProfile: params.domainProfile,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -828,6 +851,7 @@ JSON만 반환:
   const finalReport = evaluateSemanticCopy({
     topic: params.input.topic,
     language: params.input.language,
+    domainProfile: params.domainProfile,
     slides: nextSlides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -964,10 +988,12 @@ function runFinalSemanticCopyGuard(params: {
   input: MediaCarouselInput
   slides: AgentSlideData[]
   editorialPlan: EditorialDirectorPlan
+  domainProfile: DomainProfile
 }): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
   const report = evaluateSemanticCopy({
     topic: params.input.topic,
     language: params.input.language,
+    domainProfile: params.domainProfile,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,

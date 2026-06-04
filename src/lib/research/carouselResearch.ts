@@ -7,7 +7,7 @@ import {
   logAiDiagnostic,
   readOpenAIError,
 } from '../ai/diagnostics'
-import { formatDomainCopyGuidance, getDomainProfileForText } from '../content/domainProfile'
+import { formatDomainCopyGuidance, getDomainProfileForText, getGenerationDomainProfile } from '../content/domainProfile'
 
 export interface ResearchSource {
   title: string
@@ -59,7 +59,11 @@ export async function buildCarouselResearchBrief(input: ResearchInput): Promise<
   const subject = extractResearchSubject(input.topic)
   if (!subject || subject.length < 2) return null
 
-  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
+  const domainProfile = getGenerationDomainProfile({
+    topic: input.topic,
+    category: input.category,
+    contentType: input.contentType,
+  })
   const userIntent = inferUserIntent(input.topic, input.contentType)
   const queries = buildQueries(subject, userIntent, input.language || 'ko', domainProfile)
   const openAIWebBrief = await buildOpenAIWebResearchBrief(input, subject, userIntent, queries)
@@ -216,7 +220,11 @@ async function buildOpenAIWebResearchBrief(
 
 function buildOpenAIWebResearchPrompt(input: ResearchInput, subject: string, userIntent: string, queries: string[]) {
   const slideCount = Math.min(Math.max(Math.round(input.slideCount || 5), 5), 10)
-  const domainProfile = getDomainProfileForText(input.topic, input.category, input.contentType, input.keyContent)
+  const domainProfile = getGenerationDomainProfile({
+    topic: input.topic,
+    category: input.category,
+    contentType: input.contentType,
+  })
   const languageRule = input.language === 'en'
     ? 'Write all JSON string values in English.'
     : 'JSON 문자열 값은 모두 한국어로 작성하세요.'
