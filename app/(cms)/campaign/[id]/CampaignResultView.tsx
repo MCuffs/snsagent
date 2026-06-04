@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import JSZip from 'jszip'
 import {
@@ -15,8 +14,6 @@ import {
 } from 'lucide-react'
 import {
   saveEditorialDocumentAction,
-  regenerateEditorialBackgroundAction,
-  rewriteEditorialCopyAction,
   exportEditorialSlideAction,
   resetSlideEditorDocumentAction,
   updatePostDetailsAction,
@@ -87,25 +84,6 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-function inferLayoutLabel(prompt: string) {
-  const normalized = prompt.toLowerCase()
-  if (normalized.includes('data journalism')) return 'stat-highlight'
-  if (normalized.includes('clean studio')) return 'minimal-clean'
-  if (normalized.includes('cinematic portrait')) return 'cinematic-headline'
-  if (normalized.includes('documentary news')) return 'breaking-news'
-  if (normalized.includes('social feed')) return 'trend-feed'
-  if (normalized.includes('magazine cover')) return 'magazine'
-  return 'dark-editorial'
-}
-
-function inferRole(slideNumber: number, total: number, prompt: string) {
-  if (slideNumber === 1) return 'hook'
-  if (slideNumber === total) return 'save-cta'
-  if (slideNumber === 2) return 'context'
-  if (prompt.toLowerCase().includes('data journalism')) return 'stat'
-  return slideNumber % 2 === 0 ? 'detail' : 'key-point'
-}
-
 function fileNameFor(campaignTitle: string, slideNumber: number, extension = 'png') {
   const safeTitle = campaignTitle
     .replace(/[\\/:*?"<>|]+/g, '-')
@@ -138,8 +116,6 @@ export default function CampaignResultView({
   campaign,
   post,
   brand,
-  planName,
-  regenerationAccess,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
@@ -152,9 +128,7 @@ export default function CampaignResultView({
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [regenerationImageCount, setRegenerationImageCount] = useState(campaign.regenerationImageCount)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [showRegenerationOffer, setShowRegenerationOffer] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
   const documents = useEditorialStore(state => state.documents)
   const dirtySlides = useEditorialStore(state => state.dirtySlides)
@@ -162,6 +136,7 @@ export default function CampaignResultView({
   const activateSlide = useEditorialStore(state => state.activate)
   const updateDocument = useEditorialStore(state => state.updateDocument)
   const addLayer = useEditorialStore(state => state.addLayer)
+  const selectLayer = useEditorialStore(state => state.selectLayer)
   const markSaved = useEditorialStore(state => state.markSaved)
 
   useEffect(() => {
@@ -179,9 +154,6 @@ export default function CampaignResultView({
   }
 
   const activeSlide = slides[activeSlideIndex]
-  const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
-  const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
-  const remainingRegenerationImages = Math.max(campaign.slideCount - regenerationImageCount, 0)
   const activeDocument = activeSlide ? documents[activeSlide.id] : undefined
 
   useEffect(() => {
@@ -228,52 +200,6 @@ export default function CampaignResultView({
       setMessage({ type: 'success', text: renderOutput ? '편집본을 고해상도 PNG로 확정 렌더했습니다.' : '편집 내용을 저장했습니다.' })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '편집 저장 중 오류가 발생했습니다.') })
-    } finally {
-      setEditorBusy(false)
-    }
-  }
-
-  const regenerateBackground = async (variation: 'same-style' | 'stronger-mood' | 'brighter-background') => {
-    if (!activeSlide || !activeDocument) return
-    if (regenerationAccess === 'blocked') {
-      setShowRegenerationOffer(true)
-      return
-    }
-    analytics.slideRegenerate(campaign.id, activeSlide.slideNumber, 'image')
-    setEditorBusy(true)
-    setMessage(null)
-    try {
-      const result = await regenerateEditorialBackgroundAction(activeSlide.id, JSON.stringify(activeDocument), variation)
-      if (!result.success) {
-        if ('requiresRegenerationPass' in result && result.requiresRegenerationPass) {
-          setShowRegenerationOffer(true)
-          return
-        }
-        return setMessage({ type: 'error', text: result.error })
-      }
-      applyServerSlide(result.slide as Slide, result.document)
-      setRegenerationImageCount(result.regenerationUsage.used)
-      setMessage({ type: 'success', text: '레이아웃을 유지한 채 현재 슬라이드 배경만 변경했습니다.' })
-      if (regenerationAccess === 'single-use') {
-        setShowRegenerationOffer(false)
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '배경 생성 중 오류가 발생했습니다.') })
-    } finally {
-      setEditorBusy(false)
-    }
-  }
-
-  const rewriteCopy = async (intent: string) => {
-    if (!activeSlide || !activeDocument) return
-    if (/밝|brighter/i.test(intent)) return regenerateBackground('brighter-background')
-    if (/배경|이미지|무드|mood|background/i.test(intent)) return regenerateBackground('stronger-mood')
-    setEditorBusy(true)
-    try {
-      const result = await rewriteEditorialCopyAction(activeSlide.id, JSON.stringify(activeDocument), intent)
-      if (!result.success) return setMessage({ type: 'error', text: result.error })
-      applyServerSlide(result.slide as Slide, result.document)
-      setMessage({ type: 'success', text: '이미지는 유지하고 문구 레이어만 보정했습니다. 확정 렌더로 출력에 반영하세요.' })
     } finally {
       setEditorBusy(false)
     }
@@ -330,8 +256,9 @@ export default function CampaignResultView({
         setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
         return
       }
+      const newLayerId = `img-${Date.now()}`
       const newLayer: EditorialLayer = {
-        id: `img-${Date.now()}`,
+        id: newLayerId,
         type: 'sticker',
         name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지',
         visible: true,
@@ -349,6 +276,7 @@ export default function CampaignResultView({
         imageUrl,
       }
       addLayer(activeSlide.id, newLayer)
+      selectLayer(newLayerId)
       setMessage({ type: 'success', text: '이미지를 레이어로 추가했습니다. 캔버스에서 위치를 조정하세요.' })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, '이미지 업로드 중 오류가 발생했습니다.') })
@@ -488,26 +416,6 @@ export default function CampaignResultView({
         </div>
       )}
 
-      {showRegenerationOffer && (
-        <div className="mb-6 flex flex-col gap-4 rounded-[12px] border border-[#f2d1bb] bg-[#fff6ef] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b94718]">AI Regeneration Pass</p>
-            <p className="mt-2 text-base font-black text-[#1f1512]">
-              25,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
-            </p>
-            <p className="mt-1 text-xs font-semibold text-[#746a62]">
-              무료 플랜에는 AI 재생성이 포함되지 않습니다. 1회권으로 현재 결과물의 배경을 한 번 다시 만들 수 있습니다.
-            </p>
-          </div>
-          <Link
-            href="/billing?offer=regeneration"
-            className="shrink-0 rounded-lg bg-[#111318] px-5 py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
-          >
-            3,000원 1회권 보기
-          </Link>
-        </div>
-      )}
-
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <section className="space-y-5">
           <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-5 shadow-[0_24px_70px_rgba(31,21,18,0.18)]">
@@ -591,21 +499,10 @@ export default function CampaignResultView({
             <>
               {activeSlide && (
                 <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Meta label="role" value={roleLabel} />
-                    <Meta label="layout" value={layoutLabel} />
-                    <Meta label="brand" value={brand.name} />
-                    <Meta label="plan" value={planName} />
-                  </div>
                   <EditorialInspector
                     slideId={activeSlide.id}
                     busy={editorBusy}
-                    credits={remainingRegenerationImages}
-                    regenerationAccess={regenerationAccess}
                     onSave={saveEditor}
-                    onBackgroundVariation={regenerateBackground}
-                    onRegenerationBlocked={() => setShowRegenerationOffer(true)}
-                    onRewrite={rewriteCopy}
                     onUpload={() => bgFileInputRef.current?.click()}
                     onImageUpload={() => imgFileInputRef.current?.click()}
                   />
@@ -771,15 +668,6 @@ export default function CampaignResultView({
           </div>
         </aside>
       </div>
-    </div>
-  )
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[8px] border border-[#e8dfd4] bg-[#fff8f0] px-3 py-2">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9a8d82]">{label}</p>
-      <p className="mt-1 truncate text-xs font-black text-[#1f1512]">{value}</p>
     </div>
   )
 }

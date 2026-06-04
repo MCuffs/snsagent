@@ -188,7 +188,7 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
   })
   const fallbackLayers = new Map(fallback.layers.map(item => [item.type, item]))
   const sanitized = input.layers
-    .filter(candidate => fallbackLayers.has(candidate.type))
+    .filter(candidate => fallbackLayers.has(candidate.type) && !isUserImageLayer(candidate))
     .map((candidate, index) => normalizeLayer(candidate, fallbackLayers.get(candidate.type)!, index))
   for (const missing of fallback.layers) {
     if (!sanitized.some(layerItem => layerItem.type === missing.type)) sanitized.push(missing)
@@ -196,7 +196,7 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
 
   // Preserve user-added image layers: sticker type with a non-default id and imageUrl
   const userImageLayers = input.layers
-    .filter(candidate => candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string')
+    .filter(isUserImageLayer)
     .map(candidate => normalizeUserImageLayer(candidate))
 
   return {
@@ -221,6 +221,10 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
     layers: [...sanitized, ...userImageLayers].sort((a, b) => a.zIndex - b.zIndex),
     updatedAt: new Date().toISOString(),
   }
+}
+
+function isUserImageLayer(candidate: EditorialLayer) {
+  return candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string'
 }
 
 function normalizeUserImageLayer(candidate: EditorialLayer): EditorialLayer {

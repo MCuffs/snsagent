@@ -3,24 +3,19 @@
 import { useState } from 'react'
 import { Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
-import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset, TypographyPreset } from '../../../../../src/lib/editor/types'
+import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 
 type EditorTab = 'text' | 'background' | 'overlay' | 'image'
 
 interface Props {
   slideId: string
   busy: boolean
-  credits: number
-  regenerationAccess: 'blocked' | 'single-use' | 'included'
   onSave: (render: boolean) => void
-  onBackgroundVariation: (type: 'same-style' | 'stronger-mood' | 'brighter-background') => void
-  onRegenerationBlocked: () => void
-  onRewrite: (intent: string) => void
   onUpload: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, credits, regenerationAccess, onSave, onBackgroundVariation, onRegenerationBlocked, onRewrite, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, busy, onSave, onUpload, onImageUpload }: Props) {
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
@@ -30,7 +25,6 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
   const redo = useEditorialStore(state => state.redo)
   const [tab, setTab] = useState<EditorTab>('text')
   const [copyTarget, setCopyTarget] = useState<'title' | 'subtitle'>('title')
-  const [prompt, setPrompt] = useState('')
 
   if (!document) return null
   const copyLayer = document.layers.find(item => item.type === copyTarget)!
@@ -68,24 +62,14 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
           <TextPanel
             layer={copyLayer}
             target={copyTarget}
-            busy={busy}
-            prompt={prompt}
             onTarget={value => { setCopyTarget(value); selectLayer(value) }}
             onChange={update => updateLayer(slideId, copyLayer.id, update)}
-            onRewrite={onRewrite}
-            onPrompt={setPrompt}
-            document={document}
-            onTypography={preset => updateDocument(slideId, value => applyTypographyPreset(value, preset))}
           />
         )}
         {tab === 'background' && (
           <BackgroundPanel
             busy={busy}
-            credits={credits}
-            regenerationAccess={regenerationAccess}
             onUpload={onUpload}
-            onVariation={onBackgroundVariation}
-            onRegenerationBlocked={onRegenerationBlocked}
           />
         )}
         {tab === 'overlay' && (
@@ -106,25 +90,13 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
 function TextPanel({
   layer,
   target,
-  busy,
-  prompt,
   onTarget,
   onChange,
-  onRewrite,
-  onPrompt,
-  document,
-  onTypography,
 }: {
   layer: EditorialLayer
   target: 'title' | 'subtitle'
-  busy: boolean
-  prompt: string
   onTarget: (target: 'title' | 'subtitle') => void
   onChange: (update: Partial<EditorialLayer>) => void
-  onRewrite: (intent: string) => void
-  onPrompt: (value: string) => void
-  document: EditorialDocument
-  onTypography: (preset: TypographyPreset) => void
 }) {
   return (
     <div className="space-y-4">
@@ -149,40 +121,6 @@ function TextPanel({
         </select>
         <input type="number" aria-label="글자 크기" value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-11 px-3 text-xs font-bold" />
         <input type="color" aria-label="텍스트 색상" value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-11 w-11 cursor-pointer p-1" />
-      </div>
-
-      <div className="border-t border-[#f0e8de] pt-4">
-        <OptionGroup title="타이포그래피 분위기">
-          {([
-            ['cinematic-headline', '시네마틱'], ['magazine-editorial', '매거진'], ['minimal-luxury', '럭셔리'], ['high-ctr-hook', '강한 훅'],
-          ] as const).map(([key, label]) => (
-            <Choice key={key} active={document.typographyPreset === key} onClick={() => onTypography(key)}>{label}</Choice>
-          ))}
-        </OptionGroup>
-      </div>
-
-      <div className="border-t border-[#f0e8de] pt-4 space-y-3">
-        <p className="text-xs font-bold text-[#746a62]">AI 문구 다듬기</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ['stronger-hook', '강한 훅'], ['emotional', '감성적'], ['premium', '프리미엄'], ['shorter', '짧게'], ['trendy', '트렌디'],
-          ].map(([intent, label]) => (
-            <button type="button" key={intent} disabled={busy} onClick={() => onRewrite(intent)} className="rounded-full border border-[#e8dfd4] px-3 py-2 text-xs font-bold text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff] disabled:opacity-40">
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="rounded-lg border border-[#e8dfd4] bg-[#fffdf9] p-3">
-          <input
-            value={prompt}
-            onChange={event => onPrompt(event.target.value)}
-            placeholder="예: 더 고급스럽고 짧게 바꿔줘"
-            className="w-full bg-transparent text-xs outline-none"
-          />
-          <button type="button" disabled={busy || !prompt.trim()} onClick={() => { onRewrite(prompt.trim()); onPrompt('') }} className="mt-3 w-full rounded-md bg-[#111318] py-2 text-xs font-bold text-white disabled:opacity-40">
-            AI에게 요청
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -217,45 +155,20 @@ function OverlayPanel({
 
 function BackgroundPanel({
   busy,
-  credits,
-  regenerationAccess,
   onUpload,
-  onVariation,
-  onRegenerationBlocked,
 }: {
   busy: boolean
-  credits: number
-  regenerationAccess: Props['regenerationAccess']
   onUpload: () => void
-  onVariation: Props['onBackgroundVariation']
-  onRegenerationBlocked: () => void
 }) {
-  const blocked = regenerationAccess === 'blocked'
-  const applyVariation = (variation: Parameters<Props['onBackgroundVariation']>[0]) => {
-    if (blocked) {
-      onRegenerationBlocked()
-      return
-    }
-    onVariation(variation)
-  }
-
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
-        {blocked ? (
-          <p>무료 플랜에서는 AI 배경 재생성을 사용할 수 없습니다. 버튼을 눌러 1회 이용권 안내를 확인하세요.</p>
-        ) : (
-          <p>글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong></p>
-        )}
+        <p>글자와 레이아웃은 그대로 두고 배경 이미지만 직접 교체합니다.</p>
         <p className="text-[10px] text-[#717b8f] font-semibold">※ 배경 이미지는 텍스트 없이 생성되고, 문구는 편집 가능한 레이어로만 올라갑니다.</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> 내 이미지로 교체
       </button>
-      <p className="pt-2 text-xs font-bold text-[#746a62]">AI 배경 변형</p>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('same-style')} className="btn-secondary w-full rounded-md text-sm">같은 분위기, 다른 이미지</button>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('stronger-mood')} className="btn-secondary w-full rounded-md text-sm">더 깊은 시네마틱 무드</button>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('brighter-background')} className="btn-secondary w-full rounded-md text-sm">더 밝고 깨끗한 배경</button>
     </div>
   )
 }
@@ -300,6 +213,14 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
                 </button>
               </div>
               <RangeControl label="불투명도" value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
+              <div className="grid grid-cols-2 gap-2">
+                <NumberControl label="X" value={layer.x} min={0} max={1080} onChange={value => updateLayer(slideId, layer.id, { x: value })} />
+                <NumberControl label="Y" value={layer.y} min={0} max={1350} onChange={value => updateLayer(slideId, layer.id, { y: value })} />
+                <NumberControl label="가로" value={layer.width} min={16} max={1080} onChange={value => updateLayer(slideId, layer.id, { width: value })} />
+                <NumberControl label="세로" value={layer.height} min={16} max={1350} onChange={value => updateLayer(slideId, layer.id, { height: value })} />
+              </div>
+              <RangeControl label="크기" value={Math.round(layer.scale * 100)} min={25} max={400} onChange={value => updateLayer(slideId, layer.id, { scale: value / 100 })} />
+              <RangeControl label="회전" value={layer.rotation} min={-180} max={180} onChange={value => updateLayer(slideId, layer.id, { rotation: value })} />
             </div>
           ))}
         </div>
@@ -309,19 +230,6 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
       )}
     </div>
   )
-}
-
-function applyTypographyPreset(document: EditorialDocument, preset: TypographyPreset) {
-  const styles: Record<TypographyPreset, { title: Partial<EditorialLayer>; subtitle: Partial<EditorialLayer> }> = {
-    'cinematic-headline': { title: { fontPreset: 'pretendard', fontSize: 72, fontWeight: 800, tracking: -2, lineHeight: 1.06 }, subtitle: { fontSize: 27, tracking: 0 } },
-    'breaking-news': { title: { fontPreset: 'suit', fontSize: 78, fontWeight: 900, tracking: -3, lineHeight: 1 }, subtitle: { fontSize: 25, tracking: 1 } },
-    'magazine-editorial': { title: { fontPreset: 'magazine', fontSize: 76, fontWeight: 700, tracking: -1, lineHeight: 1.12 }, subtitle: { fontSize: 26, tracking: 0 } },
-    'minimal-luxury': { title: { fontPreset: 'serif', fontSize: 62, fontWeight: 600, tracking: 1, lineHeight: 1.18 }, subtitle: { fontSize: 23, tracking: 2 } },
-    'dark-social': { title: { fontPreset: 'pretendard', fontSize: 70, fontWeight: 850, tracking: -2, lineHeight: 1.05 }, subtitle: { fontSize: 28, tracking: 0 } },
-    'emotional-storytelling': { title: { fontPreset: 'serif', fontSize: 67, fontWeight: 650, tracking: 0, lineHeight: 1.15 }, subtitle: { fontSize: 27, tracking: 0 } },
-    'high-ctr-hook': { title: { fontPreset: 'suit', fontSize: 84, fontWeight: 900, tracking: -3, lineHeight: 0.98 }, subtitle: { fontSize: 26, tracking: 0 } },
-  }
-  return { ...document, typographyPreset: preset, layers: document.layers.map(layer => layer.type === 'title' ? { ...layer, ...styles[preset].title } : layer.type === 'subtitle' ? { ...layer, ...styles[preset].subtitle } : layer) }
 }
 
 function applyOverlayPreset(document: EditorialDocument, preset: OverlayPreset) {
@@ -354,6 +262,22 @@ function Choice({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function RangeControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
   return <label className="block text-xs font-bold text-[#514a44]"><span className="mb-2 flex justify-between"><span>{label}</span><span className="text-[#746a62]">{value}</span></span><input type="range" value={value} min={min} max={max} onChange={event => onChange(Number(event.target.value))} className="w-full accent-[#0066ff]" /></label>
+}
+
+function NumberControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="block text-xs font-bold text-[#514a44]">
+      <span className="mb-1 block text-[#746a62]">{label}</span>
+      <input
+        type="number"
+        value={Math.round(value)}
+        min={min}
+        max={max}
+        onChange={event => onChange(Number(event.target.value))}
+        className="field h-9 w-full px-2 text-xs font-bold"
+      />
+    </label>
+  )
 }
 
 function IconButton({ label, children, onClick }: { label: string; children: React.ReactNode; onClick: () => void }) {

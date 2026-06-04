@@ -102,7 +102,10 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
           <motion.div
             key={layer.id}
             drag={!layer.locked}
+            dragElastic={0}
             dragMomentum={false}
+            dragConstraints={stageRef}
+            whileDrag={{ cursor: 'grabbing' }}
             onPointerDown={() => selectLayer(layer.id)}
             onDrag={(_, info) => {
               const otherLayers = document.layers.filter(l => l.id !== layer.id && l.visible && !['background', 'overlay'].includes(l.type))
