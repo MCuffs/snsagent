@@ -274,21 +274,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   useEffect(() => {
     if (!readyParams) return
     const handler = (e: ClipboardEvent) => {
-      const target = e.target as HTMLElement
-      // Don't intercept paste in text inputs
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
       const items = Array.from(e.clipboardData?.items ?? [])
       const files = items
         .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
         .map(item => item.getAsFile())
         .filter((f): f is File => f !== null)
+      // Only intercept when clipboard actually contains images — text paste in inputs is unaffected
       if (files.length > 0) {
         e.preventDefault()
         addFiles(files)
       }
     }
-    document.addEventListener('paste', handler)
-    return () => document.removeEventListener('paste', handler)
+    window.addEventListener('paste', handler)
+    return () => window.removeEventListener('paste', handler)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyParams])
 
