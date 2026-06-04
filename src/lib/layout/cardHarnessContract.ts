@@ -135,6 +135,7 @@ function hasActionCue(value: string) {
 function normalizeCopy(value: string) {
   return String(value || '')
     .replace(/\*\*/g, '')
+    .replace(/^\d+\.\s*/, '')
     .replace(/\s+/g, ' ')
     .trim()
 }

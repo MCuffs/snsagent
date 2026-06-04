@@ -592,7 +592,7 @@ ${sourceMaterial || '추가 자료 없음'}
 ${slideDescriptions}
 
 규칙:
-- headline: 24자 이하, 강렬하고 구체적 (공백 포함)
+- headline: 24자 이하, 강렬하고 구체적 (공백 포함). "1.", "2." 같은 숫자 번호로 시작하지 마세요.
 - body: 일반 슬라이드는 80~150자, 마무리 슬라이드는 70~120자 권장. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
 - body는 글자수를 억지로 줄이기보다 의미 있는 정보량을 우선하세요. 단, 한 슬라이드에 수치가 너무 많아지면 읽기 어려우므로 핵심 수치 1~2개만 선택하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
@@ -734,7 +734,7 @@ Rewrite rules:
 - Do not end with an open setup such as "because", "the reason is", "more", or a dangling comparison.
 - Each slide must add a concrete fact, reason, use case, caution, or action.
 - Never include news, stock, politics, or unrelated trend information unless the user topic explicitly asks for it.
-- Keep headline under 25 characters when possible.
+- Keep headline under 25 characters when possible. Never start a headline with a number like "1.", "2.", etc.
 - Body should normally be 80-150 characters, closing slides 70-120 characters, and must fit 3-5 mobile-readable lines.
 - Do not use planning tokens or internal terms in card copy.
 - Write all output in English.
@@ -769,7 +769,7 @@ body: ${slide.body}
 - 문제 제기만 하고 결론을 빼거나, "이유는", "핵심은", "더"처럼 열린 생각으로 끝내지 마세요.
 - 각 슬라이드 역할에 맞게 관찰, 해석, 구체적 의미, 다음 행동 중 하나를 반드시 완성하세요.
 - 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
-- headline은 필요할 때만 다듬고 25자 이하로 유지하세요.
+- headline은 필요할 때만 다듬고 25자 이하로 유지하세요. "1.", "2." 같은 숫자 번호로 시작하지 마세요.
 - body는 일반 슬라이드 80~150자, 마무리 슬라이드 70~120자를 권장합니다. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
 - 각 body에는 주제의 구체 기준, 이유, 실제 행동 중 최소 2개를 자연스럽게 연결하세요.
 - 영어 기획 토큰이나 내부 계획 용어를 본문에 쓰지 마세요.
@@ -1094,6 +1094,7 @@ function trimHeadline(value: string) {
   return value
     .replace(/\*\*/g, '')
     .replace(/^슬라이드\s*\d+\s*/i, '')
+    .replace(/^\d+\.\s*/, '')
     .trim()
     .slice(0, 34)
 }
