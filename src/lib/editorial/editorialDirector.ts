@@ -111,6 +111,8 @@ export interface EditorialDirectorPlan {
     applied: boolean
     summary: string
     preferredCopyTone: string | null
+    preferredHookPatterns: string[]   // HookPatternId[]
+    avoidPatterns: string[]           // HookPatternId[]
   }
 }
 
@@ -185,6 +187,18 @@ export function buildEditorialDirectorPlan(input: EditorialDirectorInput): Edito
   const emotionCurve = roleSequence.map((role, index) => emotionalGoalForRole(role, index, roleSequence.length))
   const preferredLayout = extractPreferredLayout(input.memory?.preferredLayouts)
 
+  // Parse structured memory from compression engine
+  let preferredHookPatterns: string[] = []
+  let avoidPatterns: string[] = []
+  try {
+    if (input.memory?.preferredHookPatterns) {
+      preferredHookPatterns = JSON.parse(input.memory.preferredHookPatterns)
+    }
+    if (input.memory?.avoidPatterns) {
+      avoidPatterns = JSON.parse(input.memory.avoidPatterns)
+    }
+  } catch { /* malformed JSON — ignore */ }
+
   const productAnalysis: ProductAnalysis = {
     category: input.category || input.contentType,
     target: input.targetAudience || 'social-first prospective customers',
@@ -240,9 +254,11 @@ export function buildEditorialDirectorPlan(input: EditorialDirectorInput): Edito
       preferredLayout,
     })),
     personalization: {
-      applied: Boolean(memorySummary || input.memory?.preferredCopyTone || preferredLayout),
+      applied: Boolean(memorySummary || input.memory?.preferredCopyTone || preferredLayout || preferredHookPatterns.length),
       summary: memorySummary,
       preferredCopyTone: input.memory?.preferredCopyTone || null,
+      preferredHookPatterns,
+      avoidPatterns,
     },
   }
 }
@@ -264,7 +280,23 @@ export function formatEditorialPlanForPrompt(plan: EditorialDirectorPlan) {
     `Hook psychology: ${plan.audiencePsychology.hookPreference}`,
     `CTA direction: ${plan.carouselStrategy.ctaStyle}`,
     `Tone: ${plan.audiencePsychology.preferredTone}`,
-    plan.personalization.applied ? `Learned brand memory: ${plan.personalization.summary || plan.personalization.preferredCopyTone}` : '',
+    // ── Brand Intelligence (learned from past generations) ──
+    ...(plan.personalization.applied ? [
+      '--- BRAND INTELLIGENCE (derived from past results — follow strictly) ---',
+      plan.personalization.summary
+        ? `Past performance insight: ${plan.personalization.summary}`
+        : '',
+      plan.personalization.preferredHookPatterns.length > 0
+        ? `Hook patterns that worked well for this brand: ${plan.personalization.preferredHookPatterns.join(', ')} — prioritize these for slide 1.`
+        : '',
+      plan.personalization.avoidPatterns.length > 0
+        ? `Hook patterns that underperformed — DO NOT use: ${plan.personalization.avoidPatterns.join(', ')}`
+        : '',
+      plan.personalization.preferredCopyTone
+        ? `This brand's copy tone: ${plan.personalization.preferredCopyTone} — maintain throughout.`
+        : '',
+      '--- END BRAND INTELLIGENCE ---',
+    ].filter(Boolean) : []),
     ...slideLines,
     'Every slide must advance the sequence. Do not repeat the same claim or emotional beat.',
   ].filter(Boolean).join('\n')

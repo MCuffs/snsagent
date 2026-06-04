@@ -148,35 +148,8 @@ function completeFallbackBody(value: string) {
     .replace(/\s*(은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|이나|거나|그리고|하지만|그래서|때문에|도록|라면|하면)$/u, '')
     .trim()
   if (isCompleteBodyCopy(withoutDanglingEnding)) return withoutDanglingEnding
-  if (/함께 있는$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/함께 있는$/u, '함께 있는 견과라서 식사 사이 간식 선택의 기준이 됩니다.')
-  }
-  if (/함께 봐야$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/함께 봐야$/u, '함께 봐야 식단에 넣을 이유가 분명해집니다.')
-  }
-  if (/대신 분명한$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/대신 분명한$/u, '대신 분명한 섭취 기준을 제시해야 합니다.')
-  }
-  if (/살피는$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/살피는$/u, '살피는 기준까지 함께 제시해야 합니다.')
-  }
-  if (/많이 먹는$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/많이 먹는$/u, '많이 먹는 방식은 피하는 편이 좋습니다.')
-  }
-  if (/한 번에$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/한 번에$/u, '한 번에 많이 먹기보다 소량씩 나누는 편이 좋습니다.')
-  }
-  if (/불포화지방산이$/u.test(withoutDanglingEnding)) {
-    return withoutDanglingEnding.replace(/불포화지방산이$/u, '불포화지방산이 포함되어 있어 식사 사이 간식 선택의 기준이 됩니다.')
-  }
-  if (/어떤 식사와 함께$/u.test(withoutDanglingEnding)) {
-    return `${withoutDanglingEnding} 먹을지 정해두면 루틴으로 이어가기 쉽습니다.`
-  }
-  if (/(은|는|이|가|을|를|으로|도록|라면|하면|필요|중요|좋은|많은|위한|더|다시|먼저|쓸|봐야|한 줄)$/.test(withoutDanglingEnding)) {
-    return '핵심 정보와 실천 기준을 함께 정리하면 독자가 바로 저장해둘 이유가 생깁니다.'
-  }
   if (withoutDanglingEnding.length >= 18 && !hasIncompleteMeaningEnding(withoutDanglingEnding)) return `${withoutDanglingEnding}.`
-  return '핵심 정보와 실천 기준을 함께 정리하면 독자가 바로 저장해둘 이유가 생깁니다.'
+  return withoutDanglingEnding || normalized
 }
 
 function splitCompleteSentences(value: string) {

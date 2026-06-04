@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
-import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset, TypographyPreset } from '../../../../../src/lib/editor/types'
+import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 
 type EditorTab = 'text' | 'background' | 'overlay' | 'image' | 'templates'
 
@@ -17,17 +18,12 @@ interface SavedTemplate {
 interface Props {
   slideId: string
   busy: boolean
-  credits: number
-  regenerationAccess: 'blocked' | 'single-use' | 'included'
-  onSave: (render: boolean) => void
-  onBackgroundVariation: (type: 'same-style' | 'stronger-mood' | 'brighter-background') => void
-  onRegenerationBlocked: () => void
-  onRewrite: (intent: string) => void
   onUpload: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, credits, regenerationAccess, onSave, onBackgroundVariation, onRegenerationBlocked, onRewrite, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: Props) {
+  const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
@@ -37,7 +33,6 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
   const redo = useEditorialStore(state => state.redo)
   const [tab, setTab] = useState<EditorTab>('text')
   const [copyTarget, setCopyTarget] = useState<'title' | 'subtitle'>('title')
-  const [prompt, setPrompt] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [showTemplateInput, setShowTemplateInput] = useState(false)
@@ -85,19 +80,16 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
         <div className="flex items-center justify-between">
           <div>
             <p className="eyebrow">Editorial Editor</p>
-            <h2 className="mt-1 text-lg font-black tracking-[-0.04em]">카드 디자인 편집</h2>
+            <h2 className="mt-1 text-lg font-black tracking-[-0.04em]">{t('editor_title')}</h2>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${dirty ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-            {dirty ? '저장 중' : '저장됨'}
+            {dirty ? t('status_saving') : t('status_saved')}
           </span>
         </div>
         <div className="mt-4 flex gap-2">
-          <IconButton label="실행 취소" onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
-          <IconButton label="다시 실행" onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
+          <IconButton label={t('undo')} onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
+          <IconButton label={t('redo')} onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
           <IconButton label="템플릿으로 저장" onClick={() => setShowTemplateInput(v => !v)}><BookmarkPlus className="h-4 w-4" /></IconButton>
-          <button type="button" disabled={busy} onClick={() => onSave(true)} className="btn-primary ml-auto min-h-10 rounded-md px-4 text-xs">
-            <Save className="h-3.5 w-3.5" /> 결과에 적용
-          </button>
         </div>
         {showTemplateInput && (
           <div className="mt-3 flex gap-2">
@@ -122,10 +114,10 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
       </header>
 
       <nav className="grid grid-cols-5 border-b border-[#f0e8de] p-2">
-        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label="글자" />
-        <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label="배경" />
-        <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label="오버레이" />
-        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label="이미지" />
+        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label={t('tab_text')} />
+        <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label={t('tab_background')} />
+        <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label={t('tab_overlay')} />
+        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label={t('tab_image')} />
         <TabButton active={tab === 'templates'} onClick={() => setTab('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label="템플릿" />
       </nav>
 
@@ -134,24 +126,14 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
           <TextPanel
             layer={copyLayer}
             target={copyTarget}
-            busy={busy}
-            prompt={prompt}
             onTarget={value => { setCopyTarget(value); selectLayer(value) }}
             onChange={update => updateLayer(slideId, copyLayer.id, update)}
-            onRewrite={onRewrite}
-            onPrompt={setPrompt}
-            document={document}
-            onTypography={preset => updateDocument(slideId, value => applyTypographyPreset(value, preset))}
           />
         )}
         {tab === 'background' && (
           <BackgroundPanel
             busy={busy}
-            credits={credits}
-            regenerationAccess={regenerationAccess}
             onUpload={onUpload}
-            onVariation={onBackgroundVariation}
-            onRegenerationBlocked={onRegenerationBlocked}
           />
         )}
         {tab === 'overlay' && (
@@ -188,84 +170,63 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
 function TextPanel({
   layer,
   target,
-  busy,
-  prompt,
   onTarget,
   onChange,
-  onRewrite,
-  onPrompt,
-  document,
-  onTypography,
 }: {
   layer: EditorialLayer
   target: 'title' | 'subtitle'
-  busy: boolean
-  prompt: string
   onTarget: (target: 'title' | 'subtitle') => void
   onChange: (update: Partial<EditorialLayer>) => void
-  onRewrite: (intent: string) => void
-  onPrompt: (value: string) => void
-  document: EditorialDocument
-  onTypography: (preset: TypographyPreset) => void
 }) {
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-4">
       <div className="flex rounded-lg bg-[#f7f4ef] p-1">
-        <Segment active={target === 'title'} onClick={() => onTarget('title')}>제목</Segment>
-        <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>본문</Segment>
+        <Segment active={target === 'title'} onClick={() => onTarget('title')}>{t('target_title')}</Segment>
+        <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>{t('target_body')}</Segment>
       </div>
       <textarea
         value={layer.text || ''}
         onChange={event => onChange({ text: event.target.value })}
         rows={target === 'title' ? 2 : 3}
         className="field w-full resize-none p-3 text-sm leading-6"
-        placeholder={target === 'title' ? '헤드라인을 입력하세요' : '본문을 입력하세요'}
+        placeholder={target === 'title' ? t('placeholder_headline') : t('placeholder_body')}
       />
-      <div className="grid grid-cols-[1fr_86px_44px] gap-2">
-        <select value={layer.fontPreset} onChange={event => onChange({ fontPreset: event.target.value as FontPreset })} className="field h-11 px-3 text-xs font-bold">
+      <div className="grid grid-cols-[1fr_70px_36px] gap-2">
+        <select value={layer.fontPreset} onChange={event => onChange({ fontPreset: event.target.value as FontPreset })} className="field h-10 px-3 text-xs font-bold">
           <option value="pretendard">Pretendard</option>
           <option value="suit">SUIT</option>
           <option value="noto-sans">Noto Sans KR</option>
           <option value="serif">Editorial Serif</option>
           <option value="magazine">Magazine</option>
         </select>
-        <input type="number" aria-label="글자 크기" value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-11 px-3 text-xs font-bold" />
-        <input type="color" aria-label="텍스트 색상" value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-11 w-11 cursor-pointer p-1" />
+        <input type="number" aria-label={t('font_size')} value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-10 px-2 text-xs font-bold text-center" />
+        <input type="color" aria-label={t('text_color')} value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
       </div>
-
-      <div className="border-t border-[#f0e8de] pt-4">
-        <OptionGroup title="타이포그래피 분위기">
-          {([
-            ['cinematic-headline', '시네마틱'], ['magazine-editorial', '매거진'], ['minimal-luxury', '럭셔리'], ['high-ctr-hook', '강한 훅'],
-          ] as const).map(([key, label]) => (
-            <Choice key={key} active={document.typographyPreset === key} onClick={() => onTypography(key)}>{label}</Choice>
-          ))}
-        </OptionGroup>
+      <div className="flex gap-2">
+        <ToggleButton
+          active={(layer.fontWeight ?? 400) >= 700}
+          onClick={() => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })}
+          label={t('bold')}
+        >
+          <Bold className="h-3.5 w-3.5" />
+        </ToggleButton>
+        <ToggleButton
+          active={!!layer.italic}
+          onClick={() => onChange({ italic: !layer.italic })}
+          label={t('italic')}
+        >
+          <Italic className="h-3.5 w-3.5" />
+        </ToggleButton>
+        <ToggleButton
+          active={!!layer.underline}
+          onClick={() => onChange({ underline: !layer.underline })}
+          label={t('underline')}
+        >
+          <Underline className="h-3.5 w-3.5" />
+        </ToggleButton>
       </div>
-
-      <div className="border-t border-[#f0e8de] pt-4 space-y-3">
-        <p className="text-xs font-bold text-[#746a62]">AI 문구 다듬기</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ['stronger-hook', '강한 훅'], ['emotional', '감성적'], ['premium', '프리미엄'], ['shorter', '짧게'], ['trendy', '트렌디'],
-          ].map(([intent, label]) => (
-            <button type="button" key={intent} disabled={busy} onClick={() => onRewrite(intent)} className="rounded-full border border-[#e8dfd4] px-3 py-2 text-xs font-bold text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff] disabled:opacity-40">
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="rounded-lg border border-[#e8dfd4] bg-[#fffdf9] p-3">
-          <input
-            value={prompt}
-            onChange={event => onPrompt(event.target.value)}
-            placeholder="예: 더 고급스럽고 짧게 바꿔줘"
-            className="w-full bg-transparent text-xs outline-none"
-          />
-          <button type="button" disabled={busy || !prompt.trim()} onClick={() => { onRewrite(prompt.trim()); onPrompt('') }} className="mt-3 w-full rounded-md bg-[#111318] py-2 text-xs font-bold text-white disabled:opacity-40">
-            AI에게 요청
-          </button>
-        </div>
-      </div>
+      <RangeControl label={t('font_weight')} value={layer.fontWeight || 400} min={100} max={900} onChange={value => onChange({ fontWeight: value })} />
     </div>
   )
 }
@@ -279,19 +240,20 @@ function OverlayPanel({
   onOverlay: (preset: OverlayPreset) => void
   onOverlayValue: (key: 'darkness' | 'vignette' | 'contrast', value: number) => void
 }) {
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-5">
-      <OptionGroup title="오버레이 무드">
+      <OptionGroup title={t('overlay_mood')}>
         {([
-          ['netflix-dark', '딥 다크'], ['luxury-editorial', '에디토리얼'], ['dreamy', '소프트'], ['modern-korean-media', '모던 미디어'],
+          ['netflix-dark', t('overlay_deep_dark')], ['luxury-editorial', t('overlay_editorial')], ['dreamy', t('overlay_soft')], ['modern-korean-media', t('overlay_modern')],
         ] as const).map(([key, label]) => (
           <Choice key={key} active={document.overlay.preset === key} onClick={() => onOverlay(key)}>{label}</Choice>
         ))}
       </OptionGroup>
       <div className="space-y-4 border-t border-[#f0e8de] pt-4">
-        <RangeControl label="어둡기" value={document.overlay.darkness} min={0} max={100} onChange={value => onOverlayValue('darkness', value)} />
-        <RangeControl label="비네팅" value={document.overlay.vignette} min={0} max={100} onChange={value => onOverlayValue('vignette', value)} />
-        <RangeControl label="대비" value={document.overlay.contrast} min={50} max={160} onChange={value => onOverlayValue('contrast', value)} />
+        <RangeControl label={t('darkness')} value={document.overlay.darkness} min={0} max={100} onChange={value => onOverlayValue('darkness', value)} />
+        <RangeControl label={t('vignette')} value={document.overlay.vignette} min={0} max={100} onChange={value => onOverlayValue('vignette', value)} />
+        <RangeControl label={t('contrast')} value={document.overlay.contrast} min={50} max={160} onChange={value => onOverlayValue('contrast', value)} />
       </div>
     </div>
   )
@@ -299,50 +261,27 @@ function OverlayPanel({
 
 function BackgroundPanel({
   busy,
-  credits,
-  regenerationAccess,
   onUpload,
-  onVariation,
-  onRegenerationBlocked,
 }: {
   busy: boolean
-  credits: number
-  regenerationAccess: Props['regenerationAccess']
   onUpload: () => void
-  onVariation: Props['onBackgroundVariation']
-  onRegenerationBlocked: () => void
 }) {
-  const blocked = regenerationAccess === 'blocked'
-  const applyVariation = (variation: Parameters<Props['onBackgroundVariation']>[0]) => {
-    if (blocked) {
-      onRegenerationBlocked()
-      return
-    }
-    onVariation(variation)
-  }
-
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
-        {blocked ? (
-          <p>무료 플랜에서는 AI 배경 재생성을 사용할 수 없습니다. 버튼을 눌러 1회 이용권 안내를 확인하세요.</p>
-        ) : (
-          <p>글자와 레이아웃은 그대로 두고 배경만 바꿉니다. AI 배경 생성 가능 횟수: <strong>{credits}장</strong></p>
-        )}
-        <p className="text-[10px] text-[#717b8f] font-semibold">※ 배경 이미지는 텍스트 없이 생성되고, 문구는 편집 가능한 레이어로만 올라갑니다.</p>
+        <p>{t('background_help')}</p>
+        <p className="text-[10px] text-[#717b8f] font-semibold">{t('background_note')}</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
-        <Upload className="h-4 w-4" /> 내 이미지로 교체
+        <Upload className="h-4 w-4" /> {t('replace_background')}
       </button>
-      <p className="pt-2 text-xs font-bold text-[#746a62]">AI 배경 변형</p>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('same-style')} className="btn-secondary w-full rounded-md text-sm">같은 분위기, 다른 이미지</button>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('stronger-mood')} className="btn-secondary w-full rounded-md text-sm">더 깊은 시네마틱 무드</button>
-      <button type="button" disabled={busy || (!blocked && credits < 1)} onClick={() => applyVariation('brighter-background')} className="btn-secondary w-full rounded-md text-sm">더 밝고 깨끗한 배경</button>
     </div>
   )
 }
 
 function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; document: EditorialDocument; busy: boolean; onUpload: () => void }) {
+  const t = useTranslations('campaign')
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const removeLayer = useEditorialStore(state => state.removeLayer)
   const imageLayers = document.layers.filter(l => l.type === 'sticker' && l.id !== 'sticker' && l.imageUrl)
@@ -350,14 +289,14 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
-        <p>이미지를 레이어로 추가합니다. 캔버스에서 드래그해 위치를 조정할 수 있습니다.</p>
+        <p>{t('image_help')}</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
-        <Upload className="h-4 w-4" /> 이미지 추가
+        <Upload className="h-4 w-4" /> {t('add_image')}
       </button>
       {imageLayers.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-bold text-[#746a62]">추가된 이미지 레이어</p>
+          <p className="text-xs font-bold text-[#746a62]">{t('image_layers')}</p>
           {imageLayers.map(layer => (
             <div key={layer.id} className="rounded-lg border border-[#e8dfd4] p-3 space-y-3">
               <div className="flex items-center gap-3">
@@ -366,7 +305,7 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
                 <p className="flex-1 min-w-0 truncate text-xs font-bold text-[#1f1512]">{layer.name}</p>
                 <button
                   type="button"
-                  aria-label={layer.visible ? '레이어 숨기기' : '레이어 표시'}
+                  aria-label={layer.visible ? t('hide_layer') : t('show_layer')}
                   onClick={() => updateLayer(slideId, layer.id, { visible: !layer.visible })}
                   className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]"
                 >
@@ -374,102 +313,33 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
                 </button>
                 <button
                   type="button"
-                  aria-label="레이어 삭제"
+                  aria-label={t('delete_layer')}
                   onClick={() => removeLayer(slideId, layer.id)}
                   className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <RangeControl label="불투명도" value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
+              <RangeControl label={t('opacity')} value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
+              <div className="grid grid-cols-2 gap-2">
+                <NumberControl label="X" value={layer.x} min={0} max={1080} onChange={value => updateLayer(slideId, layer.id, { x: value })} />
+                <NumberControl label="Y" value={layer.y} min={0} max={1350} onChange={value => updateLayer(slideId, layer.id, { y: value })} />
+                <NumberControl label={t('width')} value={layer.width} min={16} max={1080} onChange={value => updateLayer(slideId, layer.id, { width: value })} />
+                <NumberControl label={t('height')} value={layer.height} min={16} max={1350} onChange={value => updateLayer(slideId, layer.id, { height: value })} />
+              </div>
+              <RangeControl label={t('scale')} value={Math.round(layer.scale * 100)} min={25} max={400} onChange={value => updateLayer(slideId, layer.id, { scale: value / 100 })} />
+              <RangeControl label={t('rotation')} value={layer.rotation} min={-180} max={180} onChange={value => updateLayer(slideId, layer.id, { rotation: value })} />
+              <RangeControl label={t('corner_radius')} value={layer.borderRadius ?? 0} min={0} max={50} onChange={value => updateLayer(slideId, layer.id, { borderRadius: value })} />
+              <RangeControl label={t('edge_fade')} value={layer.edgeFade ?? 0} min={0} max={80} onChange={value => updateLayer(slideId, layer.id, { edgeFade: value })} />
             </div>
           ))}
         </div>
       )}
       {imageLayers.length === 0 && (
-        <p className="py-4 text-center text-xs text-[#9a8d82]">추가된 이미지가 없습니다</p>
+        <p className="py-4 text-center text-xs text-[#9a8d82]">{t('no_images')}</p>
       )}
     </div>
   )
-}
-
-function applyTypographyPreset(document: EditorialDocument, preset: TypographyPreset) {
-  const styles: Record<TypographyPreset, { title: Partial<EditorialLayer>; subtitle: Partial<EditorialLayer> }> = {
-    'cinematic-headline': { title: { fontPreset: 'pretendard', fontSize: 72, fontWeight: 800, tracking: -2, lineHeight: 1.06 }, subtitle: { fontSize: 27, tracking: 0 } },
-    'breaking-news': { title: { fontPreset: 'suit', fontSize: 78, fontWeight: 900, tracking: -3, lineHeight: 1 }, subtitle: { fontSize: 25, tracking: 1 } },
-    'magazine-editorial': { title: { fontPreset: 'magazine', fontSize: 76, fontWeight: 700, tracking: -1, lineHeight: 1.12 }, subtitle: { fontSize: 26, tracking: 0 } },
-    'minimal-luxury': { title: { fontPreset: 'serif', fontSize: 62, fontWeight: 600, tracking: 1, lineHeight: 1.18 }, subtitle: { fontSize: 23, tracking: 2 } },
-    'dark-social': { title: { fontPreset: 'pretendard', fontSize: 70, fontWeight: 850, tracking: -2, lineHeight: 1.05 }, subtitle: { fontSize: 28, tracking: 0 } },
-    'emotional-storytelling': { title: { fontPreset: 'serif', fontSize: 67, fontWeight: 650, tracking: 0, lineHeight: 1.15 }, subtitle: { fontSize: 27, tracking: 0 } },
-    'high-ctr-hook': { title: { fontPreset: 'suit', fontSize: 84, fontWeight: 900, tracking: -3, lineHeight: 0.98 }, subtitle: { fontSize: 26, tracking: 0 } },
-  }
-  return { ...document, typographyPreset: preset, layers: document.layers.map(layer => layer.type === 'title' ? { ...layer, ...styles[preset].title } : layer.type === 'subtitle' ? { ...layer, ...styles[preset].subtitle } : layer) }
-}
-
-function applyOverlayPreset(document: EditorialDocument, preset: OverlayPreset) {
-  const settings: Record<OverlayPreset, Partial<typeof document.overlay>> = {
-    'netflix-dark': { darkness: 100, vignette: 55, contrast: 112, grain: 10, colorFilter: '#170e10' },
-    'luxury-editorial': { darkness: 100, vignette: 30, contrast: 104, grain: 6, colorFilter: '#2b241e' },
-    noir: { darkness: 100, vignette: 70, contrast: 126, grain: 22, colorFilter: '#090909' },
-    dreamy: { darkness: 100, vignette: 18, contrast: 92, grain: 4, glow: 28, bloom: 25, colorFilter: '#493b58' },
-    'instagram-magazine': { darkness: 100, vignette: 26, contrast: 106, grain: 12, colorFilter: '#342326' },
-    'modern-korean-media': { darkness: 100, vignette: 34, contrast: 112, grain: 8, colorFilter: '#121b27' },
-  }
-  return { ...document, overlay: { ...document.overlay, ...settings[preset], preset } }
-}
-
-function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[11px] font-bold ${active ? 'bg-[#0066ff]/8 text-[#0066ff]' : 'text-[#746a62] hover:bg-[#faf8f4]'}`}>{icon}{label}</button>
-}
-
-function Segment({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`flex-1 rounded-md py-2 text-xs font-bold ${active ? 'bg-white text-[#111318] shadow-sm' : 'text-[#746a62]'}`}>{children}</button>
-}
-
-function OptionGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div><p className="mb-2 text-xs font-bold text-[#746a62]">{title}</p><div className="grid grid-cols-2 gap-2">{children}</div></div>
-}
-
-function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-3 text-left text-xs font-bold ${active ? 'border-[#0066ff] bg-[#0066ff]/5 text-[#0066ff]' : 'border-[#e8dfd4] text-[#514a44]'}`}>{children}</button>
-}
-
-function RangeControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
-  return <label className="block text-xs font-bold text-[#514a44]"><span className="mb-2 flex justify-between"><span>{label}</span><span className="text-[#746a62]">{value}</span></span><input type="range" value={value} min={min} max={max} onChange={event => onChange(Number(event.target.value))} className="w-full accent-[#0066ff]" /></label>
-}
-
-function IconButton({ label, children, onClick }: { label: string; children: React.ReactNode; onClick: () => void }) {
-  return <button type="button" aria-label={label} onClick={onClick} className="flex h-10 w-10 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]">{children}</button>
-}
-
-function stripContentFromDocument(doc: EditorialDocument): EditorialDocument {
-  return {
-    ...doc,
-    layers: doc.layers.map(layer => {
-      if (layer.type === 'background') return { ...layer, imageUrl: null }
-      if (layer.type === 'title' || layer.type === 'subtitle') return { ...layer, text: '' }
-      if (layer.type === 'sticker' && layer.id !== 'sticker') return { ...layer, imageUrl: null }
-      return layer
-    }),
-  }
-}
-
-function mergeTemplateIntoDocument(current: EditorialDocument, template: EditorialDocument): EditorialDocument {
-  const currentById = new Map(current.layers.map(l => [l.id, l]))
-  const merged = template.layers.map(tLayer => {
-    const existing = currentById.get(tLayer.id)
-    if (!existing) return tLayer
-    // keep current text/image, apply template style
-    return {
-      ...tLayer,
-      text: existing.text,
-      imageUrl: existing.imageUrl,
-    }
-  })
-  // keep any current layers not in template (e.g. user-added stickers)
-  const templateIds = new Set(template.layers.map(l => l.id))
-  const extra = current.layers.filter(l => !templateIds.has(l.id))
-  return { ...template, layers: [...merged, ...extra] }
 }
 
 function TemplatesPanel({
@@ -499,15 +369,15 @@ function TemplatesPanel({
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
         <p>적용하면 텍스트·배경 이미지는 유지되고, 폰트·오버레이·레이아웃만 교체됩니다.</p>
       </div>
-      {templates.map(t => (
-        <div key={t.id} className="flex items-center gap-2 rounded-lg border border-[#e8dfd4] p-3">
+      {templates.map(tmpl => (
+        <div key={tmpl.id} className="flex items-center gap-2 rounded-lg border border-[#e8dfd4] p-3">
           <div className="flex-1 min-w-0">
-            <p className="truncate text-xs font-bold text-[#1f1512]">{t.name}</p>
-            <p className="text-[10px] text-[#9a8d82]">{new Date(t.createdAt).toLocaleDateString('ko-KR')}</p>
+            <p className="truncate text-xs font-bold text-[#1f1512]">{tmpl.name}</p>
+            <p className="text-[10px] text-[#9a8d82]">{new Date(tmpl.createdAt).toLocaleDateString('ko-KR')}</p>
           </div>
           <button
             type="button"
-            onClick={() => onApply(t)}
+            onClick={() => onApply(tmpl)}
             className="rounded-md bg-[#111318] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#0066ff]"
           >
             적용
@@ -515,7 +385,7 @@ function TemplatesPanel({
           <button
             type="button"
             aria-label="템플릿 삭제"
-            onClick={() => onDelete(t.id)}
+            onClick={() => onDelete(tmpl.id)}
             className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -524,4 +394,97 @@ function TemplatesPanel({
       ))}
     </div>
   )
+}
+
+function applyOverlayPreset(document: EditorialDocument, preset: OverlayPreset) {
+  const settings: Record<OverlayPreset, Partial<typeof document.overlay>> = {
+    'netflix-dark': { darkness: 100, vignette: 55, contrast: 112, grain: 10, colorFilter: '#170e10' },
+    'luxury-editorial': { darkness: 100, vignette: 30, contrast: 104, grain: 6, colorFilter: '#2b241e' },
+    noir: { darkness: 100, vignette: 70, contrast: 126, grain: 22, colorFilter: '#090909' },
+    dreamy: { darkness: 100, vignette: 18, contrast: 92, grain: 4, glow: 28, bloom: 25, colorFilter: '#493b58' },
+    'instagram-magazine': { darkness: 100, vignette: 26, contrast: 106, grain: 12, colorFilter: '#342326' },
+    'modern-korean-media': { darkness: 100, vignette: 34, contrast: 112, grain: 8, colorFilter: '#121b27' },
+  }
+  return { ...document, overlay: { ...document.overlay, ...settings[preset], preset } }
+}
+
+function stripContentFromDocument(doc: EditorialDocument): EditorialDocument {
+  return {
+    ...doc,
+    layers: doc.layers.map(layer => {
+      if (layer.type === 'background') return { ...layer, imageUrl: null }
+      if (layer.type === 'title' || layer.type === 'subtitle') return { ...layer, text: '' }
+      if (layer.type === 'sticker' && layer.id !== 'sticker') return { ...layer, imageUrl: null }
+      return layer
+    }),
+  }
+}
+
+function mergeTemplateIntoDocument(current: EditorialDocument, template: EditorialDocument): EditorialDocument {
+  const currentById = new Map(current.layers.map(l => [l.id, l]))
+  const merged = template.layers.map(tLayer => {
+    const existing = currentById.get(tLayer.id)
+    if (!existing) return tLayer
+    return { ...tLayer, text: existing.text, imageUrl: existing.imageUrl }
+  })
+  const templateIds = new Set(template.layers.map(l => l.id))
+  const extra = current.layers.filter(l => !templateIds.has(l.id))
+  return { ...template, layers: [...merged, ...extra] }
+}
+
+function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[11px] font-bold ${active ? 'bg-[#0066ff]/8 text-[#0066ff]' : 'text-[#746a62] hover:bg-[#faf8f4]'}`}>{icon}{label}</button>
+}
+
+function Segment({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className={`flex-1 rounded-md py-2 text-xs font-bold ${active ? 'bg-white text-[#111318] shadow-sm' : 'text-[#746a62]'}`}>{children}</button>
+}
+
+function OptionGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div><p className="mb-2 text-xs font-bold text-[#746a62]">{title}</p><div className="grid grid-cols-2 gap-2">{children}</div></div>
+}
+
+function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className={`rounded-lg border px-3 py-3 text-left text-xs font-bold ${active ? 'border-[#0066ff] bg-[#0066ff]/5 text-[#0066ff]' : 'border-[#e8dfd4] text-[#514a44]'}`}>{children}</button>
+}
+
+function RangeControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return <label className="block text-xs font-bold text-[#514a44]"><span className="mb-2 flex justify-between"><span>{label}</span><span className="text-[#746a62]">{value}</span></span><input type="range" value={value} min={min} max={max} onChange={event => onChange(Number(event.target.value))} className="w-full accent-[#0066ff]" /></label>
+}
+
+function ToggleButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
+        active
+          ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
+          : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function NumberControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="block text-xs font-bold text-[#514a44]">
+      <span className="mb-1 block text-[#746a62]">{label}</span>
+      <input
+        type="number"
+        value={Math.round(value)}
+        min={min}
+        max={max}
+        onChange={event => onChange(Number(event.target.value))}
+        className="field h-9 w-full px-2 text-xs font-bold"
+      />
+    </label>
+  )
+}
+
+function IconButton({ label, children, onClick }: { label: string; children: React.ReactNode; onClick: () => void }) {
+  return <button type="button" aria-label={label} onClick={onClick} className="flex h-10 w-10 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]">{children}</button>
 }

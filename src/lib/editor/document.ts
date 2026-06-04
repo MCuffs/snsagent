@@ -71,9 +71,9 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       layer('title', '타이틀', 40, {
         text: seed.headline,
         x: 72,
-        y: 900,
+        y: 780,
         width: 910,
-        height: 170,
+        height: 200,
         fontPreset,
         fontSize: seed.headlineFontSize || 66,
         fontWeight: 800,
@@ -85,9 +85,9 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       layer('subtitle', '본문', 50, {
         text: safeSubtitleText(seed.headline, seed.body),
         x: 72,
-        y: 1075,
+        y: 990,
         width: 820,
-        height: 170,
+        height: 200,
         fontPreset,
         fontSize: seed.bodyFontSize || 26,
         fontWeight: 450,
@@ -188,7 +188,7 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
   })
   const fallbackLayers = new Map(fallback.layers.map(item => [item.type, item]))
   const sanitized = input.layers
-    .filter(candidate => fallbackLayers.has(candidate.type))
+    .filter(candidate => fallbackLayers.has(candidate.type) && !isUserImageLayer(candidate))
     .map((candidate, index) => normalizeLayer(candidate, fallbackLayers.get(candidate.type)!, index))
   for (const missing of fallback.layers) {
     if (!sanitized.some(layerItem => layerItem.type === missing.type)) sanitized.push(missing)
@@ -196,7 +196,7 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
 
   // Preserve user-added image layers: sticker type with a non-default id and imageUrl
   const userImageLayers = input.layers
-    .filter(candidate => candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string')
+    .filter(isUserImageLayer)
     .map(candidate => normalizeUserImageLayer(candidate))
 
   return {
@@ -223,6 +223,10 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
   }
 }
 
+function isUserImageLayer(candidate: EditorialLayer) {
+  return candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string'
+}
+
 function normalizeUserImageLayer(candidate: EditorialLayer): EditorialLayer {
   return {
     id: typeof candidate.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(candidate.id) ? candidate.id : `img-${Date.now()}`,
@@ -240,6 +244,8 @@ function normalizeUserImageLayer(candidate: EditorialLayer): EditorialLayer {
     rotation: number(candidate.rotation, -180, 180, 0),
     blur: number(candidate.blur, 0, 40, 0),
     shadow: number(candidate.shadow, 0, 60, 0),
+    borderRadius: number(candidate.borderRadius, 0, 50, 0),
+    edgeFade: number(candidate.edgeFade, 0, 80, 0),
     imageUrl: typeof candidate.imageUrl === 'string' ? candidate.imageUrl.slice(0, 4096) : null,
   }
 }

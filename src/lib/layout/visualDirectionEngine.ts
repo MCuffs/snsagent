@@ -7,6 +7,8 @@ export interface VisualDirectionInput {
   layout: LayoutDefinition
   category: string
   topic: string
+  headline?: string
+  body?: string
   tone: string
   visualHint?: string
   brandMainColor?: string
@@ -28,7 +30,12 @@ export interface VisualDirection {
 
 function inferSubject(topic: string, category: string): string {
   const profile = getDomainProfileForText(topic, category)
-  if (profile.domain !== 'general') return profile.imageSubject
+  const explicitSubject = extractExplicitSubject(topic)
+  if (profile.domain !== 'general') {
+    return explicitSubject
+      ? `${explicitSubject}, shown as ${profile.imageSubject}`
+      : profile.imageSubject
+  }
 
   const text = `${topic} ${category}`.toLowerCase()
   if (text.includes('bag') || text.includes('백') || text.includes('가방')) return 'a premium designer bag'
@@ -58,9 +65,11 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
   })
   const subjectPosition = roleDirection.subjectPosition
   const safeTypographyArea = roleDirection.copySafeArea
+  const copyMeaning = formatSlideCopyVisualMeaning(input.headline, input.body)
 
   const prompt = [
     'CONTRACT: Background-only vertical editorial photograph for a Korean Instagram carousel; final typography is added by the application.',
+    copyMeaning,
     `PRIMARY SCENE: ${scene}; feature ${subject} in a single believable moment. ${roleDirection.narrativeBeat}.`,
     `CAMERA AND EMOTION: ${roleDirection.camera}; ${roleDirection.emotion}. ${input.editorialDirection?.imagePurpose || ''}`.trim(),
     `COMPOSITION: Portrait source intended for a final 4:5 crop; ${subjectPosition}; reserve ${safeTypographyArea} as quiet low-detail negative space; keep essential details inside the central crop-safe region.`,
@@ -78,6 +87,39 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
       overlayRecommendation: input.layout.overlayStyle,
     },
   }
+}
+
+function extractExplicitSubject(topic: string) {
+  const normalized = topic
+    .replace(/\s+/g, ' ')
+    .replace(/카드뉴스|콘텐츠|본문|소개|추천|효능|효과|장점|특징|가이드|만들어주세요|만들어줘/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim()
+  const possessive = normalized.match(/^([가-힣A-Za-z0-9]{2,20})의\b/u)
+  if (possessive?.[1]) return possessive[1]
+  return normalized.split(/\s+/).find(token => /^[가-힣A-Za-z0-9]{2,24}$/u.test(token)) || ''
+}
+
+function formatSlideCopyVisualMeaning(headline?: string, body?: string) {
+  const normalizedHeadline = normalizeCopySignal(headline)
+  const normalizedBody = normalizeCopySignal(body)
+  if (!normalizedHeadline && !normalizedBody) return ''
+
+  return [
+    'SLIDE COPY SEMANTIC ANCHOR: Use the following slide meaning only to choose the background subject, scene, props, mood, and composition.',
+    normalizedHeadline ? `Headline meaning: ${normalizedHeadline}` : '',
+    normalizedBody ? `Body meaning: ${normalizedBody}` : '',
+    'EXCLUSIONS: no readable words, letters, numbers, captions, labels, logos, UI, or typographic marks in the image.',
+  ].filter(Boolean).join('\n')
+}
+
+function normalizeCopySignal(value?: string) {
+  return String(value || '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220)
 }
 
 export function getLayoutDefinition(layoutType: keyof typeof LAYOUT_DEFINITIONS) {

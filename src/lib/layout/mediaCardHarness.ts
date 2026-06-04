@@ -28,7 +28,7 @@ const HARNESS_RULES = [
 ]
 
 const HEADLINE_MAX_CHARS = 9
-const TEXT_BLOCK_MAX_HEIGHT = 330
+const TEXT_BLOCK_MAX_HEIGHT = 560
 
 export function applyMediaCardHarness(input: {
   layout: LayoutDefinition
@@ -106,7 +106,7 @@ function enforceArchiveLayout(layout: LayoutDefinition, template: ArchiveTemplat
     },
     preferredColorPalette: ['black', 'white', 'gray'],
     recommendedHeadlineLength: Math.min(layout.recommendedHeadlineLength, 25),
-    recommendedBodyLength: Math.min(layout.recommendedBodyLength, 70),
+    recommendedBodyLength: Math.min(Math.max(layout.recommendedBodyLength, 130), 160),
     visualMood: `${layout.visualMood}, ${template}, muted archive editorial, quiet premium product card`,
     visualDensity: 'low',
     spacingRules: {
@@ -122,7 +122,9 @@ function enforceArchiveTypography(typography: TypographyPlan, template: ArchiveT
   const headlineLines = rebuildHeadlineLines(typography)
   const bodyLines = typography.bodyLines
   const headlineFontSize = template === 'cta-dark' ? 64 : fitHeadlineFontSize(headlineLines.length)
-  const bodyFontSize = template === 'cta-dark' ? 25 : bodyLines.length > 3 ? 22 : bodyLines.length > 1 ? 23 : 25
+  const bodyFontSize = template === 'cta-dark'
+    ? bodyLines.length > 4 ? 22 : 25
+    : bodyLines.length > 4 ? 20 : bodyLines.length > 3 ? 22 : bodyLines.length > 1 ? 23 : 25
 
   return {
     ...typography,
@@ -151,8 +153,8 @@ function validateHarness(layout: LayoutDefinition, typography: TypographyPlan) {
   if (typography.headlineFontSize > 68) {
     issues.push('헤드라인이 레퍼런스보다 과하게 큽니다.')
   }
-  if (typography.bodyLines.length > 2) {
-    issues.push('본문이 2줄을 초과해 저장형 카드 밀도를 해칩니다.')
+  if (typography.bodyLines.length > 5) {
+    issues.push('본문이 5줄을 초과해 카드 안전영역에 들어가기 어렵습니다.')
   }
   if (estimateTextBlockHeight(typography) > TEXT_BLOCK_MAX_HEIGHT) {
     issues.push('타이포그래피 블록이 하단 안전영역을 초과합니다.')

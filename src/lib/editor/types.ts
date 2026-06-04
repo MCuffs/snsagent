@@ -40,6 +40,8 @@ export interface EditorialLayer {
   rotation: number
   blur: number
   shadow: number
+  borderRadius?: number   // 0–50 (%) for image layers
+  edgeFade?: number       // 0–100 — radial mask fade from edge inward
   text?: string
   imageUrl?: string | null
   fontPreset?: FontPreset
@@ -49,6 +51,8 @@ export interface EditorialLayer {
   tracking?: number
   color?: string
   textAlign?: 'left' | 'center' | 'right'
+  italic?: boolean
+  underline?: boolean
   stroke?: number
   strokeColor?: string
   textBackground?: string

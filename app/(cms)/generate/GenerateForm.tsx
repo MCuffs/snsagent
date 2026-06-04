@@ -219,6 +219,21 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     briefingTimersRef.current = []
   }, [])
 
+  const addFiles = useCallback((incoming: File[]) => {
+    const imageFiles = incoming.filter(f => f.type.startsWith('image/'))
+    if (!imageFiles.length) return
+    setReferenceFiles(current => {
+      const merged = [...current, ...imageFiles]
+      if (merged.length > 4) {
+        setError(t('error_max_images'))
+        return current
+      }
+      setError(null)
+      if (imageFiles.length > 0) analytics.productImageAdd(imageFiles.length)
+      return merged
+    })
+  }, [t])
+
   const revealBriefing = useCallback((params?: GenerateParams) => {
     clearBriefingTimers()
     if (!params) return
@@ -270,6 +285,54 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     clearBriefingTimers()
   }, [clearBriefingTimers, clearTypingTimer])
 
+  // Global paste listener — catches Ctrl+V / Cmd+V anywhere on the page
+  useEffect(() => {
+    if (!readyParams) return
+
+    // Primary: DOM paste event (works when document has focus after interaction)
+    const pasteHandler = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const files = items
+        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter((f): f is File => f !== null)
+      if (files.length > 0) {
+        e.preventDefault()
+        addFiles(files)
+      }
+    }
+
+    // Fallback: keydown Ctrl/Cmd+V → navigator.clipboard.read() for cases where
+    // paste event is suppressed (e.g. focus on non-editable element)
+    const keyHandler = async (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      try {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            const file = new File([blob], `pasted-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType })
+            addFiles([file])
+            break
+          }
+        }
+      } catch {
+        // clipboard-read permission denied or no image — ignore
+      }
+    }
+
+    window.addEventListener('paste', pasteHandler)
+    window.addEventListener('keydown', keyHandler)
+    return () => {
+      window.removeEventListener('paste', pasteHandler)
+      window.removeEventListener('keydown', keyHandler)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyParams])
+
   const callAgent = useCallback(async (history: ChatMessage[]) => {
     setIsWaiting(true)
     try {
@@ -288,7 +351,15 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
       appendAiMessage(msg, data.ready && data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
 
-      const assistantHistory: ChatMessage = { role: 'assistant', content: msg }
+      const clarificationContext = data.clarification
+        ? [
+            '',
+            `[Clarification question shown to user] ${data.clarification.question}`,
+            '[Clarification options]',
+            ...data.clarification.options.map(option => `- ${option.label}: ${option.value}`),
+          ].join('\n')
+        : ''
+      const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}` }
       setChatHistory(prev => [...prev, assistantHistory])
     } catch {
       appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -473,13 +544,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const selectReferenceFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (files.length > 4) {
-      setError(t('error_max_images'))
-      return
+    addFiles(files)
+  }
+
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = Array.from(event.clipboardData.items)
+    const files = items
+      .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter((f): f is File => f !== null)
+    if (files.length > 0) {
+      event.preventDefault()
+      addFiles(files)
     }
-    setReferenceFiles(files)
-    if (files.length > 0) analytics.productImageAdd(files.length)
-    setError(null)
   }
 
   // ── Generating overlay ──────────────────────────────────────────
@@ -701,7 +778,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                     {error}
                   </div>
                 )}
-                <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]">
+                <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
@@ -713,6 +790,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                       <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
                     </label>
                   </div>
+                  {referenceFiles.length === 0 && (
+                    <p className="text-[10px] text-[#B8AEA4] text-center py-1">{t('paste_hint')}</p>
+                  )}
                   {referenceFiles.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {referenceFiles.map((file) => (

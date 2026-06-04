@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import JSZip from 'jszip'
 import {
   Check,
@@ -15,8 +15,6 @@ import {
 } from 'lucide-react'
 import {
   saveEditorialDocumentAction,
-  regenerateEditorialBackgroundAction,
-  rewriteEditorialCopyAction,
   exportEditorialSlideAction,
   resetSlideEditorDocumentAction,
   updatePostDetailsAction,
@@ -87,25 +85,6 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-function inferLayoutLabel(prompt: string) {
-  const normalized = prompt.toLowerCase()
-  if (normalized.includes('data journalism')) return 'stat-highlight'
-  if (normalized.includes('clean studio')) return 'minimal-clean'
-  if (normalized.includes('cinematic portrait')) return 'cinematic-headline'
-  if (normalized.includes('documentary news')) return 'breaking-news'
-  if (normalized.includes('social feed')) return 'trend-feed'
-  if (normalized.includes('magazine cover')) return 'magazine'
-  return 'dark-editorial'
-}
-
-function inferRole(slideNumber: number, total: number, prompt: string) {
-  if (slideNumber === 1) return 'hook'
-  if (slideNumber === total) return 'save-cta'
-  if (slideNumber === 2) return 'context'
-  if (prompt.toLowerCase().includes('data journalism')) return 'stat'
-  return slideNumber % 2 === 0 ? 'detail' : 'key-point'
-}
-
 function fileNameFor(campaignTitle: string, slideNumber: number, extension = 'png') {
   const safeTitle = campaignTitle
     .replace(/[\\/:*?"<>|]+/g, '-')
@@ -138,10 +117,10 @@ export default function CampaignResultView({
   campaign,
   post,
   brand,
-  planName,
-  regenerationAccess,
 }: CampaignResultViewProps) {
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('campaign')
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [caption, setCaption] = useState(post.caption)
@@ -152,9 +131,7 @@ export default function CampaignResultView({
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [regenerationImageCount, setRegenerationImageCount] = useState(campaign.regenerationImageCount)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [showRegenerationOffer, setShowRegenerationOffer] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
   const documents = useEditorialStore(state => state.documents)
   const dirtySlides = useEditorialStore(state => state.dirtySlides)
@@ -162,6 +139,7 @@ export default function CampaignResultView({
   const activateSlide = useEditorialStore(state => state.activate)
   const updateDocument = useEditorialStore(state => state.updateDocument)
   const addLayer = useEditorialStore(state => state.addLayer)
+  const selectLayer = useEditorialStore(state => state.selectLayer)
   const markSaved = useEditorialStore(state => state.markSaved)
 
   useEffect(() => {
@@ -179,10 +157,52 @@ export default function CampaignResultView({
   }
 
   const activeSlide = slides[activeSlideIndex]
-  const layoutLabel = activeSlide ? inferLayoutLabel(activeSlide.designPrompt) : '-'
-  const roleLabel = activeSlide ? inferRole(activeSlide.slideNumber, slides.length, activeSlide.designPrompt) : '-'
-  const remainingRegenerationImages = Math.max(campaign.slideCount - regenerationImageCount, 0)
   const activeDocument = activeSlide ? documents[activeSlide.id] : undefined
+
+  useEffect(() => {
+    const pasteHandler = async (e: ClipboardEvent) => {
+      if (!activeSlide || !activeDocument) return
+      // Only handle when not typing in a text field
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const imageItem = items.find(item => item.kind === 'file' && item.type.startsWith('image/'))
+      if (!imageItem) return
+
+      e.preventDefault()
+      const file = imageItem.getAsFile()
+      if (!file) return
+      await uploadAndAddImageLayer(file)
+    }
+
+    const keyHandler = async (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return
+      if (!activeSlide || !activeDocument) return
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      try {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            const file = new File([blob], `pasted-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType })
+            await uploadAndAddImageLayer(file)
+            break
+          }
+        }
+      } catch { /* permission denied or no image */ }
+    }
+
+    window.addEventListener('paste', pasteHandler)
+    window.addEventListener('keydown', keyHandler)
+    return () => {
+      window.removeEventListener('paste', pasteHandler)
+      window.removeEventListener('keydown', keyHandler)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSlide, activeDocument])
 
   useEffect(() => {
     const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
@@ -217,68 +237,6 @@ export default function CampaignResultView({
     }
   }
 
-  const saveEditor = async (renderOutput: boolean) => {
-    if (!activeSlide || !activeDocument) return
-    setEditorBusy(true)
-    setMessage(null)
-    try {
-      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), renderOutput)
-      if (!result.success) return setMessage({ type: 'error', text: result.error })
-      applyServerSlide(result.slide as Slide, result.document)
-      setMessage({ type: 'success', text: renderOutput ? '편집본을 고해상도 PNG로 확정 렌더했습니다.' : '편집 내용을 저장했습니다.' })
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '편집 저장 중 오류가 발생했습니다.') })
-    } finally {
-      setEditorBusy(false)
-    }
-  }
-
-  const regenerateBackground = async (variation: 'same-style' | 'stronger-mood' | 'brighter-background') => {
-    if (!activeSlide || !activeDocument) return
-    if (regenerationAccess === 'blocked') {
-      setShowRegenerationOffer(true)
-      return
-    }
-    analytics.slideRegenerate(campaign.id, activeSlide.slideNumber, 'image')
-    setEditorBusy(true)
-    setMessage(null)
-    try {
-      const result = await regenerateEditorialBackgroundAction(activeSlide.id, JSON.stringify(activeDocument), variation)
-      if (!result.success) {
-        if ('requiresRegenerationPass' in result && result.requiresRegenerationPass) {
-          setShowRegenerationOffer(true)
-          return
-        }
-        return setMessage({ type: 'error', text: result.error })
-      }
-      applyServerSlide(result.slide as Slide, result.document)
-      setRegenerationImageCount(result.regenerationUsage.used)
-      setMessage({ type: 'success', text: '레이아웃을 유지한 채 현재 슬라이드 배경만 변경했습니다.' })
-      if (regenerationAccess === 'single-use') {
-        setShowRegenerationOffer(false)
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '배경 생성 중 오류가 발생했습니다.') })
-    } finally {
-      setEditorBusy(false)
-    }
-  }
-
-  const rewriteCopy = async (intent: string) => {
-    if (!activeSlide || !activeDocument) return
-    if (/밝|brighter/i.test(intent)) return regenerateBackground('brighter-background')
-    if (/배경|이미지|무드|mood|background/i.test(intent)) return regenerateBackground('stronger-mood')
-    setEditorBusy(true)
-    try {
-      const result = await rewriteEditorialCopyAction(activeSlide.id, JSON.stringify(activeDocument), intent)
-      if (!result.success) return setMessage({ type: 'error', text: result.error })
-      applyServerSlide(result.slide as Slide, result.document)
-      setMessage({ type: 'success', text: '이미지는 유지하고 문구 레이어만 보정했습니다. 확정 렌더로 출력에 반영하세요.' })
-    } finally {
-      setEditorBusy(false)
-    }
-  }
-
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !activeSlide) return
@@ -292,7 +250,7 @@ export default function CampaignResultView({
       const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
       const backgroundUrl = uploadData.urls?.[0]
       if (!uploadRes.ok || !backgroundUrl) {
-        setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
+        setMessage({ type: 'error', text: uploadData.error || t('message_upload_error') })
         return
       }
       const nextDocument = {
@@ -302,22 +260,21 @@ export default function CampaignResultView({
       updateDocument(activeSlide.id, () => nextDocument)
       const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(nextDocument), true)
       if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '배경 교체에 실패했습니다.' })
+        setMessage({ type: 'error', text: result.error || t('message_background_error') })
         return
       }
       applyServerSlide(result.slide as Slide, result.document)
-      setMessage({ type: 'success', text: '업로드한 배경을 적용하고 확정 렌더했습니다.' })
+      setMessage({ type: 'success', text: t('message_background_saved') })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '배경 교체 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_background_save_error')) })
     } finally {
       setEditorBusy(false)
       if (bgFileInputRef.current) bgFileInputRef.current.value = ''
     }
   }
 
-  const handleImageStickerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !activeSlide || !activeDocument) return
+  const uploadAndAddImageLayer = async (file: File) => {
+    if (!activeSlide || !activeDocument) return
     setEditorBusy(true)
     setMessage(null)
     try {
@@ -327,13 +284,14 @@ export default function CampaignResultView({
       const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
       const imageUrl = uploadData.urls?.[0]
       if (!uploadRes.ok || !imageUrl) {
-        setMessage({ type: 'error', text: uploadData.error || '이미지 업로드에 실패했습니다.' })
+        setMessage({ type: 'error', text: uploadData.error || t('message_upload_error') })
         return
       }
+      const newLayerId = `img-${Date.now()}`
       const newLayer: EditorialLayer = {
-        id: `img-${Date.now()}`,
+        id: newLayerId,
         type: 'sticker',
-        name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지',
+        name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || t('message_image_layer_name'),
         visible: true,
         locked: false,
         opacity: 100,
@@ -349,13 +307,20 @@ export default function CampaignResultView({
         imageUrl,
       }
       addLayer(activeSlide.id, newLayer)
-      setMessage({ type: 'success', text: '이미지를 레이어로 추가했습니다. 캔버스에서 위치를 조정하세요.' })
+      selectLayer(newLayerId)
+      setMessage({ type: 'success', text: t('message_image_layer_added') })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '이미지 업로드 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_image_layer_error')) })
     } finally {
       setEditorBusy(false)
-      if (imgFileInputRef.current) imgFileInputRef.current.value = ''
     }
+  }
+
+  const handleImageStickerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await uploadAndAddImageLayer(file)
+    if (imgFileInputRef.current) imgFileInputRef.current.value = ''
   }
 
   const saveCaption = async () => {
@@ -365,13 +330,13 @@ export default function CampaignResultView({
     try {
       const result = await updatePostDetailsAction(post.id, caption, hashtags)
       if (!result.success) {
-        setMessage({ type: 'error', text: result.error || '캡션 저장에 실패했습니다.' })
+        setMessage({ type: 'error', text: result.error || t('message_caption_error') })
         return
       }
-      setMessage({ type: 'success', text: '캡션과 해시태그를 저장했습니다.' })
+      setMessage({ type: 'success', text: t('message_caption_saved') })
       router.refresh()
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '캡션 저장 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_caption_save_error')) })
     } finally {
       setSavingCaption(false)
     }
@@ -391,7 +356,7 @@ export default function CampaignResultView({
         await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
       }
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '이미지 다운로드에 실패했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_download_error')) })
     } finally {
       setExporting(false)
     }
@@ -405,9 +370,9 @@ export default function CampaignResultView({
       const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), format, scale)
       if (!result.success) return setMessage({ type: 'error', text: result.error })
       await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber, format))
-      setMessage({ type: 'success', text: `${format.toUpperCase()} ${scale === 2 ? '2x 고해상도' : ''} 내보내기를 완료했습니다.` })
+      setMessage({ type: 'success', text: scale === 2 ? t('message_export_done_2x', { format: format.toUpperCase() }) : t('message_export_done', { format: format.toUpperCase() }) })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '내보내기에 실패했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_export_error')) })
     } finally {
       setExporting(false)
     }
@@ -432,9 +397,9 @@ export default function CampaignResultView({
       link.download = `${campaign.title.replace(/\s+/g, '-')}-instagram-4x5.zip`
       link.click()
       URL.revokeObjectURL(link.href)
-      setMessage({ type: 'success', text: 'Instagram 4:5 PNG 묶음을 ZIP으로 내보냈습니다.' })
+      setMessage({ type: 'success', text: t('message_zip_done') })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, 'ZIP 내보내기에 실패했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_zip_error')) })
     } finally {
       setDownloadingAll(false)
     }
@@ -448,9 +413,9 @@ export default function CampaignResultView({
       const result = await resetSlideEditorDocumentAction(activeSlide.id)
       if (!result.success) return setMessage({ type: 'error', text: result.error })
       applyServerSlide(result.slide as Slide, parseEditorialDocument(null, result.slide as Slide))
-      setMessage({ type: 'success', text: '슬라이드 편집 정보를 초기화했습니다. 기본값(어둡기 100 등)으로 재설정되었습니다.' })
+      setMessage({ type: 'success', text: t('message_reset_done') })
     } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '초기화 중 오류가 발생했습니다.') })
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_reset_error')) })
     } finally {
       setEditorBusy(false)
     }
@@ -460,22 +425,22 @@ export default function CampaignResultView({
     <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="eyebrow">Card News Studio</p>
+          <p className="eyebrow">{t('page_eyebrow')}</p>
           <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] text-[#1f1512] md:text-5xl">
             {campaign.title}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
-            AI가 만든 초안을 캔버스에서 직접 다듬고, 필요한 레이어만 AI로 보정한 뒤 제작용 이미지로 확정하세요.
+            {t('page_desc')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary px-5">
             {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            전체 ZIP 내보내기
+            {t('export_zip_full')}
           </button>
-          <button type="button" onClick={() => router.push('/generate')} className="btn-secondary px-5">
+          <button type="button" onClick={() => router.push(`/${locale}/generate`)} className="btn-secondary px-5">
             <RefreshCw className="h-4 w-4" />
-            새 카드뉴스 만들기
+            {t('new_card')}
           </button>
         </div>
       </div>
@@ -485,26 +450,6 @@ export default function CampaignResultView({
           message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'
         }`}>
           {message.text}
-        </div>
-      )}
-
-      {showRegenerationOffer && (
-        <div className="mb-6 flex flex-col gap-4 rounded-[12px] border border-[#f2d1bb] bg-[#fff6ef] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b94718]">AI Regeneration Pass</p>
-            <p className="mt-2 text-base font-black text-[#1f1512]">
-              25,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요
-            </p>
-            <p className="mt-1 text-xs font-semibold text-[#746a62]">
-              무료 플랜에는 AI 재생성이 포함되지 않습니다. 1회권으로 현재 결과물의 배경을 한 번 다시 만들 수 있습니다.
-            </p>
-          </div>
-          <Link
-            href="/billing?offer=regeneration"
-            className="shrink-0 rounded-lg bg-[#111318] px-5 py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
-          >
-            3,000원 1회권 보기
-          </Link>
         </div>
       )}
 
@@ -549,7 +494,7 @@ export default function CampaignResultView({
                 <div className="aspect-[4/5] overflow-hidden rounded-[5px] bg-[#f8f3e9]">
                   {slide.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={slide.imageUrl} alt={`${slide.slideNumber}번 썸네일`} className="h-full w-full object-cover" />
+                    <img src={slide.imageUrl} alt={t('thumbnail_alt', { number: slide.slideNumber })} className="h-full w-full object-cover" />
                   )}
                 </div>
                 <p className="mt-2 truncate px-1 pb-1 text-left text-[11px] font-black text-[#4a4039]">
@@ -572,7 +517,7 @@ export default function CampaignResultView({
                   : 'text-[#746a62] hover:text-[#1f1512]'
               }`}
             >
-              편집 에디터
+              {t('editor_tab')}
             </button>
             <button
               type="button"
@@ -583,7 +528,7 @@ export default function CampaignResultView({
                   : 'text-[#746a62] hover:text-[#1f1512]'
               }`}
             >
-              AI 에이전트 리포트
+              {t('agent_tab')}
             </button>
           </div>
 
@@ -591,21 +536,9 @@ export default function CampaignResultView({
             <>
               {activeSlide && (
                 <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Meta label="role" value={roleLabel} />
-                    <Meta label="layout" value={layoutLabel} />
-                    <Meta label="brand" value={brand.name} />
-                    <Meta label="plan" value={planName} />
-                  </div>
                   <EditorialInspector
                     slideId={activeSlide.id}
                     busy={editorBusy}
-                    credits={remainingRegenerationImages}
-                    regenerationAccess={regenerationAccess}
-                    onSave={saveEditor}
-                    onBackgroundVariation={regenerateBackground}
-                    onRegenerationBlocked={() => setShowRegenerationOffer(true)}
-                    onRewrite={rewriteCopy}
                     onUpload={() => bgFileInputRef.current?.click()}
                     onImageUpload={() => imgFileInputRef.current?.click()}
                   />
@@ -615,7 +548,7 @@ export default function CampaignResultView({
                     onClick={resetEditor}
                     className="mt-2 w-full rounded-md border border-[#e8dfd4] py-2 text-xs font-bold text-[#9a8d82] hover:border-red-300 hover:text-red-500 disabled:opacity-40"
                   >
-                    편집 초기화 (기본값으로 재설정)
+                    {t('reset_editor')}
                   </button>
                 </>
               )}
@@ -625,8 +558,8 @@ export default function CampaignResultView({
               <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
                 <div className="mb-5 flex items-center justify-between">
                   <div>
-                    <p className="eyebrow">Caption</p>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">콘텐츠 문안 메모</h2>
+                    <p className="eyebrow">{t('caption_eyebrow')}</p>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#1f1512]">{t('caption_title')}</h2>
                   </div>
                   <Check className="h-5 w-5 text-[#ff4f0a]" />
                 </div>
@@ -645,7 +578,7 @@ export default function CampaignResultView({
                   />
                   <button type="button" onClick={saveCaption} disabled={savingCaption} className="btn-secondary w-full rounded-[8px]">
                     {savingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                    문안 저장
+                    {t('save_caption')}
                   </button>
                 </div>
               </div>
@@ -657,16 +590,16 @@ export default function CampaignResultView({
               {agentReportData ? (
                 <>
                   <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-                    <p className="eyebrow">Quality Score</p>
+                    <p className="eyebrow">{t('quality_score')}</p>
                     <div className="mt-4 flex items-center justify-between">
                       <div>
                         <div className="text-4xl font-black text-[#1f1512]">
-                          {agentReportData.score}점
+                          {t('quality_points', { score: agentReportData.score })}
                         </div>
                         <p className="mt-1 text-[11px] font-bold text-[#746a62]">
                           {agentReportData.status === 'passed'
-                            ? '✅ 품질 기준 통과 (사용 권장)'
-                            : '⚠️ 일부 조정 권장 (needs_review)'}
+                            ? t('quality_passed')
+                            : t('quality_review')}
                         </p>
                       </div>
                       <div className={`h-12 w-12 rounded-full border-4 flex items-center justify-center font-black text-sm ${
@@ -680,7 +613,7 @@ export default function CampaignResultView({
                   </div>
 
                   <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
-                    <h3 className="text-sm font-black text-[#1f1512] mb-5">AI 에이전트 상세 활약 로그</h3>
+                    <h3 className="text-sm font-black text-[#1f1512] mb-5">{t('agent_log_title')}</h3>
                     <div className="relative border-l-2 border-[#e8dfd4] pl-4 ml-2 space-y-6">
                       {agentReportData.logs?.map((log: AgentReportItem, idx: number) => {
                         let icon = 'ℹ️'
@@ -727,7 +660,7 @@ export default function CampaignResultView({
                 </>
               ) : (
                 <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 text-center text-sm font-bold text-[#746a62]">
-                  이 캠페인은 AI 에이전트 리포트 기능이 구현되기 전에 제작되었습니다.
+                  {t('agent_report_legacy')}
                 </div>
               )}
             </div>
@@ -736,21 +669,21 @@ export default function CampaignResultView({
           <div className="rounded-[10px] border border-[#d8edf7] bg-[#f3fbff] p-5 text-sm leading-6 text-[#4c6070]">
             <div className="mb-3 flex items-center gap-2 font-black text-[#1f1512]">
               <Download className="h-4 w-4 text-[#2aa2db]" />
-              다운로드
+              {t('download_title')}
             </div>
             <p className="mb-3">
-              완성된 카드뉴스를 이미지 파일로 내려받을 수 있습니다. 추가 콘텐츠가 필요하면 새 카드뉴스를 바로 만들어 이어가세요.
+              {t('download_desc')}
             </p>
             <div className="flex flex-wrap gap-2">
               {activeSlide?.imageUrl && (
                 <>
                   <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
                     <ExternalLink className="h-4 w-4" />
-                    원본 열기
+                    {t('open_original')}
                   </a>
                   <button type="button" onClick={downloadActiveSlide} disabled={exporting} className="btn-secondary min-h-10 px-4 text-xs">
                     {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    현재 카드 다운로드
+                    {t('download_current')}
                   </button>
                 </>
               )}
@@ -765,21 +698,12 @@ export default function CampaignResultView({
               </button>
               <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary min-h-10 px-4 text-xs">
                 {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                전체 ZIP
+                {t('export_zip')}
               </button>
             </div>
           </div>
         </aside>
       </div>
-    </div>
-  )
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[8px] border border-[#e8dfd4] bg-[#fff8f0] px-3 py-2">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9a8d82]">{label}</p>
-      <p className="mt-1 truncate text-xs font-black text-[#1f1512]">{value}</p>
     </div>
   )
 }

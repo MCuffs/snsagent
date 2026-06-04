@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import prisma from '../../../lib/db'
 
 type AiDiagnosticStatus = 'start' | 'success' | 'failure' | 'fallback'
 
@@ -6,6 +7,9 @@ interface AiDiagnosticEvent {
   status: AiDiagnosticStatus
   stepName: string
   provider: 'openai' | 'mock'
+  userId?: string
+  campaignId?: string
+  brandId?: string
   model?: string
   baseURL?: string
   keyFingerprint?: string
@@ -16,6 +20,7 @@ interface AiDiagnosticEvent {
   errorCode?: string
   errorType?: string
   errorMessage?: string
+  metadata?: Record<string, unknown>
 }
 
 export function normalizeModelName(value: string | undefined, fallback: string) {
@@ -47,6 +52,38 @@ export function logAiDiagnostic(event: AiDiagnosticEvent) {
     ...event,
   }
   console.log(`[AI_DIAGNOSTIC] ${JSON.stringify(safeEvent)}`)
+  void persistAiDiagnostic(event)
+}
+
+async function persistAiDiagnostic(event: AiDiagnosticEvent) {
+  try {
+    await prisma.aiGenerationLog.create({
+      data: {
+        userId: event.userId ?? null,
+        campaignId: event.campaignId ?? null,
+        brandId: event.brandId ?? null,
+        stepName: event.stepName,
+        provider: event.provider,
+        status: event.status,
+        model: event.model ?? null,
+        baseURL: event.baseURL ?? null,
+        keyFingerprint: event.keyFingerprint ?? null,
+        promptTokens: event.promptTokens ?? null,
+        completionTokens: event.completionTokens ?? null,
+        totalTokens: event.totalTokens ?? null,
+        errorStatus: event.errorStatus ?? null,
+        errorCode: event.errorCode ?? null,
+        errorType: event.errorType ?? null,
+        errorMessage: event.errorMessage ?? null,
+        metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/AiGenerationLog|does not exist|Unknown model|table/i.test(message)) {
+      console.warn('[AI_DIAGNOSTIC] Failed to persist diagnostic event', error)
+    }
+  }
 }
 
 export function readOpenAIError(error: unknown) {

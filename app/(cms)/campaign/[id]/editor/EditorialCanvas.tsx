@@ -1,14 +1,64 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Move, Pencil } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { Bold, Italic, Move, Pencil, Underline } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/types'
 
 const SCALE = 0.5
 
+// Floating toolbar that appears over selected text in contentEditable layers
+function SelectionToolbar() {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    const update = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); return }
+      const range = sel.getRangeAt(0)
+      const container = range.commonAncestorContainer
+      const editable = (container instanceof Element ? container : container.parentElement)?.closest('[contenteditable="true"]')
+      if (!editable) { setPos(null); return }
+      const r = range.getBoundingClientRect()
+      if (r.width === 0) { setPos(null); return }
+      setPos({ top: r.top - 40, left: r.left + r.width / 2 })
+    }
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [])
+
+  if (!pos) return null
+
+  const apply = (command: string) => {
+    document.execCommand(command)
+    const sel = window.getSelection()
+    const el = (sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null
+    if (el) { el.blur(); el.focus() }
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)', zIndex: 9999 }}
+      className="flex items-center gap-0.5 rounded-lg border border-[#333] bg-[#1a1a1a] px-1.5 py-1 shadow-2xl"
+      onMouseDown={e => e.preventDefault()}
+    >
+      <button type="button" onClick={() => apply('bold')} title="굵게" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Bold className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={() => apply('italic')} title="기울임" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Italic className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={() => apply('underline')} title="밑줄" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Underline className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
 export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string; fallbackImageUrl?: string | null }) {
+  const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const selectedLayerId = useEditorialStore(state => state.selectedLayerId)
   const selectLayer = useEditorialStore(state => state.selectLayer)
@@ -58,9 +108,10 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
   return (
     <div className="relative">
+      <SelectionToolbar />
       <div className="mb-3 flex items-center justify-between text-[11px] font-bold text-white/60">
-        <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> DRAG / DOUBLE CLICK TO EDIT</span>
-        <span>1080 x 1350 · SAFE ZONE 72PX</span>
+        <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> {t('canvas_instruction')}</span>
+        <span>{t('canvas_safe_zone')}</span>
       </div>
       <div
         ref={stageRef}
@@ -93,7 +144,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
         <div className="pointer-events-none absolute inset-[36px] border border-dashed border-white/10" />
         {showingRenderedPreview && (
           <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/80">
-            저장된 결과 이미지로 미리보기 중
+            {t('rendered_preview')}
           </div>
         )}
         {guides.x !== undefined && <div className="pointer-events-none absolute bottom-0 top-0 w-px bg-[#29c5ff]" style={{ left: guides.x * SCALE }} />}
@@ -102,7 +153,10 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
           <motion.div
             key={layer.id}
             drag={!layer.locked}
+            dragElastic={0}
             dragMomentum={false}
+            dragConstraints={stageRef}
+            whileDrag={{ cursor: 'grabbing' }}
             onPointerDown={() => selectLayer(layer.id)}
             onDrag={(_, info) => {
               const otherLayers = document.layers.filter(l => l.id !== layer.id && l.visible && !['background', 'overlay'].includes(l.type))
@@ -168,6 +222,12 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
 function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; selected: boolean; onText: (text: string) => void }) {
   if (layer.imageUrl) {
+    const radius = layer.borderRadius ?? 0
+    const fade = layer.edgeFade ?? 0
+    // Build a CSS mask that combines border-radius (via inset clip) and edge fade (via radial gradient)
+    const maskGradient = fade > 0
+      ? `radial-gradient(ellipse at center, black ${100 - fade}%, transparent 100%)`
+      : undefined
     return (
       <>
         {selected && <Pencil className="absolute -right-5 -top-5 h-4 w-4 text-[#29c5ff]" />}
@@ -177,6 +237,11 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
           alt=""
           draggable={false}
           className="pointer-events-none h-full w-full select-none object-contain"
+          style={{
+            borderRadius: radius > 0 ? `${radius}%` : undefined,
+            WebkitMaskImage: maskGradient,
+            maskImage: maskGradient,
+          }}
         />
       </>
     )
@@ -200,6 +265,8 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
           textShadow: layer.shadow ? `0 ${4 * SCALE}px ${layer.shadow * SCALE}px rgba(0,0,0,.58)` : undefined,
           WebkitTextStroke: layer.stroke ? `${layer.stroke * SCALE}px ${layer.strokeColor}` : undefined,
           background: layer.textBackground,
+          fontStyle: layer.italic ? 'italic' : undefined,
+          textDecoration: layer.underline ? 'underline' : undefined,
         }}
       >
         {layer.text}

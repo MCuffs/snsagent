@@ -40,6 +40,7 @@ model User {
   editLogs                 UserEditLog[]
   summarizedPreferences    SummarizedPreference[]
   qualityScoreLogs         QualityScoreLog[]
+  aiGenerationLogs         AiGenerationLog[]
 }
 
 model Brand {
@@ -164,6 +165,34 @@ model ErrorLog {
   errorStack   String?
   contextData  String? // JSON stringified context
   createdAt    DateTime @default(now())
+}
+
+model AiGenerationLog {
+  id               String   @id @default(uuid())
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  campaignId       String?
+  brandId          String?
+  stepName         String
+  provider         String
+  status           String
+  model            String?
+  baseURL          String?
+  keyFingerprint   String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  errorStatus      Int?
+  errorCode        String?
+  errorType        String?
+  errorMessage     String?
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([stepName, status])
+  @@index([model])
 }
 
 // ─── Intelligence Layer Models ────────────────────────────────────────────────

@@ -103,7 +103,8 @@ npm run dev
 | --- | --- |
 | `DATABASE_URL`, `DIRECT_URL` | PostgreSQL/Prisma 연결 |
 | `DATABASE_MOCK_FALLBACK` | 로컬 JSON DB fallback 허용 여부 |
-| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `IMAGE_PROVIDER` | Agent, 카피, 이미지 생성 (`gpt-image-1` 원가 기준 고정) |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `IMAGE_PROVIDER` | Agent, 카피, 이미지 공급자 설정. `IMAGE_PROVIDER=auto`는 무료 Wikimedia Commons 검색을 먼저 사용하고 실패 시 무료 mock 배경으로 fallback |
+| `FREE_STOCK_IMAGES`, `FREE_STOCK_TIMEOUT_MS`, `FREE_STOCK_FALLBACK_AI` | 무료 배경 이미지 검색 설정. 비용 0원을 유지하려면 `FREE_STOCK_FALLBACK_AI=false` 유지 |
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `PERPLEXITY_API_KEY` | 브랜드 분석 공급자 |
 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 스토어 상품 보조 수집 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth |

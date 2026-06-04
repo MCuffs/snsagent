@@ -13,8 +13,9 @@ import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
+import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
-import { buildSemanticFallback, evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
+import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
 import {
   BrandIdentityAgent,
@@ -265,6 +266,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         layout: harness.layout,
         category: input.category,
         topic: input.topic,
+        headline: slide.headline,
+        body: slide.body,
         tone: input.tone,
         visualHint: input.visualHint,
         brandMainColor: input.brandMainColor,
@@ -379,6 +382,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const agentReport: AgentReport & {
     editorialPlan: EditorialDirectorPlan
     editorialValidation: EditorialQualityReport
+    groundingSources?: Array<{ title: string; provider?: string; url: string }>
   } = {
     timestamp: new Date().toISOString(),
     status: qualityPassed ? 'passed' : 'needs_review',
@@ -386,6 +390,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     logs: agentReportLogs,
     editorialPlan,
     editorialValidation: editorialQuality,
+    groundingSources: extractGroundingSources(input.keyContent),
   }
 
   const campaign = await dbService.createCampaign(
@@ -432,15 +437,22 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
     personaUsed: knowledgeCtx.personaProfile.id,
     industryUsed: knowledgeCtx.industryToneRule?.industry,
+    trendContextUsed: hasExternalGrounding(input.keyContent),
     memoryContextUsed: editorialPlan.personalization.applied,
   })
 
+  const caption = await generateCaption(input, slides)
+
   const post = await dbService.createPost(input.userId, input.brandId, campaign.id, {
-    caption: buildCaption(input),
+    caption,
     hashtags: buildHashtags(input).join(', '),
     scheduledAt: tomorrowAt20(),
   })
   await dbService.updatePostStatus(post.id, 'pending_approval')
+
+  // Fire-and-forget: update brand intelligence after each successful generation.
+  // Never awaited — never blocks the response.
+  void runBrandIntelligenceCompression(input.brandId, input.userId)
 
   return {
     campaignId: campaign.id,
@@ -448,10 +460,28 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     status,
     title: input.title,
     slides,
-    caption: buildCaption(input),
+    caption,
     hashtags: buildHashtags(input),
     qualityCheck,
   }
+}
+
+function hasExternalGrounding(value: string) {
+  return /\[(?:외부 리서치 브리프|EXTERNAL RESEARCH BRIEF|실시간|Real-Time News Context)/i.test(value)
+}
+
+function extractGroundingSources(value: string) {
+  const sources: Array<{ title: string; provider?: string; url: string }> = []
+  for (const line of value.split(/\r?\n/)) {
+    const match = line.match(/^-\s*(.+?)(?:\s+\(([^)]+)\))?\s+(https?:\/\/\S+)/)
+    if (!match) continue
+    sources.push({
+      title: match[1].trim().slice(0, 160),
+      provider: match[2]?.trim(),
+      url: match[3].trim(),
+    })
+  }
+  return sources.slice(0, 12)
 }
 
 async function generateMediaSlideCopies(
@@ -499,16 +529,21 @@ async function generateMediaSlideCopies(
     editorialPlan,
   })
   const storyOntologySection = formatStoryOntologyForPrompt(storyOntology)
+  const isEnglish = input.language === 'en'
 
-  const systemPrompt = isGeneral
-    ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
-    : (knowledgeCtx
-      ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
-      : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.')
+  const systemPrompt = isEnglish
+    ? (isGeneral
+      ? 'You are an English Instagram carousel editor for information, news, and trend content. Summarize only the provided articles or factual material into objective, readable card copy. If real-time news context is provided, reflect the actual article angles, keywords, and trends. Return valid JSON only.'
+      : 'You are an English Instagram carousel copywriter. Write native, specific, editorial social copy based on the provided brand, audience, source material, and slide plan. Do not invent numbers, claims, rankings, reviews, or benefits not supported by the supplied material. Return valid JSON only.')
+    : (isGeneral
+      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
+      : (knowledgeCtx
+        ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+        : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'))
 
-  const langInstruction = input.language === 'en'
-    ? '\n\nIMPORTANT: Write ALL headlines, body copy, and captions in English only. Do not use Korean in any field.'
-    : ''
+  const languageRule = isEnglish
+    ? 'Write every headline, body, caption, and hashtag in natural English only. Do not use Korean in any field.'
+    : '모든 카피는 한국어로 작성'
 
   const hasRssContext = sourceMaterial.includes('[실시간 뉴스 컨텍스트') || sourceMaterial.includes('[Real-Time News Context')
   const rssInstruction = hasRssContext
@@ -522,7 +557,7 @@ async function generateMediaSlideCopies(
 - 출처명이나 URL을 카드 본문에 노출하지 말고, 근거에서 얻은 의미만 자연스러운 카피로 바꾸세요.`
     : ''
 
-  const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
+  const prompt = `${isEnglish ? 'Write English Instagram carousel card copy.' : '한국 인스타그램 카드뉴스 카피를 작성해주세요.'}
 
 ${editorialPlanSection}
 
@@ -549,15 +584,15 @@ ${sourceMaterial || '추가 자료 없음'}
 ${slideDescriptions}
 
 규칙:
-- headline: 20자 이하, 강렬하고 구체적 (공백 포함)
-- body: 42~64자, 최대 2문장, 모바일 카드에서 2줄 안에 읽히는 짧은 완성 문장
-- body는 64자를 절대 넘기지 마세요. 수치 2개 이상이 들어가면 문장이 길어지므로 수치 1개만 선택해 집중하세요.
+- headline: 24자 이하, 강렬하고 구체적 (공백 포함)
+- body: 일반 슬라이드는 80~150자, 마무리 슬라이드는 70~120자 권장. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
+- body는 글자수를 억지로 줄이기보다 의미 있는 정보량을 우선하세요. 단, 한 슬라이드에 수치가 너무 많아지면 읽기 어려우므로 핵심 수치 1~2개만 선택하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
 - body에는 DOMAIN GUIDANCE의 required copy anchors 중 최소 1개를 자연스럽게 반영하세요.
 - DOMAIN GUIDANCE의 금지 표현이나 다른 업종의 표현을 쓰지 마세요.
 - "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
 - 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
-- body는 하나의 구체 기준 또는 행동만 담고, 긴 설명은 다음 슬라이드로 넘기세요.
+- body는 한 슬라이드 안에서 독자가 이해할 수 있는 구체 정보, 이유, 실천 기준을 함께 담되, 과도하게 길면 다음 슬라이드와 역할을 나눠 전개하세요.
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요. 문장을 줄여야 하면 중간을 자르지 말고 완성 문장 단위로 다시 작성하세요.${rssInstruction}
 - 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
 - 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
@@ -568,7 +603,7 @@ ${slideDescriptions}
 - 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
 - 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요${researchInstruction}
-- 모든 카피는 한국어로 작성${langInstruction}
+- ${languageRule}
 - "daily use scene", "mirror audience life", "one defining object", "imagePurpose", "guiding question", "STORY ONTOLOGY", "visualDirection" 같은 영어 기획 토큰은 절대 출력하지 마세요.
 
 JSON 응답 형식:
@@ -586,6 +621,16 @@ JSON 응답 형식:
       model: getCopywritingModel(),
       temperature: 0.35,
       systemPrompt,
+      diagnostics: {
+        userId: input.userId,
+        brandId: input.brandId,
+        metadata: {
+          language: input.language,
+          generationMode: input.generationMode,
+          topic: input.topic,
+          slideCount: slides.length,
+        },
+      },
     }
   )
 
@@ -642,6 +687,7 @@ async function enforceSemanticMeaning(params: {
 }): Promise<MediaSlidePlan[]> {
   const initialReport = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -654,7 +700,44 @@ async function enforceSemanticMeaning(params: {
 
   const client = getLLMClient()
   const weakSlides = params.slides.filter(slide => weakSlideNumbers.has(slide.slideNumber))
-  const reviewPrompt = `다음 카드뉴스 슬라이드 중 의미가 완성되지 않은 본문만 다시 작성하세요.
+  const isEnglish = params.input.language === 'en'
+  const reviewPrompt = isEnglish
+    ? `Rewrite only the weak Instagram carousel slides below.
+
+Topic: ${params.input.topic}
+Goal: ${params.input.objective || params.input.contentType}
+
+Source material:
+${params.sourceMaterial || 'No additional source material.'}
+
+${params.storyOntologySection}
+
+Weak slides and issues:
+${weakSlides.map(slide => {
+  const issues = initialReport.issues.filter(issue => issue.slideNumber === slide.slideNumber).map(issue => issue.message).join(' / ')
+  return `Slide ${slide.slideNumber} [${slide.role}]
+headline: ${slide.headline}
+body: ${slide.body}
+issues: ${issues}`
+}).join('\n\n')}
+
+Rewrite rules:
+- Body copy must complete one useful meaning, not merely sound like a sentence.
+- Do not end with an open setup such as "because", "the reason is", "more", or a dangling comparison.
+- Each slide must add a concrete fact, reason, use case, caution, or action.
+- Never include news, stock, politics, or unrelated trend information unless the user topic explicitly asks for it.
+- Keep headline under 25 characters when possible.
+- Body should normally be 80-150 characters, closing slides 70-120 characters, and must fit 3-5 mobile-readable lines.
+- Do not use planning tokens or internal terms in card copy.
+- Write all output in English.
+
+Return JSON only:
+{
+  "slides": [
+    { "slideNumber": 1, "headline": "...", "body": "..." }
+  ]
+}`
+    : `다음 카드뉴스 슬라이드 중 의미가 완성되지 않은 본문만 다시 작성하세요.
 
 주제: ${params.input.topic}
 목표: ${params.input.objective || params.input.contentType}
@@ -679,8 +762,8 @@ body: ${slide.body}
 - 각 슬라이드 역할에 맞게 관찰, 해석, 구체적 의미, 다음 행동 중 하나를 반드시 완성하세요.
 - 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
 - headline은 필요할 때만 다듬고 25자 이하로 유지하세요.
-- body는 42~64자, 최대 2문장으로 작성하세요. 모바일 카드에서 2줄 안에 읽혀야 합니다.
-- 각 body에는 주제의 구체 기준 또는 실제 행동을 하나만 넣으세요.
+- body는 일반 슬라이드 80~150자, 마무리 슬라이드 70~120자를 권장합니다. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
+- 각 body에는 주제의 구체 기준, 이유, 실제 행동 중 최소 2개를 자연스럽게 연결하세요.
 - 영어 기획 토큰이나 내부 계획 용어를 본문에 쓰지 마세요.
 
 JSON만 반환:
@@ -697,7 +780,12 @@ JSON만 반환:
     {
       model: getCopywritingModel(),
       temperature: 0.25,
-      systemPrompt: `${params.systemPrompt}\n당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.`,
+      systemPrompt: `${params.systemPrompt}\n${isEnglish ? 'You are an English social carousel editorial desk. Judge whether each slide completes a useful meaning and rewrite weak slides. Return JSON only.' : '당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.'}`,
+      diagnostics: {
+        userId: params.input.userId,
+        brandId: params.input.brandId,
+        metadata: { language: params.input.language, weakSlideCount: weakSlides.length },
+      },
     }
   )
 
@@ -708,11 +796,7 @@ JSON만 반환:
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: rewritten?.headline?.trim() || slide.headline,
-      body: rewritten?.body?.trim() || buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: rewritten?.body?.trim() || slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,
@@ -735,6 +819,7 @@ JSON만 반환:
 
   const finalReport = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: nextSlides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -751,11 +836,7 @@ JSON만 반환:
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
-      body: buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,
@@ -878,6 +959,7 @@ function runFinalSemanticCopyGuard(params: {
 }): { slides: AgentSlideData[]; logs: AgentReportItem[] } {
   const report = evaluateSemanticCopy({
     topic: params.input.topic,
+    language: params.input.language,
     slides: params.slides.map(slide => ({
       slideNumber: slide.slideNumber,
       role: slide.role,
@@ -905,11 +987,7 @@ function runFinalSemanticCopyGuard(params: {
     const contract = getCardHarnessContract(slide.role)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
-      body: buildSemanticFallback({
-        topic: params.input.topic,
-        role: slide.role,
-        headline: slide.headline,
-      }),
+      body: slide.body,
       constraints: {
         maxHeadlineChars: contract.maxHeadlineChars,
         maxBodyChars: contract.maxBodyChars,
@@ -1044,9 +1122,73 @@ function toMediaLayout(layoutType: LayoutType): LayoutType {
   return layoutType
 }
 
-function buildCaption(input: MediaCarouselInput) {
-  const body = summarize(input.keyContent, 180)
-  return `${input.title}\n\n${body}\n\n저장해두고 필요한 순간 다시 확인해보세요.`
+async function generateCaption(input: MediaCarouselInput, slides: MediaSlidePlan[]): Promise<string> {
+  const isEn = input.language === 'en'
+  const slidesSummary = slides
+    .slice(0, 5)
+    .map(s => `${s.slideNumber}. ${s.headline}`)
+    .join('\n')
+
+  const prompt = isEn
+    ? `You are a professional Instagram content writer. Write a natural, conversational Instagram caption for a card news carousel about the following topic.
+
+Topic: ${input.topic}
+Brand tone: ${input.brandToneOfVoice || 'warm and approachable'}
+Slide headlines:
+${slidesSummary}
+
+Rules:
+- Write in first or second person, as if talking directly to the reader
+- Open with a short, punchy hook sentence (1–2 lines) — NOT the topic title
+- 2–4 sentences describing what the carousel covers, written naturally like a person, not a summary
+- End with a warm call to action that feels human (save, share, swipe, etc.)
+- Total: 4–7 lines. No bullet points. No markdown. Plain text only.
+- Do NOT start with the carousel title or topic name as the first word`
+    : `당신은 인스타그램 카드뉴스 전문 카피라이터입니다. 아래 카드뉴스 내용을 보고 자연스럽고 대화체에 가까운 인스타그램 캡션을 작성해주세요.
+
+주제: ${input.topic}
+브랜드 톤: ${input.brandToneOfVoice || '친근하고 따뜻하게'}
+슬라이드 헤드라인:
+${slidesSummary}
+
+작성 규칙:
+- 독자에게 말을 거는 듯한 1인칭 또는 2인칭 톤으로 작성
+- 첫 줄은 주제명 그대로 쓰지 말고, 짧고 임팩트 있는 훅 문장으로 시작
+- 카드뉴스에서 다루는 내용을 2~4문장으로 자연스럽게 소개 (딱딱한 요약 X, 대화하듯 서술)
+- 마지막에 저장, 공유, 스와이프 등 따뜻하고 자연스러운 행동 유도로 마무리
+- 전체 4~7줄. 불릿 포인트 없음. 마크다운 없음. 순수 텍스트만.
+- 첫 단어로 주제명이나 카드뉴스 제목을 그대로 쓰지 말 것`
+
+  const client = getLLMClient()
+  try {
+    const result = await client.generateJson<{ caption: string }>(
+      'instagram caption generation',
+      prompt + '\n\nRespond with JSON: { "caption": "<the caption text>" }',
+      () => ({ caption: fallbackCaption(input, slides, isEn) }),
+      {
+        model: getCopywritingModel(),
+        temperature: 0.7,
+        diagnostics: {
+          userId: input.userId,
+          brandId: input.brandId,
+          metadata: { language: input.language, topic: input.topic, slideCount: slides.length },
+        },
+      }
+    )
+    return result?.caption?.trim() && result.caption.trim().length > 20
+      ? result.caption.trim()
+      : fallbackCaption(input, slides, isEn)
+  } catch {
+    return fallbackCaption(input, slides, isEn)
+  }
+}
+
+function fallbackCaption(input: MediaCarouselInput, slides: MediaSlidePlan[], isEn: boolean): string {
+  const hook = slides[0]?.headline || input.topic
+  if (isEn) {
+    return `${hook}\n\nSwipe through to get the full picture — we broke it down into ${slides.length} slides so it's easy to follow.\n\nSave this for later 🔖`
+  }
+  return `${hook}\n\n${slides.length}장으로 정리해봤어요. 스와이프하면서 한 번에 읽어보세요.\n\n나중에 다시 보고 싶으면 저장해두세요 🔖`
 }
 
 function buildHashtags(input: MediaCarouselInput) {
@@ -1055,7 +1197,10 @@ function buildHashtags(input: MediaCarouselInput) {
     .map(item => item.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .slice(0, 6)
-  return Array.from(new Set(['카드뉴스', '인스타그램콘텐츠', '콘텐츠자동화', ...normalized])).map(tag => `#${tag}`)
+  const defaults = input.language === 'en'
+    ? ['cardnews', 'instagramcontent', 'contentautomation']
+    : ['카드뉴스', '인스타그램콘텐츠', '콘텐츠자동화']
+  return Array.from(new Set([...defaults, ...normalized])).map(tag => `#${tag}`)
 }
 
 function normalizeSlideCount(slideCount: number) {
