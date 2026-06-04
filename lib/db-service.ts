@@ -131,6 +131,16 @@ export interface Post {
   updatedAt: Date
 }
 
+export interface Template {
+  id: string
+  userId: string
+  name: string
+  document: string
+  thumbnail: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
 // Local mock database structure
 interface MockDatabase {
   users: User[]
@@ -139,6 +149,7 @@ interface MockDatabase {
   campaigns: Campaign[]
   slides: CarouselSlide[]
   posts: Post[]
+  templates: Template[]
 }
 
 type StoredUser = Omit<User, 'createdAt' | 'updatedAt'> & { createdAt: string; updatedAt: string }
@@ -147,6 +158,7 @@ type StoredInstagramAccount = Omit<InstagramAccount, 'createdAt' | 'updatedAt'> 
 type StoredCampaign = Omit<Campaign, 'createdAt' | 'updatedAt'> & { createdAt: string; updatedAt: string }
 type StoredCarouselSlide = Omit<CarouselSlide, 'createdAt' | 'updatedAt'> & { createdAt: string; updatedAt: string }
 type StoredPost = Omit<Post, 'scheduledAt' | 'createdAt' | 'updatedAt'> & { scheduledAt: string; createdAt: string; updatedAt: string }
+type StoredTemplate = Omit<Template, 'createdAt' | 'updatedAt'> & { createdAt: string; updatedAt: string }
 
 interface StoredMockDatabase {
   users?: StoredUser[]
@@ -155,6 +167,7 @@ interface StoredMockDatabase {
   campaigns?: StoredCampaign[]
   slides?: StoredCarouselSlide[]
   posts?: StoredPost[]
+  templates?: StoredTemplate[]
 }
 
 function hydrateCampaign(campaign: StoredCampaign | Campaign): Campaign {
@@ -229,6 +242,7 @@ function initMockDb(): MockDatabase {
         campaigns: (parsed.campaigns || []).map(hydrateCampaign),
         slides: (parsed.slides || []).map(hydrateSlide),
         posts: (parsed.posts || []).map((p) => ({ ...p, scheduledAt: new Date(p.scheduledAt), createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })),
+        templates: (parsed.templates || []).map((t) => ({ ...t, createdAt: new Date(t.createdAt), updatedAt: new Date(t.updatedAt) })),
       }
     } catch (e) {
       console.error('Failed to parse mock database, initializing new database', e)
@@ -242,6 +256,7 @@ function initMockDb(): MockDatabase {
     campaigns: [],
     slides: [],
     posts: [],
+    templates: [],
   }
   fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), 'utf8')
   return defaultDb
@@ -1737,5 +1752,73 @@ export const dbService = {
       }
     }
     // Mock: no-op
+  },
+
+  // Template operations
+  async getTemplates(userId: string): Promise<Template[]> {
+    if (!isMock()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const templates = await (prisma as any).template.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        })
+        return templates as Template[]
+      } catch (err) {
+        console.warn('Prisma getTemplates failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    const db = initMockDb()
+    return (db.templates || []).filter(t => t.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  },
+
+  async createTemplate(userId: string, data: { name: string; document: string; thumbnail?: string | null }): Promise<Template> {
+    if (!isMock()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const template = await (prisma as any).template.create({
+          data: { userId, name: data.name, document: data.document, thumbnail: data.thumbnail ?? null },
+        })
+        return template as Template
+      } catch (err) {
+        console.warn('Prisma createTemplate failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    const db = initMockDb()
+    const template: Template = {
+      id: `tmpl-${Date.now()}`,
+      userId,
+      name: data.name,
+      document: data.document,
+      thumbnail: data.thumbnail ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    if (!db.templates) db.templates = []
+    db.templates.push(template)
+    writeMockDb(db)
+    return template
+  },
+
+  async deleteTemplate(userId: string, templateId: string): Promise<void> {
+    if (!isMock()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma as any).template.deleteMany({
+          where: { id: templateId, userId },
+        })
+        return
+      } catch (err) {
+        console.warn('Prisma deleteTemplate failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') throw err
+      }
+    }
+    const db = initMockDb()
+    if (db.templates) {
+      db.templates = db.templates.filter(t => !(t.id === templateId && t.userId === userId))
+      writeMockDb(db)
+    }
   },
 }

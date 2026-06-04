@@ -35,6 +35,7 @@ model User {
   brands                   Brand[]
   campaigns                Campaign[]
   posts                    Post[]
+  templates                Template[]
   instagramAccount         InstagramAccount?
   editLogs                 UserEditLog[]
   summarizedPreferences    SummarizedPreference[]
@@ -142,6 +143,17 @@ model Post {
   status           String   @default("draft") // draft, pending_approval, scheduled, posted, failed
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model Template {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  document  String   // EditorialDocument JSON (text/image stripped)
+  thumbnail String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ErrorLog {

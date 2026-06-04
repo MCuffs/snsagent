@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset, TypographyPreset } from '../../../../../src/lib/editor/types'
 
-type EditorTab = 'text' | 'background' | 'overlay' | 'image'
+type EditorTab = 'text' | 'background' | 'overlay' | 'image' | 'templates'
+
+interface SavedTemplate {
+  id: string
+  name: string
+  document: string
+  createdAt: string
+}
 
 interface Props {
   slideId: string
@@ -31,9 +38,46 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
   const [tab, setTab] = useState<EditorTab>('text')
   const [copyTarget, setCopyTarget] = useState<'title' | 'subtitle'>('title')
   const [prompt, setPrompt] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [showTemplateInput, setShowTemplateInput] = useState(false)
+  const [templates, setTemplates] = useState<SavedTemplate[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  const fetchTemplates = useCallback(async () => {
+    setLoadingTemplates(true)
+    try {
+      const res = await fetch('/api/templates')
+      const data = await res.json() as { templates: SavedTemplate[] }
+      setTemplates(data.templates || [])
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'templates') fetchTemplates()
+  }, [tab, fetchTemplates])
 
   if (!document) return null
   const copyLayer = document.layers.find(item => item.type === copyTarget)!
+
+  async function handleSaveTemplate() {
+    if (!templateName.trim() || !document) return
+    setSavingTemplate(true)
+    try {
+      const styleDoc = stripContentFromDocument(document)
+      await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: templateName.trim(), document: JSON.stringify(styleDoc) }),
+      })
+      setTemplateName('')
+      setShowTemplateInput(false)
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
 
   return (
     <div className="rounded-[12px] border border-[#e8dfd4] bg-white shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
@@ -50,17 +94,39 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
         <div className="mt-4 flex gap-2">
           <IconButton label="실행 취소" onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
           <IconButton label="다시 실행" onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
+          <IconButton label="템플릿으로 저장" onClick={() => setShowTemplateInput(v => !v)}><BookmarkPlus className="h-4 w-4" /></IconButton>
           <button type="button" disabled={busy} onClick={() => onSave(true)} className="btn-primary ml-auto min-h-10 rounded-md px-4 text-xs">
             <Save className="h-3.5 w-3.5" /> 결과에 적용
           </button>
         </div>
+        {showTemplateInput && (
+          <div className="mt-3 flex gap-2">
+            <input
+              value={templateName}
+              onChange={e => setTemplateName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSaveTemplate()}
+              placeholder="템플릿 이름 입력"
+              className="field flex-1 h-9 px-3 text-xs"
+              autoFocus
+            />
+            <button
+              type="button"
+              disabled={savingTemplate || !templateName.trim()}
+              onClick={handleSaveTemplate}
+              className="btn-primary h-9 rounded-md px-3 text-xs disabled:opacity-40"
+            >
+              저장
+            </button>
+          </div>
+        )}
       </header>
 
-      <nav className="grid grid-cols-4 border-b border-[#f0e8de] p-2">
+      <nav className="grid grid-cols-5 border-b border-[#f0e8de] p-2">
         <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label="글자" />
         <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label="배경" />
         <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label="오버레이" />
         <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label="이미지" />
+        <TabButton active={tab === 'templates'} onClick={() => setTab('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label="템플릿" />
       </nav>
 
       <div className="p-4">
@@ -97,6 +163,22 @@ export function EditorialInspector({ slideId, busy, credits, regenerationAccess,
         )}
         {tab === 'image' && (
           <ImagePanel slideId={slideId} document={document} busy={busy} onUpload={onImageUpload} />
+        )}
+        {tab === 'templates' && (
+          <TemplatesPanel
+            templates={templates}
+            loading={loadingTemplates}
+            onApply={tmpl => {
+              try {
+                const styleDoc = JSON.parse(tmpl.document) as EditorialDocument
+                updateDocument(slideId, current => mergeTemplateIntoDocument(current, styleDoc))
+              } catch {}
+            }}
+            onDelete={async id => {
+              await fetch(`/api/templates/${id}`, { method: 'DELETE' })
+              setTemplates(prev => prev.filter(t => t.id !== id))
+            }}
+          />
         )}
       </div>
     </div>
@@ -358,4 +440,88 @@ function RangeControl({ label, value, min, max, onChange }: { label: string; val
 
 function IconButton({ label, children, onClick }: { label: string; children: React.ReactNode; onClick: () => void }) {
   return <button type="button" aria-label={label} onClick={onClick} className="flex h-10 w-10 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]">{children}</button>
+}
+
+function stripContentFromDocument(doc: EditorialDocument): EditorialDocument {
+  return {
+    ...doc,
+    layers: doc.layers.map(layer => {
+      if (layer.type === 'background') return { ...layer, imageUrl: null }
+      if (layer.type === 'title' || layer.type === 'subtitle') return { ...layer, text: '' }
+      if (layer.type === 'sticker' && layer.id !== 'sticker') return { ...layer, imageUrl: null }
+      return layer
+    }),
+  }
+}
+
+function mergeTemplateIntoDocument(current: EditorialDocument, template: EditorialDocument): EditorialDocument {
+  const currentById = new Map(current.layers.map(l => [l.id, l]))
+  const merged = template.layers.map(tLayer => {
+    const existing = currentById.get(tLayer.id)
+    if (!existing) return tLayer
+    // keep current text/image, apply template style
+    return {
+      ...tLayer,
+      text: existing.text,
+      imageUrl: existing.imageUrl,
+    }
+  })
+  // keep any current layers not in template (e.g. user-added stickers)
+  const templateIds = new Set(template.layers.map(l => l.id))
+  const extra = current.layers.filter(l => !templateIds.has(l.id))
+  return { ...template, layers: [...merged, ...extra] }
+}
+
+function TemplatesPanel({
+  templates,
+  loading,
+  onApply,
+  onDelete,
+}: {
+  templates: SavedTemplate[]
+  loading: boolean
+  onApply: (t: SavedTemplate) => void
+  onDelete: (id: string) => void
+}) {
+  if (loading) return <p className="py-6 text-center text-xs text-[#9a8d82]">불러오는 중…</p>
+  if (templates.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
+          <p>편집 중인 카드의 스타일(폰트·오버레이·레이아웃)을 템플릿으로 저장하면, 다른 카드에 한 번에 적용할 수 있어요.</p>
+        </div>
+        <p className="py-4 text-center text-xs text-[#9a8d82]">저장된 템플릿이 없습니다</p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
+        <p>적용하면 텍스트·배경 이미지는 유지되고, 폰트·오버레이·레이아웃만 교체됩니다.</p>
+      </div>
+      {templates.map(t => (
+        <div key={t.id} className="flex items-center gap-2 rounded-lg border border-[#e8dfd4] p-3">
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-xs font-bold text-[#1f1512]">{t.name}</p>
+            <p className="text-[10px] text-[#9a8d82]">{new Date(t.createdAt).toLocaleDateString('ko-KR')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onApply(t)}
+            className="rounded-md bg-[#111318] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#0066ff]"
+          >
+            적용
+          </button>
+          <button
+            type="button"
+            aria-label="템플릿 삭제"
+            onClick={() => onDelete(t.id)}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
 }
