@@ -221,6 +221,8 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
               </div>
               <RangeControl label="크기" value={Math.round(layer.scale * 100)} min={25} max={400} onChange={value => updateLayer(slideId, layer.id, { scale: value / 100 })} />
               <RangeControl label="회전" value={layer.rotation} min={-180} max={180} onChange={value => updateLayer(slideId, layer.id, { rotation: value })} />
+              <RangeControl label="모서리 라운드" value={layer.borderRadius ?? 0} min={0} max={50} onChange={value => updateLayer(slideId, layer.id, { borderRadius: value })} />
+              <RangeControl label="외곽 페이드" value={layer.edgeFade ?? 0} min={0} max={80} onChange={value => updateLayer(slideId, layer.id, { edgeFade: value })} />
             </div>
           ))}
         </div>

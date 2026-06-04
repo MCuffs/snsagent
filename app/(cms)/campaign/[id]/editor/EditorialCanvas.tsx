@@ -171,6 +171,12 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
 function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; selected: boolean; onText: (text: string) => void }) {
   if (layer.imageUrl) {
+    const radius = layer.borderRadius ?? 0
+    const fade = layer.edgeFade ?? 0
+    // Build a CSS mask that combines border-radius (via inset clip) and edge fade (via radial gradient)
+    const maskGradient = fade > 0
+      ? `radial-gradient(ellipse at center, black ${100 - fade}%, transparent 100%)`
+      : undefined
     return (
       <>
         {selected && <Pencil className="absolute -right-5 -top-5 h-4 w-4 text-[#29c5ff]" />}
@@ -180,6 +186,11 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
           alt=""
           draggable={false}
           className="pointer-events-none h-full w-full select-none object-contain"
+          style={{
+            borderRadius: radius > 0 ? `${radius}%` : undefined,
+            WebkitMaskImage: maskGradient,
+            maskImage: maskGradient,
+          }}
         />
       </>
     )
