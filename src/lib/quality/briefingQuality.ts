@@ -7,10 +7,12 @@ export interface BriefingQualityInput {
 
 export interface BriefingQualityResult {
   score: number
-  missing: Array<'subject' | 'audience' | 'angle' | 'purpose' | 'evidence' | 'action'>
+  missing: BriefingQualityMissing[]
   signals: string[]
   shouldClarify: boolean
 }
+
+export type BriefingQualityMissing = 'subject' | 'audience' | 'angle' | 'purpose' | 'evidence' | 'action'
 
 const KO_PATTERNS = {
   audience: /타겟|대상|누구|초보자|직장인|주부|학생|부모|고객|구매자|건강\s*관심|다이어트|운동|MZ|20대|30대|40대/u,

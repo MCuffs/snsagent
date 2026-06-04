@@ -351,7 +351,15 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
       appendAiMessage(msg, data.ready && data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
 
-      const assistantHistory: ChatMessage = { role: 'assistant', content: msg }
+      const clarificationContext = data.clarification
+        ? [
+            '',
+            `[Clarification question shown to user] ${data.clarification.question}`,
+            '[Clarification options]',
+            ...data.clarification.options.map(option => `- ${option.label}: ${option.value}`),
+          ].join('\n')
+        : ''
+      const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}` }
       setChatHistory(prev => [...prev, assistantHistory])
     } catch {
       appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')

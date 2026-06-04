@@ -13,7 +13,7 @@ import {
   logAiDiagnostic,
   readOpenAIError,
 } from '../../../../src/lib/ai/diagnostics'
-import { evaluateBriefingQuality } from '../../../../src/lib/quality/briefingQuality'
+import { evaluateBriefingQuality, type BriefingQualityMissing } from '../../../../src/lib/quality/briefingQuality'
 
 export const runtime = 'nodejs'
 
@@ -85,8 +85,8 @@ function buildSystemPrompt(
   const turnsLeft = Math.max(0, 3 - (userTurnCount ?? 0))
   const roundGuidance = turnsLeft > 0
     ? (language === 'en'
-      ? `\n## Briefing Round Control (CRITICAL)\nThe user has answered ${userTurnCount ?? 0} out of 3 required briefing rounds. You MUST NOT set ready:true yet. Ask one more concrete clarifying question with 3-4 specific options that deepen the angle, target reader, or desired action. Remaining rounds before generation is allowed: ${turnsLeft}.\n`
-      : `\n## 브리핑 라운드 제어 (필수 준수)\n사용자가 필수 브리핑 ${userTurnCount ?? 0}/3 라운드를 완료했습니다. 아직 ready:true로 설정하면 안 됩니다. 반드시 clarification을 반환하여 각도·독자·원하는 행동 중 하나를 더 구체화하는 선택지 3~4개를 제시하세요. 생성 허용까지 남은 라운드: ${turnsLeft}.\n`)
+      ? `\n## Briefing Round Control\nThe user has answered ${userTurnCount ?? 0} briefing rounds. If the accumulated briefing is still missing audience, angle, evidence, or desired action, ask one concrete follow-up with 3-4 options. Do not repeat a question focus already asked in the conversation. If the briefing is specific enough, return ready:true.\n`
+      : `\n## 브리핑 라운드 제어\n사용자가 브리핑 ${userTurnCount ?? 0}라운드에 답했습니다. 누적 브리핑에 독자·관점·근거·행동 유도 중 부족한 축이 남아 있을 때만 추가 질문을 하세요. 이미 물어본 질문 축을 반복하지 말고, 충분히 구체적이면 ready:true를 반환하세요.\n`)
     : (language === 'en'
       ? `\n## Briefing Round Control\nThe user has completed all 3 required briefing rounds. You may now set ready:true and return the full params.\n`
       : `\n## 브리핑 라운드 제어\n사용자가 필수 브리핑 3라운드를 모두 완료했습니다. 이제 ready:true와 함께 전체 params를 반환할 수 있습니다.\n`)
@@ -419,46 +419,37 @@ function needsQualityClarification(text: string) {
 
 function buildClarificationResponse(input: {
   userText: string
+  allUserText?: string
+  previousAssistantText?: string
   brand: { name: string; industry: string }
   language?: 'ko' | 'en'
   generationMode?: 'brand' | 'general'
 }): AgentResponse | null {
   const hasUrl = /https?:\/\/[^\s]+/.test(input.userText)
   if (hasUrl) return null
+  const briefingText = input.allUserText?.trim() || input.userText
   const quality = evaluateBriefingQuality({
-    text: input.userText,
+    text: briefingText,
     language: input.language,
     generationMode: input.generationMode,
     hasUrl,
   })
-  const shouldClarifyForQuality = quality.shouldClarify || needsQualityClarification(input.userText)
-  if (!shouldClarifyForQuality && !isGenericCardNewsRequest(input.userText) && !isBroadTopic(input.userText)) return null
+  const shouldClarifyForQuality = quality.shouldClarify || needsQualityClarification(briefingText)
+  if (!shouldClarifyForQuality && !isGenericCardNewsRequest(briefingText) && !isBroadTopic(briefingText)) return null
 
   if (input.language === 'en') {
-    const question = input.generationMode === 'general'
-      ? 'Which angle should this card news focus on?'
-      : `What should ${input.brand.name}'s card news focus on?`
+    const clarification = buildEnglishClarification({
+      latestUserText: input.userText,
+      briefingText,
+      missing: quality.missing,
+      generationMode: input.generationMode,
+      brandName: input.brand.name,
+      previousAssistantText: input.previousAssistantText,
+    })
     return {
       ready: false,
       message: `I need one more detail to avoid a generic carousel.\n\nMissing briefing signals: ${quality.missing.slice(0, 3).join(', ') || 'specific angle'}. Pick a direction below or type your own answer.`,
-      clarification: {
-        question,
-        allowCustom: true,
-        skipLabel: 'Use current info',
-        options: input.generationMode === 'general'
-          ? [
-              { label: 'Benefits summary', value: `${input.userText} benefits and key points` },
-              { label: 'Checklist', value: `${input.userText} checklist and practical tips` },
-              { label: 'Trend angle', value: `${input.userText} recent trend and context` },
-              { label: 'Cautions', value: `${input.userText} cautions and balanced explanation` },
-            ]
-          : [
-              { label: 'New product', value: `${input.brand.name} new product launch card news` },
-              { label: 'Customer problem', value: `${input.brand.name} customer pain point solution card news` },
-              { label: 'Brand story', value: `${input.brand.name} brand story and differentiation card news` },
-              { label: 'Promotion', value: `${input.brand.name} promotion or event card news` },
-            ],
-      },
+      clarification,
     }
   }
 
@@ -505,6 +496,67 @@ function buildClarificationResponse(input: {
             { label: '이벤트/프로모션', value: `${input.brand.name}의 이벤트 또는 프로모션을 안내하는 카드뉴스` },
           ],
     },
+  }
+}
+
+function buildEnglishClarification(input: {
+  latestUserText: string
+  briefingText: string
+  missing: BriefingQualityMissing[]
+  generationMode?: 'brand' | 'general'
+  brandName: string
+  previousAssistantText?: string
+}): ClarificationPrompt {
+  const asked = (input.previousAssistantText || '').toLowerCase()
+  const missing = input.missing
+  const baseTopic = input.briefingText || input.latestUserText
+  const brandPrefix = input.generationMode === 'brand' ? `${input.brandName}: ` : ''
+
+  if (missing.includes('audience') && !asked.includes('who should')) {
+    return {
+      question: 'Who should this carousel be written for?',
+      allowCustom: true,
+      skipLabel: 'Use current audience',
+      options: [
+        { label: 'Beginners', value: `${baseTopic} for beginners who need a simple practical explanation` },
+        { label: 'Busy professionals', value: `${baseTopic} for busy professionals who want quick useful takeaways` },
+        { label: 'Purchase checkers', value: `${brandPrefix}${baseTopic} for people comparing options before they decide` },
+        { label: 'Fans / followers', value: `${brandPrefix}${baseTopic} for existing followers who want a deeper story` },
+      ],
+    }
+  }
+
+  if ((missing.includes('angle') || missing.includes('evidence')) && !asked.includes('which angle')) {
+    return {
+      question: 'Which angle should this carousel focus on?',
+      allowCustom: true,
+      skipLabel: 'Use current angle',
+      options: input.generationMode === 'general'
+        ? [
+            { label: 'Benefits with proof', value: `${baseTopic} focusing on concrete benefits, evidence, and practical examples` },
+            { label: 'Step-by-step guide', value: `${baseTopic} as a step-by-step guide with clear do and do not points` },
+            { label: 'Checklist', value: `${baseTopic} as a checklist with decision points readers can save` },
+            { label: 'Balanced cautions', value: `${baseTopic} explaining benefits, limits, and cautions without exaggeration` },
+          ]
+        : [
+            { label: 'Customer problem', value: `${brandPrefix}${baseTopic} focused on the customer problem and the brand solution` },
+            { label: 'Product proof', value: `${brandPrefix}${baseTopic} focused on product details, proof points, and reasons to trust` },
+            { label: 'Brand story', value: `${brandPrefix}${baseTopic} focused on brand story and differentiation` },
+            { label: 'Use case', value: `${brandPrefix}${baseTopic} focused on real usage scenes and buying context` },
+          ],
+    }
+  }
+
+  return {
+    question: 'What should readers do after seeing this carousel?',
+    allowCustom: true,
+    skipLabel: 'Choose the best outcome',
+    options: [
+      { label: 'Save it', value: `${baseTopic} with a save-worthy structure and a clear bookmark CTA` },
+      { label: 'Share it', value: `${baseTopic} with relatable points that make readers want to share it` },
+      { label: 'Visit profile', value: `${brandPrefix}${baseTopic} designed to move readers to the profile for more details` },
+      { label: 'Buy / compare', value: `${brandPrefix}${baseTopic} designed to help readers compare and take purchase action` },
+    ],
   }
 }
 
@@ -556,9 +608,19 @@ export async function POST(request: Request) {
 
     // 3. Detect URL in the latest user message and scrape
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
+    const allUserText = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.content)
+      .join('\n')
+    const previousAssistantText = messages
+      .filter(m => m.role === 'assistant')
+      .map(m => m.content)
+      .join('\n')
     if (lastUserMessage) {
       const clarification = buildClarificationResponse({
         userText: lastUserMessage.content,
+        allUserText,
+        previousAssistantText,
         brand,
         language,
         generationMode,
@@ -719,33 +781,26 @@ export async function POST(request: Request) {
       parsed.params.slideCount = Number(parsed.params.slideCount)
     }
 
-    // Enforce minimum 3 briefing rounds before allowing generation
+    // Ask follow-up questions only when the accumulated briefing is still weak.
     if (parsed.ready && userTurnCount < 3) {
-      const fallbackClarification: ClarificationPrompt = parsed.clarification && validateClarification(parsed.clarification)
-        ? parsed.clarification
-        : (language === 'en'
-          ? {
-              question: 'One more detail before we generate — which outcome matters most to you?',
-              allowCustom: true,
-              skipLabel: 'Proceed with current info',
-              options: [
-                { label: 'Save / bookmark', value: 'Optimise for save rate — make this card news highly saveable and shareable.' },
-                { label: 'Profile visits', value: 'Optimise for profile visits — hook should drive curiosity about the brand.' },
-                { label: 'Direct purchase', value: 'Optimise for purchase intent — highlight value and urgency.' },
-                { label: 'Brand awareness', value: 'Optimise for brand recall — focus on unique identity and storytelling.' },
-              ],
-            }
-          : {
-              question: '생성 전 마지막 확인 — 이번 카드뉴스에서 가장 중요한 성과는 무엇인가요?',
-              allowCustom: true,
-              skipLabel: '현재 정보로 진행',
-              options: [
-                { label: '저장/공유 극대화', value: '저장률을 높이는 방향으로 최적화 — 소장 가치 있는 정보 중심으로 구성해 주세요.' },
-                { label: '프로필 유입', value: '프로필 방문을 유도하는 방향으로 최적화 — 훅이 브랜드 호기심을 자극하게 해 주세요.' },
-                { label: '구매 전환', value: '구매 의도를 높이는 방향으로 최적화 — 가치와 urgency를 강조해 주세요.' },
-                { label: '브랜드 인지도', value: '브랜드 각인을 높이는 방향으로 최적화 — 고유 감성과 스토리텔링 중심으로 해 주세요.' },
-              ],
-            })
+      const briefingQuality = evaluateBriefingQuality({
+        text: allUserText,
+        language,
+        generationMode,
+      })
+      const fallbackClarification = briefingQuality.shouldClarify && lastUserMessage
+        ? buildClarificationResponse({
+            userText: lastUserMessage.content,
+            allUserText,
+            previousAssistantText,
+            brand,
+            language,
+            generationMode,
+          })?.clarification
+        : null
+      if (!fallbackClarification) {
+        return NextResponse.json(parsed)
+      }
       return NextResponse.json({
         message: parsed.message,
         ready: false,
