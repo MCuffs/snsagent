@@ -83,8 +83,10 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
       const res = await analyzeGeneralProfileCoreWordAction(coreWord.trim(), locale)
       if (res.success && res.profile) {
         const p = res.profile
-        setName(prev => prev.trim() ? prev : `${coreWord.trim()} 리포트`)
-        setCategory(p.industry)
+        const validCategories = ['current-affairs', 'information', 'trends']
+        const normalizedIndustry = validCategories.includes(p.industry) ? p.industry : 'current-affairs'
+        setName(`${coreWord.trim()} 리포트`)
+        setCategory(normalizedIndustry)
         setKeywords(p.forbiddenWords)
         setTargetAudience(p.targetAudience)
         setToneOfVoice(p.toneOfVoice)
