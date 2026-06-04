@@ -51,6 +51,8 @@ export interface EditorialLayer {
   tracking?: number
   color?: string
   textAlign?: 'left' | 'center' | 'right'
+  italic?: boolean
+  underline?: boolean
   stroke?: number
   strokeColor?: string
   textBackground?: string

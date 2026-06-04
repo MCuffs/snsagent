@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, EyeOff, ImageIcon, Layers, Redo2, Save, Sparkles, Trash2, Type, Undo2, Upload } from 'lucide-react'
+import { Bold, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Save, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 
@@ -111,17 +111,44 @@ function TextPanel({
         className="field w-full resize-none p-3 text-sm leading-6"
         placeholder={target === 'title' ? '헤드라인을 입력하세요' : '본문을 입력하세요'}
       />
-      <div className="grid grid-cols-[1fr_86px_44px] gap-2">
-        <select value={layer.fontPreset} onChange={event => onChange({ fontPreset: event.target.value as FontPreset })} className="field h-11 px-3 text-xs font-bold">
+      {/* Font / size / color row */}
+      <div className="grid grid-cols-[1fr_70px_36px] gap-2">
+        <select value={layer.fontPreset} onChange={event => onChange({ fontPreset: event.target.value as FontPreset })} className="field h-10 px-3 text-xs font-bold">
           <option value="pretendard">Pretendard</option>
           <option value="suit">SUIT</option>
           <option value="noto-sans">Noto Sans KR</option>
           <option value="serif">Editorial Serif</option>
           <option value="magazine">Magazine</option>
         </select>
-        <input type="number" aria-label="글자 크기" value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-11 px-3 text-xs font-bold" />
-        <input type="color" aria-label="텍스트 색상" value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-11 w-11 cursor-pointer p-1" />
+        <input type="number" aria-label="글자 크기" value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-10 px-2 text-xs font-bold text-center" />
+        <input type="color" aria-label="텍스트 색상" value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
       </div>
+      {/* Style toggles: bold / italic / underline */}
+      <div className="flex gap-2">
+        <ToggleButton
+          active={(layer.fontWeight ?? 400) >= 700}
+          onClick={() => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })}
+          label="굵게"
+        >
+          <Bold className="h-3.5 w-3.5" />
+        </ToggleButton>
+        <ToggleButton
+          active={!!layer.italic}
+          onClick={() => onChange({ italic: !layer.italic })}
+          label="기울기"
+        >
+          <Italic className="h-3.5 w-3.5" />
+        </ToggleButton>
+        <ToggleButton
+          active={!!layer.underline}
+          onClick={() => onChange({ underline: !layer.underline })}
+          label="밑줄"
+        >
+          <Underline className="h-3.5 w-3.5" />
+        </ToggleButton>
+      </div>
+      {/* Weight slider (fine control) */}
+      <RangeControl label="굵기" value={layer.fontWeight || 400} min={100} max={900} onChange={value => onChange({ fontWeight: value })} />
     </div>
   )
 }
@@ -264,6 +291,23 @@ function Choice({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function RangeControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
   return <label className="block text-xs font-bold text-[#514a44]"><span className="mb-2 flex justify-between"><span>{label}</span><span className="text-[#746a62]">{value}</span></span><input type="range" value={value} min={min} max={max} onChange={event => onChange(Number(event.target.value))} className="w-full accent-[#0066ff]" /></label>
+}
+
+function ToggleButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
+        active
+          ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
+          : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
+      }`}
+    >
+      {children}
+    </button>
+  )
 }
 
 function NumberControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {

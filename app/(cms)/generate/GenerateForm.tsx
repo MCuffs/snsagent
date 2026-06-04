@@ -273,20 +273,48 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   // Global paste listener — catches Ctrl+V / Cmd+V anywhere on the page
   useEffect(() => {
     if (!readyParams) return
-    const handler = (e: ClipboardEvent) => {
+
+    // Primary: DOM paste event (works when document has focus after interaction)
+    const pasteHandler = (e: ClipboardEvent) => {
       const items = Array.from(e.clipboardData?.items ?? [])
       const files = items
         .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
         .map(item => item.getAsFile())
         .filter((f): f is File => f !== null)
-      // Only intercept when clipboard actually contains images — text paste in inputs is unaffected
       if (files.length > 0) {
         e.preventDefault()
         addFiles(files)
       }
     }
-    window.addEventListener('paste', handler)
-    return () => window.removeEventListener('paste', handler)
+
+    // Fallback: keydown Ctrl/Cmd+V → navigator.clipboard.read() for cases where
+    // paste event is suppressed (e.g. focus on non-editable element)
+    const keyHandler = async (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      try {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            const file = new File([blob], `pasted-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType })
+            addFiles([file])
+            break
+          }
+        }
+      } catch {
+        // clipboard-read permission denied or no image — ignore
+      }
+    }
+
+    window.addEventListener('paste', pasteHandler)
+    window.addEventListener('keydown', keyHandler)
+    return () => {
+      window.removeEventListener('paste', pasteHandler)
+      window.removeEventListener('keydown', keyHandler)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyParams])
 

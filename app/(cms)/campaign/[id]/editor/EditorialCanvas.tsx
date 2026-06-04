@@ -214,6 +214,8 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
           textShadow: layer.shadow ? `0 ${4 * SCALE}px ${layer.shadow * SCALE}px rgba(0,0,0,.58)` : undefined,
           WebkitTextStroke: layer.stroke ? `${layer.stroke * SCALE}px ${layer.strokeColor}` : undefined,
           background: layer.textBackground,
+          fontStyle: layer.italic ? 'italic' : undefined,
+          textDecoration: layer.underline ? 'underline' : undefined,
         }}
       >
         {layer.text}
