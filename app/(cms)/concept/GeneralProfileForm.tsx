@@ -68,6 +68,7 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
 
   // UI state
   const [isSaving, setIsSaving] = useState(false)
+  const [isContinuing, setIsContinuing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -132,13 +133,16 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
   }
 
   const handleContinue = () => {
-    if (profileId) {
-      const params = new URLSearchParams(window.location.search)
-      params.set('brandId', profileId)
-      const newUrl = `${window.location.pathname}?${params.toString()}`
-      window.history.pushState(null, '', newUrl)
+    if (!profileId || isContinuing) return
+    setIsContinuing(true)
+    const params = new URLSearchParams(window.location.search)
+    params.set('brandId', profileId)
+    const newUrl = `${window.location.pathname}?${params.toString()}`
+    window.history.pushState(null, '', newUrl)
+    window.setTimeout(() => {
       setActiveTab('generate')
-    }
+      setIsContinuing(false)
+    }, 220)
   }
 
   return (
@@ -310,14 +314,29 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
                 {t('save_btn')}
               </button>
               {profileId && (
-                <button
+                <motion.button
                   type="button"
                   onClick={handleContinue}
-                  className="flex h-11 items-center gap-2 rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#a1a1aa] hover:bg-[#fafafa]"
+                  disabled={isContinuing}
+                  whileTap={{ scale: 0.97 }}
+                  animate={isContinuing ? { scale: [1, 0.98, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative flex h-11 items-center gap-2 overflow-hidden rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#0066ff] hover:bg-[#f5f8ff] hover:text-[#0066ff] disabled:cursor-wait disabled:border-[#0066ff]/40 disabled:bg-[#f5f8ff] disabled:text-[#0066ff]"
                 >
+                  {isContinuing && (
+                    <motion.span
+                      className="absolute inset-0 bg-[#0066ff]/8"
+                      initial={{ x: '-100%' }}
+                      animate={{ x: '100%' }}
+                      transition={{ duration: 0.45, ease: 'easeInOut' }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    {isContinuing && <Loader2 className="h-4 w-4 animate-spin" />}
                   {t('generate_card_btn')}
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                    {!isContinuing && <ArrowRight className="h-4 w-4" />}
+                  </span>
+                </motion.button>
               )}
             </motion.div>
           </form>
