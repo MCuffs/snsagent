@@ -31,6 +31,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const updateDocument = useEditorialStore(state => state.updateDocument)
   const selectLayer = useEditorialStore(state => state.selectLayer)
+  const applyOverlayToAll = useEditorialStore(state => state.applyOverlayToAll)
   const undo = useEditorialStore(state => state.undo)
   const redo = useEditorialStore(state => state.redo)
   const [tab, setTab] = useState<EditorTab>('text')
@@ -148,6 +149,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
             document={document}
             onOverlay={preset => updateDocument(slideId, value => applyOverlayPreset(value, preset))}
             onOverlayValue={(key, value) => updateDocument(slideId, current => ({ ...current, overlay: { ...current.overlay, [key]: value } }))}
+            onApplyToAll={() => applyOverlayToAll(document.overlay)}
           />
         )}
         {tab === 'image' && (
@@ -243,12 +245,22 @@ function OverlayPanel({
   document,
   onOverlay,
   onOverlayValue,
+  onApplyToAll,
 }: {
   document: EditorialDocument
   onOverlay: (preset: OverlayPreset) => void
   onOverlayValue: (key: 'darkness' | 'vignette' | 'contrast', value: number) => void
+  onApplyToAll: () => void
 }) {
   const t = useTranslations('campaign')
+  const [applied, setApplied] = useState(false)
+
+  const handleApplyToAll = () => {
+    onApplyToAll()
+    setApplied(true)
+    setTimeout(() => setApplied(false), 1800)
+  }
+
   return (
     <div className="space-y-5">
       <OptionGroup title={t('overlay_mood')}>
@@ -263,6 +275,13 @@ function OverlayPanel({
         <RangeControl label={t('vignette')} value={document.overlay.vignette} min={0} max={100} onChange={value => onOverlayValue('vignette', value)} />
         <RangeControl label={t('contrast')} value={document.overlay.contrast} min={50} max={160} onChange={value => onOverlayValue('contrast', value)} />
       </div>
+      <button
+        type="button"
+        onClick={handleApplyToAll}
+        className={`w-full rounded-lg border py-2.5 text-xs font-bold transition-colors ${applied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'}`}
+      >
+        {applied ? '✓ 전체 카드에 적용됨' : '이 오버레이를 전체 카드에 적용'}
+      </button>
     </div>
   )
 }

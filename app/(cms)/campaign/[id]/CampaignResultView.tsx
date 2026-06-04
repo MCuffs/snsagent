@@ -383,13 +383,16 @@ export default function CampaignResultView({
     analytics.campaignDownload(campaign.id, 'zip', slides.length)
     try {
       const zip = new JSZip()
-      for (const slide of slides) {
-        const document = documents[slide.id] || parseEditorialDocument(slide.editorDocument, slide)
-        const result = await exportEditorialSlideAction(slide.id, JSON.stringify(document), 'png', 1)
-        if (!result.success) throw new Error(result.error)
-        const response = await fetch(result.url)
-        zip.file(fileNameFor(campaign.title, slide.slideNumber), await response.blob())
-      }
+      const results = await Promise.all(
+        slides.map(async slide => {
+          const doc = documents[slide.id] || parseEditorialDocument(slide.editorDocument, slide)
+          const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc), 'png', 1)
+          if (!result.success) throw new Error(result.error)
+          const response = await fetch(result.url)
+          return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
+        })
+      )
+      for (const { name, blob } of results) zip.file(name, blob)
       const archive = await zip.generateAsync({ type: 'blob' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(archive)

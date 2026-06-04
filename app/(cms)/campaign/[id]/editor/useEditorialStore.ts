@@ -9,6 +9,8 @@ interface History {
   future: EditorialDocument[]
 }
 
+import type { OverlaySettings } from '../../../../../src/lib/editor/types'
+
 interface EditorialState {
   documents: Record<string, EditorialDocument>
   histories: Record<string, History>
@@ -20,6 +22,7 @@ interface EditorialState {
   selectLayer: (layerId: string | null) => void
   updateDocument: (slideId: string, update: (document: EditorialDocument) => EditorialDocument) => void
   updateLayer: (slideId: string, layerId: string, update: Partial<EditorialLayer>) => void
+  applyOverlayToAll: (overlay: Partial<OverlaySettings>) => void
   addLayer: (slideId: string, layer: EditorialLayer) => void
   removeLayer: (slideId: string, layerId: string) => void
   reorderLayer: (slideId: string, layerId: string, direction: -1 | 1) => void
@@ -72,6 +75,23 @@ export const useEditorialStore = create<EditorialState>((set) => ({
         [slideId]: { past: [...history.past.slice(-39), current], future: [] },
       },
       dirtySlides: { ...state.dirtySlides, [slideId]: true },
+    }
+  }),
+  applyOverlayToAll: (overlay) => set((state) => {
+    const updatedDocs: Record<string, EditorialDocument> = {}
+    const updatedHistories: Record<string, History> = {}
+    const updatedDirty: Record<string, boolean> = {}
+    for (const [id, doc] of Object.entries(state.documents)) {
+      const next = normalizeDocument({ ...doc, overlay: { ...doc.overlay, ...overlay } })
+      const history = state.histories[id] || { past: [], future: [] }
+      updatedDocs[id] = next
+      updatedHistories[id] = { past: [...history.past.slice(-39), doc], future: [] }
+      updatedDirty[id] = true
+    }
+    return {
+      documents: { ...state.documents, ...updatedDocs },
+      histories: { ...state.histories, ...updatedHistories },
+      dirtySlides: { ...state.dirtySlides, ...updatedDirty },
     }
   }),
   addLayer: (slideId, layer) => set((state) => {
