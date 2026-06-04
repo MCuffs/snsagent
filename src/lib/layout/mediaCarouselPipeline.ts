@@ -437,8 +437,10 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     memoryContextUsed: editorialPlan.personalization.applied,
   })
 
+  const caption = await generateCaption(input, slides)
+
   const post = await dbService.createPost(input.userId, input.brandId, campaign.id, {
-    caption: buildCaption(input),
+    caption,
     hashtags: buildHashtags(input).join(', '),
     scheduledAt: tomorrowAt20(),
   })
@@ -450,7 +452,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     status,
     title: input.title,
     slides,
-    caption: buildCaption(input),
+    caption,
     hashtags: buildHashtags(input),
     qualityCheck,
   }
@@ -1034,9 +1036,68 @@ function toMediaLayout(layoutType: LayoutType): LayoutType {
   return layoutType
 }
 
-function buildCaption(input: MediaCarouselInput) {
-  const body = summarize(input.keyContent, 180)
-  return `${input.title}\n\n${body}\n\n저장해두고 필요한 순간 다시 확인해보세요.`
+async function generateCaption(input: MediaCarouselInput, slides: MediaSlidePlan[]): Promise<string> {
+  const isEn = input.language === 'en'
+  const slidesSummary = slides
+    .slice(0, 5)
+    .map(s => `${s.slideNumber}. ${s.headline}`)
+    .join('\n')
+
+  const prompt = isEn
+    ? `You are a professional Instagram content writer. Write a natural, conversational Instagram caption for a card news carousel about the following topic.
+
+Topic: ${input.topic}
+Brand tone: ${input.brandToneOfVoice || 'warm and approachable'}
+Slide headlines:
+${slidesSummary}
+
+Rules:
+- Write in first or second person, as if talking directly to the reader
+- Open with a short, punchy hook sentence (1–2 lines) — NOT the topic title
+- 2–4 sentences describing what the carousel covers, written naturally like a person, not a summary
+- End with a warm call to action that feels human (save, share, swipe, etc.)
+- Total: 4–7 lines. No bullet points. No markdown. Plain text only.
+- Do NOT start with the carousel title or topic name as the first word`
+    : `당신은 인스타그램 카드뉴스 전문 카피라이터입니다. 아래 카드뉴스 내용을 보고 자연스럽고 대화체에 가까운 인스타그램 캡션을 작성해주세요.
+
+주제: ${input.topic}
+브랜드 톤: ${input.brandToneOfVoice || '친근하고 따뜻하게'}
+슬라이드 헤드라인:
+${slidesSummary}
+
+작성 규칙:
+- 독자에게 말을 거는 듯한 1인칭 또는 2인칭 톤으로 작성
+- 첫 줄은 주제명 그대로 쓰지 말고, 짧고 임팩트 있는 훅 문장으로 시작
+- 카드뉴스에서 다루는 내용을 2~4문장으로 자연스럽게 소개 (딱딱한 요약 X, 대화하듯 서술)
+- 마지막에 저장, 공유, 스와이프 등 따뜻하고 자연스러운 행동 유도로 마무리
+- 전체 4~7줄. 불릿 포인트 없음. 마크다운 없음. 순수 텍스트만.
+- 첫 단어로 주제명이나 카드뉴스 제목을 그대로 쓰지 말 것`
+
+  const client = getLLMClient()
+  try {
+    const result = await client.generateJson<{ caption: string }>(
+      'instagram caption generation',
+      prompt + '\n\nRespond with JSON: { "caption": "<the caption text>" }',
+      () => ({ caption: fallbackCaption(input, slides, isEn) }),
+      {
+        model: getCopywritingModel(),
+        temperature: 0.7,
+      }
+    )
+    return result?.caption?.trim() && result.caption.trim().length > 20
+      ? result.caption.trim()
+      : fallbackCaption(input, slides, isEn)
+  } catch {
+    return fallbackCaption(input, slides, isEn)
+  }
+}
+
+function fallbackCaption(input: MediaCarouselInput, slides: MediaSlidePlan[], isEn: boolean): string {
+  const hook = slides[0]?.headline || input.topic
+  if (isEn) {
+    return `${hook}\n\nSwipe through to get the full picture — we broke it down into ${slides.length} slides so it's easy to follow.\n\nSave this for later 🔖`
+  }
+  return `${hook}\n\n${slides.length}장으로 정리해봤어요. 스와이프하면서 한 번에 읽어보세요.\n\n나중에 다시 보고 싶으면 저장해두세요 🔖`
 }
 
 function buildHashtags(input: MediaCarouselInput) {
