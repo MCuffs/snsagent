@@ -502,7 +502,6 @@ export default function CampaignResultView({
                   <EditorialInspector
                     slideId={activeSlide.id}
                     busy={editorBusy}
-                    onSave={saveEditor}
                     onUpload={() => bgFileInputRef.current?.click()}
                     onImageUpload={() => imgFileInputRef.current?.click()}
                   />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Bold, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Save, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
+import { Bold, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 
@@ -10,12 +10,11 @@ type EditorTab = 'text' | 'background' | 'overlay' | 'image'
 interface Props {
   slideId: string
   busy: boolean
-  onSave: (render: boolean) => void
   onUpload: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, busy, onSave, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: Props) {
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
@@ -44,9 +43,6 @@ export function EditorialInspector({ slideId, busy, onSave, onUpload, onImageUpl
         <div className="mt-4 flex gap-2">
           <IconButton label="실행 취소" onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
           <IconButton label="다시 실행" onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
-          <button type="button" disabled={busy} onClick={() => onSave(true)} className="btn-primary ml-auto min-h-10 rounded-md px-4 text-xs">
-            <Save className="h-3.5 w-3.5" /> 결과에 적용
-          </button>
         </div>
       </header>
 
