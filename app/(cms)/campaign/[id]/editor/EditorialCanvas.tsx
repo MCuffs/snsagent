@@ -1,13 +1,61 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { Move, Pencil } from 'lucide-react'
+import { Bold, Italic, Move, Pencil, Underline } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/types'
 
 const SCALE = 0.5
+
+// Floating toolbar that appears over selected text in contentEditable layers
+function SelectionToolbar() {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    const update = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); return }
+      const range = sel.getRangeAt(0)
+      const container = range.commonAncestorContainer
+      const editable = (container instanceof Element ? container : container.parentElement)?.closest('[contenteditable="true"]')
+      if (!editable) { setPos(null); return }
+      const r = range.getBoundingClientRect()
+      if (r.width === 0) { setPos(null); return }
+      setPos({ top: r.top - 40, left: r.left + r.width / 2 })
+    }
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [])
+
+  if (!pos) return null
+
+  const apply = (command: string) => {
+    document.execCommand(command)
+    const sel = window.getSelection()
+    const el = (sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null
+    if (el) { el.blur(); el.focus() }
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)', zIndex: 9999 }}
+      className="flex items-center gap-0.5 rounded-lg border border-[#333] bg-[#1a1a1a] px-1.5 py-1 shadow-2xl"
+      onMouseDown={e => e.preventDefault()}
+    >
+      <button type="button" onClick={() => apply('bold')} title="굵게" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Bold className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={() => apply('italic')} title="기울임" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Italic className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={() => apply('underline')} title="밑줄" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+        <Underline className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
 
 export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string; fallbackImageUrl?: string | null }) {
   const t = useTranslations('campaign')
@@ -60,6 +108,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
   return (
     <div className="relative">
+      <SelectionToolbar />
       <div className="mb-3 flex items-center justify-between text-[11px] font-bold text-white/60">
         <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> {t('canvas_instruction')}</span>
         <span>{t('canvas_safe_zone')}</span>
