@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { createContext, useContext, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 interface TabContextType {
   activeTab: string
@@ -11,12 +11,12 @@ interface TabContextType {
 const TabContext = createContext<TabContextType | null>(null)
 
 export function TabProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const activeTab = searchParams.get('tab') || 'concept'
+  const initialTab = searchParams.get('tab') || 'concept'
+  const [activeTab, setActiveTabState] = useState(initialTab)
 
   const setActiveTab = (tab: string) => {
+    setActiveTabState(tab)
     const params = new URLSearchParams(window.location.search)
     if (tab === 'concept') {
       params.delete('tab')
@@ -24,8 +24,8 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
       params.set('tab', tab)
     }
     const query = params.toString()
-    const newUrl = query ? `${pathname}?${query}` : pathname
-    router.push(newUrl, { scroll: false })
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
+    window.history.replaceState(null, '', newUrl)
   }
 
   return (
