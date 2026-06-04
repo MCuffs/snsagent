@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslations } from 'next-intl'
 import { Move, Pencil } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/types'
@@ -9,6 +10,7 @@ import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/t
 const SCALE = 0.5
 
 export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string; fallbackImageUrl?: string | null }) {
+  const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const selectedLayerId = useEditorialStore(state => state.selectedLayerId)
   const selectLayer = useEditorialStore(state => state.selectLayer)
@@ -59,8 +61,8 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   return (
     <div className="relative">
       <div className="mb-3 flex items-center justify-between text-[11px] font-bold text-white/60">
-        <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> DRAG / DOUBLE CLICK TO EDIT</span>
-        <span>1080 x 1350 · SAFE ZONE 72PX</span>
+        <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> {t('canvas_instruction')}</span>
+        <span>{t('canvas_safe_zone')}</span>
       </div>
       <div
         ref={stageRef}
@@ -93,7 +95,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
         <div className="pointer-events-none absolute inset-[36px] border border-dashed border-white/10" />
         {showingRenderedPreview && (
           <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/80">
-            저장된 결과 이미지로 미리보기 중
+            {t('rendered_preview')}
           </div>
         )}
         {guides.x !== undefined && <div className="pointer-events-none absolute bottom-0 top-0 w-px bg-[#29c5ff]" style={{ left: guides.x * SCALE }} />}

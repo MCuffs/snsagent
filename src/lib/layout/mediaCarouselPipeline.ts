@@ -508,16 +508,21 @@ async function generateMediaSlideCopies(
     editorialPlan,
   })
   const storyOntologySection = formatStoryOntologyForPrompt(storyOntology)
+  const isEnglish = input.language === 'en'
 
-  const systemPrompt = isGeneral
-    ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
-    : (knowledgeCtx
-      ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
-      : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.')
+  const systemPrompt = isEnglish
+    ? (isGeneral
+      ? 'You are an English Instagram carousel editor for information, news, and trend content. Summarize only the provided articles or factual material into objective, readable card copy. If real-time news context is provided, reflect the actual article angles, keywords, and trends. Return valid JSON only.'
+      : 'You are an English Instagram carousel copywriter. Write native, specific, editorial social copy based on the provided brand, audience, source material, and slide plan. Do not invent numbers, claims, rankings, reviews, or benefits not supported by the supplied material. Return valid JSON only.')
+    : (isGeneral
+      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
+      : (knowledgeCtx
+        ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+        : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'))
 
-  const langInstruction = input.language === 'en'
-    ? '\n\nIMPORTANT: Write ALL headlines, body copy, and captions in English only. Do not use Korean in any field.'
-    : ''
+  const languageRule = isEnglish
+    ? 'Write every headline, body, caption, and hashtag in natural English only. Do not use Korean in any field.'
+    : '모든 카피는 한국어로 작성'
 
   const hasRssContext = sourceMaterial.includes('[실시간 뉴스 컨텍스트') || sourceMaterial.includes('[Real-Time News Context')
   const rssInstruction = hasRssContext
@@ -531,7 +536,7 @@ async function generateMediaSlideCopies(
 - 출처명이나 URL을 카드 본문에 노출하지 말고, 근거에서 얻은 의미만 자연스러운 카피로 바꾸세요.`
     : ''
 
-  const prompt = `한국 인스타그램 카드뉴스 카피를 작성해주세요.
+  const prompt = `${isEnglish ? 'Write English Instagram carousel card copy.' : '한국 인스타그램 카드뉴스 카피를 작성해주세요.'}
 
 ${editorialPlanSection}
 
@@ -577,7 +582,7 @@ ${slideDescriptions}
 - 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
 - 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
 - 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요${researchInstruction}
-- 모든 카피는 한국어로 작성${langInstruction}
+- ${languageRule}
 - "daily use scene", "mirror audience life", "one defining object", "imagePurpose", "guiding question", "STORY ONTOLOGY", "visualDirection" 같은 영어 기획 토큰은 절대 출력하지 마세요.
 
 JSON 응답 형식:
@@ -1111,7 +1116,10 @@ function buildHashtags(input: MediaCarouselInput) {
     .map(item => item.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .slice(0, 6)
-  return Array.from(new Set(['카드뉴스', '인스타그램콘텐츠', '콘텐츠자동화', ...normalized])).map(tag => `#${tag}`)
+  const defaults = input.language === 'en'
+    ? ['cardnews', 'instagramcontent', 'contentautomation']
+    : ['카드뉴스', '인스타그램콘텐츠', '콘텐츠자동화']
+  return Array.from(new Set([...defaults, ...normalized])).map(tag => `#${tag}`)
 }
 
 function normalizeSlideCount(slideCount: number) {

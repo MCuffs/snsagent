@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Bold, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: Props) {
+  const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
   const updateLayer = useEditorialStore(state => state.updateLayer)
@@ -34,23 +36,23 @@ export function EditorialInspector({ slideId, busy, onUpload, onImageUpload }: P
         <div className="flex items-center justify-between">
           <div>
             <p className="eyebrow">Editorial Editor</p>
-            <h2 className="mt-1 text-lg font-black tracking-[-0.04em]">카드 디자인 편집</h2>
+            <h2 className="mt-1 text-lg font-black tracking-[-0.04em]">{t('editor_title')}</h2>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${dirty ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-            {dirty ? '저장 중' : '저장됨'}
+            {dirty ? t('status_saving') : t('status_saved')}
           </span>
         </div>
         <div className="mt-4 flex gap-2">
-          <IconButton label="실행 취소" onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
-          <IconButton label="다시 실행" onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
+          <IconButton label={t('undo')} onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
+          <IconButton label={t('redo')} onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
         </div>
       </header>
 
       <nav className="grid grid-cols-4 border-b border-[#f0e8de] p-2">
-        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label="글자" />
-        <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label="배경" />
-        <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label="오버레이" />
-        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label="이미지" />
+        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={<Type className="h-4 w-4" />} label={t('tab_text')} />
+        <TabButton active={tab === 'background'} onClick={() => setTab('background')} icon={<ImageIcon className="h-4 w-4" />} label={t('tab_background')} />
+        <TabButton active={tab === 'overlay'} onClick={() => setTab('overlay')} icon={<Sparkles className="h-4 w-4" />} label={t('tab_overlay')} />
+        <TabButton active={tab === 'image'} onClick={() => setTab('image')} icon={<Layers className="h-4 w-4" />} label={t('tab_image')} />
       </nav>
 
       <div className="p-4">
@@ -94,18 +96,19 @@ function TextPanel({
   onTarget: (target: 'title' | 'subtitle') => void
   onChange: (update: Partial<EditorialLayer>) => void
 }) {
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-4">
       <div className="flex rounded-lg bg-[#f7f4ef] p-1">
-        <Segment active={target === 'title'} onClick={() => onTarget('title')}>제목</Segment>
-        <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>본문</Segment>
+        <Segment active={target === 'title'} onClick={() => onTarget('title')}>{t('target_title')}</Segment>
+        <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>{t('target_body')}</Segment>
       </div>
       <textarea
         value={layer.text || ''}
         onChange={event => onChange({ text: event.target.value })}
         rows={target === 'title' ? 2 : 3}
         className="field w-full resize-none p-3 text-sm leading-6"
-        placeholder={target === 'title' ? '헤드라인을 입력하세요' : '본문을 입력하세요'}
+        placeholder={target === 'title' ? t('placeholder_headline') : t('placeholder_body')}
       />
       {/* Font / size / color row */}
       <div className="grid grid-cols-[1fr_70px_36px] gap-2">
@@ -116,35 +119,35 @@ function TextPanel({
           <option value="serif">Editorial Serif</option>
           <option value="magazine">Magazine</option>
         </select>
-        <input type="number" aria-label="글자 크기" value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-10 px-2 text-xs font-bold text-center" />
-        <input type="color" aria-label="텍스트 색상" value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
+        <input type="number" aria-label={t('font_size')} value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-10 px-2 text-xs font-bold text-center" />
+        <input type="color" aria-label={t('text_color')} value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
       </div>
       {/* Style toggles: bold / italic / underline */}
       <div className="flex gap-2">
         <ToggleButton
           active={(layer.fontWeight ?? 400) >= 700}
           onClick={() => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })}
-          label="굵게"
+          label={t('bold')}
         >
           <Bold className="h-3.5 w-3.5" />
         </ToggleButton>
         <ToggleButton
           active={!!layer.italic}
           onClick={() => onChange({ italic: !layer.italic })}
-          label="기울기"
+          label={t('italic')}
         >
           <Italic className="h-3.5 w-3.5" />
         </ToggleButton>
         <ToggleButton
           active={!!layer.underline}
           onClick={() => onChange({ underline: !layer.underline })}
-          label="밑줄"
+          label={t('underline')}
         >
           <Underline className="h-3.5 w-3.5" />
         </ToggleButton>
       </div>
       {/* Weight slider (fine control) */}
-      <RangeControl label="굵기" value={layer.fontWeight || 400} min={100} max={900} onChange={value => onChange({ fontWeight: value })} />
+      <RangeControl label={t('font_weight')} value={layer.fontWeight || 400} min={100} max={900} onChange={value => onChange({ fontWeight: value })} />
     </div>
   )
 }
@@ -158,19 +161,20 @@ function OverlayPanel({
   onOverlay: (preset: OverlayPreset) => void
   onOverlayValue: (key: 'darkness' | 'vignette' | 'contrast', value: number) => void
 }) {
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-5">
-      <OptionGroup title="오버레이 무드">
+      <OptionGroup title={t('overlay_mood')}>
         {([
-          ['netflix-dark', '딥 다크'], ['luxury-editorial', '에디토리얼'], ['dreamy', '소프트'], ['modern-korean-media', '모던 미디어'],
+          ['netflix-dark', t('overlay_deep_dark')], ['luxury-editorial', t('overlay_editorial')], ['dreamy', t('overlay_soft')], ['modern-korean-media', t('overlay_modern')],
         ] as const).map(([key, label]) => (
           <Choice key={key} active={document.overlay.preset === key} onClick={() => onOverlay(key)}>{label}</Choice>
         ))}
       </OptionGroup>
       <div className="space-y-4 border-t border-[#f0e8de] pt-4">
-        <RangeControl label="어둡기" value={document.overlay.darkness} min={0} max={100} onChange={value => onOverlayValue('darkness', value)} />
-        <RangeControl label="비네팅" value={document.overlay.vignette} min={0} max={100} onChange={value => onOverlayValue('vignette', value)} />
-        <RangeControl label="대비" value={document.overlay.contrast} min={50} max={160} onChange={value => onOverlayValue('contrast', value)} />
+        <RangeControl label={t('darkness')} value={document.overlay.darkness} min={0} max={100} onChange={value => onOverlayValue('darkness', value)} />
+        <RangeControl label={t('vignette')} value={document.overlay.vignette} min={0} max={100} onChange={value => onOverlayValue('vignette', value)} />
+        <RangeControl label={t('contrast')} value={document.overlay.contrast} min={50} max={160} onChange={value => onOverlayValue('contrast', value)} />
       </div>
     </div>
   )
@@ -183,20 +187,22 @@ function BackgroundPanel({
   busy: boolean
   onUpload: () => void
 }) {
+  const t = useTranslations('campaign')
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
-        <p>글자와 레이아웃은 그대로 두고 배경 이미지만 직접 교체합니다.</p>
-        <p className="text-[10px] text-[#717b8f] font-semibold">※ 배경 이미지는 텍스트 없이 생성되고, 문구는 편집 가능한 레이어로만 올라갑니다.</p>
+        <p>{t('background_help')}</p>
+        <p className="text-[10px] text-[#717b8f] font-semibold">{t('background_note')}</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
-        <Upload className="h-4 w-4" /> 내 이미지로 교체
+        <Upload className="h-4 w-4" /> {t('replace_background')}
       </button>
     </div>
   )
 }
 
 function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; document: EditorialDocument; busy: boolean; onUpload: () => void }) {
+  const t = useTranslations('campaign')
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const removeLayer = useEditorialStore(state => state.removeLayer)
   const imageLayers = document.layers.filter(l => l.type === 'sticker' && l.id !== 'sticker' && l.imageUrl)
@@ -204,14 +210,14 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
-        <p>이미지를 레이어로 추가합니다. 캔버스에서 드래그해 위치를 조정할 수 있습니다.</p>
+        <p>{t('image_help')}</p>
       </div>
       <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
-        <Upload className="h-4 w-4" /> 이미지 추가
+        <Upload className="h-4 w-4" /> {t('add_image')}
       </button>
       {imageLayers.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-bold text-[#746a62]">추가된 이미지 레이어</p>
+          <p className="text-xs font-bold text-[#746a62]">{t('image_layers')}</p>
           {imageLayers.map(layer => (
             <div key={layer.id} className="rounded-lg border border-[#e8dfd4] p-3 space-y-3">
               <div className="flex items-center gap-3">
@@ -220,7 +226,7 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
                 <p className="flex-1 min-w-0 truncate text-xs font-bold text-[#1f1512]">{layer.name}</p>
                 <button
                   type="button"
-                  aria-label={layer.visible ? '레이어 숨기기' : '레이어 표시'}
+                  aria-label={layer.visible ? t('hide_layer') : t('show_layer')}
                   onClick={() => updateLayer(slideId, layer.id, { visible: !layer.visible })}
                   className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]"
                 >
@@ -228,30 +234,30 @@ function ImagePanel({ slideId, document, busy, onUpload }: { slideId: string; do
                 </button>
                 <button
                   type="button"
-                  aria-label="레이어 삭제"
+                  aria-label={t('delete_layer')}
                   onClick={() => removeLayer(slideId, layer.id)}
                   className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <RangeControl label="불투명도" value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
+              <RangeControl label={t('opacity')} value={layer.opacity} min={0} max={100} onChange={value => updateLayer(slideId, layer.id, { opacity: value })} />
               <div className="grid grid-cols-2 gap-2">
                 <NumberControl label="X" value={layer.x} min={0} max={1080} onChange={value => updateLayer(slideId, layer.id, { x: value })} />
                 <NumberControl label="Y" value={layer.y} min={0} max={1350} onChange={value => updateLayer(slideId, layer.id, { y: value })} />
-                <NumberControl label="가로" value={layer.width} min={16} max={1080} onChange={value => updateLayer(slideId, layer.id, { width: value })} />
-                <NumberControl label="세로" value={layer.height} min={16} max={1350} onChange={value => updateLayer(slideId, layer.id, { height: value })} />
+                <NumberControl label={t('width')} value={layer.width} min={16} max={1080} onChange={value => updateLayer(slideId, layer.id, { width: value })} />
+                <NumberControl label={t('height')} value={layer.height} min={16} max={1350} onChange={value => updateLayer(slideId, layer.id, { height: value })} />
               </div>
-              <RangeControl label="크기" value={Math.round(layer.scale * 100)} min={25} max={400} onChange={value => updateLayer(slideId, layer.id, { scale: value / 100 })} />
-              <RangeControl label="회전" value={layer.rotation} min={-180} max={180} onChange={value => updateLayer(slideId, layer.id, { rotation: value })} />
-              <RangeControl label="모서리 라운드" value={layer.borderRadius ?? 0} min={0} max={50} onChange={value => updateLayer(slideId, layer.id, { borderRadius: value })} />
-              <RangeControl label="외곽 페이드" value={layer.edgeFade ?? 0} min={0} max={80} onChange={value => updateLayer(slideId, layer.id, { edgeFade: value })} />
+              <RangeControl label={t('scale')} value={Math.round(layer.scale * 100)} min={25} max={400} onChange={value => updateLayer(slideId, layer.id, { scale: value / 100 })} />
+              <RangeControl label={t('rotation')} value={layer.rotation} min={-180} max={180} onChange={value => updateLayer(slideId, layer.id, { rotation: value })} />
+              <RangeControl label={t('corner_radius')} value={layer.borderRadius ?? 0} min={0} max={50} onChange={value => updateLayer(slideId, layer.id, { borderRadius: value })} />
+              <RangeControl label={t('edge_fade')} value={layer.edgeFade ?? 0} min={0} max={80} onChange={value => updateLayer(slideId, layer.id, { edgeFade: value })} />
             </div>
           ))}
         </div>
       )}
       {imageLayers.length === 0 && (
-        <p className="py-4 text-center text-xs text-[#9a8d82]">추가된 이미지가 없습니다</p>
+        <p className="py-4 text-center text-xs text-[#9a8d82]">{t('no_images')}</p>
       )}
     </div>
   )

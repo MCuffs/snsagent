@@ -219,6 +219,21 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     briefingTimersRef.current = []
   }, [])
 
+  const addFiles = useCallback((incoming: File[]) => {
+    const imageFiles = incoming.filter(f => f.type.startsWith('image/'))
+    if (!imageFiles.length) return
+    setReferenceFiles(current => {
+      const merged = [...current, ...imageFiles]
+      if (merged.length > 4) {
+        setError(t('error_max_images'))
+        return current
+      }
+      setError(null)
+      if (imageFiles.length > 0) analytics.productImageAdd(imageFiles.length)
+      return merged
+    })
+  }, [t])
+
   const revealBriefing = useCallback((params?: GenerateParams) => {
     clearBriefingTimers()
     if (!params) return
@@ -516,21 +531,6 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       setError(t('error_network'))
       setGenerating(false)
     }
-  }
-
-  const addFiles = (incoming: File[]) => {
-    const imageFiles = incoming.filter(f => f.type.startsWith('image/'))
-    if (!imageFiles.length) return
-    setReferenceFiles(current => {
-      const merged = [...current, ...imageFiles]
-      if (merged.length > 4) {
-        setError(t('error_max_images'))
-        return current
-      }
-      setError(null)
-      if (imageFiles.length > 0) analytics.productImageAdd(imageFiles.length)
-      return merged
-    })
   }
 
   const selectReferenceFiles = (event: React.ChangeEvent<HTMLInputElement>) => {

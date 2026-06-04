@@ -17,17 +17,18 @@ function DashboardFallback() {
   )
 }
 
-export default function ConceptPage() {
+export default async function ConceptPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <Suspense fallback={<DashboardFallback />}>
-      <DashboardDataLoader />
+      <DashboardDataLoader locale={locale} />
     </Suspense>
   )
 }
 
-async function DashboardDataLoader() {
+async function DashboardDataLoader({ locale }: { locale: string }) {
   const user = await getSessionUser()
-  if (!user) redirect('/login')
+  if (!user) redirect(`/${locale}/login`)
 
   const plan = normalizePlan(user.plan || 'FREE')
   await dbService.deleteExpiredCampaignsForUser(user.id, plan)
