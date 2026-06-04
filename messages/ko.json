@@ -282,6 +282,7 @@
     "error_max_images": "참고 이미지는 최대 4장까지 선택할 수 있습니다.",
     "error_generate": "생성에 실패했습니다.",
     "error_network": "서버 통신 중 오류가 발생했습니다.",
+    "paste_hint": "이미지를 복사한 뒤 여기에 붙여넣기 (Ctrl+V / ⌘V)",
     "mode_brand": "브랜드 카드뉴스",
     "mode_general": "일반 카드뉴스 (시사/정보/트렌드)",
     "category_affairs": "시사",

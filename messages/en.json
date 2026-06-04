@@ -282,6 +282,7 @@
     "error_max_images": "You can select up to 4 reference images.",
     "error_generate": "Generation failed.",
     "error_network": "A server communication error occurred.",
+    "paste_hint": "Paste a copied image here (Ctrl+V / ⌘V)",
     "mode_brand": "Brand News",
     "mode_general": "General News (Current Affairs/Info/Trends)",
     "category_affairs": "Affairs",

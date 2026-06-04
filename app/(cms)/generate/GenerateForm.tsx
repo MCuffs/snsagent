@@ -270,6 +270,28 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     clearBriefingTimers()
   }, [clearBriefingTimers, clearTypingTimer])
 
+  // Global paste listener — catches Ctrl+V / Cmd+V anywhere on the page
+  useEffect(() => {
+    if (!readyParams) return
+    const handler = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement
+      // Don't intercept paste in text inputs
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const files = items
+        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter((f): f is File => f !== null)
+      if (files.length > 0) {
+        e.preventDefault()
+        addFiles(files)
+      }
+    }
+    document.addEventListener('paste', handler)
+    return () => document.removeEventListener('paste', handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyParams])
+
   const callAgent = useCallback(async (history: ChatMessage[]) => {
     setIsWaiting(true)
     try {
@@ -470,16 +492,37 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     }
   }
 
+  const addFiles = (incoming: File[]) => {
+    const imageFiles = incoming.filter(f => f.type.startsWith('image/'))
+    if (!imageFiles.length) return
+    setReferenceFiles(current => {
+      const merged = [...current, ...imageFiles]
+      if (merged.length > 4) {
+        setError(t('error_max_images'))
+        return current
+      }
+      setError(null)
+      if (imageFiles.length > 0) analytics.productImageAdd(imageFiles.length)
+      return merged
+    })
+  }
+
   const selectReferenceFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (files.length > 4) {
-      setError(t('error_max_images'))
-      return
+    addFiles(files)
+  }
+
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = Array.from(event.clipboardData.items)
+    const files = items
+      .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter((f): f is File => f !== null)
+    if (files.length > 0) {
+      event.preventDefault()
+      addFiles(files)
     }
-    setReferenceFiles(files)
-    if (files.length > 0) analytics.productImageAdd(files.length)
-    setError(null)
   }
 
   // ── Generating overlay ──────────────────────────────────────────
@@ -701,7 +744,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                     {error}
                   </div>
                 )}
-                <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]">
+                <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
@@ -713,6 +756,9 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                       <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
                     </label>
                   </div>
+                  {referenceFiles.length === 0 && (
+                    <p className="text-[10px] text-[#B8AEA4] text-center py-1">{t('paste_hint')}</p>
+                  )}
                   {referenceFiles.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {referenceFiles.map((file) => (
