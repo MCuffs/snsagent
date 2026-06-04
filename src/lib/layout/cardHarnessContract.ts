@@ -27,11 +27,11 @@ export function getCardHarnessContract(role: string | undefined): CardHarnessCon
   const isClosing = ['summary', 'save-cta', 'cta'].includes(normalizedRole)
   return {
     role: normalizedRole,
-    maxHeadlineChars: isClosing ? 22 : 20,
-    maxBodyChars: isClosing ? 58 : 64,
-    maxBodyLines: 2,
-    lineLength: isClosing ? 22 : 24,
-    maxTotalChars: isClosing ? 78 : 84,
+    maxHeadlineChars: isClosing ? 26 : 24,
+    maxBodyChars: isClosing ? 130 : 160,
+    maxBodyLines: isClosing ? 4 : 5,
+    lineLength: isClosing ? 28 : 30,
+    maxTotalChars: isClosing ? 170 : 210,
     requiresAction: ['save-cta', 'cta'].includes(normalizedRole),
   }
 }

@@ -169,9 +169,9 @@ function validateMobileReadability(
     warnings.push('헤드라인 전체 자수가 너무 깁니다. 모바일 탐색 피드에서 시선을 끌기 어렵습니다.')
   }
 
-  if (body.length > 90) {
+  if (body.length > 160) {
     score -= 15
-    warnings.push('본문 카피라인이 권장 수준(90자)을 초과하여 텍스트 밀도가 너무 높습니다.')
+    warnings.push('본문 카피라인이 권장 수준(160자)을 초과하여 텍스트 밀도가 너무 높습니다.')
   }
 
   return {

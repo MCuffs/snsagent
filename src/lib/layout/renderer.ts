@@ -44,7 +44,15 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const badgeToHeadlineGap = input.layout.spacingRules?.badgeToHeadlineGap || 24
   const headlineToBodyGap = input.layout.spacingRules?.headlineToBodyGap || 36
 
-  let currentY = textBox.y
+  let currentY = fitTextBoxY({
+    layout: input.layout,
+    textBoxY: textBox.y,
+    typography,
+    headlineLineGap,
+    bodyLineGap,
+    badgeToHeadlineGap,
+    headlineToBodyGap,
+  })
   const kickerMarkup = renderKicker(input, textBox.x, currentY, textColor, textBox.align)
   currentY += 24 + badgeToHeadlineGap
 
@@ -108,6 +116,40 @@ function getTextBox(layout: LayoutDefinition) {
     default:
       return { x: left, y: bottom, align: 'left' as const }
   }
+}
+
+function fitTextBoxY(input: {
+  layout: LayoutDefinition
+  textBoxY: number
+  typography: TypographyPlan
+  headlineLineGap: number
+  bodyLineGap: number
+  badgeToHeadlineGap: number
+  headlineToBodyGap: number
+}) {
+  const blockHeight = estimateRenderedTextBlockHeight(input)
+  const safeTop = input.layout.safeArea.top + 48
+  const safeBottom = 1350 - input.layout.safeArea.bottom
+  const overflow = input.textBoxY + blockHeight - safeBottom
+  if (overflow <= 0) return input.textBoxY
+  return Math.max(safeTop, input.textBoxY - overflow - 24)
+}
+
+function estimateRenderedTextBlockHeight(input: {
+  typography: TypographyPlan
+  headlineLineGap: number
+  bodyLineGap: number
+  badgeToHeadlineGap: number
+  headlineToBodyGap: number
+}) {
+  const kickerHeight = 24 + input.badgeToHeadlineGap
+  const headlineHeight = Math.max(1, input.typography.headlineLines.length) *
+    input.typography.headlineFontSize *
+    input.headlineLineGap
+  const bodyHeight = Math.max(1, input.typography.bodyLines.length) *
+    input.typography.bodyFontSize *
+    input.bodyLineGap
+  return kickerHeight + headlineHeight + input.headlineToBodyGap + bodyHeight
 }
 
 function renderTopChrome(source: string, pageNumber: number | undefined, totalPages: number | undefined, fill: string) {
@@ -175,9 +217,11 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
     .map(line => line.tokens.map(token => token.text).join(' '))
     .join(' ') || input.headline
   const bodyLines = typography.bodyLines.length ? typography.bodyLines : [input.body]
-  if (bodyLines.length > 4) {
-    throw new Error(`CTA layout body exceeds renderable line limit (${bodyLines.length}/4)`)
+  if (bodyLines.length > 5) {
+    throw new Error(`CTA layout body exceeds renderable line limit (${bodyLines.length}/5)`)
   }
+  const ctaBodyFontSize = bodyLines.length > 4 ? Math.min(typography.bodyFontSize, 22) : typography.bodyFontSize
+  const ctaBodyStartY = bodyLines.length > 4 ? 982 : 1002
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
@@ -194,7 +238,7 @@ async function renderArchiveCta(input: RenderMediaCardInput) {
   ${renderTopChrome(sourceMark, input.pageNumber, input.totalPages, textColor)}
   <text xml:space="preserve" x="540" y="675" text-anchor="middle" font-family="${fontFam}" font-size="52" font-weight="700" fill="${textColor}" fill-opacity="0.42" letter-spacing="2">${sourceMark.toUpperCase()}</text>
   <text xml:space="preserve" x="540" y="925" text-anchor="middle" font-family="${fontFam}" font-size="${typography.headlineFontSize}" font-weight="750" fill="${textColor}" letter-spacing="-0.5">${escapeXml(headline)}</text>
-  ${bodyLines.map((line, index) => `<text xml:space="preserve" x="540" y="${1002 + index * (typography.bodyFontSize + 14)}" text-anchor="middle" font-family="${fontFam}" font-size="${typography.bodyFontSize}" font-weight="400" fill="${secondaryTextColor}" fill-opacity="0.64" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
+  ${bodyLines.map((line, index) => `<text xml:space="preserve" x="540" y="${ctaBodyStartY + index * (ctaBodyFontSize + 12)}" text-anchor="middle" font-family="${fontFam}" font-size="${ctaBodyFontSize}" font-weight="400" fill="${secondaryTextColor}" fill-opacity="0.64" letter-spacing="-0.2">${escapeXml(line)}</text>`).join('')}
   <line x1="72" y1="1188" x2="1008" y2="1188" stroke="#ffffff" stroke-opacity="0.16"/>
   <rect x="72" y="1230" width="936" height="78" fill="#f3f3f3"/>
   <text xml:space="preserve" x="540" y="1280" text-anchor="middle" font-family="${fontFamily('clean-sans')}" font-size="28" font-weight="700" fill="#050505" letter-spacing="0">팔로우 ${escapeXml(sourceHandle)}</text>

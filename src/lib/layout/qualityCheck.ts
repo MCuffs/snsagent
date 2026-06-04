@@ -63,7 +63,7 @@ export function runMediaCardQualityCheck(params: {
 
   if (params.body.length > params.layout.recommendedBodyLength * 1.8) {
     issues.push('본문 카피라인이 너무 길어 화면을 채우고 모바일 시인성을 해칩니다.')
-    suggestions.push('본문은 1~2줄의 에디토리얼 핵심 요약문으로 압축하세요.')
+    suggestions.push('본문은 의미를 유지하되 3~5줄 안에서 읽히도록 문장 밀도와 줄바꿈을 조정하세요.')
   }
 
   if (params.typography.headlineLines.length > params.typography.maxLineCount) {
@@ -93,7 +93,7 @@ export function runMediaCardQualityCheck(params: {
 
   if (totalTextHeight > safeHeight) {
     issues.push(`타이포그래피 세로 높이(${Math.round(totalTextHeight)}px)가 Safe Area 높이(${safeHeight}px)를 초과하여 오버플로우 위험이 있습니다.`)
-    suggestions.push('본문 문장 길이를 축소하거나 줄바꿈 개수를 줄이십시오.')
+    suggestions.push('텍스트 시작 위치를 위로 당기거나 본문 폰트 크기와 줄 간격을 조정하세요.')
   }
 
   // 4. AI 생성 이미지 가이드라인 및 워터마크 혼입 위험 자가 진단
