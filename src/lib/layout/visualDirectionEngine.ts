@@ -1,7 +1,7 @@
 import { LAYOUT_DEFINITIONS, type LayoutDefinition } from './layoutTypes'
 import { formatVisualBrandLanguage, translateBrandToVisualLanguage } from './brandHarness'
 import type { EditorialSlideRole, EditorialVisualDirection } from '../editorial/editorialDirector'
-import { formatDomainVisualGuidance, getDomainProfileForText } from '../content/domainProfile'
+import { formatDomainVisualGuidance, getGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
 
 export interface VisualDirectionInput {
   layout: LayoutDefinition
@@ -17,6 +17,7 @@ export interface VisualDirectionInput {
   brandDna?: string | null
   role?: EditorialSlideRole
   editorialDirection?: EditorialVisualDirection
+  domainProfile?: DomainProfile
 }
 
 export interface VisualDirection {
@@ -28,8 +29,8 @@ export interface VisualDirection {
   }
 }
 
-function inferSubject(topic: string, category: string): string {
-  const profile = getDomainProfileForText(topic, category)
+function inferSubject(topic: string, category: string, domainProfile?: DomainProfile): string {
+  const profile = domainProfile ?? getGenerationDomainProfile({ topic, category })
   const explicitSubject = extractExplicitSubject(topic)
   if (profile.domain !== 'general') {
     return explicitSubject
@@ -52,8 +53,14 @@ function inferSubject(topic: string, category: string): string {
 
 export function generateVisualDirection(input: VisualDirectionInput): VisualDirection {
   const context = `${input.brandIndustry || ''} ${input.category} ${input.topic} ${input.tone}`.toLowerCase()
-  const domainProfile = getDomainProfileForText(input.topic, input.category, input.tone, input.brandIndustry, input.visualHint, input.brandDna)
+  const domainProfile = input.domainProfile ?? getGenerationDomainProfile({
+    topic: input.topic,
+    category: input.category,
+    brandIndustry: input.brandIndustry,
+    contentType: input.tone,
+  })
   console.info('[DomainProfile:visual]', {
+    source: input.domainProfile ? 'resolved' : 'fallback',
     topic: input.topic,
     category: input.category,
     brandIndustry: input.brandIndustry,
@@ -65,7 +72,7 @@ export function generateVisualDirection(input: VisualDirectionInput): VisualDire
   const role = input.role || 'detail'
   const roleDirection = roleVisualLanguage(role)
   const scene = inferScene(context, domainProfile.imageScene)
-  const subject = inferSubject(input.topic, input.category)
+  const subject = inferSubject(input.topic, input.category, domainProfile)
   const brandLanguage = translateBrandToVisualLanguage({
     brandIndustry: input.brandIndustry,
     brandToneOfVoice: input.brandToneOfVoice,

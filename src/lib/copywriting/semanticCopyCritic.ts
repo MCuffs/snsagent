@@ -1,4 +1,4 @@
-import { getDomainBannedTerms, getDomainProfileForText } from '../content/domainProfile'
+import { getDomainBannedTerms, getDomainProfileForText, type DomainProfile } from '../content/domainProfile'
 
 export interface SemanticSlideInput {
   slideNumber: number
@@ -85,10 +85,11 @@ export function evaluateSemanticCopy(params: {
   topic: string
   slides: SemanticSlideInput[]
   language?: 'ko' | 'en'
+  domainProfile?: DomainProfile
 }): SemanticCopyReport {
   const language = params.language === 'en' ? 'en' : 'ko'
   const topicTokens = extractMeaningTokens(params.topic, language)
-  const domainProfile = getDomainProfileForText(params.topic)
+  const domainProfile = params.domainProfile ?? getDomainProfileForText(params.topic)
   const domainBannedTerms = getDomainBannedTerms(domainProfile.domain)
   const issues: SemanticIssue[] = []
   const bodyCounts = new Map<string, number>()

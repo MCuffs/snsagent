@@ -202,6 +202,20 @@ export function getDomainProfileForText(...values: Array<string | undefined | nu
   return getDomainProfile(inferContentDomain(...values))
 }
 
+export function getGenerationDomainProfile(params: {
+  topic?: string | null
+  category?: string | null
+  brandIndustry?: string | null
+  contentType?: string | null
+}): DomainProfile {
+  return getDomainProfileForText(
+    params.topic,
+    params.brandIndustry,
+    params.category,
+    params.contentType,
+  )
+}
+
 export function getDomainBannedTerms(domain: ContentDomain): string[] {
   return [...COMMON_BANNED, ...getDomainProfile(domain).bannedCopyTerms]
 }
