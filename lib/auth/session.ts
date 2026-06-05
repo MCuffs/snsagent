@@ -4,7 +4,7 @@ import { getSessionSigningSecret, isProduction } from '../env'
 export const SESSION_COOKIE_NAME = 'shuffla_session'
 export const LEGACY_SESSION_COOKIE_NAME = 'instaagent_session_email'
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = 'google_oauth_state'
-export const SESSION_DURATION_SECONDS = 60 * 60
+export const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60 // 7 days
 
 export function sessionCookieOptions() {
   return {

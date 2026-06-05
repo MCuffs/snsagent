@@ -2,7 +2,8 @@ import { dbService } from '../../lib/db-service'
 import { PRICING_PLANS, normalizePlan } from '../../lib/limits-types'
 import { getCampaignUsagePeriodStart } from '../../lib/usage-period'
 
-const SUPER_USER_EMAILS = ['alstnwjd0424@gmail.com', 'imhs1248@gmail.com', 'kanghiee616@gmail.com']
+const SUPER_USER_EMAILS = (process.env.SUPER_USER_EMAILS || 'alstnwjd0424@gmail.com,imhs1248@gmail.com,kanghiee616@gmail.com')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
 function isSuperUser(email?: string | null): boolean {
   if (!email) return false

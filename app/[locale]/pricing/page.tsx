@@ -29,7 +29,7 @@ const faqs = {
     { q: 'What if I want to regenerate a free result?', a: 'Select AI Regeneration on the result screen to add a single ₩3,000 pass instead of a full subscription.' },
     { q: 'Can I edit the AI-generated card news?', a: 'Yes. You can edit the copy and layout directly after generation.' },
     { q: 'Can I use it with multiple brands?', a: 'Currently one brand per account is supported. Contact us for multi-brand inquiries.' },
-    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
+    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day history retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
     { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create 2 card news in total without payment.' },
     { q: 'Can I change plans at any time?', a: 'Canceling your current subscription reverts access immediately. You can then choose a new plan.' },
     { q: 'Where do I complete payment?', a: 'After Google Login and brand setup, the billing screen lets you select and pay for your plan.' },
@@ -188,7 +188,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                 </div>
               </div>
               <a
-                href="mailto:support@shuffla.ai"
+                href="mailto:alstnwjd0424@gmail.com"
                 className="inline-flex h-11 items-center gap-1.5 rounded-full bg-[#0a0a0a] px-6 text-[14px] font-bold text-white hover:bg-[#1a1a1a] transition-colors whitespace-nowrap"
               >
                 {isEn ? 'Contact us' : '도입 문의하기'} <ArrowRight className="h-4 w-4" />
@@ -256,7 +256,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </div>
             <div className="mt-14 text-center">
               <p className="text-[14px] text-[#525252]">{isEn ? 'Have more questions?' : '더 궁금한 점이 있나요?'}</p>
-              <a href="mailto:support@shuffla.ai" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0a0a0a] hover:gap-2.5 transition-all">
+              <a href="mailto:alstnwjd0424@gmail.com" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0a0a0a] hover:gap-2.5 transition-all">
                 {isEn ? 'Contact us' : '문의하기'} <ArrowRight className="h-4 w-4" />
               </a>
             </div>
