@@ -5,11 +5,26 @@ import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
 
-export async function generateMetadata() {
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   const t = await getTranslations('pricing')
   return {
     title: t('meta_title'),
-    description: t('desc'),
+    description: isEn
+      ? 'Shuffla pricing: Free plan with 2 card news, Creator at ₩25,000/mo for 20/month, Studio at ₩39,000/mo for 30/month.'
+      : 'Shuffla 요금제: 무료 2회, Creator 월 25,000원(월 20회), Studio 월 39,000원(월 30회).',
+    alternates: {
+      canonical: `${base}/${locale}/pricing`,
+      languages: { ko: `${base}/ko/pricing`, en: `${base}/en/pricing` },
+    },
+    openGraph: {
+      title: t('meta_title'),
+      description: isEn ? 'Choose the plan that fits your content workflow.' : '콘텐츠 운영 규모에 맞는 플랜을 선택하세요.',
+      url: `${base}/${locale}/pricing`,
+      type: 'website',
+    },
   }
 }
 
@@ -63,6 +78,32 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const accessHref = authenticated ? `/${locale}/billing` : '/api/auth/google/start'
   const t = await getTranslations('pricing')
   const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
+
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: (isEn ? faqs.en : faqs.ko).map(faq => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: { '@type': 'Answer', text: faq.a },
+    })),
+  }
+
+  const pricingJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: isEn ? 'Shuffla Pricing' : 'Shuffla 요금제',
+    url: `${base}/${locale}/pricing`,
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Free', description: PRICING_PLANS.FREE.description_en },
+        { '@type': 'ListItem', position: 2, name: 'Creator', description: PRICING_PLANS.PRO.description_en },
+        { '@type': 'ListItem', position: 3, name: 'Studio', description: PRICING_PLANS.UNLIMITED.description_en },
+      ],
+    },
+  }
 
   const plans = [
     {
@@ -104,8 +145,11 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const compareList = isEn ? compareFeatures.en : compareFeatures.ko
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
-      <MarketingNav authenticated={authenticated} locale={locale} />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }} />
+      <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
+        <MarketingNav authenticated={authenticated} locale={locale} />
 
       <main className="flex-1">
         {/* HEADER */}
@@ -266,5 +310,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
       <MarketingFooter authenticated={authenticated} locale={locale} />
     </div>
+    </>
   )
 }
