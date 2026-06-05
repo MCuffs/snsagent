@@ -6,6 +6,12 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@resvg/resvg-js'],
+  async rewrites() {
+    return [
+      { source: '/sitemap.xml', destination: '/api/sitemap' },
+      { source: '/robots.txt', destination: '/api/robots' },
+    ]
+  },
   async headers() {
     return [
       {
