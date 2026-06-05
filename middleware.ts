@@ -7,9 +7,10 @@ const intlMiddleware = createMiddleware(routing)
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Pass through API routes, static files, and Next.js internals
+  // Pass through API routes, static files, Next.js internals, and admin routes
   if (
     pathname.startsWith('/api') ||
+    pathname.startsWith('/admin') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/_vercel') ||
     pathname.match(/\.[a-zA-Z0-9]+$/)
