@@ -14,7 +14,7 @@ interface RssFetchResult {
   topArticle: RssArticle | null
 }
 
-const FEEDS: Record<string, string[]> = {
+const FEEDS_KO: Record<string, string[]> = {
   'current-affairs': [
     'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko',
     'https://news.google.com/rss/headlines/section/topic/NATION?hl=ko&gl=KR&ceid=KR:ko',
@@ -52,6 +52,32 @@ const FEEDS: Record<string, string[]> = {
     'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko',
   ],
 }
+
+const FEEDS_EN: Record<string, string[]> = {
+  'current-affairs': [
+    'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
+    'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en',
+  ],
+  'information': [
+    'https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-US&gl=US&ceid=US:en',
+    'https://news.google.com/rss/headlines/section/topic/HEALTH?hl=en-US&gl=US&ceid=US:en',
+  ],
+  'trends': [
+    'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en',
+    'https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=en-US&gl=US&ceid=US:en',
+  ],
+  'tech': [
+    'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en',
+    'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
+  ],
+  'business': [
+    'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en',
+    'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
+  ],
+}
+
+// Legacy default — Korean
+const FEEDS = FEEDS_KO
 
 const TOPIC_STOPWORDS = new Set([
   '카드뉴스', '카드', '뉴스', '만들어주세요', '만들어줘', '만들어', '제작해주세요', '제작해줘',
@@ -133,9 +159,11 @@ export async function fetchRssForGeneration(params: {
   keywords: string[]
   topic?: string
   limit?: number
+  language?: 'ko' | 'en'
 }): Promise<RssFetchResult> {
-  const { category, keywords, topic, limit = 5 } = params
-  const feedUrls = FEEDS[category] || FEEDS['current-affairs']
+  const { category, keywords, topic, limit = 5, language = 'ko' } = params
+  const feedMap = language === 'en' ? FEEDS_EN : FEEDS_KO
+  const feedUrls = feedMap[category] || feedMap['current-affairs'] || FEEDS_KO['current-affairs']
 
   try {
     const feedResults = await Promise.all(feedUrls.map(fetchOneFeed))

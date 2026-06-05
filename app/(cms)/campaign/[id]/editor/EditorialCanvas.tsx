@@ -11,6 +11,7 @@ const SCALE = 0.5
 
 // Floating toolbar that appears over selected text in contentEditable layers
 function SelectionToolbar() {
+  const t = useTranslations('campaign')
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
@@ -44,13 +45,13 @@ function SelectionToolbar() {
       className="flex items-center gap-0.5 rounded-lg border border-[#333] bg-[#1a1a1a] px-1.5 py-1 shadow-2xl"
       onMouseDown={e => e.preventDefault()}
     >
-      <button type="button" onClick={() => apply('bold')} title="굵게" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button type="button" onClick={() => apply('bold')} title={t('bold')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
         <Bold className="h-3.5 w-3.5" />
       </button>
-      <button type="button" onClick={() => apply('italic')} title="기울임" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button type="button" onClick={() => apply('italic')} title={t('italic')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
         <Italic className="h-3.5 w-3.5" />
       </button>
-      <button type="button" onClick={() => apply('underline')} title="밑줄" className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button type="button" onClick={() => apply('underline')} title={t('underline')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
         <Underline className="h-3.5 w-3.5" />
       </button>
     </div>

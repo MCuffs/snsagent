@@ -1195,6 +1195,9 @@ ${slidesSummary}
 - 첫 단어로 주제명이나 카드뉴스 제목을 그대로 쓰지 말 것`
 
   const client = getLLMClient()
+  const systemPrompt = isEn
+    ? 'You are a professional Instagram content writer. Write only in natural English. Never use Korean.'
+    : '당신은 인스타그램 카드뉴스 전문 카피라이터입니다. 반드시 한국어로만 작성하세요.'
   try {
     const result = await client.generateJson<{ caption: string }>(
       'instagram caption generation',
@@ -1203,6 +1206,7 @@ ${slidesSummary}
       {
         model: getCopywritingModel(),
         temperature: 0.7,
+        systemPrompt,
         diagnostics: {
           userId: input.userId,
           brandId: input.brandId,

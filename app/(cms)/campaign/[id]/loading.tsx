@@ -1,4 +1,7 @@
-export default function CampaignDetailsLoading() {
+import { getTranslations } from 'next-intl/server'
+
+export default async function CampaignDetailsLoading() {
+  const t = await getTranslations('campaign')
   return (
     <div className="flex h-full min-h-screen bg-[#fbfaf7]">
       <aside className="hidden w-72 shrink-0 border-r border-[#ebe6dd] bg-white p-5 lg:block">
@@ -14,7 +17,7 @@ export default function CampaignDetailsLoading() {
         <div className="flex w-full max-w-md flex-col items-center gap-5">
           <div className="aspect-[4/5] w-full animate-pulse rounded-2xl border border-[#ebe6dd] bg-[#f1eee8]" />
           <div className="h-3 w-48 animate-pulse rounded bg-[#e4dfd5]" />
-          <p className="text-sm font-semibold text-[#81786d]">작업물을 불러오는 중입니다.</p>
+          <p className="text-sm font-semibold text-[#81786d]">{t('loading_campaign')}</p>
         </div>
       </main>
     </div>

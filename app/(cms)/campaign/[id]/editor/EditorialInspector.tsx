@@ -97,7 +97,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
         <div className="mt-4 flex gap-2">
           <IconButton label={t('undo')} onClick={() => undo(slideId)}><Undo2 className="h-4 w-4" /></IconButton>
           <IconButton label={t('redo')} onClick={() => redo(slideId)}><Redo2 className="h-4 w-4" /></IconButton>
-          <IconButton label="템플릿으로 저장" onClick={() => setShowTemplateInput(v => !v)}><BookmarkPlus className="h-4 w-4" /></IconButton>
+          <IconButton label={t('template_save')} onClick={() => setShowTemplateInput(v => !v)}><BookmarkPlus className="h-4 w-4" /></IconButton>
         </div>
         {showTemplateInput && (
           <div className="mt-3 flex gap-2">
@@ -105,7 +105,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
               value={templateName}
               onChange={e => setTemplateName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSaveTemplate()}
-              placeholder="템플릿 이름 입력"
+              placeholder={t('template_name_placeholder')}
               className="field flex-1 h-9 px-3 text-xs"
               autoFocus
             />
@@ -115,7 +115,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
               onClick={handleSaveTemplate}
               className="btn-primary h-9 rounded-md px-3 text-xs disabled:opacity-40"
             >
-              저장
+              {t('template_save_btn')}
             </button>
           </div>
         )}
@@ -126,7 +126,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
         <TabButton active={tab === 'background'} onClick={() => handleTabChange('background')} icon={<ImageIcon className="h-4 w-4" />} label={t('tab_background')} />
         <TabButton active={tab === 'overlay'} onClick={() => handleTabChange('overlay')} icon={<Sparkles className="h-4 w-4" />} label={t('tab_overlay')} />
         <TabButton active={tab === 'image'} onClick={() => handleTabChange('image')} icon={<Layers className="h-4 w-4" />} label={t('tab_image')} />
-        <TabButton active={tab === 'templates'} onClick={() => handleTabChange('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label="템플릿" />
+        <TabButton active={tab === 'templates'} onClick={() => handleTabChange('templates')} icon={<BookmarkCheck className="h-4 w-4" />} label={t('tab_templates')} />
       </nav>
 
       <div className="p-4">
@@ -280,7 +280,7 @@ function OverlayPanel({
         onClick={handleApplyToAll}
         className={`w-full rounded-lg border py-2.5 text-xs font-bold transition-colors ${applied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'}`}
       >
-        {applied ? '✓ 전체 카드에 적용됨' : '이 오버레이를 전체 카드에 적용'}
+        {applied ? t('overlay_applied_all') : t('overlay_apply_all')}
       </button>
     </div>
   )
@@ -382,21 +382,23 @@ function TemplatesPanel({
   onApply: (t: SavedTemplate) => void
   onDelete: (id: string) => void
 }) {
-  if (loading) return <p className="py-6 text-center text-xs text-[#9a8d82]">불러오는 중…</p>
+  const t = useTranslations('campaign')
+  const locale = typeof window !== 'undefined' ? document.documentElement.lang : 'ko'
+  if (loading) return <p className="py-6 text-center text-xs text-[#9a8d82]">{t('templates_loading')}</p>
   if (templates.length === 0) {
     return (
       <div className="space-y-3">
         <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
-          <p>편집 중인 카드의 스타일(폰트·오버레이·레이아웃)을 템플릿으로 저장하면, 다른 카드에 한 번에 적용할 수 있어요.</p>
+          <p>{t('templates_hint')}</p>
         </div>
-        <p className="py-4 text-center text-xs text-[#9a8d82]">저장된 템플릿이 없습니다</p>
+        <p className="py-4 text-center text-xs text-[#9a8d82]">{t('templates_empty')}</p>
       </div>
     )
   }
   return (
     <div className="space-y-3">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070]">
-        <p>적용하면 텍스트·배경 이미지는 유지되고, 폰트·오버레이·레이아웃만 교체됩니다.</p>
+        <p>{t('templates_apply_hint')}</p>
       </div>
       {templates.map(tmpl => {
         const isSameSlide = tmpl.slideNumber == null || tmpl.slideNumber === currentSlideNumber
@@ -407,22 +409,22 @@ function TemplatesPanel({
                 <p className="truncate text-xs font-bold text-[#1f1512]">{tmpl.name}</p>
                 {tmpl.slideNumber != null && (
                   <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isSameSlide ? 'bg-[#0066ff]/10 text-[#0066ff]' : 'bg-amber-100 text-amber-700'}`}>
-                    {tmpl.slideNumber}번 카드
+                    {t('template_slide_label', { number: tmpl.slideNumber })}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-[#9a8d82]">{new Date(tmpl.createdAt).toLocaleDateString('ko-KR')}</p>
+              <p className="text-[10px] text-[#9a8d82]">{new Date(tmpl.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ko-KR')}</p>
             </div>
             <button
               type="button"
               onClick={() => onApply(tmpl)}
               className="rounded-md bg-[#111318] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#0066ff]"
             >
-              적용
+              {t('template_apply')}
             </button>
             <button
               type="button"
-              aria-label="템플릿 삭제"
+              aria-label={t('template_delete')}
               onClick={() => onDelete(tmpl.id)}
               className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e8dfd4] text-[#514a44] hover:border-red-400 hover:text-red-500"
             >

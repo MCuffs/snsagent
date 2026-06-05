@@ -485,7 +485,21 @@
     "no_images": "추가된 이미지가 없습니다",
     "canvas_instruction": "드래그 / 더블클릭으로 편집",
     "canvas_safe_zone": "1080 x 1350 · 안전 영역 72PX",
-    "rendered_preview": "저장된 결과 이미지로 미리보기 중"
+    "rendered_preview": "저장된 결과 이미지로 미리보기 중",
+    "template_save": "템플릿으로 저장",
+    "template_name_placeholder": "템플릿 이름 입력",
+    "template_save_btn": "저장",
+    "tab_templates": "템플릿",
+    "overlay_apply_all": "이 오버레이를 전체 카드에 적용",
+    "overlay_applied_all": "✓ 전체 카드에 적용됨",
+    "templates_loading": "불러오는 중…",
+    "templates_empty": "저장된 템플릿이 없습니다",
+    "templates_hint": "편집 중인 카드의 스타일(폰트·오버레이·레이아웃)을 템플릿으로 저장하면, 다른 카드에 한 번에 적용할 수 있어요.",
+    "templates_apply_hint": "적용하면 텍스트·배경 이미지는 유지되고, 폰트·오버레이·레이아웃만 교체됩니다.",
+    "template_slide_label": "{number}번 카드",
+    "template_apply": "적용",
+    "template_delete": "템플릿 삭제",
+    "loading_campaign": "작업물을 불러오는 중입니다."
   },
   "hero": {
     "title_line1": "카드뉴스를",

@@ -485,7 +485,21 @@
     "no_images": "No images added",
     "canvas_instruction": "Drag / double-click to edit",
     "canvas_safe_zone": "1080 x 1350 · safe zone 72px",
-    "rendered_preview": "Previewing the saved result image"
+    "rendered_preview": "Previewing the saved result image",
+    "template_save": "Save as template",
+    "template_name_placeholder": "Template name",
+    "template_save_btn": "Save",
+    "tab_templates": "Templates",
+    "overlay_apply_all": "Apply overlay to all cards",
+    "overlay_applied_all": "✓ Applied to all cards",
+    "templates_loading": "Loading…",
+    "templates_empty": "No saved templates",
+    "templates_hint": "Save the current card's style (font, overlay, layout) as a template to apply it to other cards at once.",
+    "templates_apply_hint": "Text and background images are preserved — only font, overlay, and layout are replaced.",
+    "template_slide_label": "Card {number}",
+    "template_apply": "Apply",
+    "template_delete": "Delete template",
+    "loading_campaign": "Loading your work…"
   },
   "hero": {
     "title_line1": "Card news,",

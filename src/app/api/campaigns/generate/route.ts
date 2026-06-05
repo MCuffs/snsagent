@@ -120,6 +120,7 @@ export async function POST(request: Request) {
           keywords,
           topic: body.topic,
           limit: 5,
+          language: body.language || 'ko',
         })
 
         const rssContext = buildRssContext(rssResult, body.language || 'ko')
