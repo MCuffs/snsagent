@@ -225,10 +225,18 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
   if (layer.imageUrl) {
     const radius = layer.borderRadius ?? 0
     const fade = layer.edgeFade ?? 0
-    // Build a CSS mask that combines border-radius (via inset clip) and edge fade (via radial gradient)
-    const maskGradient = fade > 0
-      ? `radial-gradient(ellipse at center, black ${100 - fade}%, transparent 100%)`
-      : undefined
+    // Edge fade: 4-directional linear gradients composited via mask-composite.
+    // Each gradient fades from transparent (outer edge) to black (inner) over `fade`%.
+    // This gives a clean rectangular fade on all 4 sides regardless of image aspect ratio.
+    let maskImage: string | undefined
+    if (fade > 0) {
+      const stop = `${fade}%`
+      const top    = `linear-gradient(to bottom, transparent 0%, black ${stop})`
+      const bottom = `linear-gradient(to top,    transparent 0%, black ${stop})`
+      const left   = `linear-gradient(to right,  transparent 0%, black ${stop})`
+      const right  = `linear-gradient(to left,   transparent 0%, black ${stop})`
+      maskImage = `${top}, ${bottom}, ${left}, ${right}`
+    }
     return (
       <>
         {selected && <Pencil className="absolute -right-5 -top-5 h-4 w-4 text-[#29c5ff]" />}
@@ -240,8 +248,10 @@ function LayerContent({ layer, selected, onText }: { layer: EditorialLayer; sele
           className="pointer-events-none h-full w-full select-none object-contain"
           style={{
             borderRadius: radius > 0 ? `${radius}%` : undefined,
-            WebkitMaskImage: maskGradient,
-            maskImage: maskGradient,
+            WebkitMaskImage: maskImage,
+            maskImage: maskImage,
+            WebkitMaskComposite: maskImage ? 'source-in' : undefined,
+            maskComposite: maskImage ? 'intersect' : undefined,
           }}
         />
       </>
