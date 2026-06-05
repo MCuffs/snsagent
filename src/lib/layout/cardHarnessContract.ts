@@ -22,15 +22,26 @@ export const HARNESSED_COPY_META_TOKENS = [
   'recognizable daily situation',
 ]
 
-export function getCardHarnessContract(role: string | undefined): CardHarnessContract {
+export function getCardHarnessContract(role: string | undefined, language: 'ko' | 'en' = 'ko'): CardHarnessContract {
   const normalizedRole = role || 'detail'
   const isClosing = ['summary', 'save-cta', 'cta'].includes(normalizedRole)
+  // EN headlines are measured in chars too but English words are longer — allow more chars
+  const maxHeadline = language === 'en'
+    ? (isClosing ? 42 : 40)
+    : (isClosing ? 26 : 24)
+  // EN body: 1–2 punchy sentences ≈ 120 chars max; KO: 130–160 chars
+  const maxBody = language === 'en'
+    ? (isClosing ? 110 : 130)
+    : (isClosing ? 130 : 160)
+  const lineLen = language === 'en'
+    ? (isClosing ? 42 : 44)
+    : (isClosing ? 28 : 30)
   return {
     role: normalizedRole,
-    maxHeadlineChars: isClosing ? 26 : 24,
-    maxBodyChars: isClosing ? 130 : 160,
+    maxHeadlineChars: maxHeadline,
+    maxBodyChars: maxBody,
     maxBodyLines: isClosing ? 4 : 5,
-    lineLength: isClosing ? 28 : 30,
+    lineLength: lineLen,
     maxTotalChars: isClosing ? 170 : 210,
     requiresAction: ['save-cta', 'cta'].includes(normalizedRole),
   }
@@ -41,8 +52,9 @@ export function repairCopyToHarness(params: {
   role: string
   headline: string
   body: string
+  language?: 'ko' | 'en'
 }): { headline: string; body: string; issues: string[] } {
-  const contract = getCardHarnessContract(params.role)
+  const contract = getCardHarnessContract(params.role, params.language)
   const issues: string[] = []
   const headline = normalizeCopy(params.headline)
   const body = normalizeCopy(params.body)

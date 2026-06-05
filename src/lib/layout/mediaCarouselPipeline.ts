@@ -561,8 +561,8 @@ async function generateMediaSlideCopies(
 
   const systemPrompt = isEnglish
     ? (isGeneral
-      ? 'You are an English Instagram carousel editor for information, news, and trend content. Summarize only the provided articles or factual material into objective, readable card copy. If real-time news context is provided, reflect the actual article angles, keywords, and trends. Return valid JSON only.'
-      : 'You are an English Instagram carousel copywriter. Write native, specific, editorial social copy based on the provided brand, audience, source material, and slide plan. Do not invent numbers, claims, rankings, reviews, or benefits not supported by the supplied material. Return valid JSON only.')
+      ? 'You are an English editorial carousel writer in the style of The Verge, Axios, or Morning Brew. Write punchy, specific, journalist-quality card news copy. Each slide = one sharp insight, not a paragraph. Reflect actual article angles when real-time news context is provided. Return valid JSON only.'
+      : 'You are an English Instagram carousel copywriter in the style of Morning Brew or The Hustle. Write native, punchy, editorial social copy. Headline = 4–7 words, one bold thesis. Body = 1–2 complete sentences, specific insight only. Do not invent unverified claims. Return valid JSON only.')
     : (isGeneral
       ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
       : (knowledgeCtx
@@ -579,13 +579,63 @@ async function generateMediaSlideCopies(
     : ''
   const hasResearchBrief = sourceMaterial.includes('[외부 리서치 브리프') || sourceMaterial.includes('[EXTERNAL RESEARCH BRIEF')
   const researchInstruction = hasResearchBrief
-    ? `\n- 외부 리서치 브리프가 있으면 가장 우선되는 사실 근거로 사용하세요.
+    ? isEnglish
+      ? `\n- Prioritize the external research brief as the primary factual source.
+- Each slide must reflect at least one mustUseFact from the "slide evidence allocation" in the brief.
+- Do not include therapeutic claims, disease prevention claims, unverified stats, or off-topic economic/political information flagged in the brief's caution list.
+- Never expose source names or URLs in card copy — convert evidence into natural copy.`
+      : `\n- 외부 리서치 브리프가 있으면 가장 우선되는 사실 근거로 사용하세요.
 - 각 슬라이드는 리서치 브리프의 "슬라이드별 근거 배분"에서 지정된 mustUseFacts 중 최소 1개를 body에 반영하세요.
 - 리서치 브리프의 "주의할 표현"에 걸리는 치료 효과, 질병 예방, 검증되지 않은 수치, 주제와 무관한 시사/경제 정보는 쓰지 마세요.
 - 출처명이나 URL을 카드 본문에 노출하지 말고, 근거에서 얻은 의미만 자연스러운 카피로 바꾸세요.`
     : ''
 
-  const prompt = `${isEnglish ? 'Write English Instagram carousel card copy.' : '한국 인스타그램 카드뉴스 카피를 작성해주세요.'}
+  const prompt = isEnglish ? `Write English Instagram carousel card copy.
+
+${editorialPlanSection}
+
+${domainGuidanceSection}
+
+${storyOntologySection}
+
+Brand info:
+- Brand: ${isGeneral ? 'General news/info channel' : input.brandName}
+- Industry: ${isGeneral ? 'News / Information / Trends' : (input.brandIndustry || 'unspecified')}
+- Tone: ${isGeneral ? 'Objective and trustworthy' : (input.brandToneOfVoice || 'professional and credible')}
+- Forbidden words: ${isGeneral ? 'none' : (input.brandForbiddenWords || 'none')}
+${brandDnaSection}${knowledgeSection}
+Content brief:
+- Topic: ${input.topic}
+- Goal: ${input.objective || input.contentType}
+- Content type: ${input.contentType}
+- Visual style: ${input.visualHint || 'dark-editorial'}
+
+Source material and facts:
+${sourceMaterial || 'No additional source material.'}
+
+Slide structure:
+${slideDescriptions}
+
+Rules:
+- headline: max 40 characters (including spaces). Bold thesis statement, 4–7 words. No numbering like "1.", "2.".
+- body: 1–2 complete sentences, 60–120 characters. One specific insight per slide — no vague filler.
+- body must end with a complete sentence. Never cut mid-thought or mid-clause.
+- Each slide adds one new angle. Do not repeat information from previous slides.
+- hook slide: grab attention immediately with a counterintuitive or surprising angle.
+- stat slide: use only numbers from the provided source material.
+- save-cta / summary slide: wrap the key insight and include one clear action (save, share, swipe, check).
+- Do not invent stats, rankings, endorsements, or effects not in the source material.
+- Avoid vague filler phrases like "a key consideration", "an important factor", "in today's world".
+- Do not write internal planning tokens (guiding question, STORY ONTOLOGY, visualDirection, etc.) in card copy.
+- Overall flow: hook → context/evidence → core insight → action/summary.${hasRssContext ? `\n- Real-time news context is provided. The hook and body copy must reference actual article angles, keywords, and trends from those articles.` : ''}${researchInstruction}
+- ${languageRule}
+
+JSON response format:
+{
+  "slides": [
+    { "slideNumber": 1, "headline": "...", "body": "..." }
+  ]
+}` : `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
 ${editorialPlanSection}
 
@@ -671,7 +721,7 @@ JSON 응답 형식:
     if (typeof generated?.headline !== 'string' || !generated.headline.trim()) return slide
     const body = typeof generated.body === 'string' ? generated.body.trim() : slide.body
     if (hasUnsupportedNumericClaim(`${generated.headline} ${body}`, groundingText)) return slide
-    const contract = getCardHarnessContract(slide.role)
+    const contract = getCardHarnessContract(slide.role, input.language)
     const repaired = repairRenderableCopy({
       headline: generated.headline.trim(),
       body,
@@ -687,6 +737,7 @@ JSON 응답 형식:
       role: slide.role,
       headline: repaired.headline || slide.headline,
       body: repaired.body || slide.body,
+      language: input.language,
     })
     return {
       ...slide,
@@ -755,12 +806,12 @@ issues: ${issues}`
 Rewrite rules:
 - Body copy must complete one useful meaning, not merely sound like a sentence.
 - Do not end with an open setup such as "because", "the reason is", "more", or a dangling comparison.
-- Each slide must add a concrete fact, reason, use case, caution, or action.
-- Never include news, stock, politics, or unrelated trend information unless the user topic explicitly asks for it.
-- Keep headline under 25 characters when possible. Never start a headline with a number like "1.", "2.", etc.
-- Body should normally be 80-150 characters, closing slides 70-120 characters, and must fit 3-5 mobile-readable lines.
+- Each slide must add a concrete fact, reason, use case, caution, or action — one sharp insight per slide.
+- Never include unrelated news, stock, politics, or trend information unless the user topic explicitly asks for it.
+- Keep headline under 40 characters. Never start with a number like "1.", "2.", etc.
+- Body should normally be 60-120 characters (1-2 complete sentences). Avoid vague filler phrases.
 - Do not use planning tokens or internal terms in card copy.
-- Write all output in English.
+- Write all output in English. No Korean characters anywhere.
 
 Return JSON only:
 {
@@ -824,7 +875,7 @@ JSON만 반환:
   const nextSlides = params.slides.map(slide => {
     if (!weakSlideNumbers.has(slide.slideNumber)) return slide
     const rewritten = rewriteMap.get(slide.slideNumber)
-    const contract = getCardHarnessContract(slide.role)
+    const contract = getCardHarnessContract(slide.role, params.input.language)
     const repaired = repairRenderableCopy({
       headline: rewritten?.headline?.trim() || slide.headline,
       body: rewritten?.body?.trim() || slide.body,
@@ -840,6 +891,7 @@ JSON만 반환:
       role: slide.role,
       headline: repaired.headline || slide.headline,
       body: repaired.body || slide.body,
+      language: params.input.language,
     })
     return {
       ...slide,
@@ -865,7 +917,7 @@ JSON만 반환:
   const finalWeak = new Set(finalReport.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
   return nextSlides.map(slide => {
     if (!finalWeak.has(slide.slideNumber)) return slide
-    const contract = getCardHarnessContract(slide.role)
+    const contract = getCardHarnessContract(slide.role, params.input.language)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
       body: slide.body,
@@ -881,6 +933,7 @@ JSON만 반환:
       role: slide.role,
       headline: repaired.headline,
       body: repaired.body,
+      language: params.input.language,
     })
     return { ...slide, headline: harnessed.headline, body: harnessed.body }
   })
@@ -910,6 +963,7 @@ function enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[])
       role: slide.role,
       headline: slide.headline,
       body: slide.body,
+      language: input.language,
     })
     return {
       ...slide,
@@ -926,6 +980,7 @@ function enforceHarnessAgentCopy(input: MediaCarouselInput, slides: AgentSlideDa
       role: slide.role,
       headline: slide.headline,
       body: slide.body,
+      language: input.language,
     })
     return {
       ...slide,
@@ -1018,7 +1073,7 @@ function runFinalSemanticCopyGuard(params: {
 
   const slides = params.slides.map(slide => {
     if (!weakSlideNumbers.has(slide.slideNumber)) return slide
-    const contract = getCardHarnessContract(slide.role)
+    const contract = getCardHarnessContract(slide.role, params.input.language)
     const repaired = repairRenderableCopy({
       headline: slide.headline,
       body: slide.body,
@@ -1034,6 +1089,7 @@ function runFinalSemanticCopyGuard(params: {
       role: slide.role,
       headline: repaired.headline,
       body: repaired.body,
+      language: params.input.language,
     })
     return {
       ...slide,
