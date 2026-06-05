@@ -16,6 +16,7 @@ export interface User {
   email: string
   name: string | null
   plan: string // FREE, LITE, PRO, UNLIMITED
+  accountStatus: string // active, blocked
   paypalSubscriptionId: string | null
   paypalSubscriptionStatus: string | null
   tossCustomerKey: string | null
@@ -186,6 +187,7 @@ function hydrateCampaign(campaign: StoredCampaign | Campaign): Campaign {
 function hydrateUser(user: StoredUser | User): User {
   return {
     ...user,
+    accountStatus: (user as User).accountStatus ?? 'active',
     paypalSubscriptionId: user.paypalSubscriptionId ?? null,
     paypalSubscriptionStatus: user.paypalSubscriptionStatus ?? null,
     tossCustomerKey: user.tossCustomerKey ?? null,
@@ -352,6 +354,7 @@ export const dbService = {
         email,
         name: name || email.split('@')[0],
         plan: 'FREE',
+        accountStatus: 'active',
         paypalSubscriptionId: null,
         paypalSubscriptionStatus: null,
         tossCustomerKey: null,

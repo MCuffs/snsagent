@@ -1,16 +1,13 @@
 import { dbService } from './db-service'
 import { SubscriptionPlan, PlanFeature, PRICING_PLANS, normalizePlan } from './limits-types'
 import { getCampaignUsagePeriodStart } from './usage-period'
+import { isAdminEmail } from './admin'
 
 export type { SubscriptionPlan, PlanFeature }
 export { PRICING_PLANS }
 
-const SUPER_USER_EMAILS = (process.env.SUPER_USER_EMAILS || 'alstnwjd0424@gmail.com,imhs1248@gmail.com,kanghiee616@gmail.com')
-  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-
 function isSuperUser(email?: string | null): boolean {
-  if (!email) return false
-  return SUPER_USER_EMAILS.includes(email.toLowerCase())
+  return isAdminEmail(email)
 }
 
 /**
