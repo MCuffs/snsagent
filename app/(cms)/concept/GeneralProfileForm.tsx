@@ -140,11 +140,10 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
     const params = new URLSearchParams(window.location.search)
     params.set('brandId', profileId)
     const newUrl = `${window.location.pathname}?${params.toString()}`
-    window.history.pushState(null, '', newUrl)
-    window.setTimeout(() => {
-      setActiveTab('generate')
-      setIsContinuing(false)
-    }, 220)
+    // replaceState를 먼저 동기적으로 실행해 useSearchParams가 올바른 brandId를 읽게 한다
+    window.history.replaceState(null, '', newUrl)
+    setActiveTab('generate')
+    setIsContinuing(false)
   }
 
   return (

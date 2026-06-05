@@ -56,6 +56,8 @@ export default function DashboardContainer({
   const urlBrandId = searchParams?.get('brandId') || null
 
   const [subTab, setSubTab] = useState<'brand' | 'general'>(() => {
+    // URL에 general profile의 brandId가 있으면 general 탭으로 시작
+    if (urlBrandId && existingGeneralProfile && urlBrandId === existingGeneralProfile.id) return 'general'
     if (!existingBrand && existingGeneralProfile) return 'general'
     return 'brand'
   })
@@ -69,6 +71,9 @@ export default function DashboardContainer({
       brandToPass = existingGeneralProfile
     } else if (existingBrand && urlBrandId === existingBrand.id) {
       brandToPass = existingBrand
+    } else {
+      // urlBrandId가 어느 쪽도 매칭 안 되면 두 프로필 중 존재하는 것 사용
+      brandToPass = existingBrand || existingGeneralProfile
     }
   } else {
     brandToPass = existingBrand || existingGeneralProfile
@@ -140,6 +145,7 @@ export default function DashboardContainer({
           className="h-full"
         >
           <GenerateForm
+            key={brandToPass.id}
             brand={{
               id: brandToPass.id,
               name: brandToPass.name,
