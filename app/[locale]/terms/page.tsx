@@ -52,6 +52,10 @@ export default async function TermsPage({ params }: { params: Promise<{ locale: 
               <a href="https://www.instagram.com/shuffla.io/" target="_blank" rel="noopener noreferrer" className="text-[#171714] font-medium hover:underline">@shuffla.io</a>
             </div>
           </section>
+          <section>
+            <h2 className="text-base font-semibold text-[#171714]">{t('s7_title')}</h2>
+            <p className="mt-3">{t('s7_body')}</p>
+          </section>
         </div>
       </section>
       <MarketingFooter authenticated={authenticated} locale={locale} />
