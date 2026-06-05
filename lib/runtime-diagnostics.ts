@@ -63,15 +63,6 @@ export function getPayPalConfigStatus() {
   }
 }
 
-export function getTossConfigStatus() {
-  const missing = ['NEXT_PUBLIC_TOSS_CLIENT_KEY', 'TOSS_SECRET_KEY'].filter(name => !hasEnv(name))
-
-  return {
-    ready: missing.length === 0,
-    missing,
-  }
-}
-
 export function formatMissingConfigMessage(provider: string, missing: string[]) {
   return `${provider} 설정이 완료되지 않았습니다. 누락된 환경변수: ${missing.join(', ')}`
 }

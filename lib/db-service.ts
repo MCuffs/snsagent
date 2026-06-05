@@ -427,52 +427,21 @@ export const dbService = {
     }
   },
 
-  async ensureTossCustomerKey(userId: string): Promise<string> {
-    const user = await this.getUser(userId)
-    if (!user) throw new Error('User not found')
-    if (user.tossCustomerKey) return user.tossCustomerKey
-
-    const customerKey = `tp_${randomUUID()}`
-    await this.updateUserToss(userId, { tossCustomerKey: customerKey })
-    return customerKey
+  async ensureTossCustomerKey(_userId: string): Promise<string> {
+    // Toss removed
+    return ''
   },
 
-  async updateUserToss(userId: string, data: {
-    tossCustomerKey?: string | null
-    tossBillingKey?: string | null
-    tossPaymentKey?: string | null
-    tossLastOrderId?: string | null
-    tossSubscriptionStatus?: string | null
-    tossNextBillingAt?: Date | null
-    tossLastPaidAt?: Date | null
-    tossCanceledAt?: Date | null
-    plan?: string
-  }): Promise<void> {
-    if (!isMock()) {
-      await prisma.user.update({
-        where: { id: userId },
-        data,
-      })
-    } else {
-      const db = initMockDb()
-      const userIndex = db.users.findIndex(u => u.id === userId)
-      if (userIndex !== -1) {
-        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
-        if (data.tossCustomerKey !== undefined) db.users[userIndex].tossCustomerKey = data.tossCustomerKey
-        if (data.tossBillingKey !== undefined) db.users[userIndex].tossBillingKey = data.tossBillingKey
-        if (data.tossPaymentKey !== undefined) db.users[userIndex].tossPaymentKey = data.tossPaymentKey
-        if (data.tossLastOrderId !== undefined) db.users[userIndex].tossLastOrderId = data.tossLastOrderId
-        if (data.tossSubscriptionStatus !== undefined) db.users[userIndex].tossSubscriptionStatus = data.tossSubscriptionStatus
-        if (data.tossNextBillingAt !== undefined) db.users[userIndex].tossNextBillingAt = data.tossNextBillingAt
-        if (data.tossLastPaidAt !== undefined) db.users[userIndex].tossLastPaidAt = data.tossLastPaidAt
-        if (data.tossCanceledAt !== undefined) db.users[userIndex].tossCanceledAt = data.tossCanceledAt
-        db.users[userIndex].updatedAt = new Date()
-        writeMockDb(db)
-      }
-    }
+  async updateUserToss(_userId: string, _data: Record<string, unknown>): Promise<void> {
+    // Toss removed
   },
 
-  async updateUserNicepay(userId: string, data: {
+  async getDueTossSubscriptions(_at: Date): Promise<User[]> {
+    // Toss removed
+    return []
+  },
+
+    async updateUserNicepay(userId: string, data: {
     nicepayBid?: string | null
     nicepaySubscriptionStatus?: string | null
     nicepayNextBillingAt?: Date | null
@@ -527,27 +496,6 @@ export const dbService = {
       })
     }
     return []
-  },
-
-  async getDueTossSubscriptions(at: Date): Promise<User[]> {
-    if (!isMock()) {
-      return prisma.user.findMany({
-        where: {
-          tossSubscriptionStatus: 'ACTIVE',
-          tossBillingKey: { not: null },
-          tossCustomerKey: { not: null },
-          tossNextBillingAt: { lte: at },
-        },
-      }) as unknown as Promise<User[]>
-    }
-
-    const db = initMockDb()
-    return db.users.filter(user =>
-      user.tossSubscriptionStatus === 'ACTIVE' &&
-      Boolean(user.tossBillingKey) &&
-      Boolean(user.tossCustomerKey) &&
-      Boolean(user.tossNextBillingAt && user.tossNextBillingAt.getTime() <= at.getTime()),
-    )
   },
 
   async getUserByPayPalSubscriptionId(paypalSubscriptionId: string): Promise<User | null> {

@@ -10,17 +10,6 @@ import { analytics } from '../../../lib/analytics/thinkingdata'
 
 declare global {
   interface Window {
-    TossPayments?: (clientKey: string) => {
-      payment: (options: { customerKey: string }) => {
-        requestBillingAuth: (options: {
-          method: 'CARD'
-          successUrl: string
-          failUrl: string
-          customerName?: string
-          customerEmail?: string
-        }) => Promise<void>
-      }
-    }
     AUTHNICE?: {
       requestPay: (options: {
         clientId: string
@@ -46,10 +35,8 @@ interface PricingClientViewProps {
   currentPlan: string
   plansList: SubscriptionPlan[]
   hasSubscription: boolean
-  paymentProvider: 'toss' | 'paypal' | 'nicepay' | null
+  paymentProvider: 'paypal' | 'nicepay' | null
   userId: string
-  tossClientKey: string
-  tossCustomerKey: string
   paypalClientId: string
   paypalPlanIds: Record<string, string>
   nicepayClientKey: string
@@ -85,8 +72,6 @@ function PricingGrid({
   hasSubscription,
   paymentProvider,
   userId,
-  tossClientKey,
-  tossCustomerKey,
   paypalPlanIds,
   nicepayClientKey,
   customerName,
@@ -102,19 +87,6 @@ function PricingGrid({
     analytics.billingPageView(currentPlan)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!tossClientKey || window.TossPayments) return
-
-    const script = document.createElement('script')
-    script.src = 'https://js.tosspayments.com/v2/standard'
-    script.async = true
-    script.onerror = () => setError(t('toss_load_error'))
-    document.body.appendChild(script)
-    return () => {
-      document.body.removeChild(script)
-    }
-  }, [tossClientKey, t])
 
   useEffect(() => {
     if (!nicepayClientKey || window.AUTHNICE) return
@@ -134,11 +106,9 @@ function PricingGrid({
     setCanceling(true)
     analytics.subscriptionCancel(currentPlan, paymentProvider ?? 'unknown')
     try {
-      const endpoint = paymentProvider === 'toss'
-        ? '/api/payments/toss/cancel'
-        : paymentProvider === 'nicepay'
-          ? '/api/payments/nicepay/cancel'
-          : '/api/paypal/cancel'
+      const endpoint = paymentProvider === 'nicepay'
+        ? '/api/payments/nicepay/cancel'
+        : '/api/paypal/cancel'
       const res = await fetch(endpoint, { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
@@ -150,33 +120,6 @@ function PricingGrid({
       setError(t('network_error'))
     } finally {
       setCanceling(false)
-    }
-  }
-
-  const handleTossPayment = async (planKey: string) => {
-    if (!tossClientKey) {
-      setError(t('toss_key_missing'))
-      return
-    }
-    if (!window.TossPayments) {
-      setError(t('toss_loading'))
-      return
-    }
-    analytics.planSelectClick(planKey, currentPlan)
-    analytics.paymentStart(planKey, 'toss')
-
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    const payment = window.TossPayments(tossClientKey).payment({ customerKey: tossCustomerKey })
-    try {
-      await payment.requestBillingAuth({
-        method: 'CARD',
-        successUrl: `${appUrl}/api/payments/toss/billing/callback?plan=${encodeURIComponent(planKey)}`,
-        failUrl: `${appUrl}/billing?canceled=true`,
-        customerName: customerName || undefined,
-        customerEmail,
-      })
-    } catch {
-      setError(t('card_register_failed'))
     }
   }
 
@@ -210,7 +153,7 @@ function PricingGrid({
       fnClose: async (result) => {
         if (!result.tid || !result.authToken || result.resultCode !== '0000') {
           if (result.resultCode && result.resultCode !== '0000') {
-            setError(result.resultMsg || t('payment_canceled'))
+            setError(result.resultMsg || t('payment_canceled_msg'))
           }
           return
         }
@@ -286,14 +229,6 @@ function PricingGrid({
                 <div className="rounded-lg bg-[#f1f0eb] px-4 py-3 text-center text-sm font-bold text-[#5d584f]">
                   {t('one_time_used')}
                 </div>
-              ) : tossClientKey ? (
-                <button
-                  type="button"
-                  onClick={() => void handleTossPayment('LITE')}
-                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
-                >
-                  {t('one_time_cta_toss')}
-                </button>
               ) : nicepayClientKey ? (
                 <button
                   type="button"
@@ -343,11 +278,7 @@ function PricingGrid({
 
               <div className="mt-6">
                 {isCurrentPlan ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="btn-secondary w-full opacity-60"
-                  >
+                  <button type="button" disabled className="btn-secondary w-full opacity-60">
                     {t('in_use')}
                   </button>
                 ) : hasSubscription ? (
@@ -356,16 +287,7 @@ function PricingGrid({
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    {tossClientKey && (
-                      <button
-                        type="button"
-                        onClick={() => void handleTossPayment(planKey)}
-                        className="w-full rounded-lg bg-[#0064ff] py-2.5 text-sm font-black text-white transition-all hover:bg-[#0054d6] active:scale-[0.98]"
-                      >
-                        {t('domestic_toss')}
-                      </button>
-                    )}
-                    {nicepayClientKey && !tossClientKey && (
+                    {nicepayClientKey && (
                       <button
                         type="button"
                         onClick={() => handleNicepayPayment(planKey)}
@@ -374,16 +296,7 @@ function PricingGrid({
                         {t('domestic_nicepay')}
                       </button>
                     )}
-                    {nicepayClientKey && tossClientKey && (
-                      <button
-                        type="button"
-                        onClick={() => handleNicepayPayment(planKey)}
-                        className="w-full rounded-lg border border-[#e8173e] py-2.5 text-sm font-black text-[#e8173e] transition-all hover:bg-[#fff0f3] active:scale-[0.98]"
-                      >
-                        {t('nicepay_alt')}
-                      </button>
-                    )}
-                    {(tossClientKey || nicepayClientKey) && paypalPlanId && (
+                    {nicepayClientKey && paypalPlanId && (
                       <div className="flex items-center gap-3 py-1 text-[11px] font-bold text-[#6f6a61]">
                         <span className="h-px flex-1 bg-[#ece9e0]" />
                         {t('foreign_divider')}
@@ -398,7 +311,7 @@ function PricingGrid({
                         onError={setError}
                       />
                     )}
-                    {!tossClientKey && !nicepayClientKey && !paypalPlanId && (
+                    {!nicepayClientKey && !paypalPlanId && (
                       <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
                     )}
                   </div>

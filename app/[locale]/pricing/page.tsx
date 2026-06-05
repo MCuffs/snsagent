@@ -68,8 +68,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       name: PRICING_PLANS.FREE.name,
       tagline: t('free_tagline'),
-      price: PRICING_PLANS.FREE.price,
-      desc: PRICING_PLANS.FREE.description,
+      price: isEn ? PRICING_PLANS.FREE.price_en : PRICING_PLANS.FREE.price,
+      desc: isEn ? PRICING_PLANS.FREE.description_en : PRICING_PLANS.FREE.description,
       cta: t('free_cta'),
       features: isEn
         ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'AI regeneration not included']
@@ -79,8 +79,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       name: PRICING_PLANS.PRO.name,
       tagline: t('pro_tagline'),
-      price: PRICING_PLANS.PRO.price,
-      desc: PRICING_PLANS.PRO.description,
+      price: isEn ? PRICING_PLANS.PRO.price_en : PRICING_PLANS.PRO.price,
+      desc: isEn ? PRICING_PLANS.PRO.description_en : PRICING_PLANS.PRO.description,
       cta: t('paid_cta'),
       features: isEn
         ? ['20 card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
@@ -90,8 +90,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       name: PRICING_PLANS.UNLIMITED.name,
       tagline: t('unlimited_tagline'),
-      price: PRICING_PLANS.UNLIMITED.price,
-      desc: PRICING_PLANS.UNLIMITED.description,
+      price: isEn ? PRICING_PLANS.UNLIMITED.price_en : PRICING_PLANS.UNLIMITED.price,
+      desc: isEn ? PRICING_PLANS.UNLIMITED.description_en : PRICING_PLANS.UNLIMITED.description,
       cta: t('paid_cta'),
       features: isEn
         ? ['30 card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
