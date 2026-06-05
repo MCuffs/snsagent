@@ -27,7 +27,7 @@ import {
   type AgentSlideData
 } from '../carousel/agents'
 import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
-import { formatDomainCopyGuidance, getGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
+import { formatDomainCopyGuidance, resolveGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
 import type { BrandProfile, CampaignInput } from '../carousel/types'
 import {
   buildEditorialDirectorPlan,
@@ -108,13 +108,22 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
-  const domainProfile = getGenerationDomainProfile({
+  const domainResolution = await resolveGenerationDomainProfile({
     topic: input.topic,
     category: input.category,
     brandIndustry: input.brandIndustry,
     contentType: input.contentType,
+    generationMode: input.generationMode,
+    userId: input.userId,
+    brandId: input.brandId,
   })
+  const domainProfile = domainResolution.profile
   console.info('[DomainProfile:resolved]', {
+    generationMode: input.generationMode,
+    method: domainResolution.method,
+    confidence: domainResolution.confidence,
+    reason: domainResolution.reason,
+    candidates: domainResolution.candidates,
     topic: input.topic,
     category: input.category,
     brandIndustry: input.brandIndustry,

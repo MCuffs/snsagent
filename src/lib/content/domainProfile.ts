@@ -1,3 +1,5 @@
+import { getLLMClient, getTextGenerationModel } from '../ai/llmClient'
+
 export type ContentDomain =
   | 'fashion'
   | 'food'
@@ -24,19 +26,13 @@ export interface DomainProfile {
   imageExclusions: string[]
 }
 
-const DOMAIN_KEYWORDS: Array<{ domain: ContentDomain; pattern: RegExp }> = [
-  { domain: 'fashion', pattern: /패션|의류|옷|코디|착장|룩북|스트릿|그래픽|실루엣|레이어링|액세서리|street|fashion|lookbook|outfit|wear|shirt|hoodie|pants|denim|sneakers|팬츠|데님|스니커즈|신발|비니|체인|무드/i },
-  { domain: 'beauty', pattern: /뷰티|화장품|스킨케어|세럼|크림|토너|앰플|선크림|립|메이크업|피부|beauty|skincare|cosmetic/i },
-  { domain: 'food', pattern: /푸드|식품|음식|간식|맛집|레시피|식감|맛|커피|카페|디저트|빵|쿠키|그래놀라|호두|아몬드|견과|food|recipe|snack|coffee/i },
-  { domain: 'health', pattern: /건강|웰니스|운동|다이어트|영양|수면|루틴|헬스|보충제|효능|섭취|health|wellness|fitness|nutrition/i },
-  { domain: 'living', pattern: /리빙|인테리어|가구|수납|공간|집|원룸|조명|침실|주방|욕실|living|interior|furniture|storage|home/i },
-  { domain: 'tech', pattern: /테크|앱|ai|인공지능|툴|saas|소프트웨어|생산성|자동화|디지털|기기|노트북|tech|app|software|workflow/i },
-  { domain: 'finance', pattern: /금융|투자|주식|증시|시장|경제|금리|환율|코인|가상자산|비트코인|부동산|실적|매출|영업이익|경제지표|물가|인플레이션|finance|stock|market|rate|exchange rate|crypto|bitcoin|earnings|inflation/i },
-  { domain: 'news', pattern: /뉴스|이슈|속보|논란|정치|사회|사건|정책|트렌드|화제|커뮤니티|여론|news|issue|breaking|policy|trend/i },
-  { domain: 'education', pattern: /교육|공부|학습|강의|수업|입시|자격증|커리어|education|study|course|learning/i },
-  { domain: 'travel', pattern: /여행|숙소|호텔|로컬|장소|공간|코스|데이트|travel|hotel|trip|local/i },
-  { domain: 'commerce', pattern: /제품|출시|브랜드|커머스|스토어|구매|할인|상세페이지|리뷰|추천템|product|brand|store|commerce|review/i },
-]
+export interface DomainResolution {
+  profile: DomainProfile
+  method: 'rules' | 'ai' | 'fallback'
+  confidence: number
+  reason: string
+  candidates: Array<{ domain: ContentDomain; score: number; reasons: string[] }>
+}
 
 const COMMON_BANNED = [
   '최고의',
@@ -187,11 +183,7 @@ const PROFILES: Record<ContentDomain, DomainProfile> = {
 }
 
 export function inferContentDomain(...values: Array<string | undefined | null>): ContentDomain {
-  const text = values.filter(Boolean).join(' ').toLowerCase()
-  for (const item of DOMAIN_KEYWORDS) {
-    if (item.pattern.test(text)) return item.domain
-  }
-  return 'general'
+  return scoreDomainCandidates({ topic: values.filter(Boolean).join(' ') }).domain
 }
 
 export function getDomainProfile(domain: ContentDomain): DomainProfile {
@@ -207,13 +199,365 @@ export function getGenerationDomainProfile(params: {
   category?: string | null
   brandIndustry?: string | null
   contentType?: string | null
+  generationMode?: 'brand' | 'general' | null
 }): DomainProfile {
-  return getDomainProfileForText(
-    params.topic,
-    params.brandIndustry,
-    params.category,
-    params.contentType,
+  return getDomainProfile(resolveDomainByRules(params).profile.domain)
+}
+
+type DomainSignalConfig = {
+  domain: Exclude<ContentDomain, 'general'>
+  strong: string[]
+  context: string[]
+  negative?: string[]
+}
+
+const DOMAIN_SIGNAL_CONFIGS: DomainSignalConfig[] = [
+  {
+    domain: 'news',
+    strong: ['current-affairs', '뉴스', '속보', '이슈', '선관위', '투표', '개표', '선거', '국정조사', '국조', '특검', '정치', '정책', '정부', '국회', '대통령', '장관', '사회', '사건', '사고', '논란', '쟁점', '여론', '재난', '법원', '검찰', '경찰', '판결', 'news', 'issue', 'breaking', 'policy', 'election', 'vote', 'politics', 'public issue'],
+    context: ['배경', '영향', '발표', '조사', '브리핑', '의혹', '입장', '대응', '책임', '공방', '규제', '제도', '행정', '유권자', '공공', '후속', '현장', '확인된 내용'],
+    negative: ['구매', '할인', '제품 후기', '제형', '성분', '레시피', '코디', '착장'],
+  },
+  {
+    domain: 'finance',
+    strong: ['금융', '투자', '주식', '증시', '시장', '경제', '금리', '환율', '코인', '가상자산', '비트코인', '부동산', '실적', '매출', '영업이익', '경제지표', '물가', '인플레이션', 'finance', 'stock', 'market', 'crypto', 'bitcoin', 'earnings', 'inflation'],
+    context: ['지표', '기간', '변동', '리스크', '공시', '정책', '수익률', '가격', '거래량', '전망', '경기', '소비자물가', '환차익'],
+    negative: ['피부', '제형', '레시피', '착장', '숙소'],
+  },
+  {
+    domain: 'tech',
+    strong: ['테크', 'AI', '인공지능', '앱', '소프트웨어', 'SaaS', '자동화', '플랫폼', '개발자', '알고리즘', '데이터', '클라우드', '보안', '스타트업', '챗GPT', 'tech', 'app', 'software', 'workflow'],
+    context: ['디지털', '툴', '워크플로우', '기기', '노트북', '생산성', '업데이트', '기능', '연동', 'API', '서비스', '대시보드', '사용자 경험'],
+    negative: ['투표', '선거', '국회', '정치', '식감', '피부 타입', '착장'],
+  },
+  {
+    domain: 'beauty',
+    strong: ['뷰티', '화장품', '스킨케어', '세럼', '크림', '토너', '앰플', '선크림', '립', '메이크업', '클렌저', '로션', '바디워시', '향수', 'beauty', 'skincare', 'cosmetic'],
+    context: ['피부', '제형', '성분', '발림', '사용감', '루틴', '보습', '진정', '결', '톤', '향', '텍스처'],
+    negative: ['섭취', '맛', '주가', '투표', '선거', '코디'],
+  },
+  {
+    domain: 'food',
+    strong: ['푸드', '식품', '음식', '간식', '맛집', '레시피', '커피', '카페', '디저트', '빵', '쿠키', '그래놀라', '호두', '아몬드', '견과', '식당', '메뉴', 'food', 'recipe', 'snack', 'coffee'],
+    context: ['맛', '식감', '향', '재료', '조합', '보관', '섭취', '영양', '원재료', '칼로리', '단맛', '고소함'],
+    negative: ['피부 개선', '투표', '선거', '앱 기능', '착장'],
+  },
+  {
+    domain: 'health',
+    strong: ['건강', '웰니스', '운동', '다이어트', '영양', '수면', '헬스', '보충제', '효능', '질환', '병원', '의료', 'health', 'wellness', 'fitness', 'nutrition'],
+    context: ['루틴', '습관', '주의점', '근거', '범위', '섭취', '증상', '예방', '관리', '회복', '컨디션', '생활습관'],
+    negative: ['패션', '코디', '주가', '투표', '앱 UI'],
+  },
+  {
+    domain: 'fashion',
+    strong: ['패션', '의류', '옷', '코디', '착장', '룩북', '스트릿', '실루엣', '레이어링', '액세서리', '스니커즈', '신발', '팬츠', '데님', '셔츠', '후디', 'fashion', 'lookbook', 'outfit', 'wear', 'shirt', 'hoodie', 'denim', 'sneakers'],
+    context: ['핏', '소재', '컬러', '그래픽', '스타일링', '계절감', '무드', '사이즈', '매치', '룩'],
+    negative: ['섭취', '영양', '치료', '주가', '투표'],
+  },
+  {
+    domain: 'living',
+    strong: ['리빙', '인테리어', '가구', '수납', '공간', '원룸', '조명', '침실', '주방', '욕실', '생활용품', '정리', 'living', 'interior', 'furniture', 'storage', 'home'],
+    context: ['동선', '배치', '소재', '사이즈', '집', '공간감', '청소', '살림', '수납력', '분위기'],
+    negative: ['섭취', '피부', '주식', '투표', '코디'],
+  },
+  {
+    domain: 'education',
+    strong: ['교육', '공부', '학습', '강의', '수업', '입시', '자격증', '커리어', '시험', '학생', '학교', 'education', 'study', 'course', 'learning'],
+    context: ['학습 단계', '방법', '연습', '수준', '개념', '문제풀이', '커리큘럼', '스킬', '성장', '훈련'],
+    negative: ['구매 후기', '피부', '식감', '주가', '투표'],
+  },
+  {
+    domain: 'travel',
+    strong: ['여행', '숙소', '호텔', '로컬', '장소', '코스', '데이트', '항공', '관광', '휴가', '맛집 투어', 'travel', 'hotel', 'trip', 'local'],
+    context: ['동선', '시간대', '예약', '분위기', '주변', '교통', '체크인', '경로', '명소', '방문'],
+    negative: ['주식', '피부 타입', '투표', '앱 기능'],
+  },
+  {
+    domain: 'commerce',
+    strong: ['제품', '출시', '브랜드', '커머스', '스토어', '구매', '할인', '상세페이지', '리뷰', '추천템', '신상품', '패키지', 'product', 'brand', 'store', 'commerce', 'review'],
+    context: ['사용 장면', '차별점', '구매 이유', '비교 기준', '가격감', '배송', '교환', '반품', '쿠폰', '판매처'],
+    negative: ['국정조사', '특검', '투표', '선거', '질병 치료'],
+  },
+]
+
+const SIGNAL_WEIGHT = {
+  strong: 5,
+  context: 2,
+  negative: -4,
+} as const
+
+const FIELD_WEIGHT = {
+  topic: 1,
+  category: 0.35,
+  brandIndustry: 0.45,
+} as const
+
+const GENERAL_MODE_PROFILE_BOOSTS: Record<string, Partial<Record<ContentDomain, { score: number; reason: string }>>> = {
+  'current-affairs': {
+    news: { score: 6, reason: 'general current-affairs mode' },
+  },
+  information: {
+    general: { score: 1.5, reason: 'general information mode' },
+  },
+  trends: {
+    news: { score: 1.5, reason: 'general trends mode' },
+  },
+}
+
+const MIN_RULE_SCORE = 6
+const MIN_RULE_GAP = 4
+const MIN_RULE_RATIO = 1.45
+
+function matchKeyword(text: string, keyword: string) {
+  const normalizedText = text.toLowerCase()
+  const normalizedKeyword = keyword.toLowerCase()
+  if (!normalizedKeyword.trim()) return false
+
+  if (/^[a-z0-9+#.-]+(?:\s+[a-z0-9+#.-]+)*$/i.test(keyword)) {
+    const escaped = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(normalizedText)
+  }
+
+  return normalizedText.includes(normalizedKeyword)
+}
+
+function getMatchedKeywords(text: string, keywords: string[]) {
+  return keywords.filter(keyword => matchKeyword(text, keyword))
+}
+
+function getProfileCategory(...values: Array<string | undefined | null>) {
+  const text = values.filter(Boolean).join(' ')
+  if (/\bcurrent-affairs\b/i.test(text)) return 'current-affairs'
+  if (/\binformation\b/i.test(text)) return 'information'
+  if (/\btrends\b/i.test(text)) return 'trends'
+  return null
+}
+
+function roundScore(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function hasTopicStrongSignal(candidate?: { reasons: string[] }) {
+  return Boolean(candidate?.reasons.some(reason => reason.startsWith('topic strong:')))
+}
+
+function hasOnlyProfileSignals(candidate?: { reasons: string[] }) {
+  if (!candidate?.reasons.length) return false
+  return candidate.reasons.every(reason =>
+    reason.startsWith('category strong:') ||
+    reason.startsWith('category context:') ||
+    reason.startsWith('brandIndustry strong:') ||
+    reason.startsWith('brandIndustry context:') ||
+    reason.includes('mode')
   )
+}
+
+function shouldTrustRuleCandidate(params: {
+  top?: { domain: ContentDomain; score: number; reasons: string[] }
+  second?: { domain: ContentDomain; score: number; reasons: string[] }
+  generationMode?: 'brand' | 'general' | null
+}) {
+  const { top, second } = params
+  if (!top || top.domain === 'general') return false
+
+  const secondScore = second?.score || 0
+  const gap = top.score - secondScore
+  const ratio = secondScore > 0 ? top.score / secondScore : Number.POSITIVE_INFINITY
+  const hasTopicSignal = hasTopicStrongSignal(top)
+
+  if (top.score < MIN_RULE_SCORE) return false
+  if (hasOnlyProfileSignals(top) && top.score < 10) return false
+
+  const decisiveLead = gap >= MIN_RULE_GAP && ratio >= MIN_RULE_RATIO
+  const uncontestedTopicSignal = hasTopicSignal && secondScore === 0 && top.score >= 5
+  const currentAffairsNews = params.generationMode === 'general'
+    && top.domain === 'news'
+    && top.reasons.some(reason => reason.includes('current-affairs'))
+    && gap >= 3
+
+  return decisiveLead || uncontestedTopicSignal || currentAffairsNews
+}
+
+function scoreDomainCandidates(params: {
+  topic?: string | null
+  category?: string | null
+  brandIndustry?: string | null
+  generationMode?: 'brand' | 'general' | null
+}) {
+  const scoreMap = new Map<ContentDomain, { score: number; reasons: string[] }>()
+  const fields = [
+    { name: 'topic' as const, text: String(params.topic || ''), weight: FIELD_WEIGHT.topic },
+    { name: 'category' as const, text: String(params.category || ''), weight: FIELD_WEIGHT.category },
+    { name: 'brandIndustry' as const, text: String(params.brandIndustry || ''), weight: FIELD_WEIGHT.brandIndustry },
+  ].filter(field => field.text.trim())
+
+  const addScore = (domain: ContentDomain, score: number, reason: string) => {
+    const current = scoreMap.get(domain) || { score: 0, reasons: [] }
+    current.score += score
+    current.reasons.push(reason)
+    scoreMap.set(domain, current)
+  }
+
+  for (const config of DOMAIN_SIGNAL_CONFIGS) {
+    for (const field of fields) {
+      const strong = getMatchedKeywords(field.text, config.strong)
+      if (strong.length) {
+        const score = Math.min(strong.length * SIGNAL_WEIGHT.strong, 12) * field.weight
+        addScore(config.domain, score, `${field.name} strong: ${strong.slice(0, 6).join(', ')}`)
+      }
+
+      const context = getMatchedKeywords(field.text, config.context)
+      if (context.length) {
+        const score = Math.min(context.length * SIGNAL_WEIGHT.context, 6) * field.weight
+        addScore(config.domain, score, `${field.name} context: ${context.slice(0, 6).join(', ')}`)
+      }
+
+      const negative = getMatchedKeywords(field.text, config.negative || [])
+      if (negative.length) {
+        const score = Math.max(negative.length * SIGNAL_WEIGHT.negative, -8) * field.weight
+        addScore(config.domain, score, `${field.name} negative: ${negative.slice(0, 6).join(', ')}`)
+      }
+    }
+  }
+
+  if (params.generationMode === 'general') {
+    const profileCategory = getProfileCategory(params.category, params.brandIndustry)
+    const boosts = profileCategory ? GENERAL_MODE_PROFILE_BOOSTS[profileCategory] : null
+    if (boosts) {
+      for (const [domain, boost] of Object.entries(boosts) as Array<[ContentDomain, { score: number; reason: string } | undefined]>) {
+        if (!boost) continue
+        addScore(domain, boost.score, boost.reason)
+      }
+    }
+  }
+
+  const candidates = ([...scoreMap.entries()] as Array<[ContentDomain, { score: number; reasons: string[] }]>)
+    .map(([domain, data]) => ({ domain, score: roundScore(data.score), reasons: data.reasons }))
+    .filter(candidate => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)
+
+  const top = candidates[0] || { domain: 'general' as ContentDomain, score: 0, reasons: ['no strong domain keyword'] }
+  return { domain: top.domain, candidates }
+}
+
+export function resolveDomainByRules(params: {
+  topic?: string | null
+  category?: string | null
+  brandIndustry?: string | null
+  contentType?: string | null
+  generationMode?: 'brand' | 'general' | null
+}): DomainResolution {
+  const scored = scoreDomainCandidates(params)
+  const [top, second] = scored.candidates
+  const score = top?.score || 0
+  const gap = score - (second?.score || 0)
+  const ratio = second?.score ? roundScore(score / second.score) : null
+  const confident = shouldTrustRuleCandidate({
+    top,
+    second,
+    generationMode: params.generationMode,
+  })
+  const domain = top?.domain || 'general'
+
+  return {
+    profile: getDomainProfile(confident ? domain : 'general'),
+    method: confident ? 'rules' : 'fallback',
+    confidence: confident
+      ? Math.min(0.95, 0.58 + Math.min(score, 12) * 0.025 + Math.min(gap, 10) * 0.03)
+      : Math.max(0.2, Math.min(0.62, score * 0.05)),
+    reason: confident
+      ? `rule match: ${(top?.reasons || []).join(', ')}`
+      : `low-confidence rule match${top ? `: ${top.domain} score ${score}, gap ${roundScore(gap)}, ratio ${ratio || 'none'}` : ''}`,
+    candidates: scored.candidates.slice(0, 4),
+  }
+}
+
+export async function resolveGenerationDomainProfile(params: {
+  topic?: string | null
+  category?: string | null
+  brandIndustry?: string | null
+  contentType?: string | null
+  generationMode?: 'brand' | 'general' | null
+  userId?: string
+  brandId?: string
+}): Promise<DomainResolution> {
+  const ruleResolution = resolveDomainByRules(params)
+  if (ruleResolution.method === 'rules' && ruleResolution.confidence >= 0.72) {
+    return ruleResolution
+  }
+
+  const client = getLLMClient()
+  const allowedDomains: ContentDomain[] = [
+    'fashion',
+    'food',
+    'beauty',
+    'living',
+    'tech',
+    'health',
+    'news',
+    'finance',
+    'commerce',
+    'education',
+    'travel',
+    'general',
+  ]
+  const fallback = () => ({
+    domain: ruleResolution.candidates[0]?.domain || ruleResolution.profile.domain,
+    confidence: ruleResolution.confidence,
+    reason: ruleResolution.reason,
+    method: 'fallback' as const,
+  })
+
+  const result = await client.generateJson<{ domain?: ContentDomain; confidence?: number; reason?: string; method?: 'fallback' }>(
+    'domain profile classification',
+    [
+      'Classify the content domain for a Korean Instagram carousel.',
+      'Choose exactly one domain from this list:',
+      allowedDomains.join(', '),
+      '',
+      `generationMode: ${params.generationMode || 'brand'}`,
+      `topic: ${params.topic || ''}`,
+      `category/profile: ${params.category || ''}`,
+      `brandIndustry/profileIndustry: ${params.brandIndustry || ''}`,
+      `contentType/context only: ${params.contentType || ''}`,
+      `ruleCandidates: ${JSON.stringify(ruleResolution.candidates)}`,
+      '',
+      'Important:',
+      '- current-affairs means news/public issues, not tech.',
+      '- Do not classify as tech only because a word contains the letters "ai".',
+      '- For politics, elections, government, public incidents, controversy, or policy, prefer news unless the topic is truly about software/AI/tools.',
+      '- Return JSON only: {"domain":"news","confidence":0.92,"reason":"..."}',
+    ].join('\n'),
+    fallback,
+    {
+      model: getTextGenerationModel(),
+      temperature: 0,
+      systemPrompt: 'You classify content domains for a carousel generation pipeline. Return compact valid JSON only.',
+      diagnostics: {
+        userId: params.userId,
+        brandId: params.brandId,
+        metadata: {
+          generationMode: params.generationMode,
+          topic: params.topic,
+          ruleMethod: ruleResolution.method,
+          ruleConfidence: ruleResolution.confidence,
+        },
+      },
+    }
+  )
+
+  const domain = result.domain && allowedDomains.includes(result.domain) ? result.domain : fallback().domain
+  return {
+    profile: getDomainProfile(domain),
+    method: result.method === 'fallback'
+      ? 'fallback'
+      : (result.domain && allowedDomains.includes(result.domain) ? 'ai' : ruleResolution.method),
+    confidence: typeof result.confidence === 'number'
+      ? Math.max(0, Math.min(1, result.confidence))
+      : ruleResolution.confidence,
+    reason: result.reason || ruleResolution.reason,
+    candidates: ruleResolution.candidates,
+  }
 }
 
 export function getDomainBannedTerms(domain: ContentDomain): string[] {
