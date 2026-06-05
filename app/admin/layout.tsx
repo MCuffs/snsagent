@@ -2,7 +2,11 @@ import { ReactNode } from 'react'
 import { requireAdminUser } from '../../lib/admin'
 import { AdminShell } from './_components/AdminShell'
 
+// Shell itself is dynamic (auth check), but child pages handle their own caching
 export const dynamic = 'force-dynamic'
+
+// Prefetch all admin tab pages for instant navigation
+export const experimental_ppr = false
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const admin = await requireAdminUser()

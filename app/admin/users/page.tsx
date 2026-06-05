@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import prisma from '../../../lib/db'
-import { AdminPageHeader, formatDate, statusPill } from '../_components/AdminShell'
+import { AdminPageHeader, EmptyState, Td, Th, formatDate, statusPill } from '../_components/AdminShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +11,7 @@ export default async function AdminUsersPage({
 }) {
   const params = await searchParams
   const q = params?.q?.trim() || ''
+
   const users = await prisma.user.findMany({
     where: q ? { email: { contains: q, mode: 'insensitive' } } : undefined,
     orderBy: { createdAt: 'desc' },
@@ -25,56 +26,60 @@ export default async function AdminUsersPage({
 
   return (
     <>
-      <AdminPageHeader
-        eyebrow="Users"
-        title="User management"
-        description="Search users, inspect generation activity, review credit balance, and open operational detail pages."
-      />
-      <form className="mb-4 flex max-w-xl gap-2">
+      <AdminPageHeader title="사용자 관리" description="플랜 변경, 크레딧 조정, 계정 상태 관리" />
+
+      <form className="mb-4 flex max-w-lg gap-2">
         <input
           name="q"
           defaultValue={q}
-          placeholder="Search by email"
-          className="min-h-11 flex-1 rounded-md border border-[#d9d0c5] bg-white px-3 text-sm font-semibold outline-none focus:border-[#a47d65]"
+          placeholder="이메일로 검색"
+          className="min-h-10 flex-1 rounded-lg border border-[#ddd] bg-white px-3 text-sm outline-none focus:border-[#111] focus:ring-2 focus:ring-black/5"
         />
-        <button className="rounded-md bg-[#171412] px-4 text-sm font-black text-white">Search</button>
+        <button className="rounded-lg bg-[#111] px-4 text-sm font-bold text-white hover:bg-[#333]">검색</button>
       </form>
 
-      <div className="overflow-hidden rounded-md border border-[#e6dfd5] bg-white shadow-sm">
-        <table className="w-full min-w-[980px] text-left text-sm">
-          <thead className="bg-[#f4f1eb] text-xs font-black uppercase tracking-[0.08em] text-[#74675d]">
-            <tr>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Signup date</th>
-              <th className="px-4 py-3">Plan</th>
-              <th className="px-4 py-3">Remaining credits</th>
-              <th className="px-4 py-3">Total generations</th>
-              <th className="px-4 py-3">Last active date</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#eee8df]">
-            {users.map(user => {
-              const creditBalance = user.creditLedger.reduce((sum, item) => sum + item.amount, 0)
-              const lastActive = maxDate(user.campaigns[0]?.updatedAt, user.editLogs[0]?.createdAt, user.updatedAt)
-              const accountStatus = user.accountStatus || 'active'
-              return (
-                <tr key={user.id} className="align-top">
-                  <td className="px-4 py-3 font-bold">
-                    <Link href={`/admin/users/${user.id}`} className="text-[#1f4f8a] hover:underline">{user.email}</Link>
-                    {user.name && <div className="mt-0.5 text-xs font-semibold text-[#81756d]">{user.name}</div>}
-                  </td>
-                  <td className="px-4 py-3 text-[#635951]">{formatDate(user.createdAt)}</td>
-                  <td className="px-4 py-3 font-black">{user.plan}</td>
-                  <td className="px-4 py-3 font-black">{creditBalance}</td>
-                  <td className="px-4 py-3">{user._count.campaigns}</td>
-                  <td className="px-4 py-3 text-[#635951]">{formatDate(lastActive)}</td>
-                  <td className="px-4 py-3"><span className={statusPill(accountStatus)}>{accountStatus}</span></td>
+      <div className="overflow-hidden rounded-xl border border-[#e8e8e8] bg-white">
+        {users.length === 0 ? (
+          <div className="p-6"><EmptyState>검색 결과가 없습니다.</EmptyState></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left">
+              <thead className="border-b border-[#f0f0f0]">
+                <tr>
+                  <Th>이메일</Th>
+                  <Th>가입일</Th>
+                  <Th>플랜</Th>
+                  <Th>크레딧</Th>
+                  <Th>생성 횟수</Th>
+                  <Th>마지막 활동</Th>
+                  <Th>상태</Th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-[#f5f5f5]">
+                {users.map(user => {
+                  const creditBalance = user.creditLedger.reduce((sum, item) => sum + item.amount, 0)
+                  const lastActive = maxDate(user.campaigns[0]?.updatedAt, user.editLogs[0]?.createdAt, user.updatedAt)
+                  return (
+                    <tr key={user.id} className="hover:bg-[#fafafa]">
+                      <Td>
+                        <Link href={`/admin/users/${user.id}`} prefetch className="font-semibold text-blue-600 hover:underline">
+                          {user.email}
+                        </Link>
+                        {user.name && <div className="text-xs text-[#aaa]">{user.name}</div>}
+                      </Td>
+                      <Td className="text-[#888]">{formatDate(user.createdAt)}</Td>
+                      <Td><span className="font-bold">{user.plan}</span></Td>
+                      <Td className="font-semibold">{creditBalance}</Td>
+                      <Td>{user._count.campaigns}건</Td>
+                      <Td className="text-[#888]">{formatDate(lastActive)}</Td>
+                      <Td><span className={statusPill(user.accountStatus || 'active')}>{user.accountStatus || 'active'}</span></Td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </>
   )
