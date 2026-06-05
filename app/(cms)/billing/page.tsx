@@ -22,14 +22,12 @@ export default async function PricingPage({
 
   const params = searchParams ? await searchParams : {}
   const plansList = PAID_SUBSCRIPTION_PLANS
-  const hasSubscription = Boolean(user.tossBillingKey || user.paypalSubscriptionId || user.nicepayBid)
-  const tossCustomerKey = await dbService.ensureTossCustomerKey(user.id)
-  const paymentProvider = user.tossBillingKey ? 'toss' : user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
+  const hasSubscription = Boolean(user.paypalSubscriptionId || user.nicepayBid)
+  const paymentProvider = user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
   const paypalPlanIds: Record<string, string> = {}
   for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
     if (value) paypalPlanIds[key] = value
   }
-  const tossClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || '').trim()
   const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
   const t = await getTranslations('billing')
 
@@ -63,8 +61,6 @@ export default async function PricingPage({
         hasSubscription={hasSubscription}
         paymentProvider={paymentProvider}
         userId={user.id}
-        tossClientKey={tossClientKey}
-        tossCustomerKey={tossCustomerKey}
         paypalClientId={paypalClientId}
         paypalPlanIds={paypalPlanIds}
         nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}

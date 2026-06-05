@@ -29,8 +29,31 @@ const pretendard = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Shuffla",
-  description: "AI card news studio for generating, editing, and downloading visual content.",
+  title: {
+    default: 'Shuffla',
+    template: '%s — Shuffla',
+  },
+  description: 'AI card news studio for analyzing brands, generating, editing, and downloading social card news.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'),
+  openGraph: {
+    type: 'website',
+    siteName: 'Shuffla',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Shuffla — AI Card News Studio' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@shuffla_io',
+    images: ['/og-image.png'],
+  },
+  icons: {
+    icon: '/shuffla-logo-mark.png',
+    apple: '/shuffla-logo-mark.png',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+  },
 };
 
 export default async function LocaleLayout({

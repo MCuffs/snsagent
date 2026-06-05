@@ -5,11 +5,26 @@ import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
 
-export async function generateMetadata() {
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   const t = await getTranslations('pricing')
   return {
     title: t('meta_title'),
-    description: t('desc'),
+    description: isEn
+      ? 'Shuffla pricing: Free plan with 2 card news, Creator at ₩25,000/mo for 20/month, Studio at ₩39,000/mo for 30/month.'
+      : 'Shuffla 요금제: 무료 2회, Creator 월 25,000원(월 20회), Studio 월 39,000원(월 30회).',
+    alternates: {
+      canonical: `${base}/${locale}/pricing`,
+      languages: { ko: `${base}/ko/pricing`, en: `${base}/en/pricing` },
+    },
+    openGraph: {
+      title: t('meta_title'),
+      description: isEn ? 'Choose the plan that fits your content workflow.' : '콘텐츠 운영 규모에 맞는 플랜을 선택하세요.',
+      url: `${base}/${locale}/pricing`,
+      type: 'website',
+    },
   }
 }
 
@@ -29,7 +44,7 @@ const faqs = {
     { q: 'What if I want to regenerate a free result?', a: 'Select AI Regeneration on the result screen to add a single ₩3,000 pass instead of a full subscription.' },
     { q: 'Can I edit the AI-generated card news?', a: 'Yes. You can edit the copy and layout directly after generation.' },
     { q: 'Can I use it with multiple brands?', a: 'Currently one brand per account is supported. Contact us for multi-brand inquiries.' },
-    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
+    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day history retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
     { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create 2 card news in total without payment.' },
     { q: 'Can I change plans at any time?', a: 'Canceling your current subscription reverts access immediately. You can then choose a new plan.' },
     { q: 'Where do I complete payment?', a: 'After Google Login and brand setup, the billing screen lets you select and pay for your plan.' },
@@ -63,13 +78,39 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const accessHref = authenticated ? `/${locale}/billing` : '/api/auth/google/start'
   const t = await getTranslations('pricing')
   const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
+
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: (isEn ? faqs.en : faqs.ko).map(faq => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: { '@type': 'Answer', text: faq.a },
+    })),
+  }
+
+  const pricingJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: isEn ? 'Shuffla Pricing' : 'Shuffla 요금제',
+    url: `${base}/${locale}/pricing`,
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Free', description: PRICING_PLANS.FREE.description_en },
+        { '@type': 'ListItem', position: 2, name: 'Creator', description: PRICING_PLANS.PRO.description_en },
+        { '@type': 'ListItem', position: 3, name: 'Studio', description: PRICING_PLANS.UNLIMITED.description_en },
+      ],
+    },
+  }
 
   const plans = [
     {
       name: PRICING_PLANS.FREE.name,
       tagline: t('free_tagline'),
-      price: PRICING_PLANS.FREE.price,
-      desc: PRICING_PLANS.FREE.description,
+      price: isEn ? PRICING_PLANS.FREE.price_en : PRICING_PLANS.FREE.price,
+      desc: isEn ? PRICING_PLANS.FREE.description_en : PRICING_PLANS.FREE.description,
       cta: t('free_cta'),
       features: isEn
         ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'AI regeneration not included']
@@ -79,8 +120,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       name: PRICING_PLANS.PRO.name,
       tagline: t('pro_tagline'),
-      price: PRICING_PLANS.PRO.price,
-      desc: PRICING_PLANS.PRO.description,
+      price: isEn ? PRICING_PLANS.PRO.price_en : PRICING_PLANS.PRO.price,
+      desc: isEn ? PRICING_PLANS.PRO.description_en : PRICING_PLANS.PRO.description,
       cta: t('paid_cta'),
       features: isEn
         ? ['20 card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
@@ -90,8 +131,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       name: PRICING_PLANS.UNLIMITED.name,
       tagline: t('unlimited_tagline'),
-      price: PRICING_PLANS.UNLIMITED.price,
-      desc: PRICING_PLANS.UNLIMITED.description,
+      price: isEn ? PRICING_PLANS.UNLIMITED.price_en : PRICING_PLANS.UNLIMITED.price,
+      desc: isEn ? PRICING_PLANS.UNLIMITED.description_en : PRICING_PLANS.UNLIMITED.description,
       cta: t('paid_cta'),
       features: isEn
         ? ['30 card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
@@ -104,8 +145,11 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const compareList = isEn ? compareFeatures.en : compareFeatures.ko
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
-      <MarketingNav authenticated={authenticated} locale={locale} />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }} />
+      <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
+        <MarketingNav authenticated={authenticated} locale={locale} />
 
       <main className="flex-1">
         {/* HEADER */}
@@ -188,7 +232,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                 </div>
               </div>
               <a
-                href="mailto:support@shuffla.ai"
+                href="mailto:alstnwjd0424@gmail.com"
                 className="inline-flex h-11 items-center gap-1.5 rounded-full bg-[#0a0a0a] px-6 text-[14px] font-bold text-white hover:bg-[#1a1a1a] transition-colors whitespace-nowrap"
               >
                 {isEn ? 'Contact us' : '도입 문의하기'} <ArrowRight className="h-4 w-4" />
@@ -256,7 +300,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </div>
             <div className="mt-14 text-center">
               <p className="text-[14px] text-[#525252]">{isEn ? 'Have more questions?' : '더 궁금한 점이 있나요?'}</p>
-              <a href="mailto:support@shuffla.ai" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0a0a0a] hover:gap-2.5 transition-all">
+              <a href="mailto:alstnwjd0424@gmail.com" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0a0a0a] hover:gap-2.5 transition-all">
                 {isEn ? 'Contact us' : '문의하기'} <ArrowRight className="h-4 w-4" />
               </a>
             </div>
@@ -266,5 +310,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
       <MarketingFooter authenticated={authenticated} locale={locale} />
     </div>
+    </>
   )
 }

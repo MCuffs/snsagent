@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI, type Part } from '@google/generative-ai'
 import { type ImageProvider, sanitizeImagePrompt } from '../imageProvider'
 import { uploadGeneratedAsset } from '../../storage/upload'
+import { OpenAIImageProvider } from './openAIImageProvider'
+import { isConfiguredOpenAIKey } from '../../../../lib/env'
 
 // Nano Banana 2 = Gemini 3.1 Flash Image
 export const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'
@@ -81,4 +83,35 @@ export class GeminiImageProvider implements ImageProvider {
       throw err
     }
   }
+}
+
+/** Gemini를 먼저 시도하고 실패 시 OpenAI(gpt-image-1)로 폴백합니다. */
+export class GeminiWithOpenAIFallbackProvider implements ImageProvider {
+  private primary: GeminiImageProvider
+  private fallback: OpenAIImageProvider
+
+  constructor() {
+    this.primary = new GeminiImageProvider()
+    this.fallback = new OpenAIImageProvider()
+  }
+
+  async generateImage(
+    prompt: string,
+    options?: { size?: string; productImageUrls?: string[] }
+  ): Promise<{ imageUrl: string }> {
+    try {
+      return await this.primary.generateImage(prompt, options)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn(`[GeminiWithOpenAIFallback] Gemini failed (${message}), falling back to OpenAI gpt-image-1`)
+      return await this.fallback.generateImage(prompt, options)
+    }
+  }
+}
+
+export function canUseGeminiWithFallback(): boolean {
+  return (
+    Boolean(process.env.GEMINI_API_KEY) &&
+    isConfiguredOpenAIKey(process.env.OPENAI_API_KEY)
+  )
 }

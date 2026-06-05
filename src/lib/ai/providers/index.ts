@@ -2,7 +2,7 @@ import { isConfiguredOpenAIKey, isConfiguredGeminiKey } from '../../../../lib/en
 import type { ImageProvider } from '../imageProvider'
 import { ByteDanceImageProvider } from './byteDanceImageProvider'
 import { FreeStockImageProvider } from './freeStockImageProvider'
-import { GeminiImageProvider, GEMINI_IMAGE_MODEL } from './geminiImageProvider'
+import { GeminiImageProvider, GeminiWithOpenAIFallbackProvider, canUseGeminiWithFallback, GEMINI_IMAGE_MODEL } from './geminiImageProvider'
 import { MockImageProvider } from './mockImageProvider'
 import { ACTIVE_OPENAI_IMAGE_MODEL, OpenAIImageProvider } from './openAIImageProvider'
 
@@ -18,7 +18,9 @@ export function getPipelineImageProvider(): ImageProvider {
   }
 
   if (provider === 'gemini' && process.env.GEMINI_API_KEY) {
-    return new GeminiImageProvider()
+    return canUseGeminiWithFallback()
+      ? new GeminiWithOpenAIFallbackProvider()
+      : new GeminiImageProvider()
   }
 
   if (provider === 'auto' && process.env.FREE_STOCK_IMAGES !== 'false') {
@@ -36,9 +38,11 @@ export function getPipelineImageProvider(): ImageProvider {
     return new ByteDanceImageProvider()
   }
 
-  // auto 모드에서 OpenAI 키 없으면 Gemini fallback
+  // auto 모드에서 OpenAI 키 없으면 Gemini fallback (OpenAI 키가 있으면 폴백 포함)
   if (provider === 'auto' && isConfiguredGeminiKey(process.env.GEMINI_API_KEY)) {
-    return new GeminiImageProvider()
+    return canUseGeminiWithFallback()
+      ? new GeminiWithOpenAIFallbackProvider()
+      : new GeminiImageProvider()
   }
 
   throw new Error('Image generation is not configured. Set OPENAI_API_KEY or GEMINI_API_KEY, or set IMAGE_PROVIDER=mock for local development.')
