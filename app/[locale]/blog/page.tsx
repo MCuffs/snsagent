@@ -6,11 +6,39 @@ import { getSessionUser } from '../../../lib/auth/user'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
+  const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   return {
-    title: locale === 'en' ? 'Blog — Shuffla' : '블로그 — Shuffla',
-    description: locale === 'en'
-      ? 'Guides, updates, and FAQs for Shuffla card news studio.'
-      : '카드뉴스 제작 가이드, 업데이트 소식, 자주 묻는 질문을 확인하세요.',
+    title: isEn ? 'Blog — Shuffla Card News Studio' : '블로그 — Shuffla 카드뉴스 스튜디오',
+    description: isEn
+      ? 'Guides, updates, tips, and FAQs for Shuffla card news studio — learn how to create better social content with AI.'
+      : '카드뉴스 제작 가이드, 업데이트 소식, 활용 팁, 자주 묻는 질문을 확인하세요 — AI로 더 나은 소셜 콘텐츠를 만드는 법.',
+    alternates: {
+      canonical: `${base}/${locale}/blog`,
+      languages: { ko: `${base}/ko/blog`, en: `${base}/en/blog` },
+    },
+    openGraph: {
+      title: isEn ? 'Blog — Shuffla Card News Studio' : '블로그 — Shuffla 카드뉴스 스튜디오',
+      description: isEn
+        ? 'Guides, updates, and tips for creating better social card news with AI.'
+        : 'AI 카드뉴스 제작 가이드, 업데이트 소식, 활용 팁을 한눈에.',
+      url: `${base}/${locale}/blog`,
+      type: 'website',
+      siteName: 'Shuffla',
+      images: [{ url: `${base}/og-image.png`, width: 1200, height: 630, alt: 'Shuffla Blog' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: isEn ? 'Blog — Shuffla Card News Studio' : '블로그 — Shuffla 카드뉴스 스튜디오',
+      description: isEn
+        ? 'Guides, updates, and tips for creating better social card news with AI.'
+        : 'AI 카드뉴스 제작 가이드, 업데이트 소식, 활용 팁을 한눈에.',
+      images: [`${base}/og-image.png`],
+      site: '@shuffla_io',
+    },
+    keywords: isEn
+      ? ['card news blog', 'AI content tips', 'Instagram card news guide', 'social media content tips', 'card news tutorial', 'card news best practices']
+      : ['카드뉴스 블로그', '카드뉴스 제작 가이드', 'AI 콘텐츠 팁', '인스타그램 카드뉴스 활용법', 'SNS 마케팅 팁', '카드뉴스 튜토리얼'],
   }
 }
 

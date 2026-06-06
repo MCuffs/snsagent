@@ -24,7 +24,19 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       description: isEn ? 'Choose the plan that fits your content workflow.' : '콘텐츠 운영 규모에 맞는 플랜을 선택하세요.',
       url: `${base}/${locale}/pricing`,
       type: 'website',
+      siteName: 'Shuffla',
+      images: [{ url: `${base}/og-image.png`, width: 1200, height: 630, alt: t('meta_title') }],
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: t('meta_title'),
+      description: isEn ? 'Choose the plan that fits your content workflow.' : '콘텐츠 운영 규모에 맞는 플랜을 선택하세요.',
+      images: [`${base}/og-image.png`],
+      site: '@shuffla_io',
+    },
+    keywords: isEn
+      ? ['card news pricing', 'AI card news cost', 'card news maker pricing', 'social media content tool pricing', 'Instagram carousel maker cost']
+      : ['카드뉴스 제작 비용', '카드뉴스 요금제', 'AI 카드뉴스 가격', 'SNS 마케팅 도구 가격', '카드뉴스 생성 서비스'],
   }
 }
 

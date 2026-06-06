@@ -27,7 +27,21 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       url: `${base}/${locale}`,
       locale: isEn ? 'en_US' : 'ko_KR',
       type: 'website',
+      siteName: 'Shuffla',
+      images: [{ url: `${base}/og-image.png`, width: 1200, height: 630, alt: isEn ? 'Shuffla — AI Card News Studio' : 'Shuffla — AI 카드뉴스 스튜디오' }],
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: isEn ? 'Shuffla — AI Card News Studio' : 'Shuffla — AI 카드뉴스 스튜디오',
+      description: isEn
+        ? 'From brand URL to publishable card news — AI plans, writes, and visualizes.'
+        : '브랜드 URL 입력만으로 기획·카피·이미지가 완성되는 AI 카드뉴스 스튜디오.',
+      images: [`${base}/og-image.png`],
+      site: '@shuffla_io',
+    },
+    keywords: isEn
+      ? ['card news maker', 'AI card news generator', 'Instagram carousel maker', 'social media content tool', 'brand content AI', 'visual content creation', 'card news template']
+      : ['카드뉴스 제작', 'AI 카드뉴스 생성', '인스타그램 카드뉴스', 'SNS 마케팅 콘텐츠', '브랜드 카드뉴스', '카드뉴스 자동 생성', '카드뉴스 템플릿', '셔플라'],
   }
 }
 

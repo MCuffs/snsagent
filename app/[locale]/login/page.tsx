@@ -7,8 +7,28 @@ import { getTranslations } from 'next-intl/server'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
+  const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   return {
-    title: locale === 'en' ? 'Log in — Shuffla' : '로그인 — Shuffla',
+    title: isEn ? 'Log in — Shuffla Card News Studio' : '로그인 — Shuffla 카드뉴스 스튜디오',
+    description: isEn
+      ? 'Log in to Shuffla to start creating AI-powered card news for your brand.'
+      : 'Shuffla에 로그인하고 AI 카드뉴스 제작을 시작하세요.',
+    alternates: {
+      canonical: `${base}/${locale}/login`,
+      languages: { ko: `${base}/ko/login`, en: `${base}/en/login` },
+    },
+    openGraph: {
+      title: isEn ? 'Log in — Shuffla' : '로그인 — Shuffla',
+      description: isEn
+        ? 'Start creating AI card news for your brand.'
+        : 'AI 카드뉴스 제작을 시작하세요.',
+      url: `${base}/${locale}/login`,
+      type: 'website',
+      siteName: 'Shuffla',
+      images: [{ url: `${base}/og-image.png`, width: 1200, height: 630, alt: 'Shuffla' }],
+    },
+    robots: { index: false, follow: false },
   }
 }
 

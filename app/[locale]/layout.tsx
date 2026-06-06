@@ -28,21 +28,36 @@ const pretendard = localFont({
   ],
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
+
 export const metadata: Metadata = {
+  metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Shuffla',
+    default: 'Shuffla — AI 카드뉴스 스튜디오 | Card News Studio',
     template: '%s — Shuffla',
   },
-  description: 'AI card news studio for analyzing brands, generating, editing, and downloading social card news.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'),
+  description: '브랜드 URL만 입력하면 AI가 카드뉴스의 기획, 카피, 비주얼을 만들고 편집·다운로드까지 — AI-powered social card news creation for brands and marketers.',
+  keywords: [
+    '카드뉴스', '카드뉴스 제작', 'AI 카드뉴스', '인스타그램 카드뉴스',
+    'SNS 마케팅', 'AI 콘텐츠 제작', '브랜드 분석', '카드뉴스 템플릿',
+    'card news', 'AI card news', 'Instagram carousel', 'social media content',
+    'brand content', 'AI marketing tool', 'visual content creation',
+  ],
+  authors: [{ name: 'Shuffla', url: BASE_URL }],
+  creator: 'Shuffla',
+  publisher: 'Shuffla',
+  formatDetection: { email: false, address: false, telephone: false },
   openGraph: {
     type: 'website',
     siteName: 'Shuffla',
+    locale: 'ko_KR',
+    alternateLocale: ['en_US'],
     images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Shuffla — AI Card News Studio' }],
   },
   twitter: {
     card: 'summary_large_image',
     site: '@shuffla_io',
+    creator: '@shuffla_io',
     images: ['/og-image.png'],
   },
   icons: {
@@ -52,7 +67,10 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+  },
+  alternates: {
+    languages: { ko: `${BASE_URL}/ko`, en: `${BASE_URL}/en` },
   },
 };
 

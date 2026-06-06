@@ -5,9 +5,16 @@ import { getTranslations } from 'next-intl/server'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
+  const isEn = locale === 'en'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   return {
-    title: locale === 'en' ? 'Privacy — Shuffla' : 'Privacy — Shuffla',
-    description: locale === 'en' ? 'Shuffla privacy policy' : 'Shuffla 개인정보 처리 안내',
+    title: isEn ? 'Privacy Policy — Shuffla' : '개인정보 처리방침 — Shuffla',
+    description: isEn ? 'Shuffla card news studio privacy policy' : 'Shuffla 카드뉴스 스튜디오 개인정보 처리방침',
+    alternates: {
+      canonical: `${base}/${locale}/privacy`,
+      languages: { ko: `${base}/ko/privacy`, en: `${base}/en/privacy` },
+    },
+    robots: { index: false, follow: false },
   }
 }
 
