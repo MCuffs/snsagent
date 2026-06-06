@@ -19,6 +19,8 @@ interface Campaign {
   createdAt: string
   thumbnail: string | null
   slideCount: number
+  caption: string
+  hashtags: string
 }
 
 interface ScheduledPost {
@@ -279,83 +281,71 @@ export default function InstagramDashboard({ brandId }: InstagramDashboardProps)
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const [scheduling, setScheduling] = useState(false)
   const [scheduledAt, setScheduledAt] = useState('')
-  const [caption, setCaption] = useState('')
-  const [hashtags, setHashtags] = useState('')
+  const [caption, setCaption] = useState(campaign.caption || '')
+  const [hashtags, setHashtags] = useState(campaign.hashtags || '')
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [published, setPublished] = useState(false)
+
+  const showFeedback = (type: 'success' | 'error', text: string) => {
+    setFeedback({ type, text })
+    if (type === 'success') setTimeout(() => setFeedback(null), 4000)
+  }
 
   const handleSchedule = async () => {
     if (!scheduledAt) {
-      alert('예약 시간을 선택해주세요')
+      showFeedback('error', '예약 시간을 선택해주세요')
       return
     }
-
     setScheduling(true)
     try {
       const res = await fetch('/api/instagram/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          campaignId: campaign.id,
-          scheduledAt,
-          caption,
-          hashtags,
-        }),
+        body: JSON.stringify({ campaignId: campaign.id, scheduledAt, caption, hashtags }),
       })
-
+      const data = await res.json() as { error?: string }
       if (res.ok) {
-        alert('게시가 예약되었습니다')
-        setScheduling(false)
+        showFeedback('success', '예약되었습니다')
         setScheduledAt('')
-        setCaption('')
-        setHashtags('')
-        window.location.reload()
       } else {
-        throw new Error('Failed to schedule')
+        showFeedback('error', data.error || '예약에 실패했습니다')
       }
-    } catch (error) {
-      console.error('Failed to schedule:', error)
-      alert('예약에 실패했습니다')
+    } catch {
+      showFeedback('error', '예약 중 오류가 발생했습니다')
+    } finally {
       setScheduling(false)
     }
   }
 
   const handlePublishNow = async () => {
-    if (!confirm('지금 바로 게시하시겠습니까?')) return
-
     setScheduling(true)
+    setFeedback(null)
     try {
       const res = await fetch('/api/instagram/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          campaignId: campaign.id,
-          caption,
-          hashtags,
-        }),
+        body: JSON.stringify({ campaignId: campaign.id, caption, hashtags }),
       })
-
+      const data = await res.json() as { error?: string }
       if (res.ok) {
-        alert('게시되었습니다')
-        window.location.reload()
+        setPublished(true)
+        showFeedback('success', 'Instagram에 게시되었습니다 ✓')
       } else {
-        throw new Error('Failed to publish')
+        showFeedback('error', data.error || '게시에 실패했습니다')
       }
-    } catch (error) {
-      console.error('Failed to publish:', error)
-      alert('게시에 실패했습니다')
+    } catch {
+      showFeedback('error', '게시 중 오류가 발생했습니다')
     } finally {
       setScheduling(false)
     }
   }
 
   return (
-    <div className="rounded-md border border-[#e4e4e7] p-4 hover:border-[#d4d4d8] transition-colors">
+    <div className={`rounded-md border p-4 transition-colors ${published ? 'border-emerald-200 bg-emerald-50/50' : 'border-[#e4e4e7] hover:border-[#d4d4d8]'}`}>
       <div className="flex items-start gap-3">
         {campaign.thumbnail ? (
-          <img
-            src={campaign.thumbnail}
-            alt={campaign.title}
-            className="h-16 w-16 rounded-md object-cover shrink-0"
-          />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={campaign.thumbnail} alt={campaign.title} className="h-16 w-16 rounded-md object-cover shrink-0" />
         ) : (
           <div className="flex h-16 w-16 items-center justify-center rounded-md bg-[#fafafa] shrink-0">
             <Camera className="h-6 w-6 text-[#d4d4d8]" />
@@ -363,55 +353,63 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
         )}
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-[#111111] text-sm mb-1 truncate">{campaign.title}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-[#111111] text-sm truncate">{campaign.title}</h3>
+            {published && <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />}
+          </div>
           <p className="text-xs text-[#71717a] mb-3">
             {campaign.slideCount}장 · {new Date(campaign.createdAt).toLocaleDateString('ko-KR')}
           </p>
 
-          <div className="space-y-2">
-            <input
-              type="text"
-              placeholder="캡션 (선택사항)"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              className="w-full rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
-            />
-
-            <input
-              type="text"
-              placeholder="해시태그 (선택사항, 예: #마케팅 #SNS)"
-              value={hashtags}
-              onChange={(e) => setHashtags(e.target.value)}
-              className="w-full rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
-            />
-
-            <div className="flex gap-2">
-              <input
-                type="datetime-local"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                className="flex-1 rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
-              />
-
-              <button
-                onClick={handleSchedule}
-                disabled={scheduling || !scheduledAt}
-                className="rounded-md bg-[#111111] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#000000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                예약
-              </button>
-
-              <button
-                onClick={handlePublishNow}
-                disabled={scheduling}
-                className="rounded-md bg-[#E1306C] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#C13584] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-              >
-                <Send className="h-3.5 w-3.5" />
-                지금 게시
-              </button>
+          {feedback && (
+            <div className={`mb-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium ${feedback.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+              {feedback.type === 'success' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              {feedback.text}
             </div>
-          </div>
+          )}
+
+          {!published && (
+            <div className="space-y-2">
+              <textarea
+                rows={2}
+                placeholder="캡션 (선택사항)"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                className="w-full resize-none rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
+              />
+              <input
+                type="text"
+                placeholder="해시태그 (예: #마케팅 #SNS)"
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value)}
+                className="w-full rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="flex-1 rounded-md border border-[#e4e4e7] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#E1306C]/20 focus:border-[#E1306C]"
+                />
+                <button
+                  onClick={handleSchedule}
+                  disabled={scheduling || !scheduledAt}
+                  className="rounded-md bg-[#111111] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#000000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                >
+                  {scheduling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calendar className="h-3.5 w-3.5" />}
+                  예약
+                </button>
+                <button
+                  onClick={handlePublishNow}
+                  disabled={scheduling}
+                  className="rounded-md bg-[#E1306C] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#C13584] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                >
+                  {scheduling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  지금 게시
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

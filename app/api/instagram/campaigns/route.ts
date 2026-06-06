@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
 
     const result = await Promise.all(
       filtered.map(async (campaign) => {
-        const full = await dbService.getCampaign(campaign.id)
+        const [full, post] = await Promise.all([
+          dbService.getCampaign(campaign.id),
+          dbService.getPostByCampaign(user.id, campaign.id),
+        ])
         const slides = full?.slides || []
         const firstImage = slides
           .sort((a, b) => a.slideNumber - b.slideNumber)[0]
@@ -43,6 +46,8 @@ export async function GET(request: NextRequest) {
             : campaign.createdAt,
           thumbnail: firstImage,
           slideCount: slides.length || campaign.slideCount || 0,
+          caption: post?.caption || '',
+          hashtags: post?.hashtags || '',
         }
       })
     )
