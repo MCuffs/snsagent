@@ -77,9 +77,37 @@ export default function InstagramDashboard({ brandId }: InstagramDashboardProps)
     loadData()
   }, [brandId])
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     setConnecting(true)
-    window.location.href = `/api/auth/meta/start?brandId=${brandId}`
+    
+    // Check if mock mode or real OAuth
+    try {
+      const checkRes = await fetch('/api/auth/meta/check-config')
+      const config = await checkRes.json()
+      
+      if (config.mockMode) {
+        // Mock mode: simulate connection
+        const mockRes = await fetch('/api/instagram/mock-connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brandId }),
+        })
+        
+        if (mockRes.ok) {
+          await loadData()
+        } else {
+          alert('Mock 연결에 실패했습니다.')
+        }
+      } else {
+        // Real OAuth: redirect to Meta
+        window.location.href = `/api/auth/meta/start?brandId=${brandId}`
+      }
+    } catch (error) {
+      console.error('Connection check failed:', error)
+      alert('연결 상태를 확인하는 중 오류가 발생했습니다.')
+    } finally {
+      setConnecting(false)
+    }
   }
 
   const handleDisconnect = async () => {
