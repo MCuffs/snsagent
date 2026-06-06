@@ -24,26 +24,26 @@ export async function GET(request: Request) {
 
     const error = requestUrl.searchParams.get('error')
     if (error) {
-      return NextResponse.redirect(new URL(`/instagram?error=${encodeURIComponent(error)}`, request.url))
+      return NextResponse.redirect(new URL(`/concept?tab=instagram&error=${encodeURIComponent(error)}`, request.url))
     }
 
     const code = requestUrl.searchParams.get('code')
     const state = requestUrl.searchParams.get('state')
     if (!code || !state) {
-      return NextResponse.redirect(new URL('/instagram?error=meta_callback_invalid', request.url))
+      return NextResponse.redirect(new URL('/concept?tab=instagram&error=meta_callback_invalid', request.url))
     }
 
     const cookieStore = await cookies()
     const nonce = cookieStore.get('meta_oauth_nonce')?.value
     const parsedState = decodeState(state)
     if (!nonce || parsedState.nonce !== nonce) {
-      return NextResponse.redirect(new URL('/instagram?error=meta_state_invalid', request.url))
+      return NextResponse.redirect(new URL('/concept?tab=instagram&error=meta_state_invalid', request.url))
     }
     cookieStore.delete('meta_oauth_nonce')
 
     const brand = await dbService.getBrand(parsedState.brandId)
     if (!brand || brand.userId !== user.id) {
-      return NextResponse.redirect(new URL('/instagram?error=brand_forbidden', request.url))
+      return NextResponse.redirect(new URL('/concept?tab=instagram&error=brand_forbidden', request.url))
     }
 
     const shortToken = await exchangeCodeForShortLivedToken(request, code)
@@ -65,14 +65,14 @@ export async function GET(request: Request) {
       connectionMethod: 'oauth',
     })
 
-    return NextResponse.redirect(new URL('/instagram?connected=meta', request.url))
+    return NextResponse.redirect(new URL('/concept?tab=instagram&connected=meta', request.url))
   } catch (error) {
     console.error('Meta OAuth callback failed:', error)
     const errorCode =
       error instanceof Error && error.message === 'no_instagram_business_account'
         ? 'no_instagram_business_account'
         : 'meta_oauth_failed'
-    return NextResponse.redirect(new URL(`/instagram?error=${errorCode}`, request.url))
+    return NextResponse.redirect(new URL(`/concept?tab=instagram&error=${errorCode}`, request.url))
   }
 }
 

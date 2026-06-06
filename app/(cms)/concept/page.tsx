@@ -92,6 +92,7 @@ async function DashboardDataLoader() {
       planName={PRICING_PLANS[plan].name}
       retentionDays={PRICING_PLANS[plan].historyRetentionDays}
       canUpgradeRetention={plan !== 'UNLIMITED'}
+      userEmail={user.email}
     />
   )
 }

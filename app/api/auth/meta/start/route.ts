@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   if (!hasMetaOAuthConfig()) {
-    return NextResponse.redirect(new URL('/instagram?error=meta_config_missing', request.url))
+    return NextResponse.redirect(new URL('/concept?tab=instagram&error=meta_config_missing', request.url))
   }
 
   const nonce = crypto.randomBytes(16).toString('hex')

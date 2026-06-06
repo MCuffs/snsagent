@@ -707,6 +707,26 @@ export const dbService = {
     return db.instagramAccounts.find(ia => ia.brandId === brandId) || null
   },
 
+  async disconnectInstagramAccount(userId: string, brandId: string): Promise<void> {
+    if (!isMock()) {
+      try {
+        await prisma.instagramAccount.deleteMany({
+          where: { userId, brandId },
+        })
+        return
+      } catch (err) {
+        console.warn('Prisma disconnectInstagramAccount failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    db.instagramAccounts = db.instagramAccounts.filter(ia => !(ia.userId === userId && ia.brandId === brandId))
+    writeMockDb(db)
+  },
+
   async saveInstagramAccount(userId: string, brandId: string, instagramAccountId: string, accessTokenEncrypted: string): Promise<InstagramAccount> {
     if (!isMock()) {
       try {
