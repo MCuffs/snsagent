@@ -45,7 +45,7 @@ export default async function CmsLayout({
           </div>
 
           {/* Nav */}
-          <SidebarNav hasCompleteBrand={hasCompleteBrand} locale={locale} />
+          <SidebarNav hasCompleteBrand={hasCompleteBrand} userEmail={user.email} locale={locale} />
 
           {/* User + Plan */}
           <div className="border-t border-[#e4e4e7] p-3 space-y-1.5">
@@ -92,7 +92,7 @@ export default async function CmsLayout({
           {/* Mobile Header Drawer */}
           <MobileHeader locale={locale}>
             <div className="flex flex-col h-full justify-between pb-4">
-              <SidebarNav hasCompleteBrand={hasCompleteBrand} locale={locale} />
+              <SidebarNav hasCompleteBrand={hasCompleteBrand} userEmail={user.email} locale={locale} />
               
               <div className="border-t border-[#e4e4e7] p-3 space-y-1.5 mt-auto">
                 <Link

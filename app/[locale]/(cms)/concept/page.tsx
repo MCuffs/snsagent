@@ -93,6 +93,7 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
       planName={PRICING_PLANS[plan].name}
       retentionDays={PRICING_PLANS[plan].historyRetentionDays}
       canUpgradeRetention={plan !== 'UNLIMITED'}
+      userEmail={user.email}
     />
   )
 }
