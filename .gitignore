@@ -53,6 +53,9 @@ next-env.d.ts
 prisma/errors.log
 .env*.local
 
+# temporary files
+/tmp/
+
 # downloaded font assets and logos (reference copies, not deployed)
 /Pretendard-1.3.9/
 /logo/
