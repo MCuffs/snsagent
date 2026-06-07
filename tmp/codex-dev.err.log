@@ -1,3 +1,11 @@
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
 ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[browser] "The format of Data-" referrer undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" user_id undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" referrer undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" anonymous_id undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" referrer undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" anonymous_id undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" referrer undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)
+[browser] "The format of Data-" user_id undefined  does not meet the requirements and may not be stored correctly. The attribute value only supports String, Number, Date, Boolean, Array，Object (lib/analytics/thinkingdata.ts:88:8)

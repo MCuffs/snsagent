@@ -30,7 +30,7 @@ async function DashboardDataLoader() {
   if (!user) redirect('/login')
 
   const plan = normalizePlan(user.plan || 'FREE')
-  await dbService.deleteExpiredCampaignsForUser(user.id, plan)
+  void dbService.deleteExpiredCampaignsForUser(user.id, plan)
 
   const [brands, campaigns] = await Promise.all([
     getCachedBrands(user.id),

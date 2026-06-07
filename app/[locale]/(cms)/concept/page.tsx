@@ -31,7 +31,8 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
   if (!user) redirect(`/${locale}/login`)
 
   const plan = normalizePlan(user.plan || 'FREE')
-  await dbService.deleteExpiredCampaignsForUser(user.id, plan)
+  // 만료 캠페인 삭제는 페이지 로드를 블로킹하지 않음
+  void dbService.deleteExpiredCampaignsForUser(user.id, plan)
 
   const [brands, campaigns] = await Promise.all([
     getCachedBrands(user.id),

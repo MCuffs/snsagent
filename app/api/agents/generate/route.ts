@@ -429,7 +429,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Detect URL in the latest user message and scrape
+    // 3 & 4. URL scrape + RSS fetch in parallel
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
     const _allUserText = messages
       .filter(m => m.role === 'user')
@@ -439,14 +439,17 @@ export async function POST(request: Request) {
       .filter(m => m.role === 'assistant')
       .map(m => m.content)
       .join('\n')
-    let scrapedContext = ''
-    let purchasePersuasionContext = ''
-    if (lastUserMessage) {
-      const urlMatch = lastUserMessage.content.match(/https?:\/\/[^\s]+/)
-      if (urlMatch) {
+
+    const urlMatch = lastUserMessage?.content.match(/https?:\/\/[^\s]+/)
+    const userTextClean = lastUserMessage?.content.replace(/https?:\/\/[^\s]+/g, '').trim() || ''
+    const keywords = extractGenerationKeywords(userTextClean)
+
+    const [scrapeResult, rssResult] = await Promise.all([
+      // URL scrape (only if URL present)
+      urlMatch ? (async () => {
         try {
           const productContext = await collectBrandUrlContext(urlMatch[0])
-          scrapedContext = productContext.promptContext.slice(0, 5000)
+          const scraped = productContext.promptContext.slice(0, 5000)
           const apiKey = process.env.OPENAI_API_KEY
           if (apiKey && apiKey.length > 10) {
             const openai = new OpenAI({
@@ -458,41 +461,45 @@ export async function POST(request: Request) {
               collected: productContext,
               locale: language,
             })
-            purchasePersuasionContext = formatPurchasePersuasionForPrompt(persuasion)
+            return { scraped, persuasion: formatPurchasePersuasionForPrompt(persuasion) }
           }
+          return { scraped, persuasion: '' }
         } catch (err) {
           console.warn('[GenerateAgent] Scrape failed:', err)
+          return { scraped: '', persuasion: '' }
         }
-      }
-    }
+      })() : Promise.resolve({ scraped: '', persuasion: '' }),
 
-    // 4. Fetch RSS news relevant to the user's topic for real-time grounding
-    let rssContext = ''
-    if (lastUserMessage && generationMode === 'general') {
-      try {
-        const userText = lastUserMessage.content.replace(/https?:\/\/[^\s]+/g, '').trim()
-        const keywords = extractGenerationKeywords(userText)
-        const rssResult = await fetchRssForGeneration({
-          category: inferRssCategory(userText, brand.industry || 'information'),
-          keywords,
-          topic: userText.slice(0, 80),
-          limit: 5,
-        })
-        if (rssResult.matched && rssResult.articles.length > 0) {
-          const lines = [
-            `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
-            `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,
-            '',
-          ]
-          rssResult.articles.forEach((a, i) => {
-            lines.push(`기사 ${i + 1}: ${a.title}`)
-            if (a.description) lines.push(`  → ${a.description.slice(0, 150)}`)
+      // RSS fetch (only for general mode)
+      (lastUserMessage && generationMode === 'general') ? (async () => {
+        try {
+          return await fetchRssForGeneration({
+            category: inferRssCategory(userTextClean, brand.industry || 'information'),
+            keywords,
+            topic: userTextClean.slice(0, 80),
+            limit: 5,
           })
-          rssContext = lines.join('\n')
+        } catch (err) {
+          console.warn('[GenerateAgent] RSS fetch failed:', err)
+          return null
         }
-      } catch (err) {
-        console.warn('[GenerateAgent] RSS fetch failed:', err)
-      }
+      })() : Promise.resolve(null),
+    ])
+
+    let scrapedContext = scrapeResult.scraped
+    let purchasePersuasionContext = scrapeResult.persuasion
+    let rssContext = ''
+    if (rssResult && rssResult.matched && rssResult.articles.length > 0) {
+      const lines = [
+        `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
+        `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,
+        '',
+      ]
+      rssResult.articles.forEach((a, i) => {
+        lines.push(`기사 ${i + 1}: ${a.title}`)
+        if (a.description) lines.push(`  → ${a.description.slice(0, 150)}`)
+      })
+      rssContext = lines.join('\n')
     }
 
     const apiKey = process.env.OPENAI_API_KEY

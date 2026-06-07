@@ -20,3 +20,23 @@
 - Environments: .env.local, .env
 ✓ Ready in 1314ms
 
+ GET /api/health 200 in 832ms (next.js: 663ms, proxy.ts: 128ms, application-code: 41ms)
+ GET /ko/concept 307 in 3.6s (next.js: 3.2s, proxy.ts: 13ms, application-code: 412ms)
+ GET /ko/login 200 in 3.7s (next.js: 1889ms, proxy.ts: 7ms, application-code: 1804ms)
+ GET /api/auth/test-login 307 in 216ms (next.js: 191ms, proxy.ts: 5ms, application-code: 20ms)
+ GET /ko/concept 200 in 560ms (next.js: 79ms, proxy.ts: 6ms, application-code: 475ms)
+ POST /ko/concept 200 in 63ms (next.js: 22ms, proxy.ts: 9ms, application-code: 32ms)
+  └─ ƒ saveBrandAction(null, {"brandDna":null,"ctaStyle":"","forbiddenWords":"AI, 경제, 정책","...":"6 items not stringified"}) in 7ms app/actions.ts
+ POST /ko/concept 200 in 52ms (next.js: 24ms, proxy.ts: 6ms, application-code: 21ms)
+  └─ ƒ saveBrandAction("b-1780838933005", {"brandDna":null,"ctaStyle":"","forbiddenWords":"AI, 경제, 정책","...":"6 items not stringified"}) in 7ms app/actions.ts
+✓ Compiled in 297ms
+ GET /ko/concept?brandId=b-1780838933005&tab=generate 200 in 542ms (next.js: 300ms, proxy.ts: 92ms, application-code: 150ms)
+ GET /ko/login 200 in 389ms (next.js: 130ms, proxy.ts: 7ms, application-code: 252ms)
+ GET /ko/login 200 in 129ms (next.js: 37ms, proxy.ts: 17ms, application-code: 75ms)
+✓ Compiled in 343ms
+✓ Compiled in 227ms
+✓ Compiled in 313ms
+ GET /ko/login 200 in 601ms (next.js: 291ms, proxy.ts: 49ms, application-code: 261ms)
+✓ Compiled in 179ms
+ GET /ko/login 200 in 547ms (next.js: 230ms, proxy.ts: 26ms, application-code: 290ms)
+ GET /ko/login 200 in 125ms (next.js: 20ms, proxy.ts: 17ms, application-code: 89ms)

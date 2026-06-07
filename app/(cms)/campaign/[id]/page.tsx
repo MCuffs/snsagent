@@ -13,10 +13,8 @@ export default async function CampaignDetailsPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const user = await getSessionUser()
+  const [user, { id }] = await Promise.all([getSessionUser(), params])
   if (!user) redirect('/login')
-
-  const { id } = await params
 
   const campaign = await dbService.getCampaign(id)
   if (!campaign || campaign.userId !== user.id) redirect('/concept?tab=works')

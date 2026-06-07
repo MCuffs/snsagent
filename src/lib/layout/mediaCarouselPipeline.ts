@@ -108,15 +108,18 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     tone: input.tone,
     contentType: input.contentType,
   }))
-  const domainResolution = await resolveGenerationDomainProfile({
-    topic: input.topic,
-    category: input.category,
-    brandIndustry: input.brandIndustry,
-    contentType: input.contentType,
-    generationMode: input.generationMode,
-    userId: input.userId,
-    brandId: input.brandId,
-  })
+  const [domainResolution, personalizationMemory] = await Promise.all([
+    resolveGenerationDomainProfile({
+      topic: input.topic,
+      category: input.category,
+      brandIndustry: input.brandIndustry,
+      contentType: input.contentType,
+      generationMode: input.generationMode,
+      userId: input.userId,
+      brandId: input.brandId,
+    }),
+    dbService.getSummarizedPreference(input.brandId),
+  ])
   const domainProfile = domainResolution.profile
   console.info('[DomainProfile:resolved]', {
     generationMode: input.generationMode,
@@ -167,7 +170,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     },
   })
 
-  const personalizationMemory = await dbService.getSummarizedPreference(input.brandId)
   const editorialPlan = await buildEditorialDirectorPlan({
     productName: input.topic,
     sourceMaterial: input.keyContent,
@@ -450,32 +452,35 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     suggestions: agentReportLogs.filter(l => l.status === 'info').map(l => l.message),
   }
   const status = qualityCheck.passed ? 'pending_approval' : 'needs_review'
-  await dbService.updateCampaignStatus(campaign.id, status)
-  await dbService.createQualityScoreLog({
-    campaignId: campaign.id,
-    userId: input.userId,
-    passed: editorialQuality.passed,
-    score: editorialQuality.score,
-    narrativeFlowScore: editorialQuality.narrativeFlowScore,
-    personaFitScore: editorialQuality.personaFitScore,
-    hookPatternScore: editorialQuality.hookPatternScore,
-    issueCount: editorialQuality.issues.length,
-    issuesJson: JSON.stringify(editorialQuality.issues),
-    hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
-    personaUsed: knowledgeCtx.personaProfile.id,
-    industryUsed: knowledgeCtx.industryToneRule?.industry,
-    trendContextUsed: hasExternalGrounding(input.keyContent),
-    memoryContextUsed: editorialPlan.personalization.applied,
-  })
 
-  const caption = await generateCaption(input, slides)
+  // 병렬: updateCampaignStatus + createQualityScoreLog + generateCaption
+  const [, , caption] = await Promise.all([
+    dbService.updateCampaignStatus(campaign.id, status),
+    dbService.createQualityScoreLog({
+      campaignId: campaign.id,
+      userId: input.userId,
+      passed: editorialQuality.passed,
+      score: editorialQuality.score,
+      narrativeFlowScore: editorialQuality.narrativeFlowScore,
+      personaFitScore: editorialQuality.personaFitScore,
+      hookPatternScore: editorialQuality.hookPatternScore,
+      issueCount: editorialQuality.issues.length,
+      issuesJson: JSON.stringify(editorialQuality.issues),
+      hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
+      personaUsed: knowledgeCtx.personaProfile.id,
+      industryUsed: knowledgeCtx.industryToneRule?.industry,
+      trendContextUsed: hasExternalGrounding(input.keyContent),
+      memoryContextUsed: editorialPlan.personalization.applied,
+    }),
+    generateCaption(input, slides),
+  ])
 
   const post = await dbService.createPost(input.userId, input.brandId, campaign.id, {
     caption,
     hashtags: buildHashtags(input).join(', '),
     scheduledAt: tomorrowAt20(),
   })
-  await dbService.updatePostStatus(post.id, 'pending_approval')
+  void dbService.updatePostStatus(post.id, 'pending_approval')
 
   // Fire-and-forget: update brand intelligence after each successful generation.
   // Never awaited — never blocks the response.

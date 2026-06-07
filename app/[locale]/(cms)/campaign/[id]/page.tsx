@@ -13,8 +13,7 @@ export default async function CampaignDetailsPage({
 }: {
   params: Promise<{ locale: string; id: string }>
 }) {
-  const { locale, id } = await params
-  const user = await getSessionUser()
+  const [{ locale, id }, user] = await Promise.all([params, getSessionUser()])
   if (!user) redirect(`/${locale}/login`)
 
   const campaign = await dbService.getCampaign(id)
