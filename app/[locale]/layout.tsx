@@ -94,7 +94,7 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${pretendard.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider messages={messages}>
-          <ThinkingDataProvider />
+          <ThinkingDataProvider locale={locale} />
           {children}
         </NextIntlClientProvider>
       </body>

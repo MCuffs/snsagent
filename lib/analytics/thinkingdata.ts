@@ -4,29 +4,54 @@
 interface TD {
   init(config: { appId: string; serverUrl: string; autoTrack?: Record<string, boolean> }): void
   login(accountId: string): void
-  logout(): void
+  logout(isChangeId?: boolean): void
   identify(distinctId: string): void
+  getDistinctId(): string
+  getDeviceId(): string
   userSet(props: Record<string, unknown>): void
   userSetOnce(props: Record<string, unknown>): void
   setSuperProperties(props: Record<string, unknown>): void
+  unsetSuperProperty(propertyName: string): void
   track(event: string, props?: Record<string, unknown>): void
   timeEvent(event: string): void
+  flush(): void
 }
 
 let td: TD | null = null
 let initialized = false
+let initPromise: Promise<TD | null> | null = null
+const queuedTracks: Array<{ event: string; props: Record<string, unknown> }> = []
 
 const APP_ID = 'fb483555173b464fb64813eb7d82f294'
 const SERVER_URL = 'https://te-receiver-naver.thinkingdata.kr'
 
-export async function initThinkingData() {
-  if (typeof window === 'undefined' || initialized) return
+export async function initThinkingData(): Promise<TD | null> {
+  if (typeof window === 'undefined') return null
+  if (initialized) return td
+  if (initPromise) return initPromise
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import('thinkingdata-browser') as any
-  const lib = mod.default ?? mod
-  td = lib as TD
-  td!.init({ appId: APP_ID, serverUrl: SERVER_URL, autoTrack: { pageShow: true, pageHide: true } })
-  initialized = true
+  initPromise = import('thinkingdata-browser').then((mod: any) => {
+    const lib = mod.default ?? mod
+    td = lib as TD
+    td.init({ appId: APP_ID, serverUrl: SERVER_URL, autoTrack: { pageShow: true, pageHide: true } })
+    initialized = true
+
+    while (queuedTracks.length > 0) {
+      const item = queuedTracks.shift()
+      if (item) td.track(item.event, item.props)
+    }
+
+    return td
+  }).catch((error) => {
+    initPromise = null
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[ThinkingData] initialization failed', error)
+    }
+    return null
+  })
+
+  return initPromise
 }
 
 export function identifyUser(accountId: string, props?: Record<string, unknown>) {
@@ -37,7 +62,7 @@ export function identifyUser(accountId: string, props?: Record<string, unknown>)
 
 export function resetIdentity() {
   if (!td) return
-  td.logout()
+  td.logout(true)
 }
 
 export function setUserProperties(props: Record<string, unknown>) {
@@ -48,8 +73,26 @@ export function setSuperProperties(props: Record<string, unknown>) {
   td?.setSuperProperties(props)
 }
 
+export function unsetSuperProperty(propertyName: string) {
+  td?.unsetSuperProperty(propertyName)
+}
+
+export function getAnonymousId() {
+  return td?.getDistinctId?.() ?? td?.getDeviceId?.()
+}
+
 export function track(event: string, props?: Record<string, unknown>) {
-  td?.track(event, props ?? {})
+  const safeProps = props ?? {}
+
+  if (td) {
+    td.track(event, safeProps)
+    return
+  }
+
+  if (typeof window !== 'undefined') {
+    queuedTracks.push({ event, props: safeProps })
+    void initThinkingData()
+  }
 }
 
 export function timeEvent(event: string) {

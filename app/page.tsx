@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { MarketingFooter } from './components/MarketingFooter'
 import { MarketingNav } from './components/MarketingNav'
 import { CapabilityObjects, ConnectedWorkflow, EditorialGallery, ProductShowcase } from './components/LandingProductShowcase'
+import ThinkingDataProvider from './components/ThinkingDataProvider'
 import { getSessionUser } from '../lib/auth/user'
 
 export async function generateMetadata() {
@@ -21,10 +22,12 @@ export default async function LandingPage() {
   const tLanding = await getTranslations('landing')
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-[#171714] selection:bg-[#ec6238]/15">
-      <MarketingNav authenticated={authenticated} />
+    <>
+      <ThinkingDataProvider locale="ko" />
+      <main className="min-h-screen bg-[#fbfaf7] text-[#171714] selection:bg-[#ec6238]/15">
+        <MarketingNav authenticated={authenticated} />
 
-      <section className="relative overflow-hidden pb-24 pt-16 md:pb-32 md:pt-24">
+        <section className="relative overflow-hidden pb-24 pt-16 md:pb-32 md:pt-24">
         <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(237,101,57,0.075),transparent_66%)]" />
         <div className="relative mx-auto max-w-5xl px-5 text-center md:px-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#e8e2d8] bg-white/80 px-4 py-2 text-xs font-medium text-[#716a60]">
@@ -90,7 +93,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <MarketingFooter authenticated={authenticated} />
-    </main>
+        <MarketingFooter authenticated={authenticated} />
+      </main>
+    </>
   )
 }

@@ -32,6 +32,7 @@ export default async function CmsLayout({
         userEmail={user.email ?? undefined}
         userPlan={user.plan ?? 'FREE'}
         userName={user.name ?? undefined}
+        locale={locale}
       />
       <div className="flex h-screen overflow-hidden bg-white text-[#111111]">
         {/* Sidebar */}
