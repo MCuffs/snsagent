@@ -168,7 +168,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
 
   const personalizationMemory = await dbService.getSummarizedPreference(input.brandId)
-  const editorialPlan = buildEditorialDirectorPlan({
+  const editorialPlan = await buildEditorialDirectorPlan({
     productName: input.topic,
     sourceMaterial: input.keyContent,
     category: input.category,

@@ -1,5 +1,6 @@
 import type { CopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import type { LayoutType } from '../layout/layoutTypes'
+import { getLLMClient, getCopywritingModel } from '../ai/llmClient'
 
 export type EditorialSlideRole =
   | 'hook'
@@ -180,24 +181,257 @@ const GENERIC_TERMS = [
   '\uAC74\uAC15\uD55C',
 ]
 
-export function buildEditorialDirectorPlan(input: EditorialDirectorInput): EditorialDirectorPlan {
+export async function buildEditorialDirectorPlan(input: EditorialDirectorInput): Promise<EditorialDirectorPlan> {
   const memorySummary = input.memory?.summary?.trim() || ''
+  let preferredHookPatterns: string[] = []
+  let avoidPatterns: string[] = []
+  try {
+    if (input.memory?.preferredHookPatterns) preferredHookPatterns = JSON.parse(input.memory.preferredHookPatterns)
+    if (input.memory?.avoidPatterns) avoidPatterns = JSON.parse(input.memory.avoidPatterns)
+  } catch { /* malformed JSON */ }
+
+  const isGeneral = !input.brandName || input.brandName === 'general'
+  const isEnglish = (input.tone + input.contentType + input.sourceMaterial).match(/[a-zA-Z]{20,}/) !== null
+
+  const memorySection = memorySummary
+    ? `\n과거 성과 인사이트: ${memorySummary}
+선호 훅 패턴: ${preferredHookPatterns.join(', ') || '없음'}
+피해야 할 패턴: ${avoidPatterns.join(', ') || '없음'}
+선호 카피 톤: ${input.memory?.preferredCopyTone || '없음'}`
+    : ''
+
+  const availableLayouts = [
+    'cinematic-headline — 강렬한 단일 주제, 시네마틱 네거티브 스페이스',
+    'dark-editorial — 어두운 에디토리얼, 핵심 포인트 강조',
+    'magazine — 잡지 스타일, 스토리텔링',
+    'minimal-clean — 미니멀, 마무리/CTA에 적합',
+    'stat-highlight — 수치/데이터 강조',
+    'community-style — 공감대 형성, 일상 공유',
+    'trend-feed — 트렌드/시사 피드 스타일',
+    'quote-focus — 인용구/짧은 문장 중심',
+  ].join('\n')
+
+  const availableRoles = [
+    'hook — 스크롤을 멈추는 긴장감/호기심',
+    'context — 독자 상황 공감, 감정 연결',
+    'key-point — 핵심 문제 또는 인사이트 명시',
+    'detail — 구체적 사례/이유로 가치 입증',
+    'stat — 수치/증거로 신뢰 구축 (자료가 있을 때만)',
+    'summary — 유용한 정보로 이야기 마무리',
+    'save-cta — 저장/공유/전환 유도',
+  ].join('\n')
+
+  const prompt = `당신은 인스타그램 카드뉴스 에디토리얼 디렉터입니다.
+주제와 맥락을 분석하고, 이 카드뉴스를 어떤 구조로 만들지 전략을 수립하세요.
+
+## 입력 정보
+- 주제: ${input.productName}
+- 원본 자료 (앞 500자): ${input.sourceMaterial.slice(0, 500)}
+- 카테고리: ${input.category}
+- 콘텐츠 유형: ${input.contentType}
+- 목표: ${input.objective}
+- 타겟 오디언스: ${input.targetAudience || '일반'}
+- 브랜드: ${isGeneral ? '없음 (일반 정보성)' : input.brandName}
+- 요청 슬라이드 수: ${input.slideCount}
+- 언어: ${isEnglish ? '영어' : '한국어'}
+${memorySection}
+
+## 선택 가능한 슬라이드 역할
+${availableRoles}
+
+## 선택 가능한 레이아웃
+${availableLayouts}
+
+## 작업
+이 주제에 가장 효과적인 카드뉴스 구조를 분석하여 다음 JSON을 반환하세요.
+슬라이드 수는 요청값(${input.slideCount})을 **반드시 지켜야 합니다**.
+첫 슬라이드는 반드시 'hook', 마지막은 반드시 'save-cta'로 설정하세요.
+
+반환 형식:
+{
+  "analysis": {
+    "topicCategory": "이 주제의 본질적 카테고리 (예: 건강정보, 라이프스타일, 사회이슈, 제품리뷰, 트렌드)",
+    "targetPainPoint": "독자가 이 주제에서 가장 공감할 핵심 고민/문제 (1문장)",
+    "hookStyle": "이 주제에 효과적인 훅 방식 (예: 반전공개형, 공감유도형, 수치충격형, 질문형, 불편진실형)",
+    "emotionJourney": "독자가 느껴야 할 감정 흐름 (예: 호기심→공감→긴장→통찰→신뢰→안도→행동)",
+    "viralAngle": "이 카드뉴스가 저장/공유될 이유",
+    "contentStyle": "카피 스타일 (예: 에디토리얼, 정보전달, 감성스토리, 팩트중심)"
+  },
+  "slides": [
+    {
+      "slideNumber": 1,
+      "role": "hook",
+      "purpose": "이 슬라이드가 달성해야 할 구체적 목적 (1문장)",
+      "emotionalGoal": "독자가 이 슬라이드에서 느껴야 할 감정",
+      "expectedAction": "이 슬라이드 후 독자가 취할 행동",
+      "layoutType": "레이아웃명",
+      "copyHint": "카피라이터에게 주는 구체적 방향 힌트 (예: '요즘 OO을 고민하는 사람들이 모르는 사실'처럼 시작)",
+      "visualHint": "배경 이미지 방향 힌트",
+      "maxHeadlineChars": 22,
+      "maxBodyChars": 140
+    }
+  ]
+}`
+
+  const client = getLLMClient()
+
+  interface LLMDirectorOutput {
+    analysis: {
+      topicCategory: string
+      targetPainPoint: string
+      hookStyle: string
+      emotionJourney: string
+      viralAngle: string
+      contentStyle: string
+    }
+    slides: Array<{
+      slideNumber: number
+      role: string
+      purpose: string
+      emotionalGoal: string
+      expectedAction: string
+      layoutType: string
+      copyHint: string
+      visualHint: string
+      maxHeadlineChars: number
+      maxBodyChars: number
+    }>
+  }
+
+  const result = await client.generateJson<LLMDirectorOutput | EditorialDirectorPlan>(
+    'editorial-director-plan',
+    prompt,
+    () => buildFallbackDirectorPlan(input, memorySummary, preferredHookPatterns, avoidPatterns),
+    {
+      model: getCopywritingModel(),
+      temperature: 0.4,
+      systemPrompt: '당신은 인스타그램 카드뉴스 에디토리얼 디렉터입니다. 주어진 주제를 분석해 가장 효과적인 카드 구조를 결정합니다. 반드시 유효한 JSON으로만 응답하세요.',
+    }
+  )
+
+  // result가 이미 EditorialDirectorPlan 형태면 그대로 반환 (fallback 경우)
+  if ('version' in result) return result as unknown as EditorialDirectorPlan
+
+  // LLM 결과를 EditorialDirectorPlan 타입으로 변환
+  const preferredLayout = extractPreferredLayout(input.memory?.preferredLayouts)
+  const slides = result.slides.slice(0, input.slideCount)
+
+  // 슬라이드 수가 모자라면 fallback 슬라이드로 채움
+  while (slides.length < input.slideCount) {
+    const fallbackRoles: EditorialSlideRole[] = createRoleSequence(input.slideCount)
+    slides.push({
+      slideNumber: slides.length + 1,
+      role: fallbackRoles[slides.length] || 'detail',
+      purpose: 'additional detail',
+      emotionalGoal: 'insight',
+      expectedAction: 'continue_swipe',
+      layoutType: 'magazine',
+      copyHint: '',
+      visualHint: '',
+      maxHeadlineChars: 24,
+      maxBodyChars: 160,
+    })
+  }
+
+  const validRoles = new Set<EditorialSlideRole>(['hook', 'context', 'key-point', 'detail', 'stat', 'summary', 'save-cta'])
+  const normalizeRole = (r: string): EditorialSlideRole => {
+    if (validRoles.has(r as EditorialSlideRole)) return r as EditorialSlideRole
+    const map: Record<string, EditorialSlideRole> = {
+      problem: 'key-point', insight: 'key-point', benefit: 'detail',
+      proof: 'stat', cta: 'save-cta', closing: 'save-cta',
+    }
+    return map[r] || 'detail'
+  }
+
+  const validLayouts = new Set<LayoutType>([
+    'breaking-news', 'dark-editorial', 'trend-feed', 'magazine', 'minimal-clean',
+    'quote-focus', 'split-comparison', 'stat-highlight', 'community-style', 'cinematic-headline',
+  ])
+  const normalizeLayout = (l: string, role: EditorialSlideRole): LayoutType => {
+    if (validLayouts.has(l as LayoutType)) return l as LayoutType
+    return layoutForRole(role, 1, input.baseLayoutType, preferredLayout)
+  }
+
+  const slidePlans: EditorialSlidePlan[] = slides.map(s => {
+    const role = normalizeRole(s.role)
+    const layoutType = normalizeLayout(s.layoutType, role)
+    return {
+      slideNumber: s.slideNumber,
+      role,
+      purpose: s.purpose,
+      emotionalGoal: s.emotionalGoal,
+      expectedAction: s.expectedAction,
+      copyConstraints: {
+        maxHeadlineChars: s.maxHeadlineChars || (role === 'hook' ? 22 : 25),
+        maxBodyChars: s.maxBodyChars || (role === 'hook' ? 140 : 220),
+        style: role === 'save-cta' ? 'soft and actionable' : role === 'hook' ? 'specific and curiosity-led' : 'specific editorial prose',
+        avoid: ['generic slogans', 'unsupported claims', 'repeated emotional beat'],
+      },
+      visualDirection: {
+        focus: s.visualHint || 'subject relevant to the topic',
+        composition: 'editorial',
+        textDominance: role === 'hook' || role === 'save-cta' ? 'high' : 'balanced',
+        whitespaceRatio: role === 'save-cta' || role === 'stat' ? 'high' : 'medium',
+        mood: s.emotionalGoal,
+        imagePurpose: s.visualHint || s.purpose,
+      },
+      layoutType,
+      briefingInstruction: s.copyHint || input.briefing?.structurePreview?.find(p => p.slideNumber === s.slideNumber)?.description,
+    }
+  })
+
+  const analysis = result.analysis
+  return {
+    version: 'editorial-director-v1',
+    productAnalysis: {
+      category: analysis.topicCategory || input.category,
+      target: input.targetAudience || 'social-first audience',
+      pricingPositioning: inferPricingPositioning(input.sourceMaterial),
+      emotionalKeywords: unique([analysis.hookStyle, input.tone, 'trust', 'relevance']).slice(0, 4),
+      painPoints: [analysis.targetPainPoint, `finding relevant ${input.category} information`, `deciding on ${input.productName}`].filter(Boolean).slice(0, 3),
+      useCases: [`${input.targetAudience || 'audience'} engaging with ${input.productName}`, analysis.viralAngle || ''].filter(Boolean),
+      competitors: [`other ${input.category} content`],
+      desiredEmotions: unique((analysis.emotionJourney || '').split(/[→>\-,]/).map(s => s.trim())).slice(0, 4),
+      buyingTriggers: [input.objective, analysis.viralAngle || '', input.briefing?.recommendedCta || ''].filter(Boolean).slice(0, 3),
+      saveSharePotential: analysis.viralAngle || inferSaveSharePotential(input.objective, input.contentType),
+      viralAngles: [analysis.viralAngle, analysis.hookStyle, `${input.category} guide`].filter(Boolean).slice(0, 3),
+    },
+    audiencePsychology: {
+      hookPreference: analysis.hookStyle || input.briefing?.hookDirection || 'curiosity + relevance',
+      ctaPreference: input.briefing?.recommendedCta || input.brandCtaStyle || 'soft save-first action',
+      preferredTone: input.memory?.preferredCopyTone || analysis.contentStyle || input.tone,
+      attentionPattern: 'short headline followed by one concrete reason to swipe',
+      stopScrollReason: analysis.targetPainPoint || `${input.category} decision tension`,
+    },
+    carouselStrategy: {
+      goal: input.objective || 'save/share optimized',
+      contentStyle: analysis.contentStyle || input.contentType,
+      emotionCurve: slidePlans.map(s => s.emotionalGoal),
+      ctaStyle: input.briefing?.recommendedCta || input.brandCtaStyle || 'soft save-first action',
+      retentionMechanism: 'each slide resolves one question and opens the next',
+      saveShareMechanism: analysis.viralAngle || 'finish with reusable guidance worth saving',
+    },
+    slides: slidePlans,
+    personalization: {
+      applied: Boolean(memorySummary || input.memory?.preferredCopyTone || preferredLayout || preferredHookPatterns.length),
+      summary: memorySummary,
+      preferredCopyTone: input.memory?.preferredCopyTone || null,
+      preferredHookPatterns,
+      avoidPatterns,
+    },
+  }
+}
+
+function buildFallbackDirectorPlan(
+  input: EditorialDirectorInput,
+  memorySummary: string,
+  preferredHookPatterns: string[],
+  avoidPatterns: string[],
+): EditorialDirectorPlan {
   const desiredEmotion = input.briefing?.targetEmotion?.trim() || input.knowledgeContext.emotionalIntentProfile.intent
   const roleSequence = deriveRoleSequence(input)
   const emotionCurve = roleSequence.map((role, index) => emotionalGoalForRole(role, index, roleSequence.length))
   const preferredLayout = extractPreferredLayout(input.memory?.preferredLayouts)
-
-  // Parse structured memory from compression engine
-  let preferredHookPatterns: string[] = []
-  let avoidPatterns: string[] = []
-  try {
-    if (input.memory?.preferredHookPatterns) {
-      preferredHookPatterns = JSON.parse(input.memory.preferredHookPatterns)
-    }
-    if (input.memory?.avoidPatterns) {
-      avoidPatterns = JSON.parse(input.memory.avoidPatterns)
-    }
-  } catch { /* malformed JSON — ignore */ }
 
   const productAnalysis: ProductAnalysis = {
     category: input.category || input.contentType,
@@ -211,41 +445,29 @@ export function buildEditorialDirectorPlan(input: EditorialDirectorInput): Edito
     ],
     competitors: [`other ${input.category} alternatives`],
     desiredEmotions: unique([desiredEmotion, input.tone, 'trust', 'relevance']).slice(0, 4),
-    buyingTriggers: unique([
-      input.objective,
-      input.briefing?.recommendedCta || '',
-      'clear everyday use case',
-    ]).slice(0, 3),
+    buyingTriggers: unique([input.objective, input.briefing?.recommendedCta || '', 'clear everyday use case']).slice(0, 3),
     saveSharePotential: inferSaveSharePotential(input.objective, input.contentType),
-    viralAngles: unique([
-      input.briefing?.hookDirection || '',
-      `${input.targetAudience || 'audience'} routine`,
-      `${input.category} decision guide`,
-    ]).slice(0, 3),
-  }
-
-  const audiencePsychology: AudiencePsychology = {
-    hookPreference: input.briefing?.hookDirection || `${input.knowledgeContext.emotionalIntentProfile.intent} + relevance`,
-    ctaPreference: input.briefing?.recommendedCta || input.brandCtaStyle || 'soft save-first action',
-    preferredTone: input.memory?.preferredCopyTone || input.tone || input.knowledgeContext.personaProfile.copyToneHints[0],
-    attentionPattern: 'short headline followed by one concrete reason to swipe',
-    stopScrollReason: productAnalysis.painPoints[0] || `${input.category} decision tension`,
-  }
-
-  const carouselStrategy: CarouselStrategyPlan = {
-    goal: input.objective || 'save/share optimized',
-    contentStyle: input.contentType || 'editorial',
-    emotionCurve,
-    ctaStyle: audiencePsychology.ctaPreference,
-    retentionMechanism: 'each slide resolves one question and opens the next',
-    saveShareMechanism: 'finish with reusable guidance or a decision cue worth saving',
+    viralAngles: unique([input.briefing?.hookDirection || '', `${input.targetAudience || 'audience'} routine`, `${input.category} decision guide`]).slice(0, 3),
   }
 
   return {
     version: 'editorial-director-v1',
     productAnalysis,
-    audiencePsychology,
-    carouselStrategy,
+    audiencePsychology: {
+      hookPreference: input.briefing?.hookDirection || `${input.knowledgeContext.emotionalIntentProfile.intent} + relevance`,
+      ctaPreference: input.briefing?.recommendedCta || input.brandCtaStyle || 'soft save-first action',
+      preferredTone: input.memory?.preferredCopyTone || input.tone || input.knowledgeContext.personaProfile.copyToneHints[0],
+      attentionPattern: 'short headline followed by one concrete reason to swipe',
+      stopScrollReason: productAnalysis.painPoints[0] || `${input.category} decision tension`,
+    },
+    carouselStrategy: {
+      goal: input.objective || 'save/share optimized',
+      contentStyle: input.contentType || 'editorial',
+      emotionCurve,
+      ctaStyle: input.briefing?.recommendedCta || input.brandCtaStyle || 'soft save-first action',
+      retentionMechanism: 'each slide resolves one question and opens the next',
+      saveShareMechanism: 'finish with reusable guidance or a decision cue worth saving',
+    },
     slides: roleSequence.map((role, index) => buildSlidePlan({
       role,
       slideNumber: index + 1,
