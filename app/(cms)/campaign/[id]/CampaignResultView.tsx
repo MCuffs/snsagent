@@ -131,7 +131,7 @@ export default function CampaignResultView({
   const [downloadingAll, setDownloadingAll] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [uploadToast, setUploadToast] = useState<{ status: 'uploading' | 'done' | 'error'; text: string } | null>(null)
+  const [uploadToast, setUploadToast] = useState<{ status: 'uploading' | 'done' | 'error'; text: string; progress: number } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
   const documents = useEditorialStore(state => state.documents)
   const dirtySlides = useEditorialStore(state => state.dirtySlides)
@@ -281,21 +281,45 @@ export default function CampaignResultView({
 
   const handleBackgroundUpload = async (file: File, scale: number, offsetX: number, offsetY: number) => {
     if (!activeSlide || !activeDocument) return
-    // 백그라운드 업로드 — UI를 block하지 않고 토스트로만 상태 표시
-    setUploadToast({ status: 'uploading', text: '배경 이미지 업로드 중...' })
     const slideId = activeSlide.id
     const docSnapshot = activeDocument
+
+    setUploadToast({ status: 'uploading', text: '이미지 업로드 중', progress: 0 })
+
     try {
-      const formData = new FormData()
-      formData.append('files', file)
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
-      const backgroundUrl = uploadData.urls?.[0]
-      if (!uploadRes.ok || !backgroundUrl) {
-        setUploadToast({ status: 'error', text: uploadData.error || t('message_upload_error') })
-        setTimeout(() => setUploadToast(null), 4000)
-        return
-      }
+      // XHR로 업로드 — progress 이벤트 활용
+      const backgroundUrl = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        const formData = new FormData()
+        formData.append('files', file)
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 55)
+            setUploadToast({ status: 'uploading', text: '이미지 업로드 중', progress: pct })
+          }
+        })
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText) as { urls?: string[]; error?: string }
+              if (data.urls?.[0]) resolve(data.urls[0])
+              else reject(new Error(data.error || '업로드 실패'))
+            } catch {
+              reject(new Error('응답 파싱 실패'))
+            }
+          } else {
+            reject(new Error(`HTTP ${xhr.status}`))
+          }
+        })
+        xhr.addEventListener('error', () => reject(new Error('네트워크 오류')))
+        xhr.open('POST', '/api/upload')
+        xhr.send(formData)
+      })
+
+      setUploadToast({ status: 'uploading', text: '배경 적용 중', progress: 60 })
+
       const nextDocument = {
         ...docSnapshot,
         layers: docSnapshot.layers.map(layer =>
@@ -305,18 +329,24 @@ export default function CampaignResultView({
         ),
       }
       updateDocument(slideId, () => nextDocument)
-      setUploadToast({ status: 'uploading', text: '배경 적용 중...' })
+
+      setUploadToast({ status: 'uploading', text: '카드에 반영 중', progress: 80 })
+
       const result = await saveEditorialDocumentAction(slideId, JSON.stringify(nextDocument), true)
       if (!result.success) {
-        setUploadToast({ status: 'error', text: result.error || t('message_background_error') })
+        setUploadToast({ status: 'error', text: result.error || t('message_background_error'), progress: 0 })
         setTimeout(() => setUploadToast(null), 4000)
         return
       }
+
+      setUploadToast({ status: 'uploading', text: '완료 중', progress: 95 })
       applyServerSlide(result.slide as Slide, result.document)
-      setUploadToast({ status: 'done', text: '배경 이미지가 적용됐습니다' })
-      setTimeout(() => setUploadToast(null), 3000)
+
+      setUploadToast({ status: 'done', text: '배경 이미지가 적용됐습니다', progress: 100 })
+      setTimeout(() => setUploadToast(null), 2500)
+
     } catch (error) {
-      setUploadToast({ status: 'error', text: getErrorMessage(error, t('message_background_save_error')) })
+      setUploadToast({ status: 'error', text: getErrorMessage(error, t('message_background_save_error')), progress: 0 })
       setTimeout(() => setUploadToast(null), 4000)
     }
   }
@@ -460,14 +490,26 @@ export default function CampaignResultView({
     <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
       {/* 배경 업로드 토스트 — 화면 상단 고정 */}
       {uploadToast && (
-        <div className={`fixed top-4 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold shadow-lg transition-all ${
-          uploadToast.status === 'uploading' ? 'bg-[#111318] text-white' :
-          uploadToast.status === 'done' ? 'bg-emerald-600 text-white' :
-          'bg-red-600 text-white'
-        }`}>
-          {uploadToast.status === 'uploading' && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
-          {uploadToast.status === 'done' && <Check className="h-4 w-4 shrink-0" />}
-          {uploadToast.text}
+        <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-72 rounded-2xl shadow-2xl overflow-hidden">
+          <div className={`flex items-center gap-3 px-4 py-3 ${
+            uploadToast.status === 'error' ? 'bg-red-600' : 'bg-[#111318]'
+          }`}>
+            {uploadToast.status === 'uploading' && <Loader2 className="h-4 w-4 animate-spin shrink-0 text-white" />}
+            {uploadToast.status === 'done' && <Check className="h-4 w-4 shrink-0 text-emerald-400" />}
+            <span className="flex-1 text-sm font-bold text-white">{uploadToast.text}</span>
+            {uploadToast.status === 'uploading' && (
+              <span className="text-xs font-black text-white/70 tabular-nums">{uploadToast.progress}%</span>
+            )}
+          </div>
+          {uploadToast.status === 'uploading' && (
+            <div className="h-1 bg-white/10">
+              <div
+                className="h-full bg-[#0066ff] transition-all duration-300 ease-out"
+                style={{ width: `${uploadToast.progress}%` }}
+              />
+            </div>
+          )}
+          {uploadToast.status === 'done' && <div className="h-1 bg-emerald-500" />}
         </div>
       )}
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
