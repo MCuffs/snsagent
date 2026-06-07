@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import { dbService } from '../../../../lib/db-service'
-import { getAppBaseUrl, isInstagramMockMode } from '../../../../lib/env'
-import { schedulePost, tokenEncryptor } from '../../../../lib/instagram/client'
+import { isInstagramMockMode } from '../../../../lib/env'
+import { publishPostToInstagram } from '../../../../lib/instagram/publish'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,39 +39,27 @@ export async function POST(request: NextRequest) {
     })
 
     try {
-      const accountId = account?.instagramAccountId || ''
-      const decryptedToken = account ? tokenEncryptor.decrypt(account.accessTokenEncrypted) : ''
-      const baseUrl = getAppBaseUrl()
-
-      const imageUrls = campaign.slides
-        .sort((a, b) => a.slideNumber - b.slideNumber)
-        .map(s => {
-          if (!s.imageUrl) return null
-          if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) return s.imageUrl
-          return `${baseUrl}${s.imageUrl}`
-        })
-        .filter((url): url is string => !!url)
-
-      if (imageUrls.length === 0) {
-        await dbService.updatePostStatus(post.id, 'failed')
-        return NextResponse.json({ error: 'No valid slide images' }, { status: 400 })
+      if (isMock || !account || account.status !== 'CONNECTED') {
+        // Mock mode: simulate success
+        const mockMediaId = `ig_media_${Math.floor(10000000 + Math.random() * 90000000)}`
+        await dbService.updatePostStatus(post.id, 'posted', mockMediaId)
+        await dbService.updateCampaignStatus(campaignId, 'posted')
+        return NextResponse.json({ success: true, mediaId: mockMediaId })
       }
 
-      const result = await schedulePost(
-        accountId,
-        decryptedToken,
-        imageUrls,
-        `${caption || ''}\n\n${hashtags || ''}`.trim(),
-        new Date()
-      )
+      const result = await publishPostToInstagram({
+        postId: post.id,
+        campaignId,
+        campaign,
+        account,
+        caption: caption || '',
+        hashtags: hashtags || '',
+      })
 
       if (result.success) {
-        await dbService.updatePostStatus(post.id, 'posted', result.mediaId)
-        await dbService.updateCampaignStatus(campaignId, 'posted')
         return NextResponse.json({ success: true, mediaId: result.mediaId })
       } else {
-        await dbService.updatePostStatus(post.id, 'failed')
-        return NextResponse.json({ error: result.error || 'Publish failed' }, { status: 500 })
+        return NextResponse.json({ error: result.error }, { status: 500 })
       }
     } catch (error) {
       await dbService.updatePostStatus(post.id, 'failed')

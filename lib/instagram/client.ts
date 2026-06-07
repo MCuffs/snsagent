@@ -56,6 +56,7 @@ export const tokenEncryptor = {
     if (!encrypted) return ''
 
     if (!encrypted.startsWith('v1:')) {
+      console.warn('[TokenEncryptor] Legacy unencrypted token detected — run `node scripts/migrate-instagram-tokens.js` to migrate')
       return Buffer.from(encrypted, 'base64').toString('utf8')
     }
 

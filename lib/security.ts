@@ -14,8 +14,17 @@ export function verifyBearerSecret(authorization: string | null, expectedSecret:
   return expectedBuffer.length === providedBuffer.length && timingSafeEqual(expectedBuffer, providedBuffer)
 }
 
+/**
+ * Verify request secret via Authorization: Bearer header (default).
+ * URL query parameter fallback is disabled by default to prevent secret leakage in logs.
+ * Set WEBHOOK_ALLOW_QUERY_SECRET=true to enable query parameter authentication
+ * (only for providers that don't support custom headers, e.g., NicePay).
+ */
 export function verifyRequestSecret(request: Request, expectedSecret: string | undefined) {
   if (verifyBearerSecret(request.headers.get('authorization'), expectedSecret)) return true
+
+  // URL query parameter fallback — opt-in only
+  if (process.env.WEBHOOK_ALLOW_QUERY_SECRET !== 'true') return false
 
   const expected = expectedSecret?.trim()
   if (!expected) return false

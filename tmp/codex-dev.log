@@ -1,0 +1,22 @@
+
+> shuffla@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3000
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local, .env
+✓ Ready in 1266ms
+
+ GET /sitemap.xml 200 in 836ms (next.js: 795ms, application-code: 40ms)
+○ Compiling /sitemap.xml ...
+ GET /ko 200 in 6.5s (next.js: 4.9s, proxy.ts: 11ms, application-code: 1598ms)
+ GET /ko/blog 200 in 6.7s (next.js: 5.2s, proxy.ts: 113ms, application-code: 1412ms)
+ GET /ko/blog/%EC%B9%B4%EB%93%9C%EB%89%B4%EC%8A%A4-%EC%9E%90%EB%8F%99%ED%99%94-%EA%B0%80%EC%9D%B4%EB%93%9C 200 in 7.0s (next.js: 6.5s, proxy.ts: 10ms, generate-params: 2.8s, application-code: 469ms)
+✓ Compiled in 244ms
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local, .env
+✓ Ready in 1314ms
+

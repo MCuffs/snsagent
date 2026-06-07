@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dbService } from '../../../../lib/db-service'
-import { schedulePost, tokenEncryptor } from '../../../../lib/instagram/client'
-import { isInstagramMockMode, getAppBaseUrl } from '../../../../lib/env'
+import { publishPostToInstagram } from '../../../../lib/instagram/publish'
+import { isInstagramMockMode } from '../../../../lib/env'
 import { unauthorizedJson, verifyBearerSecret } from '../../../../lib/security'
 
 export const dynamic = 'force-dynamic'
@@ -51,54 +51,32 @@ async function handleCron(request: NextRequest) {
       const account = await dbService.getInstagramAccount(post.userId, post.brandId)
 
       if (!isMock && account && account.status === 'CONNECTED') {
-        // Real Meta API Publishing
+        // Real Meta API Publishing using shared utility
         try {
           const campaign = await dbService.getCampaign(post.campaignId)
           if (!campaign) {
             throw new Error('Campaign data not found.')
           }
 
-          const baseUrl = getAppBaseUrl(request)
-          const imageUrls = campaign.slides
-            .sort((a, b) => a.slideNumber - b.slideNumber)
-            .map(s => {
-              if (!s.imageUrl) return null
-              if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) {
-                return s.imageUrl
-              }
-              return `${baseUrl}${s.imageUrl}`
-            })
-            .filter((url): url is string => !!url)
+          const result = await publishPostToInstagram({
+            postId: post.id,
+            campaignId: post.campaignId,
+            campaign,
+            account,
+            caption: post.caption,
+            hashtags: post.hashtags,
+          })
 
-          if (imageUrls.length === 0) {
-            throw new Error('No valid slide images found for this campaign.')
+          if (result.success) {
+            processedCount++
+            results.push({ postId: post.id, campaignTitle: campaign.title, status: 'posted' })
+          } else {
+            failuresCount++
+            results.push({ postId: post.id, campaignTitle: campaign.title, status: 'failed', error: result.error })
           }
-
-          const decryptedToken = tokenEncryptor.decrypt(account.accessTokenEncrypted)
-          const accountId = account.instagramAccountId
-
-          // Publish immediately
-          const publishResult = await schedulePost(
-            accountId,
-            decryptedToken,
-            imageUrls,
-            `${post.caption}\n\n${post.hashtags}`,
-            new Date() // Immediate publish trigger
-          )
-
-          if (!publishResult.success) {
-            throw new Error(publishResult.error || 'Instagram API publishing failed')
-          }
-
-          await dbService.updatePostStatus(post.id, 'posted', publishResult.mediaId)
-          await dbService.updateCampaignStatus(post.campaignId, 'posted')
-          processedCount++
-          results.push({ postId: post.id, campaignTitle: campaign.title, status: 'posted' })
         } catch (err: unknown) {
           failuresCount++
           const errorMsg = err instanceof Error ? err.message : 'Unknown publishing error'
-          await dbService.updatePostStatus(post.id, 'failed')
-          await dbService.updateCampaignStatus(post.campaignId, 'failed')
           results.push({ postId: post.id, campaignTitle: post.campaign.title, status: 'failed', error: errorMsg })
         }
       } else {

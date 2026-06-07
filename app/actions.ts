@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers'
 import { dbService, User } from '../lib/db-service'
 import { schedulePost, tokenEncryptor } from '../lib/instagram/client'
+import { publishPostToInstagram } from '../lib/instagram/publish'
 import { checkBrandCountLimit, checkCampaignCreationLimit } from '../lib/limits'
 import { getInstagramAccountId, isInstagramMockMode, getAppBaseUrl, isConfiguredOpenAIKey, getGroqApiKey, isConfiguredGroqKey, getPerplexityApiKey, isConfiguredPerplexityKey, getNaverClientId, getNaverClientSecret, isConfiguredNaverApi, isProduction } from '../lib/env'
 import { OpenAI } from 'openai'
@@ -22,6 +23,7 @@ import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessi
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../lib/purchase-persuasion'
+import { analyzeBrandViaWebSearch } from '../lib/brand-web-search'
 import { logEditEvent } from '../src/lib/intelligence/editLogger'
 import { repairRenderableCopy } from '../src/lib/copywriting/renderableCopy'
 
@@ -996,50 +998,28 @@ export async function triggerSchedulerAction() {
       const account = await dbService.getInstagramAccount(user.id, post.brandId)
 
       if (!isMock && account && account.status === 'CONNECTED') {
-        // Real Instagram publishing integration
+        // Real Instagram publishing integration using shared utility
         try {
           const campaign = await dbService.getCampaign(post.campaignId)
           if (!campaign) {
             throw new Error('캠페인을 찾을 수 없습니다.')
           }
 
-          const baseUrl = getAppBaseUrl()
-          // Gather all slide images
-          const imageUrls = campaign.slides
-            .sort((a, b) => a.slideNumber - b.slideNumber)
-            .map(s => {
-              if (!s.imageUrl) return null
-              if (s.imageUrl.startsWith('http://') || s.imageUrl.startsWith('https://')) {
-                return s.imageUrl
-              }
-              return `${baseUrl}${s.imageUrl}`
-            })
-            .filter((url): url is string => !!url)
+          const result = await publishPostToInstagram({
+            postId: post.id,
+            campaignId: post.campaignId,
+            campaign,
+            account,
+            caption: post.caption,
+            hashtags: post.hashtags,
+          })
 
-          if (imageUrls.length === 0) {
-            throw new Error('카드뉴스에 유효한 이미지가 없습니다.')
+          if (result.success) {
+            processedCount++
+          } else {
+            failuresCount++
+            lastError = result.error
           }
-
-          const decryptedToken = tokenEncryptor.decrypt(account.accessTokenEncrypted)
-          const accountId = account.instagramAccountId
-
-          // Publish immediately by forcing current time or force immediate inside client
-          const result = await schedulePost(
-            accountId,
-            decryptedToken,
-            imageUrls,
-            `${post.caption}\n\n${post.hashtags}`,
-            new Date() // force immediate
-          )
-
-          if (!result.success) {
-            throw new Error(result.error || '인스타그램 업로드 실패')
-          }
-
-          // Update DB statuses to posted
-          await dbService.updatePostStatus(post.id, 'posted', result.mediaId)
-          await dbService.updateCampaignStatus(post.campaignId, 'posted')
-          processedCount++
         } catch (err: unknown) {
           failuresCount++
           lastError = err instanceof Error ? err.message : '알 수 없는 오류'
@@ -1597,6 +1577,41 @@ JSON 형식으로만 응답하세요:`
   } catch (err: unknown) {
     console.error('Brand Website Analysis failed, trying fallback:', err)
 
+    // ── 1차 폴백: OpenAI web_search로 웹에서 브랜드 정보 검색 ─────────────────
+    console.log(`[BrandFallback] Trying web_search for: ${url}`)
+    try {
+      const webResult = await analyzeBrandViaWebSearch(url, locale as 'ko' | 'en')
+      if (webResult) {
+        const parsed = webResult as unknown as Record<string, unknown>
+        return {
+          success: true as const,
+          brandProfile: {
+            name: String(webResult.name || (locale === 'en' ? 'Unknown' : '알 수 없음')),
+            industry: String(webResult.industry || (locale === 'en' ? 'Online store' : '온라인 스토어')),
+            targetAudience: String(webResult.targetAudience || (locale === 'en' ? 'General customers' : '대중 고객')),
+            toneOfVoice: String(webResult.toneOfVoice || (locale === 'en' ? 'Friendly and clear' : '친근하고 명확한 톤')),
+            mainColor: String(webResult.mainColor || '#03C75A'),
+            forbiddenWords: String(webResult.forbiddenWords || ''),
+            ctaStyle: String(webResult.ctaStyle || (locale === 'en' ? 'Learn more via profile link' : '프로필 링크에서 확인하기')),
+            brandDna: buildBrandDnaFromProfile({
+              name: String(webResult.name || 'Unknown brand'),
+              industry: String(webResult.industry || 'Online store'),
+              targetAudience: String(webResult.targetAudience || 'Target customers'),
+              toneOfVoice: String(webResult.toneOfVoice || 'Friendly and clear'),
+              mainColor: String(webResult.mainColor || '#03C75A'),
+              ctaStyle: String(webResult.ctaStyle || ''),
+              sourceText: `${webResult.name} ${url}`,
+              parsed,
+            }),
+          },
+          markdownReport: removeMarkdownBold(webResult.markdownReport || (locale === 'en' ? '# Analysis Complete' : '# 분석 완료'))
+        }
+      }
+    } catch (webSearchErr) {
+      console.warn('[BrandFallback] web_search failed, continuing to next fallback:', webSearchErr)
+    }
+
+    // ── 2차 폴백: 스마트스토어 전용 AI 추론 (기존 로직) ─────────────────────
     if (isSmartStore && shopId) {
       console.log(`Executing Graceful Fallback for Smartstore: ${shopId}`)
 

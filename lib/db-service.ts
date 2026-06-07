@@ -283,6 +283,13 @@ const isMock = () => {
 }
 
 export const dbService = {
+  // Health check for uptime monitoring
+  async healthCheck(): Promise<void> {
+    if (!isMock()) {
+      await prisma.$queryRaw`SELECT 1`
+    }
+  },
+
   // User operations
   async getUser(userId: string): Promise<User | null> {
     if (userId.startsWith('u-')) {
