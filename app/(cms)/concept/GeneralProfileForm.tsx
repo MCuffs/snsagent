@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useTab } from '../TabContext'
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, Save, Sparkles } from 'lucide-react'
 import { saveBrandAction, analyzeGeneralProfileCoreWordAction } from '../../actions'
 import { motion } from 'framer-motion'
@@ -22,6 +21,8 @@ interface ProfileData {
 
 interface GeneralProfileFormProps {
   existingProfile: ProfileData | null
+  onProfileSaved?: (profile: ProfileData) => void
+  onContinueToGenerate?: (profile: ProfileData) => void
 }
 
 const containerVariants = {
@@ -47,8 +48,11 @@ const itemVariants = {
   },
 }
 
-export default function GeneralProfileForm({ existingProfile }: GeneralProfileFormProps) {
-  const { setActiveTab } = useTab()
+export default function GeneralProfileForm({
+  existingProfile,
+  onProfileSaved,
+  onContinueToGenerate,
+}: GeneralProfileFormProps) {
   const t = useTranslations('concept')
   const locale = useLocale()
 
@@ -71,6 +75,19 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
   const [isContinuing, setIsContinuing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const buildProfileData = (id: string): ProfileData => ({
+    id,
+    name,
+    industry: category,
+    targetAudience,
+    toneOfVoice,
+    mainColor,
+    forbiddenWords: keywords,
+    ctaStyle: '',
+    brandDna: null,
+    websiteUrl: 'general_profile',
+  })
 
   const handleAnalyzeCoreWord = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -103,11 +120,10 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
     }
   }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const saveProfile = async (showSuccess = true) => {
     setIsSaving(true)
     setError(null)
-    setSuccess(null)
+    if (showSuccess) setSuccess(null)
 
     try {
       const res = await saveBrandAction(profileId, {
@@ -122,8 +138,11 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
         websiteUrl: 'general_profile', // Mark as general profile
       })
       if (res.success) {
-        setProfileId(res.brand.id)
-        setSuccess(t('success_saved'))
+        const savedProfile = buildProfileData(res.brand.id)
+        setProfileId(savedProfile.id)
+        onProfileSaved?.(savedProfile)
+        if (showSuccess) setSuccess(t('success_saved'))
+        return savedProfile
       } else {
         setError(res.error || t('error_save'))
       }
@@ -132,17 +151,19 @@ export default function GeneralProfileForm({ existingProfile }: GeneralProfileFo
     } finally {
       setIsSaving(false)
     }
+    return null
   }
 
-  const handleContinue = () => {
-    if (!profileId || isContinuing) return
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await saveProfile()
+  }
+
+  const handleContinue = async () => {
+    if (!profileId || isContinuing || isSaving) return
     setIsContinuing(true)
-    const params = new URLSearchParams(window.location.search)
-    params.set('brandId', profileId)
-    const newUrl = `${window.location.pathname}?${params.toString()}`
-    // replaceState를 먼저 동기적으로 실행해 useSearchParams가 올바른 brandId를 읽게 한다
-    window.history.replaceState(null, '', newUrl)
-    setActiveTab('generate')
+    const savedProfile = await saveProfile(false)
+    if (savedProfile) onContinueToGenerate?.(savedProfile)
     setIsContinuing(false)
   }
 

@@ -56,11 +56,13 @@ export default function DashboardContainer({
   canUpgradeRetention,
   userEmail,
 }: DashboardContainerProps) {
-  const { activeTab: tab } = useTab()
+  const { activeTab: tab, setActiveTab } = useTab()
   const t = useTranslations('concept')
   const searchParams = useSearchParams()
   const urlBrandId = searchParams?.get('brandId') || null
   const hasInstagramAccess = userEmail ? INSTAGRAM_ALLOWED_EMAILS.includes(userEmail) : false
+  const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
+  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
 
   const [subTab, setSubTab] = useState<'brand' | 'general'>(() => {
     // URL에 general profile의 brandId가 있으면 general 탭으로 시작
@@ -69,21 +71,37 @@ export default function DashboardContainer({
     return 'brand'
   })
 
-  const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || existingGeneralProfile
+  const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || generalProfile
   const activeTab = (!hasProfile && tab !== 'concept') ? 'concept' : tab
 
+  const handleGeneralProfileSaved = (profile: BrandProfileData) => {
+    setGeneralProfile(profile)
+  }
+
+  const handleContinueToGenerate = (profile: BrandProfileData) => {
+    setGeneralProfile(profile)
+    setSelectedBrandId(profile.id)
+
+    const params = new URLSearchParams(window.location.search)
+    params.set('brandId', profile.id)
+    const newUrl = `${window.location.pathname}?${params.toString()}`
+    window.history.replaceState(null, '', newUrl)
+    setActiveTab('generate')
+  }
+
   let brandToPass = existingBrand
-  if (urlBrandId) {
-    if (existingGeneralProfile && urlBrandId === existingGeneralProfile.id) {
-      brandToPass = existingGeneralProfile
-    } else if (existingBrand && urlBrandId === existingBrand.id) {
+  const activeBrandId = selectedBrandId || urlBrandId
+  if (activeBrandId) {
+    if (generalProfile && activeBrandId === generalProfile.id) {
+      brandToPass = generalProfile
+    } else if (existingBrand && activeBrandId === existingBrand.id) {
       brandToPass = existingBrand
     } else {
       // urlBrandId가 어느 쪽도 매칭 안 되면 두 프로필 중 존재하는 것 사용
-      brandToPass = existingBrand || existingGeneralProfile
+      brandToPass = existingBrand || generalProfile
     }
   } else {
-    brandToPass = existingBrand || existingGeneralProfile
+    brandToPass = existingBrand || generalProfile
   }
 
   return (
@@ -137,7 +155,11 @@ export default function DashboardContainer({
                 transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 className="h-full"
               >
-                <GeneralProfileForm existingProfile={existingGeneralProfile} />
+                <GeneralProfileForm
+                  existingProfile={generalProfile}
+                  onProfileSaved={handleGeneralProfileSaved}
+                  onContinueToGenerate={handleContinueToGenerate}
+                />
               </motion.div>
             )}
           </div>
