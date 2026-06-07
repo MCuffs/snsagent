@@ -67,8 +67,10 @@ export default function DashboardContainer({
   const [subTab, setSubTab] = useState<'brand' | 'general'>(() => {
     // URL에 general profile의 brandId가 있으면 general 탭으로 시작
     if (urlBrandId && existingGeneralProfile && urlBrandId === existingGeneralProfile.id) return 'general'
-    if (!existingBrand && existingGeneralProfile) return 'general'
-    return 'brand'
+    // 브랜드 프로필이 있으면 brand 탭
+    if (existingBrand) return 'brand'
+    // 신규 유저 또는 general 프로필만 있는 경우 → general(시사/정보) 탭 먼저
+    return 'general'
   })
 
   const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || generalProfile
