@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { getAllBlogPostPaths } from '../lib/blog-posts'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 const LOCALES = ['ko', 'en'] as const
@@ -27,6 +28,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       })
     }
+  }
+
+  for (const { locale, slug } of getAllBlogPostPaths()) {
+    entries.push({
+      url: encodeURI(`${BASE_URL}/${locale}/blog/${slug}`),
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    })
   }
 
   return entries

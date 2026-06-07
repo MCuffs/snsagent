@@ -152,6 +152,31 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
       <CapabilityObjects />
       <ConnectedWorkflow />
 
+      <section className="px-5 pb-20 md:px-8 md:pb-28">
+        <div className="mx-auto grid max-w-[1120px] gap-10 border-y border-[#e6dfd5] py-14 md:grid-cols-[0.9fr_1.1fr] md:py-20">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">
+              {isEn ? 'Content operations' : '콘텐츠 운영 자동화'}
+            </p>
+            <h2 className="mt-5 text-[clamp(2rem,4vw,3.6rem)] font-semibold leading-[1.08] tracking-[-0.055em] text-[#171714]">
+              {isEn ? 'Card news automation for repeatable social publishing' : '카드뉴스 자동화부터 인스타그램 자동 게시 준비까지'}
+            </h2>
+          </div>
+          <div className="space-y-5 text-[15px] leading-8 text-[#625c53] md:text-base">
+            <p>
+              {isEn
+                ? 'Shuffla turns a brand URL and topic into card news drafts that can be edited, exported, and added to an SNS auto upload workflow without starting from a blank canvas every time.'
+                : 'Shuffla는 브랜드 URL과 주제를 바탕으로 카드뉴스 자동화 초안을 만들고, 편집과 다운로드까지 이어지도록 돕습니다. 매번 빈 화면에서 시작하지 않아도 SNS 자동 업로드 워크플로우에 넣을 수 있는 결과물을 빠르게 준비할 수 있습니다.'}
+            </p>
+            <p>
+              {isEn
+                ? 'Teams preparing Instagram auto publishing can keep one consistent flow for planning, copy, visuals, review, and final 4:5 image export.'
+                : '인스타그램 자동 게시를 준비하는 팀은 기획, 카피, 비주얼, 검수, 4:5 이미지 내보내기를 하나의 흐름으로 관리할 수 있습니다. 반복 게시가 필요한 브랜드일수록 제작 시간을 줄이고 메시지 검수에 더 집중할 수 있습니다.'}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="px-5 pb-24 md:px-8 md:pb-32">
         <div className="mx-auto max-w-[1300px] overflow-hidden rounded-[30px] border border-[#e6dfd5] bg-white px-6 py-16 text-center md:px-10 md:py-24">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">{t('cta_section_eyebrow')}</p>

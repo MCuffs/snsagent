@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getAllBlogPostPaths } from '../../../lib/blog-posts'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 
@@ -35,10 +36,17 @@ ${alternates}
     })
   )
 
+  const blogUrls = getAllBlogPostPaths().map(({ locale, slug }) => `  <url>
+    <loc>${encodeURI(`${BASE_URL}/${locale}/blog/${slug}`)}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>`)
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.join('\n')}
+${[...urls, ...blogUrls].join('\n')}
 </urlset>`
 
   return new NextResponse(xml, {
