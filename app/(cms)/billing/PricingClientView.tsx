@@ -74,8 +74,8 @@ function PricingGrid({
   userId,
   paypalPlanIds,
   nicepayClientKey,
-  customerName,
-  customerEmail,
+  customerName: _customerName,
+  customerEmail: _customerEmail,
   showRegenerationOffer,
 }: PricingClientViewProps) {
   const router = useRouter()

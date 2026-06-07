@@ -1,7 +1,6 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { randomUUID } from 'crypto'
 import prisma from './db'
 import { saveErrorLog } from './errorLogger'
 import { getHistoryRetentionDays, getHistoryRetentionStatus } from './history-retention'

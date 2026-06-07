@@ -431,11 +431,11 @@ export async function POST(request: Request) {
 
     // 3. Detect URL in the latest user message and scrape
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
-    const allUserText = messages
+    const _allUserText = messages
       .filter(m => m.role === 'user')
       .map(m => m.content)
       .join('\n')
-    const previousAssistantText = messages
+    const _previousAssistantText = messages
       .filter(m => m.role === 'assistant')
       .map(m => m.content)
       .join('\n')
