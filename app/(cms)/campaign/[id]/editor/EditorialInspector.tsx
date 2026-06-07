@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, Sparkles, Trash2, Type, Underline, Undo2, Upload } from 'lucide-react'
+import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, RotateCcw, Sparkles, Trash2, Type, Underline, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 
@@ -20,11 +20,13 @@ interface Props {
   slideId: string
   slideNumber: number
   busy: boolean
-  onUpload: () => void
+  originalBackgroundUrl: string | null
+  onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onResetBackground: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, slideNumber, busy, originalBackgroundUrl, onApplyBackground, onResetBackground, onImageUpload }: Props) {
   const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
@@ -141,7 +143,9 @@ export function EditorialInspector({ slideId, slideNumber, busy, onUpload, onIma
         {tab === 'background' && (
           <BackgroundPanel
             busy={busy}
-            onUpload={onUpload}
+            originalBackgroundUrl={originalBackgroundUrl}
+            onApplyBackground={onApplyBackground}
+            onResetBackground={onResetBackground}
           />
         )}
         {tab === 'overlay' && (
@@ -288,21 +292,116 @@ function OverlayPanel({
 
 function BackgroundPanel({
   busy,
-  onUpload,
+  originalBackgroundUrl,
+  onApplyBackground,
+  onResetBackground,
 }: {
   busy: boolean
-  onUpload: () => void
+  originalBackgroundUrl: string | null
+  onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onResetBackground: () => void
 }) {
   const t = useTranslations('campaign')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [scale, setScale] = useState(100)
+  const [offsetX, setOffsetX] = useState(50)
+  const [offsetY, setOffsetY] = useState(50)
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    setPendingFile(file)
+    setPreviewUrl(url)
+    setScale(100)
+    setOffsetX(50)
+    setOffsetY(50)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleApply = () => {
+    if (!pendingFile) return
+    onApplyBackground(pendingFile, scale / 100, offsetX / 100, offsetY / 100)
+    setPendingFile(null)
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(null)
+  }
+
+  const handleCancel = () => {
+    setPendingFile(null)
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(null)
+  }
+
+  if (pendingFile && previewUrl) {
+    return (
+      <div className="space-y-4">
+        <p className="text-xs font-bold text-[#514a44]">배경 이미지 조정</p>
+
+        {/* 미리보기 */}
+        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-[#111]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt="preview"
+            className="absolute inset-0 h-full w-full"
+            style={{
+              objectFit: 'cover',
+              objectPosition: `${offsetX}% ${offsetY}%`,
+              transform: `scale(${scale / 100})`,
+              transformOrigin: `${offsetX}% ${offsetY}%`,
+            }}
+          />
+        </div>
+
+        {/* 크기 조정 */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ZoomOut className="h-3.5 w-3.5 shrink-0 text-[#9a8d82]" />
+            <input type="range" value={scale} min={50} max={200} onChange={e => setScale(Number(e.target.value))} className="flex-1 accent-[#0066ff]" />
+            <ZoomIn className="h-3.5 w-3.5 shrink-0 text-[#9a8d82]" />
+            <span className="w-10 text-right text-[11px] font-bold text-[#746a62]">{scale}%</span>
+          </div>
+
+          <RangeControl label="가로 위치" value={offsetX} min={0} max={100} onChange={setOffsetX} />
+          <RangeControl label="세로 위치" value={offsetY} min={0} max={100} onChange={setOffsetY} />
+        </div>
+
+        {/* 버튼 */}
+        <div className="flex gap-2">
+          <button type="button" onClick={handleCancel} className="flex-1 rounded-md border border-[#e8dfd4] py-2 text-xs font-bold text-[#9a8d82] hover:border-red-300 hover:text-red-500">
+            취소
+          </button>
+          <button type="button" disabled={busy} onClick={handleApply} className="flex-1 rounded-md bg-[#111318] py-2 text-xs font-bold text-white hover:bg-[#0066ff] disabled:opacity-40">
+            {busy ? '적용 중...' : '이 배경으로 적용'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="rounded-lg bg-[#f5f8ff] p-3 text-xs leading-5 text-[#4c6070] space-y-1.5">
         <p>{t('background_help')}</p>
         <p className="text-[10px] text-[#717b8f] font-semibold">{t('background_note')}</p>
       </div>
-      <button type="button" disabled={busy} onClick={onUpload} className="btn-primary w-full rounded-md">
+      <button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> {t('replace_background')}
       </button>
+      {originalBackgroundUrl && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onResetBackground}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-[#e8dfd4] py-2.5 text-xs font-bold text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff] disabled:opacity-40"
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> 원래 배경으로 전환
+        </button>
+      )}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
     </div>
   )
 }

@@ -126,7 +126,6 @@ export default function CampaignResultView({
   const [caption, setCaption] = useState(post.caption)
   const [hashtags, setHashtags] = useState(post.hashtags)
   const [editorBusy, setEditorBusy] = useState(false)
-  const bgFileInputRef = useRef<HTMLInputElement>(null)
   const imgFileInputRef = useRef<HTMLInputElement>(null)
   const [savingCaption, setSavingCaption] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
@@ -279,10 +278,8 @@ export default function CampaignResultView({
     }
   }
 
-  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !activeSlide) return
-    if (!activeDocument) return
+  const handleBackgroundUpload = async (file: File, scale: number, offsetX: number, offsetY: number) => {
+    if (!activeSlide || !activeDocument) return
     setEditorBusy(true)
     setMessage(null)
     try {
@@ -297,7 +294,11 @@ export default function CampaignResultView({
       }
       const nextDocument = {
         ...activeDocument,
-        layers: activeDocument.layers.map(layer => layer.type === 'background' ? { ...layer, imageUrl: backgroundUrl } : layer),
+        layers: activeDocument.layers.map(layer =>
+          layer.type === 'background'
+            ? { ...layer, imageUrl: backgroundUrl, scale, x: Math.round(offsetX * (1080 - 1080 * scale)), y: Math.round(offsetY * (1350 - 1350 * scale)) }
+            : layer
+        ),
       }
       updateDocument(activeSlide.id, () => nextDocument)
       const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(nextDocument), true)
@@ -311,7 +312,33 @@ export default function CampaignResultView({
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_background_save_error')) })
     } finally {
       setEditorBusy(false)
-      if (bgFileInputRef.current) bgFileInputRef.current.value = ''
+    }
+  }
+
+  const handleResetBackground = async () => {
+    if (!activeSlide || !activeDocument) return
+    const originalUrl = slides.find(s => s.id === activeSlide.id)?.backgroundImageUrl || null
+    setEditorBusy(true)
+    setMessage(null)
+    try {
+      const nextDocument = {
+        ...activeDocument,
+        layers: activeDocument.layers.map(layer =>
+          layer.type === 'background' ? { ...layer, imageUrl: originalUrl } : layer
+        ),
+      }
+      updateDocument(activeSlide.id, () => nextDocument)
+      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(nextDocument), true)
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.error || t('message_background_error') })
+        return
+      }
+      applyServerSlide(result.slide as Slide, result.document)
+      setMessage({ type: 'success', text: '원래 배경으로 복원했습니다.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error, t('message_background_save_error')) })
+    } finally {
+      setEditorBusy(false)
     }
   }
 
@@ -542,7 +569,9 @@ export default function CampaignResultView({
                     slideId={activeSlide.id}
                     slideNumber={activeSlide.slideNumber}
                     busy={editorBusy}
-                    onUpload={() => bgFileInputRef.current?.click()}
+                    originalBackgroundUrl={activeSlide.backgroundImageUrl}
+                    onApplyBackground={handleBackgroundUpload}
+                    onResetBackground={handleResetBackground}
                     onImageUpload={() => imgFileInputRef.current?.click()}
                   />
                   <button
@@ -555,7 +584,6 @@ export default function CampaignResultView({
                   </button>
                 </>
               )}
-              <input ref={bgFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
               <input ref={imgFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageStickerUpload} />
 
               <div className="rounded-[10px] border border-[#e8dfd4] bg-white p-5 shadow-[0_24px_70px_rgba(31,21,18,0.07)]">
