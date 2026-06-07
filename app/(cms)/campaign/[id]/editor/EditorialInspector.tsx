@@ -324,6 +324,7 @@ function BackgroundPanel({
   const handleApply = () => {
     if (!pendingFile) return
     onApplyBackground(pendingFile, scale / 100, offsetX / 100, offsetY / 100)
+    // 즉시 패널 닫기 — 업로드는 백그라운드에서 진행됨
     setPendingFile(null)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
@@ -374,8 +375,8 @@ function BackgroundPanel({
           <button type="button" onClick={handleCancel} className="flex-1 rounded-md border border-[#e8dfd4] py-2 text-xs font-bold text-[#9a8d82] hover:border-red-300 hover:text-red-500">
             취소
           </button>
-          <button type="button" disabled={busy} onClick={handleApply} className="flex-1 rounded-md bg-[#111318] py-2 text-xs font-bold text-white hover:bg-[#0066ff] disabled:opacity-40">
-            {busy ? '적용 중...' : '이 배경으로 적용'}
+          <button type="button" onClick={handleApply} className="flex-1 rounded-md bg-[#111318] py-2 text-xs font-bold text-white hover:bg-[#0066ff]">
+            이 배경으로 적용
           </button>
         </div>
       </div>
