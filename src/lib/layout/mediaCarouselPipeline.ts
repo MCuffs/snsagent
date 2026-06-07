@@ -584,7 +584,7 @@ async function generateMediaSlideCopies(
 
   const hasRssContext = sourceMaterial.includes('[실시간 뉴스 컨텍스트') || sourceMaterial.includes('[Real-Time News Context')
   const rssInstruction = hasRssContext
-    ? `\n- 실시간 뉴스 컨텍스트의 기사 제목·내용에서 구체적인 키워드·앵글·트렌드를 훅과 body에 반드시 반영하세요\n- 뉴스 기사에 있는 실제 이슈를 다루어야 독자의 공감을 얻습니다\n- 뉴스에 없는 수치나 사실은 만들지 마세요`
+    ? `\n- 실시간 뉴스 컨텍스트에서 주제("${input.topic}")와 직접 관련된 기사만 활용하세요. 월드컵, 선거, 연예, 스포츠 등 주제와 무관한 뉴스는 절대 카피에 끌어오지 마세요.\n- 관련 기사의 구체적인 키워드·앵글·트렌드를 훅과 body에 반영하세요\n- 뉴스에 없는 수치나 사실은 만들지 마세요`
     : ''
   const hasResearchBrief = sourceMaterial.includes('[외부 리서치 브리프') || sourceMaterial.includes('[EXTERNAL RESEARCH BRIEF')
   const researchInstruction = hasResearchBrief

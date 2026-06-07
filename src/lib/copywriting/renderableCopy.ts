@@ -137,6 +137,7 @@ export function isCompleteBodyCopy(value: string) {
   const normalized = normalizeCopy(value)
   if (!normalized) return false
   if (hasIncompleteMeaningEnding(normalized)) return false
+  if (hasDanglingDemonstrativePronoun(normalized)) return false
   if (/[.!?。！？]$/.test(normalized)) return true
   return /(습니다|합니다|됩니다|입니다|주세요|보세요|하세요|좋습니다|중요합니다|필요합니다|가능합니다|분명합니다|이어집니다|낮아집니다|높아집니다|있습니다|없습니다|같습니다|해집니다|줍니다|듭니다|납니다)$/.test(normalized)
 }
@@ -173,6 +174,11 @@ function normalizeCopy(value: string) {
 function hasIncompleteMeaningEnding(value: string) {
   const withoutPunctuation = value.replace(/[.!?。！？]+$/u, '').trim()
   return /(?:함께 있는|함께 봐야|대신 분명한|살피는|많이 먹는|한 번에|커지는지|이어지는지|은|는|이|가|을|를|에|에서|으로|로|와|과|도|만|부터|까지|보다|처럼|이나|거나|더|다시|먼저|쓸|봐야|한 줄)$/u.test(withoutPunctuation)
+}
+
+function hasDanglingDemonstrativePronoun(value: string) {
+  // "내 결제창엔 이 더 빨리" 같이 지시대명사(이/그/저)가 명사 없이 단독으로 노출되는 패턴
+  return /[가-힣]\s+(이|그|저)\s+(더|빨리|먼저|늦게|빠르게|크게|작게|많이|적게|자주|항상|바로|꼭|또|다시|확실히)\s/.test(value)
 }
 
 function visualLength(value: string) {
