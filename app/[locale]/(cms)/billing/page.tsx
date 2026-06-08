@@ -3,7 +3,9 @@ import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../../lib/limits-types'
+import { isPaidPlan } from '../../../../lib/nicepay'
 import { PAYPAL_PLAN_IDS } from '../../../../lib/paypal'
+import { createNicepayReturnToken } from '../../../../lib/nicepay-return-token'
 import PricingClientView from '../../../(cms)/billing/PricingClientView'
 import { getTranslations } from 'next-intl/server'
 
@@ -40,6 +42,9 @@ export default async function PricingPage({
   }
   const paypalClientId = isKo ? '' : (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
   const nicepayClientKey = isKo ? (process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim() : ''
+  const nicepayReturnTokens = Object.fromEntries(
+    plansList.filter(isPaidPlan).map((plan) => [plan, createNicepayReturnToken(user.id, plan)]),
+  )
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
@@ -74,6 +79,7 @@ export default async function PricingPage({
         paypalClientId={paypalClientId}
         paypalPlanIds={paypalPlanIds}
         nicepayClientKey={nicepayClientKey}
+        nicepayReturnTokens={nicepayReturnTokens}
         customerName={user.name}
         customerEmail={user.email}
         showRegenerationOffer={sp.offer === 'regeneration'}

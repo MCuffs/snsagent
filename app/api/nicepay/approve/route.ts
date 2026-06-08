@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
-import {
-  serverApprove,
-  issueBillingKey,
-  createNicepayOrderId,
-  isPaidPlan,
-  nextMonthlyBillingDate,
-  PLAN_AMOUNTS,
-  NicepayError,
-} from '../../../../lib/nicepay'
-import { normalizePlan } from '../../../../lib/limits-types'
+import { approveNicepayPaymentForUser, nicepayUnexpectedError } from '../../../../lib/nicepay-approval'
 
 export const runtime = 'nodejs'
 
@@ -28,100 +19,17 @@ export async function POST(request: NextRequest) {
       plan?: string
     }
 
-    const { tid, authToken, orderId, plan } = body
-
-    if (!tid || !authToken || !orderId || !isPaidPlan(plan ?? null)) {
-      return NextResponse.json({ error: '결제 인증 정보가 올바르지 않습니다.' }, { status: 400 })
-    }
-
-    // isPaidPlan 통과 후 plan은 PaidPlan 타입으로 확정
-    const validPlan = plan as import('../../../../lib/nicepay').PaidPlan
-
-    if (
-      user.tossSubscriptionStatus === 'ACTIVE' ||
-      user.paypalSubscriptionId ||
-      user.nicepaySubscriptionStatus === 'ACTIVE'
-    ) {
-      return NextResponse.json({ error: '이미 활성 구독이 있습니다.' }, { status: 409 })
-    }
-
-    if (plan === 'LITE' && normalizePlan(user.plan) === 'LITE') {
-      return NextResponse.json({ error: '이미 사용 가능한 1회권이 있습니다.', offer: 'regeneration' }, { status: 409 })
-    }
-
-    // 서버 DB 기준 금액으로 검증 — 프론트에서 받은 amount는 절대 신뢰하지 않음
-    const expectedAmount = PLAN_AMOUNTS[validPlan]
-    console.log(`[NicePay Approve] user=${user.id} plan=${validPlan} amount=${expectedAmount} tid=${tid}`)
-
-    // Server 승인 API 호출
-    const approveResult = await serverApprove({ tid, amount: expectedAmount, orderId })
-
-    if (approveResult.resultCode !== '0000') {
-      console.error(`[NicePay Approve] Payment approval failed: code=${approveResult.resultCode} msg=${approveResult.resultMsg}`)
+    const result = await approveNicepayPaymentForUser(user, body, dbService.updateUserNicepay)
+    if (!result.ok) {
       return NextResponse.json(
-        { error: approveResult.resultMsg || `결제 승인에 실패했습니다. (코드: ${approveResult.resultCode})` },
-        { status: 400 },
+        { error: result.error, offer: result.offer },
+        { status: result.status },
       )
     }
 
-    console.log(`[NicePay Approve] Payment approved successfully for user=${user.id}`)
-
-    const paidAt = new Date()
-
-    // BID 발급 (정기결제용) — LITE(1회권)는 불필요
-    if (validPlan === 'LITE') {
-      await dbService.updateUserNicepay(user.id, {
-        plan: validPlan,
-        nicepayBid: null,
-        nicepaySubscriptionStatus: null,
-        nicepayLastPaidAt: paidAt,
-        nicepayNextBillingAt: null,
-        nicepayCanceledAt: null,
-        nicepayLastOrderId: orderId,
-      })
-      return NextResponse.json({ success: true, offer: 'regeneration' })
-    }
-
-    // PRO / UNLIMITED: BID 발급 후 정기결제 등록
-    let bid: string | null = null
-    try {
-      const registOrderId = createNicepayOrderId('regist', `${user.id}:${orderId}`)
-      console.log(`[NicePay Approve] Issuing billing key for user=${user.id} registOrderId=${registOrderId}`)
-      const billing = await issueBillingKey(authToken, registOrderId)
-      bid = billing.bid
-      console.log(`[NicePay Approve] Billing key issued successfully: bid=${bid}`)
-
-      await dbService.updateUserNicepay(user.id, {
-        plan: validPlan,
-        nicepayBid: bid,
-        nicepaySubscriptionStatus: 'ACTIVE',
-        nicepayLastPaidAt: paidAt,
-        nicepayNextBillingAt: nextMonthlyBillingDate(paidAt),
-        nicepayCanceledAt: null,
-        nicepayLastOrderId: orderId,
-      })
-      console.log(`[NicePay Approve] Subscription activated for user=${user.id} plan=${validPlan}`)
-    } catch (bidError) {
-      console.error('[NicePay BID Issue Failed]', bidError)
-      await dbService.updateUserNicepay(user.id, {
-        nicepayBid: null,
-        nicepaySubscriptionStatus: 'PENDING',
-        nicepayLastPaidAt: paidAt,
-        nicepayLastOrderId: orderId,
-      })
-      return NextResponse.json(
-        { error: '결제는 완료되었으나 정기결제 등록에 실패했습니다. 고객센터에 문의해 주세요.' },
-        { status: 502 },
-      )
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, offer: result.offer })
   } catch (error) {
-    console.error('[NicePay Approve] Unexpected error:', error)
-    if (error instanceof NicepayError) {
-      console.error(`[NicePay Approve] NicepayError: code=${error.code} status=${error.status} msg=${error.message}`)
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-    return NextResponse.json({ error: '결제 처리 중 예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+    const result = nicepayUnexpectedError(error)
+    return NextResponse.json({ error: result.error }, { status: result.status })
   }
 }

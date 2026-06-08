@@ -22,6 +22,9 @@ declare global {
         amount: number
         goodsName: string
         returnUrl: string
+        mallReserved?: string
+        buyerName?: string
+        buyerEmail?: string
         fnError?: (result: { errorMsg?: string }) => void
         fnClose?: (result: {
           tid?: string
@@ -44,6 +47,7 @@ interface PricingClientViewProps {
   paypalClientId: string
   paypalPlanIds: Record<string, string>
   nicepayClientKey: string
+  nicepayReturnTokens: Record<string, string>
   customerName?: string | null
   customerEmail: string
   showRegenerationOffer: boolean
@@ -76,8 +80,9 @@ function PricingGrid({
   userId,
   paypalPlanIds,
   nicepayClientKey,
-  customerName: _customerName,
-  customerEmail: _customerEmail,
+  nicepayReturnTokens,
+  customerName,
+  customerEmail,
   showRegenerationOffer,
   paymentSuccess,
   locale = 'ko',
@@ -188,6 +193,11 @@ function PricingGrid({
       setError(t('nicepay_key_missing'))
       return
     }
+    const returnToken = nicepayReturnTokens[planKey]
+    if (!returnToken) {
+      setError(t('nicepay_start_failed'))
+      return
+    }
     if (!nicepayReady || !window.AUTHNICE?.requestPay) {
       setError(t('nicepay_loading'))
       return
@@ -200,6 +210,9 @@ function PricingGrid({
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const returnUrl = new URL('/api/nicepay/return', appUrl)
+    returnUrl.searchParams.set('token', returnToken)
+    returnUrl.searchParams.set('locale', locale)
     
     analytics.planSelectClick(planKey, currentPlan, {
       payment_provider: 'nicepay',
@@ -212,71 +225,89 @@ function PricingGrid({
       order_id: orderId,
     })
 
-    window.AUTHNICE.requestPay({
-      clientId: nicepayClientKey,
-      method: 'card',
-      orderId,
-      amount,
-      goodsName: `Shuffla ${planKey} 월 구독`,
-      returnUrl: `${appUrl}/api/nicepay/server-auth-dummy`,
-      fnError: (result) => {
-        analytics.paymentFailed(planKey, 'nicepay', result.errorMsg || 'sdk_error', {
-          order_id: orderId,
-        })
-        setError(result.errorMsg || t('nicepay_start_failed'))
-        setProcessingPayment(null)
-      },
-      fnClose: async (result) => {
-        if (!result.tid || !result.authToken || result.resultCode !== '0000') {
-          if (result.resultCode && result.resultCode !== '0000') {
-            setError(result.resultMsg || t('payment_canceled_msg'))
-          }
-          setProcessingPayment(null)
-          return
-        }
-        try {
-          const res = await fetch('/api/nicepay/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tid: result.tid,
-              authToken: result.authToken,
-              orderId: result.orderId ?? orderId,
-              plan: planKey,
-            }),
+    const timeoutId = window.setTimeout(() => {
+      setError(t('nicepay_start_failed'))
+      setProcessingPayment(null)
+    }, 120000)
+
+    try {
+      window.AUTHNICE.requestPay({
+        clientId: nicepayClientKey,
+        method: 'card',
+        orderId,
+        amount,
+        goodsName: `Shuffla ${planKey} 월 구독`,
+        returnUrl: returnUrl.toString(),
+        mallReserved: returnToken,
+        buyerName: customerName || undefined,
+        buyerEmail: customerEmail || undefined,
+        fnError: (result) => {
+          window.clearTimeout(timeoutId)
+          analytics.paymentFailed(planKey, 'nicepay', result.errorMsg || 'sdk_error', {
+            order_id: orderId,
           })
-          const data = await res.json() as { error?: string; offer?: string }
-          if (!res.ok) {
-            analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error', {
-              amount,
-              currency: 'KRW',
-              order_id: result.orderId ?? orderId,
-            })
-            setError(data.error || t('nicepay_approve_failed'))
-            setProcessingPayment(null)
-          } else if (data.offer === 'regeneration') {
-            analytics.paymentSuccess(planKey, 'nicepay', {
-              amount,
-              currency: 'KRW',
-              order_id: result.orderId ?? orderId,
-              offer_type: 'regeneration',
-            })
-            router.push('/billing?success=true&offer=regeneration')
-          } else {
-            analytics.paymentSuccess(planKey, 'nicepay', {
-              amount,
-              currency: 'KRW',
-              order_id: result.orderId ?? orderId,
-            })
-            router.push('/billing?success=true')
-          }
-        } catch (err) {
-          console.error('Payment approval error:', err)
-          setError(t('network_error'))
+          setError(result.errorMsg || t('nicepay_start_failed'))
           setProcessingPayment(null)
-        }
-      },
-    })
+        },
+        fnClose: async (result) => {
+          window.clearTimeout(timeoutId)
+          if (!result.tid || !result.authToken || result.resultCode !== '0000') {
+            if (result.resultCode && result.resultCode !== '0000') {
+              setError(result.resultMsg || t('payment_canceled_msg'))
+            }
+            setProcessingPayment(null)
+            return
+          }
+          try {
+            const res = await fetch('/api/nicepay/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tid: result.tid,
+                authToken: result.authToken,
+                orderId: result.orderId ?? orderId,
+                plan: planKey,
+              }),
+            })
+            const data = await res.json() as { error?: string; offer?: string }
+            if (!res.ok) {
+              analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error', {
+                amount,
+                currency: 'KRW',
+                order_id: result.orderId ?? orderId,
+              })
+              setError(data.error || t('nicepay_approve_failed'))
+              setProcessingPayment(null)
+            } else if (data.offer === 'regeneration') {
+              analytics.paymentSuccess(planKey, 'nicepay', {
+                amount,
+                currency: 'KRW',
+                order_id: result.orderId ?? orderId,
+                offer_type: 'regeneration',
+              })
+              router.push('/billing?success=true&offer=regeneration')
+            } else {
+              analytics.paymentSuccess(planKey, 'nicepay', {
+                amount,
+                currency: 'KRW',
+                order_id: result.orderId ?? orderId,
+              })
+              router.push('/billing?success=true')
+            }
+          } catch (err) {
+            console.error('Payment approval error:', err)
+            setError(t('network_error'))
+            setProcessingPayment(null)
+          }
+        },
+      })
+    } catch (err) {
+      window.clearTimeout(timeoutId)
+      console.error('NicePay requestPay error:', err)
+      analytics.paymentFailed(planKey, 'nicepay', 'request_pay_exception', { order_id: orderId })
+      setError(t('nicepay_start_failed'))
+      setProcessingPayment(null)
+    }
   }
 
   return (

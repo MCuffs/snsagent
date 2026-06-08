@@ -4,7 +4,9 @@ import { getTranslations } from 'next-intl/server'
 import { getSessionUser } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../lib/limits-types'
+import { isPaidPlan } from '../../../lib/nicepay'
 import { PAYPAL_PLAN_IDS } from '../../../lib/paypal'
+import { createNicepayReturnToken } from '../../../lib/nicepay-return-token'
 import PricingClientView from './PricingClientView'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +31,9 @@ export default async function PricingPage({
     if (value) paypalPlanIds[key] = value
   }
   const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
+  const nicepayReturnTokens = Object.fromEntries(
+    plansList.filter(isPaidPlan).map((plan) => [plan, createNicepayReturnToken(user.id, plan)]),
+  )
   const t = await getTranslations('billing')
 
   return (
@@ -64,6 +69,7 @@ export default async function PricingPage({
         paypalClientId={paypalClientId}
         paypalPlanIds={paypalPlanIds}
         nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}
+        nicepayReturnTokens={nicepayReturnTokens}
         customerName={user.name}
         customerEmail={user.email}
         showRegenerationOffer={params.offer === 'regeneration'}

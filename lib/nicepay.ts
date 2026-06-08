@@ -96,7 +96,7 @@ export async function serverApprove(input: {
   amount: number
   orderId: string
 }): Promise<NicepayServerApproveResult> {
-  return callNicepay<NicepayServerApproveResult>(`/v1/pay/${encodeURIComponent(input.tid)}`, {
+  return callNicepay<NicepayServerApproveResult>(`/v1/payments/${encodeURIComponent(input.tid)}`, {
     method: 'POST',
     body: JSON.stringify({
       amount: input.amount,
