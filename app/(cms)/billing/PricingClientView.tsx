@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Check, Loader2, X } from 'lucide-react'
-import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
+import { FUNDING, PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 import { analytics } from '../../../lib/analytics/thinkingdata'
 
@@ -565,6 +565,8 @@ function PayPalSubscribeButton({
     <div>
       <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">{t('paypal_label')}</p>
       <PayPalButtons
+        fundingSource={FUNDING.PAYPAL}
+        forceReRender={[planId, userId]}
         style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
         createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
         onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
