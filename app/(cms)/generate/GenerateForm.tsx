@@ -1189,41 +1189,50 @@ function CopyPreviewPanel({
       </div>
 
       {/* Slide list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-6 py-5">
         {error && (
-          <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
             {error}
           </div>
         )}
 
-        <div className="divide-y divide-[#F0EDE8]">
+        <div className="grid gap-4 xl:grid-cols-2">
           {editedSlides.map((slide, idx) => (
             <motion.div
               key={slide.slideNumber}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1], delay: idx * 0.04 }}
-              className="px-6 py-5 group"
+              className="group rounded-2xl border border-[#E8DED3] bg-white p-4 shadow-[0_8px_24px_rgba(80,61,49,0.04)] transition-all hover:border-[#CBB6A5] hover:shadow-[0_12px_32px_rgba(80,61,49,0.08)]"
             >
-              <div className="flex items-baseline gap-3 mb-3">
-                <span className="shrink-0 text-[11px] font-black text-[#C9B29F]">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#F0E8DF] pb-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F4EEE8] text-[11px] font-black text-[#9E7D68] ring-1 ring-[#E3D5CA]">
                   {String(slide.slideNumber).padStart(2, '0')}
+                </span>
+                <span className="shrink-0 rounded-full bg-[#FBF7F2] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#A78670]">
+                  {slide.role}
                 </span>
                 <input
                   type="text"
                   value={slide.headline}
                   onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
                   placeholder={locale === 'en' ? 'Headline' : '제목'}
-                  className="flex-1 bg-transparent text-sm font-black text-[#2C1E1A] placeholder-[#C9B29F] outline-none border-b border-transparent focus:border-[#9E7D68] transition-colors pb-0.5"
+                  className="h-11 flex-1 rounded-xl border border-[#E8DED3] bg-[#FFFCF8] px-3 text-sm font-black text-[#2C1E1A] placeholder-[#C9B29F] outline-none transition-all focus:border-[#9E7D68] focus:bg-white focus:ring-2 focus:ring-[#9E7D68]/10"
                 />
               </div>
-              <div className="pl-8">
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#A69282]">
+                    {locale === 'en' ? 'Body copy' : '본문'}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#B8A99E]">{slide.body.length}</span>
+                </div>
                 <textarea
                   value={slide.body}
                   onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
                   placeholder={locale === 'en' ? 'Body copy' : '본문'}
-                  rows={2}
-                  className="w-full resize-none bg-transparent text-xs font-medium leading-6 text-[#6B5D57] placeholder-[#C9B29F] outline-none border-b border-transparent focus:border-[#C9B29F] transition-colors"
+                  rows={4}
+                  className="min-h-[112px] w-full resize-none rounded-xl border border-[#E8DED3] bg-[#FFFCF8] px-3 py-3 text-xs font-semibold leading-6 text-[#5C4E4B] placeholder-[#C9B29F] outline-none transition-all focus:border-[#9E7D68] focus:bg-white focus:ring-2 focus:ring-[#9E7D68]/10"
                 />
               </div>
             </motion.div>
@@ -1231,7 +1240,7 @@ function CopyPreviewPanel({
         </div>
 
         {/* Image attach */}
-        <div className="mx-6 my-4 rounded-xl border border-[#E6DFD5] bg-white p-4 space-y-3">
+        <div className="mt-5 rounded-2xl border border-[#E6DFD5] bg-white p-5 shadow-[0_8px_24px_rgba(80,61,49,0.04)]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>

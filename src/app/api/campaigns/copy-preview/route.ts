@@ -52,11 +52,10 @@ export async function POST(request: Request) {
     : (await dbService.getBrands(user.id))[0]
   if (!brand) return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
 
-  let enrichedKeyContent = body.keyContent
-
-  if (body.productUrl) {
-    try {
-      const productContext = await collectBrandUrlContext(body.productUrl)
+  const language = body.language || 'ko'
+  const productContextPromise = body.productUrl
+    ? (async () => {
+      const productContext = await collectBrandUrlContext(body.productUrl!)
       const apiKey = process.env.OPENAI_API_KEY
       let productSummary = productContext.promptContext.slice(0, 3500)
       if (apiKey && apiKey.length > 10) {
@@ -67,39 +66,44 @@ export async function POST(request: Request) {
         const persuasion = await analyzePurchasePersuasionWithOpenAI({
           openai,
           collected: productContext,
-          locale: body.language || 'ko',
+          locale: language,
         })
         productSummary = formatPurchasePersuasionForPrompt(persuasion)
       }
-      enrichedKeyContent = `${enrichedKeyContent}\n\n[Product Page Purchase Persuasion]\n${productSummary}`
-    } catch { /* non-fatal */ }
-  }
+      return `[Product Page Purchase Persuasion]\n${productSummary}`
+    })().catch(() => '')
+    : Promise.resolve('')
 
-  try {
+  const rssContextPromise = (async () => {
     const keywords = extractGenerationKeywords(body.topic, [body.category || '', body.contentType || ''])
     const rssResult = await fetchRssForGeneration({
       category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
       keywords,
       topic: body.topic,
       limit: 5,
-      language: body.language || 'ko',
+      language,
     })
-    const rssContext = buildRssContext(rssResult, body.language || 'ko')
-    if (rssContext) enrichedKeyContent = `${enrichedKeyContent}\n\n${rssContext}`
-  } catch { /* non-fatal */ }
+    return buildRssContext(rssResult, language)
+  })().catch(() => '')
 
-  try {
+  const researchContextPromise = (async () => {
     const researchBrief = await buildCarouselResearchBrief({
       topic: body.topic,
       category: body.category,
-      keyContent: enrichedKeyContent,
+      keyContent: body.keyContent,
       contentType: body.contentType,
       slideCount: body.slideCount ?? 5,
-      language: body.language || 'ko',
+      language,
     })
-    const researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
-    if (researchContext) enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
-  } catch { /* non-fatal */ }
+    return formatResearchBriefForPrompt(researchBrief, language)
+  })().catch(() => '')
+
+  const enrichmentSections = await Promise.all([
+    productContextPromise,
+    rssContextPromise,
+    researchContextPromise,
+  ])
+  const enrichedKeyContent = [body.keyContent, ...enrichmentSections.filter(Boolean)].join('\n\n')
 
   const slides = await previewMediaCarouselCopy({
     userId: user.id,
