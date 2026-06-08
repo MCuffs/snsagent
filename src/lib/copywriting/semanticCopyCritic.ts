@@ -179,6 +179,22 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
+    if (language === 'ko' && startsWithDanglingKoreanParticle(body)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '본문이 조사나 연결어로 시작해 앞 문맥이 잘린 상태입니다. 주어가 있는 완전한 문장으로 다시 작성해야 합니다.',
+      })
+    }
+
+    if (language === 'ko' && hasOffTopicSensationalAngle(combined, params.topic)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: '사용자 주제와 무관한 뉴스/자극적 앵글이 카피에 섞였습니다. 주제의 실제 적용 포인트만 남겨야 합니다.',
+      })
+    }
+
     const genericHits = language === 'en'
       ? EN_GENERIC_FILLERS.filter(phrase => combined.toLowerCase().includes(phrase))
       : GENERIC_FILLERS.filter(phrase => combined.includes(phrase))
@@ -276,6 +292,18 @@ function hasBrokenKoreanParticle(value: string) {
   return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
     /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
     /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
+}
+
+function startsWithDanglingKoreanParticle(value: string) {
+  return /^(?:에서|에게서|으로|로|을|를|은|는|이|가|와|과|도|만|부터|까지|보다|처럼|의|에|에게|께|한테)\b/u.test(value.trim())
+}
+
+function hasOffTopicSensationalAngle(value: string, topic: string) {
+  const topicText = topic.toLowerCase()
+  const copy = value.toLowerCase()
+  const isDietTopic = /식단|다이어트|건강|혈당|영양|단백질|탄수화물|채소|식사|음식/.test(topicText)
+  if (!isDietTopic) return false
+  return /폭격|무기|미사일|전쟁|우주|매스\s*드라이버|mass\s*driver|공격|테러/.test(copy)
 }
 
 function hasIncompleteFinalSentence(value: string) {

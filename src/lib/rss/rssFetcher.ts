@@ -1,7 +1,7 @@
 // Server-side RSS fetcher used by the campaign generation pipeline.
 // Fetches and keyword-scores articles so real news context flows into copy/hook generation.
 
-interface RssArticle {
+export interface RssArticle {
   title: string
   link: string
   description: string
@@ -82,8 +82,20 @@ const FEEDS = FEEDS_KO
 const TOPIC_STOPWORDS = new Set([
   '카드뉴스', '카드', '뉴스', '만들어주세요', '만들어줘', '만들어', '제작해주세요', '제작해줘',
   '대한', '대해', '관련', '정보', '알려주세요', '알려줘', '해주세요', '해줘', '요청',
+  '쉽게', '풀어', '전달', '기준', '실전', '적용', '포인트', '저장형',
   'the', 'a', 'an', 'about', 'for', 'make', 'create', 'carousel', 'card', 'news',
 ])
+
+const SOFT_TOPIC_WORDS = new Set([
+  '트렌드', '일반인', '일반인들', '기준', '쉽게', '실전', '적용', '포인트', '전달',
+  '콘텐츠', '컨텐츠', '방향', '목표', '핵심', '요즘', '최근', '저장형',
+  'trend', 'trends', 'guide', 'tips', 'practical', 'easy', 'simple',
+])
+
+const FOOD_HEALTH_TOPIC_HINT_RE = /식단|다이어트|건강|혈당|영양|단백질|탄수화물|채소|식사|음식|meal|diet|nutrition|protein|carb|health/i
+const FOOD_HEALTH_ARTICLE_HINT_RE = /식단|다이어트|건강|혈당|영양|단백질|탄수화물|채소|식사|음식|먹|몸매|관리|meal|diet|nutrition|protein|carb|health|food/i
+const DIET_TOPIC_HINT_RE = /식단|다이어트|혈당|영양|단백질|탄수화물|채소|식사|음식|meal|diet|nutrition|protein|carb/i
+const DIET_ARTICLE_HINT_RE = /식단|다이어트|혈당|영양|단백질|탄수화물|채소|식사|음식|먹|몸매|관리|meal|diet|nutrition|protein|carb|food/i
 
 const CATEGORY_HINTS: Array<{ category: string; patterns: RegExp[] }> = [
   { category: 'information', patterns: [/효능|건강|영양|식단|질병|예방|증상|운동|피로|면역|수면|혈당|콜레스테롤|다이어트/] },
@@ -132,6 +144,26 @@ function scoreArticle(article: RssArticle, keywords: string[]): number {
     score += (descLower.split(k).length - 1)
   }
   return score
+}
+
+export function articleMatchesTopic(article: RssArticle, keywords: string[], topic?: string): boolean {
+  const articleText = `${article.title} ${article.description}`.toLowerCase()
+  const meaningfulKeywords = Array.from(new Set(keywords))
+    .map(keyword => keyword.toLowerCase().trim())
+    .filter(keyword => keyword.length >= 2 && !SOFT_TOPIC_WORDS.has(keyword))
+
+  if (meaningfulKeywords.some(keyword => articleText.includes(keyword))) return true
+
+  const topicText = (topic || '').toLowerCase()
+  if (DIET_TOPIC_HINT_RE.test(topicText)) {
+    return DIET_ARTICLE_HINT_RE.test(articleText)
+  }
+
+  if (FOOD_HEALTH_TOPIC_HINT_RE.test(topicText)) {
+    return FOOD_HEALTH_ARTICLE_HINT_RE.test(articleText)
+  }
+
+  return false
 }
 
 export function extractGenerationKeywords(topic?: string, extraKeywords: string[] = []): string[] {
@@ -190,7 +222,7 @@ export async function fetchRssForGeneration(params: {
         .map(a => ({ article: a, score: scoreArticle(a, allKeywords) }))
         .sort((a, b) => b.score - a.score)
 
-      const matched = scored.filter(s => s.score > 0)
+      const matched = scored.filter(s => s.score > 0 && articleMatchesTopic(s.article, allKeywords, topic))
       if (matched.length > 0) {
         const articles = matched.slice(0, limit).map(s => s.article)
         return { articles, matched: true, topArticle: articles[0] }
