@@ -14,6 +14,9 @@ import {
   Compass,
   Layers,
   Sparkle,
+  ChevronLeft,
+  Pencil,
+  Check,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -73,6 +76,13 @@ interface GenerateParams {
   recommendedCta?: string
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
+}
+
+interface CopyPreviewSlide {
+  slideNumber: number
+  role: string
+  headline: string
+  body: string
 }
 
 let msgCounter = 0
@@ -182,10 +192,14 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [isRevealingMessage, setIsRevealingMessage] = useState(false)
   const [readyParams, setReadyParams] = useState<GenerateParams | null>(null)
   const [briefingStage, setBriefingStage] = useState(0)
-  const [generating, setGenerating] = useState(false)
+  const [phase, setPhase] = useState<'chat' | 'preview' | 'generating'>('chat')
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
+  const [copyPreviewSlides, setCopyPreviewSlides] = useState<CopyPreviewSlide[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  const generating = phase === 'generating'
 
   const generationMode = brand.websiteUrl === 'general_profile' ? 'general' : 'brand'
 
@@ -496,10 +510,54 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     await callAgent(newHistory)
   }
 
-  const handleGenerate = async () => {
+  const handleCopyPreview = async () => {
+    if (!readyParams) return
+    setPreviewLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/campaigns/copy-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandId: brand.id,
+          topic: readyParams.topic,
+          category: brand.industry,
+          title: language === 'en' ? `${readyParams.topic} Card News` : `${readyParams.topic} 카드뉴스`,
+          keyContent: buildCardCopyContext(readyParams),
+          tone: brand.toneOfVoice || (language === 'en' ? 'warm and emotional' : '감성적이고 따뜻하게'),
+          contentType: readyParams.contentType,
+          objective: readyParams.objective,
+          slideCount: readyParams.slideCount,
+          productUrl: readyParams.productUrl || undefined,
+          visualHint: readyParams.visualHint,
+          brandAnalysis: readyParams.brandAnalysis,
+          targetEmotion: readyParams.targetEmotion,
+          hookDirection: readyParams.hookDirection,
+          recommendedCta: readyParams.recommendedCta,
+          reasonForStyle: readyParams.reasonForStyle,
+          structurePreview: readyParams.structurePreview,
+          language,
+          generationMode,
+        }),
+      })
+      const data = await res.json() as { slides?: CopyPreviewSlide[]; error?: string }
+      if (!res.ok || data.error || !data.slides) {
+        setError(data.error || t('copy_preview_error'))
+        return
+      }
+      setCopyPreviewSlides(data.slides)
+      setPhase('preview')
+    } catch {
+      setError(t('copy_preview_error'))
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const handleGenerate = async (confirmedSlides?: CopyPreviewSlide[]) => {
     if (!readyParams) return
     setLoadingStep(0)
-    setGenerating(true)
+    setPhase('generating')
     setError(null)
     generationStartedAtRef.current = Date.now()
 
@@ -525,7 +583,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
         if (!uploadRes.ok || !uploadData.urls?.length) {
           setError(uploadData.error || t('error_upload'))
-          setGenerating(false)
+          setPhase('preview')
           return
         }
         productImageUrls = uploadData.urls
@@ -553,6 +611,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           recommendedCta: readyParams.recommendedCta,
           reasonForStyle: readyParams.reasonForStyle,
           structurePreview: readyParams.structurePreview,
+          confirmedSlides: confirmedSlides ?? undefined,
           productImageUrls,
           language,
           generationMode,
@@ -567,7 +626,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           slide_count: readyParams.slideCount,
         })
         setError(data.error || t('error_generate'))
-        setGenerating(false)
+        setPhase('preview')
         return
       }
 
@@ -585,7 +644,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         slide_count: readyParams.slideCount,
       })
       setError(t('error_network'))
-      setGenerating(false)
+      setPhase('preview')
     }
   }
 
@@ -607,8 +666,24 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     }
   }
 
+  // ── Copy Preview screen ─────────────────────────────────────────
+  if (phase === 'preview') {
+    return (
+      <CopyPreviewPanel
+        slides={copyPreviewSlides}
+        referenceFiles={referenceFiles}
+        setReferenceFiles={setReferenceFiles}
+        error={error}
+        onBack={() => { setPhase('chat'); setError(null) }}
+        onConfirm={(slides) => handleGenerate(slides)}
+        t={t}
+        locale={locale}
+      />
+    )
+  }
+
   // ── Generating overlay ──────────────────────────────────────────
-  if (generating) {
+  if (phase === 'generating') {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#FFFDF9] via-[#FAF7F2] to-[#FAF8F5] px-6 py-16 text-[#2C1E1A] relative overflow-hidden">
         {/* Glow ambient background bubbles */}
@@ -861,12 +936,22 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 </div>
                 <button
                   type="button"
-                  onClick={handleGenerate}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] hover:to-[#7E5E4A] py-4 text-sm font-black text-white transition-all hover:shadow-[0_8px_24px_rgba(158,125,104,0.25)] active:scale-[0.99]"
+                  onClick={handleCopyPreview}
+                  disabled={previewLoading}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] hover:to-[#7E5E4A] py-4 text-sm font-black text-white transition-all hover:shadow-[0_8px_24px_rgba(158,125,104,0.25)] active:scale-[0.99] disabled:opacity-60"
                 >
-                  <Sparkles className="h-4 w-4 text-[#FFFDF8]" />
-                  {t('generate_cta')}
-                  <ArrowRight className="h-4 w-4" />
+                  {previewLoading ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      {t('copy_preview_generating')}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 text-[#FFFDF8]" />
+                      {t('copy_preview_cta')}
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -1055,5 +1140,205 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+// ── Role label map ────────────────────────────────────────────────
+const ROLE_LABELS: Record<string, { ko: string; color: string }> = {
+  hook:           { ko: 'HOOK',     color: 'bg-[#9E7D68]/15 text-[#9E7D68] border-[#9E7D68]/25' },
+  detail:         { ko: 'DETAIL',   color: 'bg-[#5C7A9E]/15 text-[#4a6b8a] border-[#5C7A9E]/25' },
+  benefit:        { ko: 'BENEFIT',  color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  cta:            { ko: 'CTA',      color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  'editorial-detail': { ko: 'DETAIL', color: 'bg-[#5C7A9E]/15 text-[#4a6b8a] border-[#5C7A9E]/25' },
+  proof:          { ko: 'PROOF',    color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  problem:        { ko: 'PROBLEM',  color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  solution:       { ko: 'SOLUTION', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+}
+
+function roleBadge(role: string) {
+  const entry = ROLE_LABELS[role] ?? { ko: role.toUpperCase(), color: 'bg-[#F5EFE6] text-[#8C7E7A] border-[#E5DDD3]' }
+  return entry
+}
+
+function CopyPreviewPanel({
+  slides,
+  referenceFiles,
+  setReferenceFiles,
+  error,
+  onBack,
+  onConfirm,
+  t,
+  locale,
+}: {
+  slides: CopyPreviewSlide[]
+  referenceFiles: File[]
+  setReferenceFiles: React.Dispatch<React.SetStateAction<File[]>>
+  error: string | null
+  onBack: () => void
+  onConfirm: (slides: CopyPreviewSlide[]) => void
+  t: (key: string) => string
+  locale: string
+}) {
+  const [editedSlides, setEditedSlides] = useState<CopyPreviewSlide[]>(
+    slides.map(s => ({ ...s }))
+  )
+  const [editingId, setEditingId] = useState<number | null>(null)
+
+  const updateSlide = (slideNumber: number, field: 'headline' | 'body', value: string) => {
+    setEditedSlides(prev => prev.map(s => s.slideNumber === slideNumber ? { ...s, [field]: value } : s))
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#FAF5EE]">
+      {/* Header */}
+      <div className="shrink-0 border-b border-[#EFEAE2] bg-[#FCFBF9]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#B88E76]">{t('copy_preview_title')}</p>
+          <p className="mt-0.5 text-xs text-[#8C7E7A] font-semibold">{t('copy_preview_desc')}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2 text-xs font-bold text-[#5C4E4B] hover:border-[#9E7D68] transition-colors"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          {t('copy_preview_back')}
+        </button>
+      </div>
+
+      {/* Slide cards */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
+            {error}
+          </div>
+        )}
+        {editedSlides.map((slide) => {
+          const badge = roleBadge(slide.role)
+          const isEditing = editingId === slide.slideNumber
+          return (
+            <motion.div
+              key={slide.slideNumber}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1], delay: slide.slideNumber * 0.06 }}
+              className={`relative rounded-2xl border bg-white p-5 shadow-[0_4px_20px_rgba(158,125,104,0.04)] transition-all ${isEditing ? 'border-[#9E7D68] ring-1 ring-[#9E7D68]/20' : 'border-[#E6DFD5] hover:border-[#C9B29F]'}`}
+            >
+              {/* Slide number + role */}
+              <div className="mb-4 flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F5EFE6] text-xs font-black text-[#9E7D68] border border-[#E5DDD3]">
+                  {slide.slideNumber}
+                </span>
+                <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black tracking-wide ${badge.color}`}>
+                  {badge.ko}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(isEditing ? null : slide.slideNumber)}
+                  className="ml-auto flex items-center gap-1 rounded-lg border border-[#E6DFD5] bg-[#FDFBF7] px-2.5 py-1 text-[10px] font-bold text-[#8C7E7A] hover:border-[#9E7D68] hover:text-[#9E7D68] transition-colors"
+                >
+                  {isEditing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                  {isEditing ? (locale === 'en' ? 'Done' : '완료') : t('copy_preview_edit_hint')}
+                </button>
+              </div>
+
+              {/* Headline */}
+              <div className="mb-3">
+                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-[#A69282]">
+                  {locale === 'en' ? 'Headline' : '제목'}
+                </p>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={slide.headline}
+                    onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
+                    className="w-full rounded-xl border border-[#E6DFD5] bg-[#FDFBF7] px-3.5 py-2.5 text-sm font-black text-[#2C1E1A] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/10"
+                    autoFocus
+                  />
+                ) : (
+                  <p className="text-sm font-black leading-6 text-[#2C1E1A]">{slide.headline}</p>
+                )}
+              </div>
+
+              {/* Body */}
+              <div>
+                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-[#A69282]">
+                  {locale === 'en' ? 'Body' : '본문'}
+                </p>
+                {isEditing ? (
+                  <textarea
+                    value={slide.body}
+                    onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-[#E6DFD5] bg-[#FDFBF7] px-3.5 py-2.5 text-sm font-semibold leading-6 text-[#5C4E4B] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/10"
+                  />
+                ) : (
+                  <p className="text-sm font-semibold leading-6 text-[#5C4E4B] whitespace-pre-line">{slide.body}</p>
+                )}
+              </div>
+            </motion.div>
+          )
+        })}
+
+        {/* Image attach */}
+        <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
+              <p className="text-[10px] text-[#8C7E7A] mt-0.5 font-semibold">{t('attach_image_desc')}</p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-bold text-[#2C1E1A] transition-all hover:border-[#9E7D68] hover:bg-[#FFFDFB] shadow-sm">
+              <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
+              {t('select_file')}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith('image/'))
+                  e.target.value = ''
+                  setReferenceFiles(prev => {
+                    const merged = [...prev, ...files]
+                    return merged.length > 4 ? prev : merged
+                  })
+                }}
+              />
+            </label>
+          </div>
+          {referenceFiles.length > 0 && (
+            <div className="space-y-1.5">
+              {referenceFiles.map((file) => (
+                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs text-[#5C4E4B] bg-[#FDFBF7] border border-[#EBE2D9] rounded-xl px-3 py-1.5">
+                  <span className="truncate font-bold">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setReferenceFiles(prev => prev.filter(f => f !== file))}
+                    className="rounded-full p-1 text-[#8C7E7A] hover:bg-[#EBE2D9]/50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="h-24" />
+      </div>
+
+      {/* Sticky bottom bar */}
+      <div className="shrink-0 border-t border-[#EFEAE2] bg-[#FCFBF9]/90 backdrop-blur-md px-6 py-4">
+        <button
+          type="button"
+          onClick={() => onConfirm(editedSlides)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] hover:to-[#7E5E4A] py-4 text-sm font-black text-white transition-all hover:shadow-[0_8px_24px_rgba(158,125,104,0.25)] active:scale-[0.99]"
+        >
+          <Sparkles className="h-4 w-4 text-[#FFFDF8]" />
+          {t('copy_preview_confirm')}
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }

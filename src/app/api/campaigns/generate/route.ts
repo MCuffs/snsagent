@@ -40,6 +40,7 @@ interface GenerateCampaignRequest {
   recommendedCta?: string
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
+  confirmedSlides?: { slideNumber: number; role: string; headline: string; body: string }[]
   language?: 'ko' | 'en'
   generationMode?: 'brand' | 'general'
 }
@@ -201,6 +202,7 @@ export async function POST(request: Request) {
           reasonForStyle: body.reasonForStyle,
           structurePreview: body.structurePreview,
         },
+        confirmedSlides: body.confirmedSlides,
         language: body.language,
         generationMode: body.generationMode,
       })

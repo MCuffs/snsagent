@@ -63,6 +63,7 @@ export interface MediaCarouselInput {
   visualHint?: string
   productImageUrls?: string[]
   briefing?: EditorialBriefing
+  confirmedSlides?: { slideNumber: number; role: string; headline: string; body: string }[]
   imageProvider?: ImageProvider
   language?: 'ko' | 'en'
   generationMode?: 'brand' | 'general'
@@ -99,6 +100,92 @@ interface MediaSlidePlan {
   headline: string
   body: string
   layoutType: LayoutType
+}
+
+export interface CopyPreviewSlide {
+  slideNumber: number
+  role: string
+  headline: string
+  body: string
+}
+
+export async function previewMediaCarouselCopy(input: MediaCarouselInput): Promise<CopyPreviewSlide[]> {
+  const slideCount = normalizeSlideCount(input.slideCount)
+  const baseLayoutType = toMediaLayout(selectLayout({
+    category: input.category,
+    topic: input.topic,
+    tone: input.tone,
+    contentType: input.contentType,
+  }))
+  const [domainResolution, personalizationMemory] = await Promise.all([
+    resolveGenerationDomainProfile({
+      topic: input.topic,
+      category: input.category,
+      brandIndustry: input.brandIndustry,
+      contentType: input.contentType,
+      generationMode: input.generationMode,
+      userId: input.userId,
+      brandId: input.brandId,
+    }),
+    dbService.getSummarizedPreference(input.brandId),
+  ])
+  const domainProfile = domainResolution.profile
+  const mediaBrand: BrandProfile = {
+    id: input.brandId,
+    name: input.brandName,
+    industry: input.brandIndustry || '',
+    targetAudience: input.brandTargetAudience || '',
+    toneOfVoice: input.brandToneOfVoice || '',
+    mainColor: input.brandMainColor || '',
+    forbiddenWords: input.brandForbiddenWords || '',
+    ctaStyle: input.brandCtaStyle || '',
+    brandDna: input.brandDna,
+  }
+  const mediaCampaignInput: CampaignInput = {
+    productName: input.topic,
+    productDescription: input.keyContent,
+    keyBenefits: input.category,
+    objective: input.objective || input.contentType,
+    slideCount,
+    productImageUrls: input.productImageUrls || [],
+  }
+  const knowledgeCtx = buildCopyKnowledgeContext({
+    brand: mediaBrand,
+    input: mediaCampaignInput,
+    strategy: {
+      strategyType: 'problem_solution',
+      targetEmotion: input.briefing?.targetEmotion || '',
+      contentGoal: input.objective || input.contentType,
+      angle: input.briefing?.hookDirection || '',
+      recommendedSlideCount: slideCount,
+      reason: '',
+    },
+  })
+  const editorialPlan = await buildEditorialDirectorPlan({
+    productName: input.topic,
+    sourceMaterial: input.keyContent,
+    category: input.category,
+    objective: input.objective || input.contentType,
+    contentType: input.contentType,
+    tone: input.tone,
+    brandName: input.brandName,
+    targetAudience: input.brandTargetAudience || '',
+    brandCtaStyle: input.brandCtaStyle,
+    slideCount,
+    baseLayoutType,
+    briefing: input.briefing,
+    memory: personalizationMemory,
+    knowledgeContext: knowledgeCtx,
+  })
+  let plannedSlides = planMediaSlides(input, editorialPlan)
+  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+  plannedSlides = enforceHarnessCopy(input, plannedSlides)
+  return plannedSlides.map(s => ({
+    slideNumber: s.slideNumber,
+    role: s.role,
+    headline: s.headline,
+    body: s.body,
+  }))
 }
 
 export async function generateMediaCarousel(input: MediaCarouselInput): Promise<MediaCarouselPipelineResult> {
@@ -188,7 +275,15 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     knowledgeContext: knowledgeCtx,
   })
   let plannedSlides = planMediaSlides(input, editorialPlan)
-  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+  if (input.confirmedSlides?.length) {
+    // User reviewed and optionally edited the copy — use it as-is, skip LLM copy generation
+    plannedSlides = plannedSlides.map(slide => {
+      const confirmed = input.confirmedSlides!.find(c => c.slideNumber === slide.slideNumber)
+      return confirmed ? { ...slide, headline: confirmed.headline, body: confirmed.body } : slide
+    })
+  } else {
+    plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+  }
   plannedSlides = enforceHarnessCopy(input, plannedSlides)
 
   // 1. Initialize Agents
