@@ -15,8 +15,6 @@ import {
   Layers,
   Sparkle,
   ChevronLeft,
-  Pencil,
-  Check,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -1144,21 +1142,6 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 }
 
 // ── Role label map ────────────────────────────────────────────────
-const ROLE_LABELS: Record<string, { ko: string; color: string }> = {
-  hook:           { ko: 'HOOK',     color: 'bg-[#9E7D68]/15 text-[#9E7D68] border-[#9E7D68]/25' },
-  detail:         { ko: 'DETAIL',   color: 'bg-[#5C7A9E]/15 text-[#4a6b8a] border-[#5C7A9E]/25' },
-  benefit:        { ko: 'BENEFIT',  color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  cta:            { ko: 'CTA',      color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  'editorial-detail': { ko: 'DETAIL', color: 'bg-[#5C7A9E]/15 text-[#4a6b8a] border-[#5C7A9E]/25' },
-  proof:          { ko: 'PROOF',    color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  problem:        { ko: 'PROBLEM',  color: 'bg-rose-50 text-rose-700 border-rose-200' },
-  solution:       { ko: 'SOLUTION', color: 'bg-teal-50 text-teal-700 border-teal-200' },
-}
-
-function roleBadge(role: string) {
-  const entry = ROLE_LABELS[role] ?? { ko: role.toUpperCase(), color: 'bg-[#F5EFE6] text-[#8C7E7A] border-[#E5DDD3]' }
-  return entry
-}
 
 function CopyPreviewPanel({
   slides,
@@ -1182,110 +1165,77 @@ function CopyPreviewPanel({
   const [editedSlides, setEditedSlides] = useState<CopyPreviewSlide[]>(
     slides.map(s => ({ ...s }))
   )
-  const [editingId, setEditingId] = useState<number | null>(null)
 
   const updateSlide = (slideNumber: number, field: 'headline' | 'body', value: string) => {
     setEditedSlides(prev => prev.map(s => s.slideNumber === slideNumber ? { ...s, [field]: value } : s))
   }
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#FAF5EE]">
+    <div className="flex h-full flex-col bg-[#FAFAF9]">
       {/* Header */}
-      <div className="shrink-0 border-b border-[#EFEAE2] bg-[#FCFBF9]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+      <div className="shrink-0 border-b border-[#EFEAE2] bg-white px-6 py-4 flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-[#B88E76]">{t('copy_preview_title')}</p>
-          <p className="mt-0.5 text-xs text-[#8C7E7A] font-semibold">{t('copy_preview_desc')}</p>
+          <h2 className="text-sm font-black text-[#2C1E1A]">{t('copy_preview_title')}</h2>
+          <p className="mt-0.5 text-xs text-[#8C7E7A]">{t('copy_preview_desc')}</p>
         </div>
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2 text-xs font-bold text-[#5C4E4B] hover:border-[#9E7D68] transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-[#E6DFD5] bg-white px-3 py-1.5 text-xs font-semibold text-[#5C4E4B] hover:border-[#9E7D68] transition-colors"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           {t('copy_preview_back')}
         </button>
       </div>
 
-      {/* Slide cards */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+      {/* Slide list */}
+      <div className="flex-1 overflow-y-auto">
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
+          <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
             {error}
           </div>
         )}
-        {editedSlides.map((slide) => {
-          const badge = roleBadge(slide.role)
-          const isEditing = editingId === slide.slideNumber
-          return (
+
+        <div className="divide-y divide-[#F0EDE8]">
+          {editedSlides.map((slide, idx) => (
             <motion.div
               key={slide.slideNumber}
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1], delay: slide.slideNumber * 0.06 }}
-              className={`relative rounded-2xl border bg-white p-5 shadow-[0_4px_20px_rgba(158,125,104,0.04)] transition-all ${isEditing ? 'border-[#9E7D68] ring-1 ring-[#9E7D68]/20' : 'border-[#E6DFD5] hover:border-[#C9B29F]'}`}
+              transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1], delay: idx * 0.04 }}
+              className="px-6 py-5 group"
             >
-              {/* Slide number + role */}
-              <div className="mb-4 flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F5EFE6] text-xs font-black text-[#9E7D68] border border-[#E5DDD3]">
-                  {slide.slideNumber}
+              <div className="flex items-baseline gap-3 mb-3">
+                <span className="shrink-0 text-[11px] font-black text-[#C9B29F]">
+                  {String(slide.slideNumber).padStart(2, '0')}
                 </span>
-                <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black tracking-wide ${badge.color}`}>
-                  {badge.ko}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEditingId(isEditing ? null : slide.slideNumber)}
-                  className="ml-auto flex items-center gap-1 rounded-lg border border-[#E6DFD5] bg-[#FDFBF7] px-2.5 py-1 text-[10px] font-bold text-[#8C7E7A] hover:border-[#9E7D68] hover:text-[#9E7D68] transition-colors"
-                >
-                  {isEditing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-                  {isEditing ? (locale === 'en' ? 'Done' : '완료') : t('copy_preview_edit_hint')}
-                </button>
+                <input
+                  type="text"
+                  value={slide.headline}
+                  onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
+                  placeholder={locale === 'en' ? 'Headline' : '제목'}
+                  className="flex-1 bg-transparent text-sm font-black text-[#2C1E1A] placeholder-[#C9B29F] outline-none border-b border-transparent focus:border-[#9E7D68] transition-colors pb-0.5"
+                />
               </div>
-
-              {/* Headline */}
-              <div className="mb-3">
-                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-[#A69282]">
-                  {locale === 'en' ? 'Headline' : '제목'}
-                </p>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={slide.headline}
-                    onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
-                    className="w-full rounded-xl border border-[#E6DFD5] bg-[#FDFBF7] px-3.5 py-2.5 text-sm font-black text-[#2C1E1A] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/10"
-                    autoFocus
-                  />
-                ) : (
-                  <p className="text-sm font-black leading-6 text-[#2C1E1A]">{slide.headline}</p>
-                )}
-              </div>
-
-              {/* Body */}
-              <div>
-                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-[#A69282]">
-                  {locale === 'en' ? 'Body' : '본문'}
-                </p>
-                {isEditing ? (
-                  <textarea
-                    value={slide.body}
-                    onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
-                    rows={3}
-                    className="w-full resize-none rounded-xl border border-[#E6DFD5] bg-[#FDFBF7] px-3.5 py-2.5 text-sm font-semibold leading-6 text-[#5C4E4B] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/10"
-                  />
-                ) : (
-                  <p className="text-sm font-semibold leading-6 text-[#5C4E4B] whitespace-pre-line">{slide.body}</p>
-                )}
+              <div className="pl-8">
+                <textarea
+                  value={slide.body}
+                  onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
+                  placeholder={locale === 'en' ? 'Body copy' : '본문'}
+                  rows={2}
+                  className="w-full resize-none bg-transparent text-xs font-medium leading-6 text-[#6B5D57] placeholder-[#C9B29F] outline-none border-b border-transparent focus:border-[#C9B29F] transition-colors"
+                />
               </div>
             </motion.div>
-          )
-        })}
+          ))}
+        </div>
 
         {/* Image attach */}
-        <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4 space-y-3">
+        <div className="mx-6 my-4 rounded-xl border border-[#E6DFD5] bg-white p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
-              <p className="text-[10px] text-[#8C7E7A] mt-0.5 font-semibold">{t('attach_image_desc')}</p>
+              <p className="text-[10px] text-[#8C7E7A] mt-0.5">{t('attach_image_desc')}</p>
             </div>
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-bold text-[#2C1E1A] transition-all hover:border-[#9E7D68] hover:bg-[#FFFDFB] shadow-sm">
               <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
