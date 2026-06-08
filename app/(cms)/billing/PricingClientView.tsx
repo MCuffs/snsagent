@@ -360,10 +360,9 @@ function PricingGrid({
                 </div>
 
                 <div className="space-y-3 border-t border-slate-100 py-6">
-                  <Feature>{t('feature_generation_count', { limit: formatLimit(plan.monthlyCardLimit) })}</Feature>
-                  <Feature>{t('feature_history_days', { days: plan.historyRetentionDays })}</Feature>
-                  <Feature>{t('feature_regen_campaign')}</Feature>
-                  <Feature>{t('feature_edit_ref')}</Feature>
+                  {(locale === 'en' ? plan.features_en : plan.features).map((feature, idx) => (
+                    <Feature key={idx}>{feature}</Feature>
+                  ))}
                 </div>
 
                 <div className="mt-6">

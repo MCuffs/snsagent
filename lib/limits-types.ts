@@ -16,6 +16,8 @@ export interface PlanFeature {
   description_en: string
   price: string
   price_en: string
+  features: string[]
+  features_en: string[]
 }
 
 export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
@@ -28,6 +30,16 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     description_en: 'Create your first 2 card news for free — no payment required.',
     price: '무료',
     price_en: 'Free',
+    features: [
+      '월 2회 카드뉴스 생성',
+      '30일 히스토리 보관',
+      '기본 편집 기능',
+    ],
+    features_en: [
+      '2 card news per month',
+      '30-day history retention',
+      'Basic editing tools',
+    ],
   },
   LITE: {
     name: 'AI 재생성 1회권',
@@ -38,6 +50,16 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     description_en: 'Add one AI background regeneration to your existing result.',
     price: '3,000원',
     price_en: '₩3,000',
+    features: [
+      'AI 재생성 1회',
+      '기존 결과물 개선',
+      '워터마크 제거',
+    ],
+    features_en: [
+      '1 AI regeneration',
+      'Improve existing results',
+      'Remove watermark',
+    ],
   },
   PRO: {
     name: 'Creator',
@@ -48,6 +70,20 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     description_en: 'For brands publishing content regularly — 20 card news per month.',
     price: '월 25,000원',
     price_en: '₩25,000 / mo',
+    features: [
+      '월 20회 카드뉴스 생성',
+      '90일 히스토리 보관',
+      '무제한 AI 재생성',
+      '참고 이미지 업로드',
+      '고급 편집 기능',
+    ],
+    features_en: [
+      '20 card news per month',
+      '90-day history retention',
+      'Unlimited AI regeneration',
+      'Reference image upload',
+      'Advanced editing tools',
+    ],
   },
   UNLIMITED: {
     name: 'Studio',
@@ -58,6 +94,22 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     description_en: 'For content teams running multiple campaigns — 30 card news per month.',
     price: '월 39,000원',
     price_en: '₩39,000 / mo',
+    features: [
+      '월 30회 카드뉴스 생성',
+      '365일 히스토리 보관',
+      '무제한 AI 재생성',
+      '참고 이미지 업로드',
+      '우선 지원',
+      '팀 협업 기능',
+    ],
+    features_en: [
+      '30 card news per month',
+      '365-day history retention',
+      'Unlimited AI regeneration',
+      'Reference image upload',
+      'Priority support',
+      'Team collaboration tools',
+    ],
   },
 }
 
