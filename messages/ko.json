@@ -133,9 +133,8 @@
     "feature_edit_ref": "참고 이미지 입력 및 결과 편집",
     "current_plan": "현재 플랜",
     "domestic_nicepay": "국내 카드 결제 (나이스페이)",
-    "nicepay_alt": "나이스페이로 결제",
-    "foreign_divider": "해외 고객",
-    "paypal_label": "PayPal 해외 결제",
+    "per_month": "/월",
+    "processing": "처리 중...",
     "paypal_error": "PayPal 결제 중 오류가 발생했습니다.",
     "paypal_activate_failed": "PayPal 구독 활성화에 실패했습니다.",
     "free_badge": "카드 등록 없음 · 2회 무료"

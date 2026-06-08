@@ -56,7 +56,10 @@ interface PricingClientViewProps {
 }
 
 export default function PricingClientView(props: PricingClientViewProps) {
-  if (!props.paypalClientId) return <PricingGrid {...props} />
+  if (!props.paypalClientId) {
+    // PayPal SDK won't load without clientId — hide PayPal buttons to avoid broken UI
+    return <PricingGrid {...props} paypalPlanIds={{}} />
+  }
 
   return (
     <PayPalScriptProvider
@@ -368,7 +371,7 @@ function PricingGrid({
                     {processingPayment === 'LITE' ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        처리 중...
+                        {t('processing')}
                       </>
                     ) : (
                       <>
@@ -418,7 +421,7 @@ function PricingGrid({
                   </div>
                   <div className="mt-6 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight text-slate-900">{plan.price}</span>
-                    <span className="text-sm text-slate-500">/월</span>
+                    <span className="text-sm text-slate-500">{t('per_month')}</span>
                   </div>
                 </div>
 
@@ -451,7 +454,7 @@ function PricingGrid({
                           {processingPayment === planKey ? (
                             <>
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              처리 중...
+                              {t('processing')}
                             </>
                           ) : (
                             <>
@@ -473,6 +476,9 @@ function PricingGrid({
                         onSuccess={() => router.refresh()}
                         onError={setError}
                       />
+                    )}
+                    {showPayPal && !paypalPlanId && (
+                      <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
                     {!showNicePay && !showPayPal && (
                       <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
