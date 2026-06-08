@@ -1,18 +1,19 @@
 import { getLLMClient, getTextGenerationModel } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
+import { buildAntiPatternRule, buildHeadlineStyleGuidance, buildBodyStyleGuidance } from '../../copywriting/copyStyleRules'
 import { repairRenderableCopy } from '../../copywriting/renderableCopy'
 import type { SlideCopy, SlideRole } from '../types'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
 
 const ROLE_SYSTEM_PROMPT: Partial<Record<SlideRole, string>> = {
-  hook:            '당신은 SNS 스크롤을 멈추게 하는 훅 카피 전문가입니다. 강렬한 호기심과 반전을 중심으로 쓰세요.',
-  problem:         '당신은 독자의 공감을 끌어내는 문제 제기 카피라이터입니다. 독자가 "맞아, 나도 그래"라고 느끼게 쓰세요.',
-  cause:           '당신은 문제의 숨겨진 원인을 드러내는 카피라이터입니다. 긴장감 있게 "왜"를 밝히세요.',
-  common_mistake:  '당신은 독자의 실수 패턴을 짚어내는 카피라이터입니다. "나도 이랬다"는 자기 인식을 유발하세요.',
-  product_solution:'당신은 통찰과 안도를 주는 해결책 카피라이터입니다. "이런 방법이 있었구나"의 감정을 만드세요.',
-  cta:             '당신은 독자를 즉각적인 행동으로 이끄는 전환 카피라이터입니다. 지금 당장 행동해야 하는 이유를 명확하게 제시하세요.',
+  hook:            '당신은 SNS 스크롤을 멈추게 하는 훅 카피 전문가입니다. 강렬한 호기심과 반전을 중심으로 쓰세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요.',
+  problem:         '당신은 독자의 공감을 끌어내는 문제 제기 카피라이터입니다. 독자가 "맞아, 나도 그래"라고 느끼게 쓰세요. 구체적 상황과 통찰로 접근하세요.',
+  cause:           '당신은 문제의 숨겨진 원인을 드러내는 카피라이터입니다. 긴장감 있게 "왜"를 밝히세요. 정보 나열이 아니라 통찰을 전달하세요.',
+  common_mistake:  '당신은 독자의 실수 패턴을 짚어내는 카피라이터입니다. "나도 이랬다"는 자기 인식을 유발하세요. 구체적 상황을 묘사하세요.',
+  product_solution:'당신은 통찰과 안도를 주는 해결책 카피라이터입니다. "이런 방법이 있었구나"의 감정을 만드세요. 제품 설명이 아니라 삶의 변화를 보여주세요.',
+  cta:             '당신은 독자를 즉각적인 행동으로 이끄는 전환 카피라이터입니다. "저장해두세요" 같은 클리셰 대신 새로운 행동 동기를 만드세요.',
 }
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -73,13 +74,20 @@ ${brandDnaSection}
 
 ${knowledgeSection}
 
+${buildHeadlineStyleGuidance('ko')}
+
+${buildBodyStyleGuidance('ko')}
+
+${buildAntiPatternRule('ko')}
+
 규칙:
-- headline: 25자 이하 (공백 포함) — 강렬하고 구체적으로
-- body: 220자 이하 (공백 포함) — 핵심 정보를 1~4문장으로 풍성하게 작성. 너무 짧으면 안 됨
+- headline: 25자 이하 (공백 포함) — 강렬하고 구체적으로. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
+- body: 220자 이하 (공백 포함) — 핵심 정보를 1~4문장으로 풍성하게 작성. 에디토리얼 톤으로 날카롭게
+- body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체("~잖아요", "~라고요?")도 피하세요
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하로 반드시 작성' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로 사용` : ''}
-- 이전 슬라이드와 같은 키워드·메시지를 반복하지 마세요
+- 이전 슬라이드와 같은 키워드·메시지를 반복하지 마세요. 같은 문장 구조도 반복하지 마세요
 - 확인할 수 없는 수치·인증·할인율·순위를 만들지 마세요
 - 스마트스토어, 쿠팡, 네이버쇼핑 등 플랫폼명을 쓰지 마세요
 - 타겟 고객 설명 문장을 body에 직접 쓰지 마세요

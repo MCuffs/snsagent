@@ -1,6 +1,7 @@
 import { getLLMClient, getTextGenerationModel } from '../../ai/llmClient'
 import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { formatKnowledgeContextForPrompt } from '../../copywriting/copyKnowledgeBase'
+import { buildAntiPatternRule, buildHeadlineStyleGuidance, buildBodyStyleGuidance } from '../../copywriting/copyStyleRules'
 import { repairRenderableCopy } from '../../copywriting/renderableCopy'
 import type { NarrativeMemory, CompletedSlide } from '../narrativeMemory'
 import { appendCompletedSlide } from '../narrativeMemory'
@@ -48,13 +49,21 @@ ${brandDnaSection}
 ${knowledgeSection}
 
 문제: 이전 슬라이드와 서사가 끊기거나 메시지가 반복되었습니다. 이를 개선하세요.
+
+${buildHeadlineStyleGuidance('ko')}
+
+${buildBodyStyleGuidance('ko')}
+
+${buildAntiPatternRule('ko')}
+
 규칙:
-- headline: 25자 이하
-- body: 220자 이하 — 정보를 풍성하게 1~4문장으로
+- headline: 25자 이하. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
+- body: 220자 이하 — 정보를 풍성하게 1~4문장으로. 뉴스 요약이 아니라 대화체로
+- body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하 필수' : 'null'}
 ${isHook ? `- headline은 반드시 "${memory.selectedHook.text}" 그대로` : ''}
-- 이전 슬라이드 메시지 반복 금지
+- 이전 슬라이드 메시지 반복 금지. 같은 문장 구조도 반복 금지
 - 확인되지 않은 수치 금지
 
 JSON만 응답:

@@ -37,6 +37,21 @@ export async function renderEditorialDocument(
 
 function buildSvg(document: EditorialDocument, backgroundData: string, stickerImageData: Map<string, string> = new Map()) {
   const visible = document.layers.filter(layer => layer.visible).sort((a, b) => a.zIndex - b.zIndex)
+  // Collect unique blur/edgeFade values from sticker layers for SVG filter defs
+  const stickerBlurDefs = visible
+    .filter(layer => layer.type === 'sticker' && layer.id !== 'sticker' && layer.blur)
+    .map(layer => `    <filter id="blur-${layer.id}"><feGaussianBlur stdDeviation="${layer.blur}"/></filter>`)
+    .join('\n')
+  // Edge fade: 4-directional linear gradients in SVG mask
+  const stickerMaskDefs = visible
+    .filter(layer => layer.type === 'sticker' && layer.id !== 'sticker' && (layer.edgeFade ?? 0) > 0)
+    .map(layer => {
+      const fade = layer.edgeFade! / 100
+      return `    <linearGradient id="fade-h-${layer.id}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="white" stop-opacity="0"/><stop offset="${fade}" stop-color="white" stop-opacity="1"/><stop offset="${1 - fade}" stop-color="white" stop-opacity="1"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>
+    <linearGradient id="fade-v-${layer.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0"/><stop offset="${fade}" stop-color="white" stop-opacity="1"/><stop offset="${1 - fade}" stop-color="white" stop-opacity="1"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>
+    <mask id="fade-${layer.id}" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#fade-h-${layer.id})"/><rect width="1" height="1" fill="url(#fade-v-${layer.id})" style="mix-blend-mode:multiply"/></mask>`
+    })
+    .join('\n')
   const content = visible.map(layer => renderLayer(layer, document, backgroundData, stickerImageData)).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
@@ -44,6 +59,8 @@ function buildSvg(document: EditorialDocument, backgroundData: string, stickerIm
     <filter id="editor-bg"><feGaussianBlur stdDeviation="${document.overlay.blur}"/><feComponentTransfer><feFuncR type="linear" slope="${document.overlay.contrast / 100}"/><feFuncG type="linear" slope="${document.overlay.contrast / 100}"/><feFuncB type="linear" slope="${document.overlay.contrast / 100}"/></feComponentTransfer></filter>
     <filter id="editor-text-shadow"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.48"/></filter>
     <filter id="editor-grain"><feTurbulence baseFrequency="0.52" numOctaves="3" seed="12"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .32 0"/></filter>
+${stickerBlurDefs}
+${stickerMaskDefs}
     <radialGradient id="editor-vignette"><stop offset="45%" stop-color="#000000" stop-opacity="0"/><stop offset="100%" stop-color="#000000" stop-opacity="${document.overlay.vignette / 100}"/></radialGradient>
     <linearGradient id="editor-darkness" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${document.overlay.colorFilter}" stop-opacity="${document.overlay.darkness / 250}"/><stop offset="1" stop-color="#050507" stop-opacity="${document.overlay.darkness / 100}"/></linearGradient>
   </defs>
@@ -68,7 +85,10 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
     const cx = layer.x + layer.width / 2
     const cy = layer.y + layer.height / 2
     const scale = layer.scale || 1
-    return `<image href="${escapeXml(imageData)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}" transform="rotate(${layer.rotation || 0} ${cx} ${cy}) scale(${scale} ${scale} ${cx} ${cy})"/>`
+    const transform = `rotate(${layer.rotation || 0} ${cx} ${cy}) scale(${scale} ${scale})`
+    const blurAttr = layer.blur ? ` filter="url(#blur-${layer.id})"` : ''
+    const maskAttr = (layer.edgeFade ?? 0) > 0 ? ` mask="url(#fade-${layer.id})"` : ''
+    return `<image href="${escapeXml(imageData)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}" transform="${transform}"${blurAttr}${maskAttr}/>`
   }
   if (!layer.text) return ''
   const fontFamily = fontFamilyForPreset(layer.fontPreset)

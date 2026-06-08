@@ -17,6 +17,7 @@ import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligen
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
+import { buildAntiPatternRule, buildHeadlineStyleGuidance, buildBodyStyleGuidance } from '../copywriting/copyStyleRules'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -575,13 +576,13 @@ async function generateMediaSlideCopies(
 
   const systemPrompt = isEnglish
     ? (isGeneral
-      ? 'You are an English editorial carousel writer in the style of The Verge, Axios, or Morning Brew. Write punchy, specific, journalist-quality card news copy. Each slide = one sharp insight, not a paragraph. Reflect actual article angles when real-time news context is provided. Return valid JSON only.'
+      ? 'You are an English editorial carousel writer in the style of The Verge, Axios, or Morning Brew. Write punchy, specific, journalist-quality card news copy. Each slide = one sharp insight, not a paragraph. Reflect actual article angles when real-time news context is provided. Talk TO the reader, not AT them. Return valid JSON only.'
       : 'You are an English Instagram carousel copywriter in the style of Morning Brew or The Hustle. Write native, punchy, editorial social copy. Headline = 4–7 words, one bold thesis. Body = 1–2 complete sentences, specific insight only. Do not invent unverified claims. Return valid JSON only.')
     : (isGeneral
-      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 기사/사실 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
+      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 뉴스 앵커처럼 정보를 전달하지 마세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. "보도에 따르면", "발표에 따르면" 같은 번역투는 절대 금지입니다. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
       : (knowledgeCtx
-        ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
-        : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요.'))
+        ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
+        : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요. 에디토리얼 톤을 유지하세요.'))
 
   const languageRule = isEnglish
     ? 'Write every headline, body, caption, and hashtag in natural English only. Do not use Korean in any field.'
@@ -630,14 +631,21 @@ ${sourceMaterial || 'No additional source material.'}
 Slide structure:
 ${slideDescriptions}
 
+${buildHeadlineStyleGuidance('en')}
+
+${buildBodyStyleGuidance('en')}
+
+${buildAntiPatternRule('en')}
+
 Rules:
-- headline: max 40 characters (including spaces). Bold thesis statement, 4–7 words. No numbering like "1.", "2.".
+- headline: max 40 characters (including spaces). Bold thesis statement, 4–7 words. No numbering like "1.", "2.". No summary labels like "at a glance" or "here's what to know".
 - body: 1–2 complete sentences, 60–120 characters. One specific insight per slide — no vague filler.
+- Vary sentence structure across slides. Don't end every sentence the same way.
 - body must end with a complete sentence. Never cut mid-thought or mid-clause.
 - Each slide adds one new angle. Do not repeat information from previous slides.
 - hook slide: grab attention immediately with a counterintuitive or surprising angle.
 - stat slide: use only numbers from the provided source material.
-- save-cta / summary slide: wrap the key insight and include one clear action (save, share, swipe, check).
+- save-cta / summary slide: wrap the key insight and include one clear action — but avoid cliché "save this for later" framing.
 - Do not invent stats, rankings, endorsements, or effects not in the source material.
 - Avoid vague filler phrases like "a key consideration", "an important factor", "in today's world".
 - Do not write internal planning tokens (guiding question, STORY ONTOLOGY, visualDirection, etc.) in card copy.
@@ -675,9 +683,16 @@ ${sourceMaterial || '추가 자료 없음'}
 슬라이드 구성:
 ${slideDescriptions}
 
+${buildHeadlineStyleGuidance('ko')}
+
+${buildBodyStyleGuidance('ko')}
+
+${buildAntiPatternRule('ko')}
+
 규칙:
-- headline: 24자 이하, 강렬하고 구체적 (공백 포함). "1.", "2." 같은 숫자 번호로 시작하지 마세요.
+- headline: 24자 이하, 강렬하고 구체적 (공백 포함). "1.", "2." 같은 숫자 번호로 시작하지 마세요. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
 - body: 일반 슬라이드는 80~150자, 마무리 슬라이드는 70~120자 권장. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
+- body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체("~잖아요", "~라고요?")도 피하세요. 에디토리얼 톤을 유지하면서 문장 구조를 다양하게 하세요.
 - body는 글자수를 억지로 줄이기보다 의미 있는 정보량을 우선하세요. 단, 한 슬라이드에 수치가 너무 많아지면 읽기 어려우므로 핵심 수치 1~2개만 선택하세요.
 - body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
 - DOMAIN GUIDANCE는 참고하되, 상품 맥락에 맞는 표현만 자연스럽게 사용하세요.
@@ -822,8 +837,9 @@ Rewrite rules:
 - Do not end with an open setup such as "because", "the reason is", "more", or a dangling comparison.
 - Each slide must add a concrete fact, reason, use case, caution, or action — one sharp insight per slide.
 - Never include unrelated news, stock, politics, or trend information unless the user topic explicitly asks for it.
-- Keep headline under 40 characters. Never start with a number like "1.", "2.", etc.
+- Keep headline under 40 characters. Never start with a number like "1.", "2.", etc. No summary labels.
 - Body should normally be 60-120 characters (1-2 complete sentences). Avoid vague filler phrases.
+- Vary sentence endings — don't repeat the same grammatical pattern across slides.
 - Do not use planning tokens or internal terms in card copy.
 - Write all output in English. No Korean characters anywhere.
 
@@ -856,6 +872,8 @@ body: ${slide.body}
 - 본문은 단순히 문장처럼 끝나는 것이 아니라, 독자가 이해할 수 있는 하나의 의미를 완성해야 합니다.
 - 문제 제기만 하고 결론을 빼거나, "이유는", "핵심은", "더"처럼 열린 생각으로 끝내지 마세요.
 - 각 슬라이드 역할에 맞게 관찰, 해석, 구체적 의미, 다음 행동 중 하나를 반드시 완성하세요.
+- 뉴스 앵커처럼 정보를 전달하지 마세요. "보도에 따르면", "발표에 따르면" 같은 번역투 금지.
+- 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체도 피하세요. 에디토리얼 톤을 유지하세요.
 - 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
 - headline은 필요할 때만 다듬고 25자 이하로 유지하세요. "1.", "2." 같은 숫자 번호로 시작하지 마세요.
 - body는 일반 슬라이드 80~150자, 마무리 슬라이드 70~120자를 권장합니다. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.

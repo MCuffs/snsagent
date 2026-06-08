@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Agent(Explore)"
+      "Agent(Explore)",
+      "Bash(git add *)"
     ]
   },
   "$version": 4
