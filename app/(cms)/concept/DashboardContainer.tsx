@@ -11,6 +11,7 @@ import PainterDashboard from '../painter/PainterDashboard'
 import InstagramDashboard from '../instagram/InstagramDashboard'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import { CheckCircle2, Globe, TrendingUp } from 'lucide-react'
 
 // Instagram 기능 테스트용 허용 이메일
 const INSTAGRAM_ALLOWED_EMAILS = ['alstnwjd0424@gmail.com']
@@ -64,13 +65,14 @@ export default function DashboardContainer({
   const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
 
-  const [subTab, setSubTab] = useState<'brand' | 'general'>(() => {
-    // URL에 general profile의 brandId가 있으면 general 탭으로 시작
+  // null = 선택 화면, 'brand' = URL 프로필 폼, 'general' = 시사/트렌드 폼
+  const [subProfile, setSubProfile] = useState<'brand' | 'general' | null>(() => {
+    // URL에 general profile의 brandId가 있으면 general 폼으로 바로 진입
     if (urlBrandId && existingGeneralProfile && urlBrandId === existingGeneralProfile.id) return 'general'
-    // 브랜드 프로필이 있으면 brand 탭
-    if (existingBrand) return 'brand'
-    // 신규 유저 또는 general 프로필만 있는 경우 → general(시사/정보) 탭 먼저
-    return 'general'
+    // URL에 brand ID가 있으면 brand 폼으로 바로 진입
+    if (urlBrandId && existingBrand && urlBrandId === existingBrand.id) return 'brand'
+    // 선택 화면 표시
+    return null
   })
 
   const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || generalProfile
@@ -99,7 +101,6 @@ export default function DashboardContainer({
     } else if (existingBrand && activeBrandId === existingBrand.id) {
       brandToPass = existingBrand
     } else {
-      // urlBrandId가 어느 쪽도 매칭 안 되면 두 프로필 중 존재하는 것 사용
       brandToPass = existingBrand || generalProfile
     }
   } else {
@@ -110,36 +111,28 @@ export default function DashboardContainer({
     <div className="h-full">
       {activeTab === 'concept' && (
         <div className="flex h-full flex-col">
-          {/* Sub-tab Switcher */}
-          <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0 flex items-center justify-between">
-            <div className="flex gap-2">
+          {subProfile !== null && (
+            <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0">
               <button
                 type="button"
-                onClick={() => setSubTab('brand')}
-                className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                  subTab === 'brand'
-                    ? 'bg-[#111111] text-white shadow-sm'
-                    : 'text-[#71717a] hover:bg-[#fafafa] hover:text-[#111111]'
-                }`}
+                onClick={() => setSubProfile(null)}
+                className="text-xs font-medium text-[#71717a] hover:text-[#111111] transition-colors"
               >
-                {t('tab_brand')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSubTab('general')}
-                className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                  subTab === 'general'
-                    ? 'bg-[#111111] text-white shadow-sm'
-                    : 'text-[#71717a] hover:bg-[#fafafa] hover:text-[#111111]'
-                }`}
-              >
-                {t('tab_general')}
+                ← {subProfile === 'brand' ? t('select_url_title') : t('select_general_title')}
               </button>
             </div>
-          </div>
+          )}
 
           <div className="flex-1 overflow-hidden">
-            {subTab === 'brand' ? (
+            {subProfile === null && (
+              <ProfileSelectScreen
+                hasUrlProfile={existingBrand && Boolean(existingBrand.websiteUrl) ? true : false}
+                hasGeneralProfile={Boolean(generalProfile)}
+                onSelect={setSubProfile}
+              />
+            )}
+
+            {subProfile === 'brand' && (
               <motion.div
                 key="brand-profile"
                 initial={{ opacity: 0, y: 10 }}
@@ -149,7 +142,9 @@ export default function DashboardContainer({
               >
                 <ConceptForm existingBrand={existingBrand} />
               </motion.div>
-            ) : (
+            )}
+
+            {subProfile === 'general' && (
               <motion.div
                 key="general-profile"
                 initial={{ opacity: 0, y: 10 }}
@@ -231,6 +226,75 @@ export default function DashboardContainer({
         </motion.div>
       )}
     </div>
+  )
+}
+
+function ProfileSelectScreen({
+  hasUrlProfile,
+  hasGeneralProfile,
+  onSelect,
+}: {
+  hasUrlProfile: boolean
+  hasGeneralProfile: boolean
+  onSelect: (type: 'brand' | 'general') => void
+}) {
+  const t = useTranslations('concept')
+
+  const cards = [
+    {
+      key: 'brand' as const,
+      icon: Globe,
+      title: t('select_url_title'),
+      desc: t('select_url_desc'),
+      complete: hasUrlProfile,
+    },
+    {
+      key: 'general' as const,
+      icon: TrendingUp,
+      title: t('select_general_title'),
+      desc: t('select_general_desc'),
+      complete: hasGeneralProfile,
+    },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="flex h-full flex-col items-center justify-center px-6 py-16"
+    >
+      <div className="w-full max-w-lg">
+        <div className="mb-10 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">{t('select_title')}</h1>
+          <p className="mt-2 text-sm text-[#71717a]">{t('select_desc')}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {cards.map(({ key, icon: Icon, title, desc, complete }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelect(key)}
+              className="group relative flex flex-col items-start gap-4 rounded-2xl border border-[#e4e4e7] bg-white p-6 text-left shadow-sm transition-all hover:border-[#111111] hover:shadow-md active:scale-[0.98]"
+            >
+              {complete && (
+                <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {t('profile_complete')}
+                </span>
+              )}
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4f4f5] transition-colors group-hover:bg-[#111111]">
+                <Icon className="h-5 w-5 text-[#71717a] transition-colors group-hover:text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#111111]">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-[#71717a]">{desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
