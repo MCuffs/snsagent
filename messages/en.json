@@ -12,9 +12,9 @@
   },
   "landing": {
     "badge": "AI Editorial Studio for Brands",
-    "hero_title": "Card news,\nfaster and smarter.",
-    "hero_desc": "Just enter your brand URL — Shuffla plans, writes, and visualizes your social card news,\nready to edit and download instantly.",
-    "cta_start": "Start for free",
+    "hero_title": "5 card news slides\nfrom one URL",
+    "hero_desc": "Enter your brand URL and topic — AI plans, writes, and visualizes your card news.\nReady to edit and download instantly. 2 free generations included.",
+    "cta_start": "Start free — no card needed",
     "cta_continue": "Continue working",
     "cta_view_product": "See product",
     "feature_brand": "Brand analysis",
@@ -74,7 +74,8 @@
     "export_png": "Export PNG",
     "export_done": "PNG export complete",
     "bg_hint": "Adjust brightness and color to improve text legibility.",
-    "effect_hint": "Add grain and contrast to complete the editorial mood."
+    "effect_hint": "Add grain and contrast to complete the editorial mood.",
+    "cta_free_hint": "No credit card · 2 free generations included"
   },
   "footer": {
     "tagline": "AI editorial studio that understands your brand and creates card news.",
@@ -93,7 +94,7 @@
     "eyebrow": "Pricing",
     "title": "Choose the plan that fits you",
     "desc": "Start free, upgrade as you grow.",
-    "free_tagline": "Try it out",
+    "free_tagline": "Try it free now",
     "pro_tagline": "Brand operations",
     "unlimited_tagline": "Content team",
     "free_cta": "Start for free",
@@ -136,7 +137,8 @@
     "paypal_label": "PayPal international",
     "paypal_error": "An error occurred during PayPal payment.",
     "paypal_activate_failed": "Failed to activate PayPal subscription.",
-    "payment_canceled": "Payment was canceled."
+    "payment_canceled": "Payment was canceled.",
+    "free_badge": "No card required · 2 free"
   },
   "login": {
     "title": "Start creating\ncard news right away",
@@ -148,7 +150,8 @@
     "name_placeholder": "e.g. Daily Mocha",
     "email_cta": "Start with email",
     "demo_cta": "Enter with demo account",
-    "back_home": "Back to home"
+    "back_home": "Back to home",
+    "trust_hint": "No payment info required · 2 free card news instantly · Cancel anytime"
   },
   "cms": {
     "nav_concept": "Concept",

@@ -123,6 +123,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       tagline: t('free_tagline'),
       price: isEn ? PRICING_PLANS.FREE.price_en : PRICING_PLANS.FREE.price,
       desc: isEn ? PRICING_PLANS.FREE.description_en : PRICING_PLANS.FREE.description,
+      badge: t('free_badge'),
       cta: t('free_cta'),
       features: isEn
         ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'AI regeneration not included']
@@ -202,6 +203,11 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   <h3 className={`mt-3 text-[24px] font-black tracking-[-0.025em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                     {plan.name}
                   </h3>
+                  {'badge' in plan && plan.badge && (
+                    <span className="mt-2 inline-block rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                      ✓ {plan.badge}
+                    </span>
+                  )}
                   <p className={`mt-2 text-[13px] leading-[1.5] min-h-[40px] ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                     {plan.desc}
                   </p>

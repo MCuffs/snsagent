@@ -135,7 +135,10 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
               {t('cta_view_product')}
             </a>
           </div>
-          <div className="mt-8 flex flex-wrap justify-center gap-x-7 gap-y-2 text-xs text-[#857e73]">
+          {!authenticated && (
+            <p className="mt-4 text-xs text-[#a89e94]">{t('cta_free_hint')}</p>
+          )}
+          <div className="mt-6 flex flex-wrap justify-center gap-x-7 gap-y-2 text-xs text-[#857e73]">
             {[t('feature_brand'), t('feature_ai'), t('feature_download')].map(item => (
               <span key={item} className="inline-flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-[#ed6238]" />

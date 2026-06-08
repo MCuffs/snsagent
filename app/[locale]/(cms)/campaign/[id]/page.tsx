@@ -15,7 +15,7 @@ export default async function CampaignDetailsPage({
 }) {
   const { locale, id } = await params
   const user = await getSessionUser()
-  if (!user) redirect(`/${locale}/login`)
+  if (!user) redirect(`/${locale}/login?from=campaign`)
 
   const campaign = await dbService.getCampaign(id)
   if (!campaign || campaign.userId !== user.id) redirect(`/${locale}/concept?tab=works`)
