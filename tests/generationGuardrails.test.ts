@@ -67,3 +67,37 @@ test('semantic guard blocks broken Korean bodies and off-topic sensational hooks
   assert.ok(report.issues.some(issue => issue.slideNumber === 2 && issue.severity === 'block'))
   assert.ok(report.issues.some(issue => issue.slideNumber === 3 && issue.severity === 'block'))
 })
+
+test('semantic guard blocks dangling Korean particles from failed diet carousel copy', () => {
+  const topic = '연예인 식단 트렌드를 일반인 기준으로 쉽게 풀어 실전 적용 포인트를 전달'
+  const report = evaluateSemanticCopy({
+    topic,
+    language: 'ko',
+    domainProfile: getDomainProfileForText(topic),
+    slides: [
+      {
+        slideNumber: 1,
+        role: 'hook',
+        headline: '연예인 식단, 일반인은 이렇게 봐야 합니다',
+        body: '그런데 은 촬영 전 관리법을 그대로 따라 하면 식사 리듬이 쉽게 무너집니다.',
+      },
+      {
+        slideNumber: 2,
+        role: 'detail',
+        headline: 'SNS에서 뜨는 식단을 볼 때',
+        body: 'SNS에서 1. 이 뜨는 이유보다 내 생활에서 반복 가능한 식사 기준을 먼저 봐야 합니다.',
+      },
+      {
+        slideNumber: 3,
+        role: 'detail',
+        headline: '따라 하기 전 확인할 점',
+        body: '을 볼 때는 연예인 식단의 목적과 일반인의 하루 활동량 차이를 먼저 확인해야 합니다.',
+      },
+    ],
+  })
+
+  assert.equal(report.passed, false)
+  assert.ok(report.issues.some(issue => issue.slideNumber === 1 && issue.severity === 'block'))
+  assert.ok(report.issues.some(issue => issue.slideNumber === 2 && issue.severity === 'block'))
+  assert.ok(report.issues.some(issue => issue.slideNumber === 3 && issue.severity === 'block'))
+})

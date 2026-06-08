@@ -171,7 +171,7 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (language === 'ko' && (hasBrokenKoreanParticle(body) || hasBrokenKoreanParticle(slide.headline))) {
+    if (language === 'ko' && (hasBrokenKoreanParticle(body) || hasBrokenKoreanParticle(slide.headline) || hasDanglingKoreanParticle(body) || hasDanglingKoreanParticle(slide.headline))) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
@@ -292,6 +292,13 @@ function hasBrokenKoreanParticle(value: string) {
   return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
     /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
     /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
+}
+
+function hasDanglingKoreanParticle(value: string) {
+  const normalized = value.trim()
+  return /(?:그런데|하지만|그리고|또한|그래서|반면|다만|SNS에서|온라인에서)\s+\d*\.?\s*(?:은|는|이|가|을|를|도|만)\b/u.test(normalized) ||
+    /\b\d+\.\s*(?:은|는|이|가|을|를|도|만)\b/u.test(normalized) ||
+    /(?:^|[.!?。！？]\s*)(?:은|는|이|가|을|를|도|만)\s+\S+/u.test(normalized)
 }
 
 function startsWithDanglingKoreanParticle(value: string) {

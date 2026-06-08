@@ -23,11 +23,12 @@ const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search'
 const cache = new Map<string, string>()
 
 export class PexelsImageProvider implements ImageProvider {
-  private fallback?: ImageProvider
-  private apiKey?: string
+  private apiKey: string
 
-  constructor(fallback?: ImageProvider, apiKey = process.env.PEXELS_API_KEY) {
-    this.fallback = fallback
+  constructor(apiKey = process.env.PEXELS_API_KEY) {
+    if (!apiKey) {
+      throw new Error('PEXELS_API_KEY is not configured. Image generation providers are disabled; configure Pexels before creating carousel images.')
+    }
     this.apiKey = apiKey
   }
 
@@ -35,28 +36,18 @@ export class PexelsImageProvider implements ImageProvider {
     prompt: string,
     options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
-    if (this.apiKey) {
-      const query = buildPexelsSearchQuery(prompt)
-      const cacheKey = `${query}:${options?.size || ''}`
-      const cached = cache.get(cacheKey)
-      if (cached) return { imageUrl: cached }
+    const query = buildPexelsSearchQuery(prompt)
+    const cacheKey = `${query}:${options?.size || ''}`
+    const cached = cache.get(cacheKey)
+    if (cached) return { imageUrl: cached }
 
-      try {
-        const imageUrl = await searchPexels(query, this.apiKey)
-        if (imageUrl) {
-          cache.set(cacheKey, imageUrl)
-          return { imageUrl }
-        }
-      } catch (error) {
-        console.warn('[PexelsImageProvider] Pexels search failed', error)
-      }
+    const imageUrl = await searchPexels(query, this.apiKey)
+    if (imageUrl) {
+      cache.set(cacheKey, imageUrl)
+      return { imageUrl }
     }
 
-    if (this.fallback) {
-      return this.fallback.generateImage(prompt, options)
-    }
-
-    throw new Error('No Pexels image was found and no fallback image provider is configured.')
+    throw new Error(`No usable Pexels image was found for query "${query}". Image generation fallback is disabled.`)
   }
 }
 

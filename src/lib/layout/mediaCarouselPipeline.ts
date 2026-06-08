@@ -407,19 +407,75 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       timestamp: new Date().toISOString(),
     })
   }
-  const qualityPassed = qualityRes.passed && editorialQuality.passed
+  const semanticQuality = evaluateSemanticCopy({
+    topic: input.topic,
+    language: input.language,
+    domainProfile,
+    slides: slides.map(slide => ({
+      slideNumber: slide.slideNumber,
+      role: slide.role,
+      headline: slide.headline,
+      body: slide.body,
+    })),
+  })
+  for (const issue of semanticQuality.issues) {
+    agentReportLogs.push({
+      agentName: 'SemanticCopyGuard',
+      role: 'final-copy-quality',
+      status: issue.severity === 'block' ? 'error' : 'warn',
+      message: `Slide ${issue.slideNumber}: ${issue.message}`,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  if (!semanticQuality.passed) {
+    const failedSlides = semanticQuality.issues
+      .filter(issue => issue.severity === 'block')
+      .map(issue => `slide ${issue.slideNumber}: ${issue.message}`)
+      .join('; ')
+    throw new Error(`Generated carousel copy failed the final semantic quality guard and was not saved. ${failedSlides}`)
+  }
+
+  const slideQualityIssues = slides.flatMap(slide =>
+    slide.qualityCheck.issues.map(issue => ({
+      severity: 'warn' as const,
+      dimension: 'rendered-card',
+      slideNumber: slide.slideNumber,
+      message: issue,
+    }))
+  )
+  const semanticIssues = semanticQuality.issues.map(issue => ({
+    severity: issue.severity,
+    dimension: 'semantic-copy',
+    slideNumber: issue.slideNumber,
+    message: issue.message,
+  }))
+  const combinedQualityIssues = [
+    ...editorialQuality.issues,
+    ...semanticIssues,
+    ...slideQualityIssues,
+  ]
+  const semanticScore = calculateSemanticQualityScore(semanticQuality)
+  const slideQualityScore = calculateSlideQualityScore(slideQualityIssues.length)
+  const finalQualityScore = Math.min(qualityRes.score, editorialQuality.score, semanticScore, slideQualityScore)
+  const qualityPassed = qualityRes.passed &&
+    editorialQuality.passed &&
+    semanticQuality.passed &&
+    slides.every(slide => slide.qualityCheck.passed)
 
   const agentReport: AgentReport & {
     editorialPlan: EditorialDirectorPlan
     editorialValidation: EditorialQualityReport
+    semanticValidation: typeof semanticQuality
     groundingSources?: Array<{ title: string; provider?: string; url: string }>
   } = {
     timestamp: new Date().toISOString(),
     status: qualityPassed ? 'passed' : 'needs_review',
-    score: Math.min(qualityRes.score, editorialQuality.score),
+    score: finalQualityScore,
     logs: agentReportLogs,
     editorialPlan,
     editorialValidation: editorialQuality,
+    semanticValidation: semanticQuality,
     groundingSources: extractGroundingSources(input.keyContent),
   }
 
@@ -460,13 +516,13 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     dbService.createQualityScoreLog({
       campaignId: campaign.id,
       userId: input.userId,
-      passed: editorialQuality.passed,
-      score: editorialQuality.score,
-      narrativeFlowScore: editorialQuality.narrativeFlowScore,
+      passed: qualityPassed,
+      score: finalQualityScore,
+      narrativeFlowScore: Math.min(editorialQuality.narrativeFlowScore, semanticScore),
       personaFitScore: editorialQuality.personaFitScore,
       hookPatternScore: editorialQuality.hookPatternScore,
-      issueCount: editorialQuality.issues.length,
-      issuesJson: JSON.stringify(editorialQuality.issues),
+      issueCount: combinedQualityIssues.length,
+      issuesJson: JSON.stringify(combinedQualityIssues),
       hookPatternUsed: knowledgeCtx.selectedHookPatterns[0]?.id,
       personaUsed: knowledgeCtx.personaProfile.id,
       industryUsed: knowledgeCtx.industryToneRule?.industry,
@@ -497,6 +553,20 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     hashtags: buildHashtags(input),
     qualityCheck,
   }
+}
+
+function calculateSemanticQualityScore(report: ReturnType<typeof evaluateSemanticCopy>) {
+  const blockCount = report.issues.filter(issue => issue.severity === 'block').length
+  const warnCount = report.issues.filter(issue => issue.severity === 'warn').length
+  return clampQualityScore(100 - blockCount * 30 - warnCount * 10)
+}
+
+function calculateSlideQualityScore(issueCount: number) {
+  return clampQualityScore(100 - issueCount * 10)
+}
+
+function clampQualityScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function hasExternalGrounding(value: string) {
