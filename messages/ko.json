@@ -12,9 +12,9 @@
   },
   "landing": {
     "badge": "AI Editorial Studio for Brands",
-    "hero_title": "카드뉴스를\n더 정확하게, 빠르게.",
-    "hero_desc": "브랜드 URL만 입력하면 SNS 카드뉴스의 기획, 카피, 비주얼을 만들고,\n바로 편집하고 다운로드할 수 있는 AI 콘텐츠 스튜디오입니다.",
-    "cta_start": "무료로 시작하기",
+    "hero_title": "URL 하나로\n카드뉴스 5장 완성",
+    "hero_desc": "브랜드 URL과 주제만 입력하면 AI가 기획·카피·이미지를 만들고\n바로 편집·다운로드까지 — 무료 2회 포함, 카드 등록 없음.",
+    "cta_start": "지금 무료로 시작하기",
     "cta_continue": "작업 계속하기",
     "cta_view_product": "제품 화면 보기",
     "feature_brand": "브랜드 분석",
@@ -74,7 +74,8 @@
     "export_png": "PNG 내보내기",
     "export_done": "PNG 내보내기 완료",
     "bg_hint": "밝기와 색감을 조정해 텍스트 가독성을 확보합니다.",
-    "effect_hint": "그레인과 대비를 조정해 에디토리얼 무드를 완성합니다."
+    "effect_hint": "그레인과 대비를 조정해 에디토리얼 무드를 완성합니다.",
+    "cta_free_hint": "신용카드 불필요 · 무료 2회 포함"
   },
   "footer": {
     "tagline": "브랜드를 이해하고 카드뉴스를 제작하는 AI editorial studio.",
@@ -93,7 +94,7 @@
     "eyebrow": "Pricing",
     "title": "목적에 맞는 플랜을 선택하세요",
     "desc": "무료로 시작하고, 운영 규모에 맞게 업그레이드하세요.",
-    "free_tagline": "체험 시작",
+    "free_tagline": "지금 바로 무료 체험",
     "pro_tagline": "브랜드 운영",
     "unlimited_tagline": "콘텐츠 팀",
     "free_cta": "무료로 시작하기",
@@ -136,7 +137,8 @@
     "foreign_divider": "해외 고객",
     "paypal_label": "PayPal 해외 결제",
     "paypal_error": "PayPal 결제 중 오류가 발생했습니다.",
-    "paypal_activate_failed": "PayPal 구독 활성화에 실패했습니다."
+    "paypal_activate_failed": "PayPal 구독 활성화에 실패했습니다.",
+    "free_badge": "카드 등록 없음 · 2회 무료"
   },
   "login": {
     "title": "카드뉴스 제작을\n바로 시작하세요",
@@ -148,7 +150,8 @@
     "name_placeholder": "예: Daily Mocha",
     "email_cta": "이메일로 시작하기",
     "demo_cta": "데모 계정으로 입장",
-    "back_home": "메인으로"
+    "back_home": "메인으로",
+    "trust_hint": "결제 정보 없이 가입 · 무료 2회 카드뉴스 즉시 생성 · 언제든 탈퇴 가능"
   },
   "cms": {
     "nav_concept": "Concept",

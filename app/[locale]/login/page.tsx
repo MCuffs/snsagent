@@ -36,7 +36,7 @@ export default async function LoginPage({
   searchParams,
   params,
 }: {
-  searchParams?: Promise<{ error?: string }>
+  searchParams?: Promise<{ error?: string; from?: string }>
   params: Promise<{ locale: string }>
 }) {
   const user = await getSessionUser()
@@ -48,6 +48,8 @@ export default async function LoginPage({
   const t = await getTranslations('login')
   const sp = searchParams ? await searchParams : {}
   const errorMessage = sp.error ? getLoginErrorMessage(sp.error, locale) : ''
+  const fromCampaign = sp.from === 'campaign'
+  const isEn = locale === 'en'
 
   async function handleSubmit(formData: FormData) {
     'use server'
@@ -86,12 +88,27 @@ export default async function LoginPage({
           <p className="mb-8 text-sm font-black uppercase tracking-[0.14em] text-[#746a62]">
             Shuffla Card News Studio
           </p>
-          <h1 className="max-w-3xl whitespace-pre-line text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
-            {t('title')}
-          </h1>
-          <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
-            {t('desc')}
-          </p>
+          {fromCampaign ? (
+            <>
+              <h1 className="max-w-3xl whitespace-pre-line text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
+                {isEn ? 'Log in to view\nthis card news' : '카드뉴스를 보려면\n로그인하세요'}
+              </h1>
+              <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
+                {isEn
+                  ? 'Free plan included — 2 card news to create. No payment required.'
+                  : '무료 2회 생성 포함 — 결제 없이 바로 시작할 수 있어요.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="max-w-3xl whitespace-pre-line text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
+                {t('title')}
+              </h1>
+              <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
+                {t('desc')}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="paper-noise rounded-[10px] bg-[#91a8c9] p-8 shadow-[0_34px_100px_rgba(57,69,90,0.22)]">
@@ -105,13 +122,14 @@ export default async function LoginPage({
             <Link
               href="/api/auth/google/start"
               prefetch={false}
-              className="mb-7 flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-lg font-black transition hover:bg-[#fff8f0]"
+              className="mb-3 flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-lg font-black transition hover:bg-[#fff8f0]"
             >
               <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-base font-black text-[#4285f4]">
                 G
               </span>
               {t('google_cta')}
             </Link>
+            <p className="mb-6 text-center text-xs text-[#a29a91]">{t('trust_hint')}</p>
 
             {process.env.NODE_ENV !== 'production' && (
               <>
