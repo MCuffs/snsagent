@@ -99,6 +99,10 @@ export function timeEvent(event: string) {
   td?.timeEvent(event)
 }
 
+type PaymentProvider = 'nicepay' | 'toss' | 'paypal'
+type ExportFormat = 'zip' | 'png' | 'jpg' | 'pdf'
+type RegenerateScope = 'copy' | 'image' | 'all'
+
 // ── Typed event helpers ────────────────────────────────────────────────────
 
 export const analytics = {
@@ -110,31 +114,110 @@ export const analytics = {
   signupComplete: (method: string, plan?: string) =>
     track('signup_complete', { method, plan }),
   loginStart: () => track('login_start'),
-  loginComplete: (method: string) => track('login_complete', { method }),
-  loginFailed: (method: string, reason?: string) =>
-    track('login_failed', { method, reason }),
-  logout: () => track('logout'),
+  loginComplete: (method: string, props?: Record<string, unknown>) =>
+    track('login_complete', { method, ...props }),
+  loginFailed: (method: string, reason?: string, props?: Record<string, unknown>) =>
+    track('login_failed', { method, reason, ...props }),
+  logout: (props?: Record<string, unknown>) => track('logout', props),
 
   // Brand
-  brandCreateStart: () => track('brand_create_start'),
-  brandCreateComplete: (brandId: string) =>
-    track('brand_create_complete', { brand_id: brandId }),
-  brandUrlAnalyzed: (url: string, success: boolean) =>
-    track('brand_url_analyzed', { url, success }),
+  brandCreateStart: (props?: Record<string, unknown>) => track('brand_create_start', props),
+  brandCreateComplete: (brandId: string, props?: Record<string, unknown>) =>
+    track('brand_create_complete', { brand_id: brandId, ...props }),
+  brandUrlAnalyzed: (brandUrl: string, success: boolean, props?: Record<string, unknown>) =>
+    track('brand_url_analyzed', { brand_url: brandUrl, success, ...props }),
+  brandAiChatSend: (props: { brandId: string; messageLength: number; chatTurnIndex: number; locale?: string }) =>
+    track('brand_ai_chat_send', {
+      brand_id: props.brandId,
+      message_length: props.messageLength,
+      chat_turn_index: props.chatTurnIndex,
+      locale: props.locale,
+    }),
 
   // Generation
-  generateStart: (params: { brandId: string; slideCount: number; platform?: string; intent?: string }) =>
-    track('generate_start', params),
+  generateAgentMessageSend: (props: {
+    brandId: string
+    generationMode: string
+    messageLength: number
+    chatTurnIndex: number
+    locale?: string
+  }) => track('generate_agent_message_send', {
+    brand_id: props.brandId,
+    generation_mode: props.generationMode,
+    message_length: props.messageLength,
+    chat_turn_index: props.chatTurnIndex,
+    locale: props.locale,
+  }),
+  generateBriefReady: (props: {
+    brandId: string
+    generationMode: string
+    topic: string
+    contentType: string
+    objective: string
+    slideCount: number
+    hasProductUrl?: boolean
+    structureSlideCount?: number
+    locale?: string
+  }) => track('generate_brief_ready', {
+    brand_id: props.brandId,
+    generation_mode: props.generationMode,
+    topic: props.topic,
+    content_type: props.contentType,
+    objective: props.objective,
+    slide_count: props.slideCount,
+    has_product_url: props.hasProductUrl,
+    structure_slide_count: props.structureSlideCount,
+    locale: props.locale,
+  }),
+  generateStart: (params: {
+    brandId: string
+    generationMode?: string
+    slideCount: number
+    platform?: string
+    intent?: string
+    topic?: string
+    contentType?: string
+    hasProductUrl?: boolean
+    imageCount?: number
+    plan?: string
+  }) =>
+    track('generate_start', {
+      brand_id: params.brandId,
+      generation_mode: params.generationMode,
+      slide_count: params.slideCount,
+      platform_name: params.platform,
+      intent: params.intent,
+      topic: params.topic,
+      content_type: params.contentType,
+      has_product_url: params.hasProductUrl,
+      image_count: params.imageCount,
+      plan: params.plan,
+    }),
   generateComplete: (params: {
     brandId: string
     campaignId: string
+    generationMode?: string
     slideCount: number
     durationMs: number
     imageProvider?: string
+    imageModel?: string
     hookPattern?: string
-  }) => track('generate_complete', params),
-  generateFailed: (brandId: string, reason: string) =>
-    track('generate_failed', { brand_id: brandId, reason }),
+    qualityScore?: number
+    plan?: string
+  }) => track('generate_complete', {
+    brand_id: params.brandId,
+    campaign_id: params.campaignId,
+    generation_mode: params.generationMode,
+    slide_count: params.slideCount,
+    duration_ms: params.durationMs,
+    image_provider: params.imageProvider,
+    image_model: params.imageModel,
+    hook_pattern: params.hookPattern,
+    quality_score: params.qualityScore,
+    plan: params.plan,
+  }),
+  generateFailed: (brandId: string, reason: string, props?: Record<string, unknown>) =>
+    track('generate_failed', { brand_id: brandId, reason, ...props }),
 
   // Slide editor
   slideEditStart: (campaignId: string, slideNumber: number, field: 'headline' | 'body') =>
@@ -143,48 +226,155 @@ export const analytics = {
     track('slide_edit_save', { campaign_id: campaignId, slide_number: slideNumber, field }),
   slideImageReplace: (campaignId: string, slideNumber: number) =>
     track('slide_image_replace', { campaign_id: campaignId, slide_number: slideNumber }),
-  slideRegenerate: (campaignId: string, slideNumber: number, scope: 'copy' | 'image' | 'all') =>
-    track('slide_regenerate', { campaign_id: campaignId, slide_number: slideNumber, scope }),
+  slideSelect: (campaignId: string, slideId: string, slideNumber: number, slideCount: number) =>
+    track('slide_select', { campaign_id: campaignId, slide_id: slideId, slide_number: slideNumber, slide_count: slideCount }),
+  editorLayerEdit: (props: {
+    campaignId: string
+    slideId: string
+    slideNumber: number
+    layerId?: string
+    layerType?: string
+    editType: string
+    field?: string
+  }) => track('editor_layer_edit', {
+    campaign_id: props.campaignId,
+    slide_id: props.slideId,
+    slide_number: props.slideNumber,
+    layer_id: props.layerId,
+    layer_type: props.layerType,
+    edit_type: props.editType,
+    field: props.field,
+  }),
+  editorDocumentSave: (props: {
+    campaignId: string
+    slideId: string
+    slideNumber: number
+    saveType: string
+    renderOutput?: boolean
+    success: boolean
+    reason?: string
+  }) => track('editor_document_save', {
+    campaign_id: props.campaignId,
+    slide_id: props.slideId,
+    slide_number: props.slideNumber,
+    save_type: props.saveType,
+    render_output: props.renderOutput,
+    success: props.success,
+    reason: props.reason,
+  }),
+  backgroundUpload: (props: {
+    campaignId: string
+    slideId: string
+    slideNumber: number
+    fileType?: string
+    fileSize?: number
+    success: boolean
+    reason?: string
+  }) => track('background_upload', {
+    campaign_id: props.campaignId,
+    slide_id: props.slideId,
+    slide_number: props.slideNumber,
+    file_type: props.fileType,
+    file_size: props.fileSize,
+    success: props.success,
+    reason: props.reason,
+  }),
+  slideRegenerate: (props: {
+    campaignId: string
+    slideId?: string
+    slideNumber: number
+    scope: RegenerateScope
+    regenerationAccess?: string
+    imageModel?: string
+    success?: boolean
+    reason?: string
+    plan?: string
+  }) =>
+    track('slide_regenerate', {
+      campaign_id: props.campaignId,
+      slide_id: props.slideId,
+      slide_number: props.slideNumber,
+      regenerate_scope: props.scope,
+      regeneration_access: props.regenerationAccess,
+      image_model: props.imageModel,
+      success: props.success,
+      reason: props.reason,
+      plan: props.plan,
+    }),
   slideLayoutChange: (campaignId: string, slideNumber: number, layout: string) =>
     track('slide_layout_change', { campaign_id: campaignId, slide_number: slideNumber, layout }),
   slideFontChange: (campaignId: string, slideNumber: number, font: string) =>
     track('slide_font_change', { campaign_id: campaignId, slide_number: slideNumber, font }),
 
   // Campaign actions
-  campaignDownload: (campaignId: string, format: 'zip' | 'png' | 'pdf', slideCount: number) =>
-    track('campaign_download', { campaign_id: campaignId, format, slide_count: slideCount }),
+  captionSave: (props: {
+    campaignId: string
+    postId: string
+    captionLength: number
+    hashtagCount: number
+    success: boolean
+    reason?: string
+  }) => track('caption_save', {
+    campaign_id: props.campaignId,
+    post_id: props.postId,
+    caption_length: props.captionLength,
+    hashtag_count: props.hashtagCount,
+    success: props.success,
+    reason: props.reason,
+  }),
+  campaignDownload: (campaignId: string, format: ExportFormat, slideCount: number, props?: Record<string, unknown>) =>
+    track('campaign_download', { campaign_id: campaignId, export_format: format, slide_count: slideCount, ...props }),
+  exportComplete: (props: {
+    campaignId: string
+    slideId?: string
+    format: ExportFormat
+    scale?: number
+    downloadScope: string
+    success: boolean
+    reason?: string
+  }) => track('export_complete', {
+    campaign_id: props.campaignId,
+    slide_id: props.slideId,
+    export_format: props.format,
+    export_scale: props.scale,
+    download_scope: props.downloadScope,
+    success: props.success,
+    reason: props.reason,
+  }),
   campaignShare: (campaignId: string, channel: string) =>
     track('campaign_share', { campaign_id: campaignId, channel }),
-  campaignDelete: (campaignId: string) =>
-    track('campaign_delete', { campaign_id: campaignId }),
-  campaignView: (campaignId: string) =>
-    track('campaign_view', { campaign_id: campaignId }),
+  campaignDelete: (campaignId: string, props?: Record<string, unknown>) =>
+    track('campaign_delete', { campaign_id: campaignId, ...props }),
+  campaignView: (campaignId: string, props?: Record<string, unknown>) =>
+    track('campaign_view', { campaign_id: campaignId, ...props }),
 
   // Billing
-  billingPageView: (currentPlan: string) =>
-    track('billing_page_view', { current_plan: currentPlan }),
-  planSelectClick: (plan: string, currentPlan: string) =>
-    track('plan_select_click', { plan, current_plan: currentPlan }),
-  paymentStart: (plan: string, provider: 'nicepay' | 'toss' | 'paypal') =>
-    track('payment_start', { plan, provider }),
-  paymentSuccess: (plan: string, provider: 'nicepay' | 'toss' | 'paypal') =>
-    track('payment_success', { plan, provider }),
-  paymentFailed: (plan: string, provider: string, reason: string) =>
-    track('payment_failed', { plan, provider, reason }),
-  subscriptionCancel: (plan: string, provider: string) =>
-    track('subscription_cancel', { plan, provider }),
+  billingPageView: (currentPlan: string, props?: Record<string, unknown>) =>
+    track('billing_page_view', { current_plan: currentPlan, ...props }),
+  planSelectClick: (selectedPlan: string, currentPlan: string, props?: Record<string, unknown>) =>
+    track('plan_select_click', { selected_plan: selectedPlan, current_plan: currentPlan, ...props }),
+  paymentStart: (selectedPlan: string, provider: PaymentProvider, props?: Record<string, unknown>) =>
+    track('payment_start', { selected_plan: selectedPlan, payment_provider: provider, ...props }),
+  paymentSuccess: (selectedPlan: string, provider: PaymentProvider, props?: Record<string, unknown>) =>
+    track('payment_success', { selected_plan: selectedPlan, payment_provider: provider, ...props }),
+  paymentFailed: (selectedPlan: string, provider: string, reason: string, props?: Record<string, unknown>) =>
+    track('payment_failed', { selected_plan: selectedPlan, payment_provider: provider, reason, ...props }),
+  subscriptionCancel: (currentPlan: string, provider: string, props?: Record<string, unknown>) =>
+    track('subscription_cancel', { current_plan: currentPlan, payment_provider: provider, ...props }),
 
   // Works
-  worksView: (count: number) => track('works_view', { campaign_count: count }),
+  worksView: (count: number, props?: Record<string, unknown>) => track('works_view', { campaign_count: count, ...props }),
   worksFilter: (filter: string) => track('works_filter', { filter }),
+  workOpen: (campaignId: string, props?: Record<string, unknown>) =>
+    track('work_open', { campaign_id: campaignId, ...props }),
 
   // Tab / navigation
-  tabSwitch: (from: string, to: string) =>
-    track('tab_switch', { from_tab: from, to_tab: to }),
-  sidebarClick: (item: string) => track('sidebar_click', { item }),
+  tabSwitch: (from: string, to: string, props?: Record<string, unknown>) =>
+    track('tab_switch', { from_tab: from, to_tab: to, ...props }),
+  sidebarClick: (item: string, props?: Record<string, unknown>) => track('sidebar_click', { item, ...props }),
 
   // Feature discovery
   referenceUrlAdd: (url: string) => track('reference_url_add', { url }),
-  productImageAdd: (count: number) => track('product_image_add', { count }),
+  productImageAdd: (count: number, props?: Record<string, unknown>) => track('product_image_add', { image_count: count, ...props }),
   keywordAdd: (keyword: string) => track('keyword_add', { keyword }),
 }

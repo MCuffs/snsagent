@@ -43,9 +43,18 @@ export default function SidebarNav({ hasCompleteBrand, userEmail, locale }: Side
   const hasInstagramAccess = userEmail ? INSTAGRAM_ALLOWED_EMAILS.includes(userEmail) : false
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    analytics.sidebarClick(item.key)
+    analytics.sidebarClick(item.key, {
+      from_tab: activeTab,
+      to_tab: item.key,
+      has_complete_brand: hasCompleteBrand,
+    })
     if (pathname === conceptPath) {
       e.preventDefault()
+      if (activeTab !== item.key) {
+        analytics.tabSwitch(activeTab, item.key, {
+          has_complete_brand: hasCompleteBrand,
+        })
+      }
       setActiveTab(item.key)
     }
   }

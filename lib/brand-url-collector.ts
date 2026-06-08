@@ -67,14 +67,18 @@ export async function collectBrandUrlContext(url: string, options?: { isNaverSto
   diagnostics.push('direct-fetch: all candidates failed, trying jina-reader')
   try {
     const jinaResult = await fetchWithJina(url)
-    diagnostics.push(`jina-reader: ok (${jinaResult.length} chars)`)
-    return {
-      requestedUrl: url,
-      finalUrl: url,
-      status: 200,
-      promptContext: buildJinaPromptContext(url, jinaResult),
-      sourceText: jinaResult.slice(0, 12000),
-      diagnostics,
+    if (jinaResult.length < 500) {
+      diagnostics.push(`jina-reader: insufficient content (${jinaResult.length} chars, need 500+)`)
+    } else {
+      diagnostics.push(`jina-reader: ok (${jinaResult.length} chars)`)
+      return {
+        requestedUrl: url,
+        finalUrl: url,
+        status: 200,
+        promptContext: buildJinaPromptContext(url, jinaResult),
+        sourceText: jinaResult.slice(0, 12000),
+        diagnostics,
+      }
     }
   } catch (jinaError) {
     diagnostics.push(`jina-reader: ${jinaError instanceof Error ? jinaError.message : String(jinaError)}`)

@@ -10,6 +10,7 @@ import { analytics } from '../../../lib/analytics/thinkingdata'
 
 declare global {
   interface Window {
+    gtag?: (command: string, action: string, params: Record<string, unknown>) => void
     AUTHNICE?: {
       requestPay: (options: {
         clientId: string
@@ -43,6 +44,7 @@ interface PricingClientViewProps {
   customerName?: string | null
   customerEmail: string
   showRegenerationOffer: boolean
+  paymentSuccess?: boolean
 }
 
 function formatLimit(limit: number) {
@@ -77,14 +79,31 @@ function PricingGrid({
   customerName: _customerName,
   customerEmail: _customerEmail,
   showRegenerationOffer,
+  paymentSuccess,
 }: PricingClientViewProps) {
   const router = useRouter()
   const t = useTranslations('billing')
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
+  const [processingPayment, setProcessingPayment] = useState<string | null>(null)
+
+  // Google Ads conversion tracking
+  useEffect(() => {
+    if (paymentSuccess && typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('event', 'conversion', {
+        send_to: 'AW-18221005488/KcMGCKnB4rocELD1ufBD',
+        transaction_id: userId,
+      })
+      console.log('[Google Ads] Conversion tracked for user:', userId)
+    }
+  }, [paymentSuccess, userId])
 
   useEffect(() => {
-    analytics.billingPageView(currentPlan)
+    analytics.billingPageView(currentPlan, {
+      payment_provider: paymentProvider ?? undefined,
+      has_subscription: hasSubscription,
+      show_regeneration_offer: showRegenerationOffer,
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -114,6 +133,9 @@ function PricingGrid({
       if (!res.ok) {
         setError(data.error || t('cancel_error'))
       } else {
+        analytics.subscriptionCancel(currentPlan, paymentProvider ?? 'unknown', {
+          success: true,
+        })
         router.refresh()
       }
     } catch {
@@ -132,13 +154,25 @@ function PricingGrid({
       setError(t('nicepay_loading'))
       return
     }
-    analytics.planSelectClick(planKey, currentPlan)
-    analytics.paymentStart(planKey, 'nicepay')
-
+    
+    setError('')
+    setProcessingPayment(planKey)
+    
     const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 25000, UNLIMITED: 39000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    
+    analytics.planSelectClick(planKey, currentPlan, {
+      payment_provider: 'nicepay',
+      amount,
+      currency: 'KRW',
+    })
+    analytics.paymentStart(planKey, 'nicepay', {
+      amount,
+      currency: 'KRW',
+      order_id: orderId,
+    })
 
     window.AUTHNICE.requestPay({
       clientId: nicepayClientKey,
@@ -148,13 +182,18 @@ function PricingGrid({
       goodsName: `Shuffla ${planKey} 월 구독`,
       returnUrl: `${appUrl}/api/nicepay/server-auth-dummy`,
       fnError: (result) => {
+        analytics.paymentFailed(planKey, 'nicepay', result.errorMsg || 'sdk_error', {
+          order_id: orderId,
+        })
         setError(result.errorMsg || t('nicepay_start_failed'))
+        setProcessingPayment(null)
       },
       fnClose: async (result) => {
         if (!result.tid || !result.authToken || result.resultCode !== '0000') {
           if (result.resultCode && result.resultCode !== '0000') {
             setError(result.resultMsg || t('payment_canceled_msg'))
           }
+          setProcessingPayment(null)
           return
         }
         try {
@@ -170,17 +209,33 @@ function PricingGrid({
           })
           const data = await res.json() as { error?: string; offer?: string }
           if (!res.ok) {
-            analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error')
+            analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error', {
+              amount,
+              currency: 'KRW',
+              order_id: result.orderId ?? orderId,
+            })
             setError(data.error || t('nicepay_approve_failed'))
+            setProcessingPayment(null)
           } else if (data.offer === 'regeneration') {
-            analytics.paymentSuccess(planKey, 'nicepay')
+            analytics.paymentSuccess(planKey, 'nicepay', {
+              amount,
+              currency: 'KRW',
+              order_id: result.orderId ?? orderId,
+              offer_type: 'regeneration',
+            })
             router.push('/billing?success=true&offer=regeneration')
           } else {
-            analytics.paymentSuccess(planKey, 'nicepay')
+            analytics.paymentSuccess(planKey, 'nicepay', {
+              amount,
+              currency: 'KRW',
+              order_id: result.orderId ?? orderId,
+            })
             router.push('/billing?success=true')
           }
-        } catch {
+        } catch (err) {
+          console.error('Payment approval error:', err)
           setError(t('network_error'))
+          setProcessingPayment(null)
         }
       },
     })
@@ -233,9 +288,17 @@ function PricingGrid({
                 <button
                   type="button"
                   onClick={() => handleNicepayPayment('LITE')}
-                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32]"
+                  disabled={processingPayment !== null}
+                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('one_time_cta_nicepay')}
+                  {processingPayment === 'LITE' ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      처리 중...
+                    </span>
+                  ) : (
+                    t('one_time_cta_nicepay')
+                  )}
                 </button>
               ) : (
                 <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
@@ -291,9 +354,17 @@ function PricingGrid({
                       <button
                         type="button"
                         onClick={() => handleNicepayPayment(planKey)}
-                        className="w-full rounded-lg bg-[#e8173e] py-2.5 text-sm font-black text-white transition-all hover:bg-[#c90f32] active:scale-[0.98]"
+                        disabled={processingPayment !== null}
+                        className="w-full rounded-lg bg-[#e8173e] py-2.5 text-sm font-black text-white transition-all hover:bg-[#c90f32] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t('domestic_nicepay')}
+                        {processingPayment === planKey ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            처리 중...
+                          </span>
+                        ) : (
+                          t('domestic_nicepay')
+                        )}
                       </button>
                     )}
                     {nicepayClientKey && paypalPlanId && (
@@ -305,8 +376,10 @@ function PricingGrid({
                     )}
                     {paypalPlanId && (
                       <PayPalSubscribeButton
+                        planKey={planKey}
                         planId={paypalPlanId}
                         userId={userId}
+                        currentPlan={currentPlan}
                         onSuccess={() => router.refresh()}
                         onError={setError}
                       />
@@ -326,13 +399,17 @@ function PricingGrid({
 }
 
 function PayPalSubscribeButton({
+  planKey,
   planId,
   userId,
+  currentPlan,
   onSuccess,
   onError,
 }: {
+  planKey: string
   planId: string
   userId: string
+  currentPlan: string
   onSuccess: () => void
   onError: (message: string) => void
 }) {
@@ -340,9 +417,12 @@ function PayPalSubscribeButton({
   const t = useTranslations('billing')
 
   const createSubscription = useCallback(
-    (_data: Record<string, unknown>, actions: { subscription: { create: (options: object) => Promise<string> } }) =>
-      actions.subscription.create({ plan_id: planId, custom_id: userId }),
-    [planId, userId],
+    (_data: Record<string, unknown>, actions: { subscription: { create: (options: object) => Promise<string> } }) => {
+      analytics.planSelectClick(planKey, currentPlan, { payment_provider: 'paypal' })
+      analytics.paymentStart(planKey, 'paypal', { subscription_id: planId })
+      return actions.subscription.create({ plan_id: planId, custom_id: userId })
+    },
+    [currentPlan, planId, planKey, userId],
   )
 
   const onApprove = useCallback(async (data: { subscriptionID?: string | null }) => {
@@ -354,14 +434,23 @@ function PayPalSubscribeButton({
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) {
+        analytics.paymentFailed(planKey, 'paypal', body.error || 'activate_failed', {
+          subscription_id: data.subscriptionID,
+        })
         onError(body.error || t('paypal_activate_failed'))
         return
       }
+      analytics.paymentSuccess(planKey, 'paypal', {
+        subscription_id: data.subscriptionID,
+      })
       onSuccess()
     } catch {
+      analytics.paymentFailed(planKey, 'paypal', 'network_error', {
+        subscription_id: data.subscriptionID,
+      })
       onError(t('network_error'))
     }
-  }, [onError, onSuccess, t])
+  }, [onError, onSuccess, planKey, t])
 
   if (isPending) {
     return (
@@ -378,7 +467,10 @@ function PayPalSubscribeButton({
         style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
         createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
         onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
-        onError={() => onError(t('paypal_error'))}
+        onError={() => {
+          analytics.paymentFailed(planKey, 'paypal', 'paypal_sdk_error', { subscription_id: planId })
+          onError(t('paypal_error'))
+        }}
       />
     </div>
   )

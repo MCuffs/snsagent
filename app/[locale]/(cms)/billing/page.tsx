@@ -70,6 +70,7 @@ export default async function PricingPage({
         customerName={user.name}
         customerEmail={user.email}
         showRegenerationOffer={sp.offer === 'regeneration'}
+        paymentSuccess={sp.success === 'true'}
       />
     </div>
   )

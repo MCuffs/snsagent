@@ -142,6 +142,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     const userMsg = { role: 'user' as const, content: text }
     setChatMessages(prev => [...prev, { role: 'user', content: text, id: msgId }])
     setChatHistory(prev => [...prev, userMsg])
+    analytics.brandAiChatSend({
+      brandId,
+      messageLength: text.length,
+      chatTurnIndex: chatHistory.filter(message => message.role === 'user').length + 1,
+      locale,
+    })
     setChatInput('')
     setChatWaiting(true)
 
@@ -189,6 +195,11 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!url) return
+    analytics.brandCreateStart({
+      brand_mode: url === 'general_profile' ? 'general' : 'brand',
+      brand_url: url,
+      locale,
+    })
     setIsAnalyzing(true)
     setAnalyzeStep(0)
     setError(null)
@@ -196,13 +207,13 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     try {
       const res = await analyzeBrandWebsiteAction(url, locale)
       if (!res || !res.success) {
-        analytics.brandUrlAnalyzed(url, false)
+        analytics.brandUrlAnalyzed(url, false, { locale, reason: ('error' in (res ?? {})) ? (res as { error: string }).error : 'analyze_failed' })
         setError(('error' in (res ?? {})) ? (res as { error: string }).error : t('error_analyze_failed'))
         setIsAnalyzing(false)
         return
       }
       if (res.success && res.brandProfile) {
-        analytics.brandUrlAnalyzed(url, true)
+        analytics.brandUrlAnalyzed(url, true, { locale })
         const p = res.brandProfile
         setName(p.name)
         setIndustry(p.industry)
@@ -245,7 +256,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
       })
       if (res.success) {
         setBrandId(res.brand.id)
-        analytics.brandCreateComplete(res.brand.id)
+        analytics.brandCreateComplete(res.brand.id, {
+          brand_mode: url === 'general_profile' ? 'general' : 'brand',
+          industry,
+          has_brand_dna: Boolean(brandDna),
+          has_website_url: Boolean(url),
+        })
         setSuccess(t('success_saved'))
       } else {
         setError(res.error || t('error_save'))
@@ -360,6 +376,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                     setIsSaving(false)
                     if (saved.success) {
                       setBrandId(saved.brand.id)
+                      analytics.brandCreateComplete(saved.brand.id, {
+                        brand_mode: url === 'general_profile' ? 'general' : 'brand',
+                        industry,
+                        has_brand_dna: Boolean(brandDna),
+                        has_website_url: Boolean(url),
+                      })
                       setPhase('profile')
                     } else {
                       setError(saved.error || t('error_save'))

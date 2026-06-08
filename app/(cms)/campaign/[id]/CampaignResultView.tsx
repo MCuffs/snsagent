@@ -117,6 +117,7 @@ export default function CampaignResultView({
   campaign,
   post,
   brand,
+  planName,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const locale = useLocale()
@@ -143,7 +144,12 @@ export default function CampaignResultView({
   const markSaved = useEditorialStore(state => state.markSaved)
 
   useEffect(() => {
-    analytics.campaignView(campaign.id)
+    analytics.campaignView(campaign.id, {
+      campaign_status: campaign.status,
+      slide_count: campaign.slideCount,
+      image_model: campaign.imageModel,
+      plan: planName,
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -194,13 +200,21 @@ export default function CampaignResultView({
       }
       addLayer(activeSlide.id, newLayer)
       selectLayer(newLayerId)
+      analytics.editorLayerEdit({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        slideNumber: activeSlide.slideNumber,
+        layerId: newLayerId,
+        layerType: 'sticker',
+        editType: 'add_image',
+      })
       setMessage({ type: 'success', text: t('message_image_layer_added') })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_image_layer_error')) })
     } finally {
       setEditorBusy(false)
     }
-  }, [activeDocument, activeSlide, addLayer, selectLayer, t])
+  }, [activeDocument, activeSlide, addLayer, campaign.id, selectLayer, t])
 
   useEffect(() => {
     const pasteHandler = async (e: ClipboardEvent) => {
@@ -260,14 +274,26 @@ export default function CampaignResultView({
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
     const timeout = window.setTimeout(async () => {
       const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), false)
+      analytics.editorDocumentSave({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        slideNumber: activeSlide.slideNumber,
+        saveType: 'autosave',
+        renderOutput: false,
+        success: result.success,
+        reason: result.success ? undefined : result.error,
+      })
       if (result.success) markSaved(activeSlide.id)
     }, 900)
     return () => window.clearTimeout(timeout)
-  }, [activeDocument, activeSlide, dirtySlides, editorBusy, markSaved])
+  }, [activeDocument, activeSlide, campaign.id, dirtySlides, editorBusy, markSaved])
 
   const selectSlide = (index: number) => {
     setActiveSlideIndex(index)
-    if (slides[index]) activateSlide(slides[index].id)
+    if (slides[index]) {
+      activateSlide(slides[index].id)
+      analytics.slideSelect(campaign.id, slides[index].id, slides[index].slideNumber, slides.length)
+    }
     setMessage(null)
   }
 
@@ -334,6 +360,15 @@ export default function CampaignResultView({
 
       const result = await saveEditorialDocumentAction(slideId, JSON.stringify(nextDocument), true)
       if (!result.success) {
+        analytics.backgroundUpload({
+          campaignId: campaign.id,
+          slideId,
+          slideNumber: activeSlide.slideNumber,
+          fileType: file.type,
+          fileSize: file.size,
+          success: false,
+          reason: result.error,
+        })
         setUploadToast({ status: 'error', text: result.error || t('message_background_error'), progress: 0 })
         setTimeout(() => setUploadToast(null), 4000)
         return
@@ -341,11 +376,28 @@ export default function CampaignResultView({
 
       setUploadToast({ status: 'uploading', text: '완료 중', progress: 95 })
       applyServerSlide(result.slide as Slide, result.document)
+      analytics.backgroundUpload({
+        campaignId: campaign.id,
+        slideId,
+        slideNumber: activeSlide.slideNumber,
+        fileType: file.type,
+        fileSize: file.size,
+        success: true,
+      })
 
       setUploadToast({ status: 'done', text: '배경 이미지가 적용됐습니다', progress: 100 })
       setTimeout(() => setUploadToast(null), 2500)
 
     } catch (error) {
+      analytics.backgroundUpload({
+        campaignId: campaign.id,
+        slideId,
+        slideNumber: activeSlide.slideNumber,
+        fileType: file.type,
+        fileSize: file.size,
+        success: false,
+        reason: getErrorMessage(error, t('message_background_save_error')),
+      })
       setUploadToast({ status: 'error', text: getErrorMessage(error, t('message_background_save_error')), progress: 0 })
       setTimeout(() => setUploadToast(null), 4000)
     }
@@ -366,10 +418,27 @@ export default function CampaignResultView({
       updateDocument(activeSlide.id, () => nextDocument)
       const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(nextDocument), true)
       if (!result.success) {
+        analytics.editorDocumentSave({
+          campaignId: campaign.id,
+          slideId: activeSlide.id,
+          slideNumber: activeSlide.slideNumber,
+          saveType: 'manual',
+          renderOutput: true,
+          success: false,
+          reason: result.error,
+        })
         setMessage({ type: 'error', text: result.error || t('message_background_error') })
         return
       }
       applyServerSlide(result.slide as Slide, result.document)
+      analytics.editorDocumentSave({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        slideNumber: activeSlide.slideNumber,
+        saveType: 'manual',
+        renderOutput: true,
+        success: true,
+      })
       setMessage({ type: 'success', text: '원래 배경으로 복원했습니다.' })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_background_save_error')) })
@@ -392,9 +461,24 @@ export default function CampaignResultView({
     try {
       const result = await updatePostDetailsAction(post.id, caption, hashtags)
       if (!result.success) {
+        analytics.captionSave({
+          campaignId: campaign.id,
+          postId: post.id,
+          captionLength: caption.length,
+          hashtagCount: hashtags.split(/\s+/).filter(Boolean).length,
+          success: false,
+          reason: result.error,
+        })
         setMessage({ type: 'error', text: result.error || t('message_caption_error') })
         return
       }
+      analytics.captionSave({
+        campaignId: campaign.id,
+        postId: post.id,
+        captionLength: caption.length,
+        hashtagCount: hashtags.split(/\s+/).filter(Boolean).length,
+        success: true,
+      })
       setMessage({ type: 'success', text: t('message_caption_saved') })
       router.refresh()
     } catch (error) {
@@ -408,16 +492,48 @@ export default function CampaignResultView({
     if (!activeSlide?.imageUrl) return
     setExporting(true)
     setMessage(null)
-    analytics.campaignDownload(campaign.id, 'png', 1)
+    analytics.campaignDownload(campaign.id, 'png', 1, {
+      export_scale: 1,
+      slide_number: activeSlide.slideNumber,
+      download_scope: 'single_slide',
+    })
     try {
       if (activeDocument) {
         const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), 'png', 1)
-        if (!result.success) return setMessage({ type: 'error', text: result.error })
+        if (!result.success) {
+          analytics.exportComplete({
+            campaignId: campaign.id,
+            slideId: activeSlide.id,
+            format: 'png',
+            scale: 1,
+            downloadScope: 'single_slide',
+            success: false,
+            reason: result.error,
+          })
+          return setMessage({ type: 'error', text: result.error })
+        }
         await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber))
       } else {
         await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
       }
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        format: 'png',
+        scale: 1,
+        downloadScope: 'single_slide',
+        success: true,
+      })
     } catch (error) {
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        format: 'png',
+        scale: 1,
+        downloadScope: 'single_slide',
+        success: false,
+        reason: getErrorMessage(error, t('message_download_error')),
+      })
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_download_error')) })
     } finally {
       setExporting(false)
@@ -428,12 +544,45 @@ export default function CampaignResultView({
     if (!activeSlide || !activeDocument) return
     setExporting(true)
     setMessage(null)
+    analytics.campaignDownload(campaign.id, format, 1, {
+      export_scale: scale,
+      slide_number: activeSlide.slideNumber,
+      download_scope: 'single_slide',
+    })
     try {
       const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), format, scale)
-      if (!result.success) return setMessage({ type: 'error', text: result.error })
+      if (!result.success) {
+        analytics.exportComplete({
+          campaignId: campaign.id,
+          slideId: activeSlide.id,
+          format,
+          scale,
+          downloadScope: 'single_slide',
+          success: false,
+          reason: result.error,
+        })
+        return setMessage({ type: 'error', text: result.error })
+      }
       await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber, format))
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        format,
+        scale,
+        downloadScope: 'single_slide',
+        success: true,
+      })
       setMessage({ type: 'success', text: scale === 2 ? t('message_export_done_2x', { format: format.toUpperCase() }) : t('message_export_done', { format: format.toUpperCase() }) })
     } catch (error) {
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        format,
+        scale,
+        downloadScope: 'single_slide',
+        success: false,
+        reason: getErrorMessage(error, t('message_export_error')),
+      })
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_export_error')) })
     } finally {
       setExporting(false)
@@ -443,27 +592,61 @@ export default function CampaignResultView({
   const exportZip = async () => {
     setDownloadingAll(true)
     setMessage(null)
-    analytics.campaignDownload(campaign.id, 'zip', slides.length)
+    analytics.campaignDownload(campaign.id, 'zip', slides.length, {
+      export_scale: 1,
+      download_scope: 'all_slides',
+    })
     try {
       const zip = new JSZip()
       const results = await Promise.all(
         slides.map(async slide => {
-          const doc = documents[slide.id] || parseEditorialDocument(slide.editorDocument, slide)
-          const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc), 'png', 1)
-          if (!result.success) throw new Error(result.error)
-          const response = await fetch(result.url)
+          const doc = documents[slide.id]
+          // Only re-export if the slide was edited (has dirty document)
+          if (doc && dirtySlides[slide.id]) {
+            const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc), 'png', 1)
+            if (!result.success) throw new Error(result.error)
+            const response = await fetch(result.url, { cache: 'force-cache' })
+            return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
+          }
+          // Use existing image for unedited slides
+          if (!slide.imageUrl) {
+            // Fallback: re-export if no image URL
+            const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)
+            if (!result.success) throw new Error(result.error)
+            const response = await fetch(result.url, { cache: 'force-cache' })
+            return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
+          }
+          const response = await fetch(slide.imageUrl, { cache: 'force-cache' })
           return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
         })
       )
       for (const { name, blob } of results) zip.file(name, blob)
-      const archive = await zip.generateAsync({ type: 'blob' })
+      const archive = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'STORE', // No compression for speed (PNGs are already compressed)
+      })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(archive)
       link.download = `${campaign.title.replace(/\s+/g, '-')}-instagram-4x5.zip`
       link.click()
       URL.revokeObjectURL(link.href)
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        format: 'zip',
+        scale: 1,
+        downloadScope: 'all_slides',
+        success: true,
+      })
       setMessage({ type: 'success', text: t('message_zip_done') })
     } catch (error) {
+      analytics.exportComplete({
+        campaignId: campaign.id,
+        format: 'zip',
+        scale: 1,
+        downloadScope: 'all_slides',
+        success: false,
+        reason: getErrorMessage(error, t('message_zip_error')),
+      })
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_zip_error')) })
     } finally {
       setDownloadingAll(false)
@@ -478,6 +661,12 @@ export default function CampaignResultView({
       const result = await resetSlideEditorDocumentAction(activeSlide.id)
       if (!result.success) return setMessage({ type: 'error', text: result.error })
       applyServerSlide(result.slide as Slide, parseEditorialDocument(null, result.slide as Slide))
+      analytics.editorLayerEdit({
+        campaignId: campaign.id,
+        slideId: activeSlide.id,
+        slideNumber: activeSlide.slideNumber,
+        editType: 'reset_editor',
+      })
       setMessage({ type: 'success', text: t('message_reset_done') })
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_reset_error')) })

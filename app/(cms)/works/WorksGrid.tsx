@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Clock, ImageOff, Loader2, Palette, Trash2 } from 'lucide-react'
 import { useTab } from '../TabContext'
@@ -71,6 +71,15 @@ export default function WorksGrid({
   const [error, setError] = useState<string | null>(null)
   const displayedCampaigns = campaigns.filter(campaign => !deletedIds.includes(campaign.id))
 
+  useEffect(() => {
+    analytics.worksView(displayedCampaigns.length, {
+      current_plan: planName,
+      retention_days: retentionDays,
+      can_upgrade_retention: canUpgradeRetention,
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     generated: { label: t('status_complete'), color: 'bg-emerald-100 text-emerald-700' },
     draft: { label: t('status_draft'), color: 'bg-[#f4f4f5] text-[#52525b]' },
@@ -88,16 +97,27 @@ export default function WorksGrid({
   const deleteCampaign = async (item: WorkItem) => {
     if (!window.confirm(t('delete_confirm', { title: item.title }))) return
 
-    analytics.campaignDelete(item.id)
+    analytics.campaignDelete(item.id, {
+      campaign_status: item.status,
+    })
     setError(null)
     setDeletingId(item.id)
     const result = await deleteWorkAction(item.id)
     setDeletingId(null)
     if (!result.success) {
+      analytics.campaignDelete(item.id, {
+        campaign_status: item.status,
+        success: false,
+        reason: result.error,
+      })
       setError(result.error)
       return
     }
 
+    analytics.campaignDelete(item.id, {
+      campaign_status: item.status,
+      success: true,
+    })
     setDeletedIds(current => [...current, item.id])
     router.refresh()
   }
@@ -210,7 +230,14 @@ export default function WorksGrid({
                 href={`/campaign/${item.id}`}
                 onMouseEnter={() => router.prefetch(`/campaign/${item.id}`)}
                 onFocus={() => router.prefetch(`/campaign/${item.id}`)}
-                onClick={() => setOpeningId(item.id)}
+                onClick={() => {
+                  analytics.workOpen(item.id, {
+                    campaign_status: item.status,
+                    days_until_deletion: item.daysUntilDeletion,
+                    expires_soon: item.expiresSoon,
+                  })
+                  setOpeningId(item.id)
+                }}
                 className="group block overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#a1a1aa] hover:shadow-md"
               >
                 {/* Thumbnail */}

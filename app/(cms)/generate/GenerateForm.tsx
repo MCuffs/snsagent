@@ -194,6 +194,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const typingTimerRef = useRef<number | null>(null)
   const briefingTimersRef = useRef<number[]>([])
+  const generationStartedAtRef = useRef<number | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -229,10 +230,16 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         return current
       }
       setError(null)
-      if (imageFiles.length > 0) analytics.productImageAdd(imageFiles.length)
+      if (imageFiles.length > 0) {
+        analytics.productImageAdd(imageFiles.length, {
+          upload_source: 'file_or_paste',
+          generation_mode: generationMode,
+          brand_id: brand.id,
+        })
+      }
       return merged
     })
-  }, [t])
+  }, [brand.id, generationMode, t])
 
   const revealBriefing = useCallback((params?: GenerateParams) => {
     clearBriefingTimers()
@@ -350,6 +357,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
       appendAiMessage(msg, data.ready && data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
+      if (data.ready && data.params) {
+        analytics.generateBriefReady({
+          brandId: brand.id,
+          generationMode,
+          topic: data.params.topic,
+          contentType: data.params.contentType,
+          objective: data.params.objective,
+          slideCount: data.params.slideCount,
+          hasProductUrl: Boolean(data.params.productUrl),
+          structureSlideCount: data.params.structurePreview?.length ?? 0,
+          locale,
+        })
+      }
 
       const clarificationContext = data.clarification
         ? [
@@ -432,6 +452,13 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
     setDisplayMessages(prev => [...prev, userDisplay(text)])
     setChatHistory(newHistory)
+    analytics.generateAgentMessageSend({
+      brandId: brand.id,
+      generationMode,
+      messageLength: text.length,
+      chatTurnIndex: chatHistory.filter(message => message.role === 'user').length + 1,
+      locale,
+    })
     setInput('')
     setReadyParams(null)
     setBriefingStage(0)
@@ -454,6 +481,13 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
     setDisplayMessages(prev => [...prev, userDisplay(userLabel)])
     setChatHistory(newHistory)
+    analytics.generateAgentMessageSend({
+      brandId: brand.id,
+      generationMode,
+      messageLength: text.length,
+      chatTurnIndex: chatHistory.filter(message => message.role === 'user').length + 1,
+      locale,
+    })
     setInput('')
     setReadyParams(null)
     setBriefingStage(0)
@@ -467,13 +501,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     setLoadingStep(0)
     setGenerating(true)
     setError(null)
+    generationStartedAtRef.current = Date.now()
 
     timeEvent('generate_complete')
     analytics.generateStart({
       brandId: brand.id,
+      generationMode,
       slideCount: readyParams.slideCount,
       platform: 'card_news',
       intent: readyParams.objective,
+      topic: readyParams.topic,
+      contentType: readyParams.contentType,
+      hasProductUrl: Boolean(readyParams.productUrl),
+      imageCount: referenceFiles.length,
     })
 
     try {
@@ -521,7 +561,11 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
       const data = await res.json() as { campaignId?: string; error?: string }
       if (!res.ok || data.error) {
-        analytics.generateFailed(brand.id, data.error || 'api_error')
+        analytics.generateFailed(brand.id, data.error || 'api_error', {
+          generation_mode: generationMode,
+          http_status: res.status,
+          slide_count: readyParams.slideCount,
+        })
         setError(data.error || t('error_generate'))
         setGenerating(false)
         return
@@ -530,12 +574,16 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       analytics.generateComplete({
         brandId: brand.id,
         campaignId: data.campaignId ?? '',
+        generationMode,
         slideCount: readyParams.slideCount,
-        durationMs: 0,
+        durationMs: generationStartedAtRef.current ? Date.now() - generationStartedAtRef.current : 0,
       })
       router.push(`/campaign/${data.campaignId}`)
     } catch {
-      analytics.generateFailed(brand.id, 'network_error')
+      analytics.generateFailed(brand.id, 'network_error', {
+        generation_mode: generationMode,
+        slide_count: readyParams.slideCount,
+      })
       setError(t('error_network'))
       setGenerating(false)
     }

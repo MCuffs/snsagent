@@ -36,7 +36,12 @@ function SelectionToolbar() {
     document.execCommand(command)
     const sel = window.getSelection()
     const el = (sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null
-    if (el) { el.blur(); el.focus() }
+    if (el) {
+      // Trigger blur to save the style change, then restore focus after a tick
+      const event = new FocusEvent('blur', { bubbles: true })
+      el.dispatchEvent(event)
+      setTimeout(() => el.focus(), 0)
+    }
   }
 
   return (
