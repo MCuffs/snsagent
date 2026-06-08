@@ -5,7 +5,7 @@ import { getSessionUser } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../lib/limits-types'
 import { isPaidPlan } from '../../../lib/nicepay'
-import { PAYPAL_PLAN_IDS } from '../../../lib/paypal'
+import { getPublicPayPalClientId, PAYPAL_PLAN_IDS } from '../../../lib/paypal'
 import { createNicepayReturnToken } from '../../../lib/nicepay-return-token'
 import PricingClientView from './PricingClientView'
 
@@ -30,7 +30,7 @@ export default async function PricingPage({
   for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
     if (value) paypalPlanIds[key] = value
   }
-  const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
+  const paypalClientId = getPublicPayPalClientId()
   const nicepayReturnTokens = Object.fromEntries(
     plansList.filter(isPaidPlan).map((plan) => [plan, createNicepayReturnToken(user.id, plan)]),
   )
