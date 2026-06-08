@@ -68,6 +68,7 @@ export default function PricingClientView(props: PricingClientViewProps) {
         vault: true,
         intent: 'subscription',
         components: 'buttons',
+        currency: 'KRW',
       }}
     >
       <PricingGrid {...props} />
@@ -394,8 +395,12 @@ function PricingGrid({
       <div className="grid gap-6 md:grid-cols-2">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
+          const isEnglish = locale === 'en'
           const isCurrentPlan = currentPlan === planKey
           const paypalPlanId = paypalPlanIds[planKey]
+          const planDescription = isEnglish ? plan.description_en : plan.description
+          const planPrice = isEnglish ? plan.price_en : plan.price
+          const planFeatures = isEnglish ? plan.features_en : plan.features
 
           return (
             <article
@@ -411,7 +416,7 @@ function PricingGrid({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-2xl font-bold tracking-tight text-slate-900">{plan.name}</h2>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-600">{plan.description}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-600">{planDescription}</p>
                     </div>
                     {isCurrentPlan && (
                       <span className="shrink-0 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-sm">
@@ -420,13 +425,12 @@ function PricingGrid({
                     )}
                   </div>
                   <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold tracking-tight text-slate-900">{plan.price}</span>
-                    <span className="text-sm text-slate-500">{t('per_month')}</span>
+                    <span className="text-4xl font-bold tracking-tight text-slate-900">{planPrice}</span>
                   </div>
                 </div>
 
                 <div className="space-y-3 border-t border-slate-100 py-6">
-                  {(locale === 'en' ? plan.features_en : plan.features).map((feature, idx) => (
+                  {planFeatures.map((feature, idx) => (
                     <Feature key={idx}>{feature}</Feature>
                   ))}
                 </div>
