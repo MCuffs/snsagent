@@ -28,11 +28,18 @@ export default async function PricingPage({
   const plansList = PAID_SUBSCRIPTION_PLANS
   const hasSubscription = Boolean(user.paypalSubscriptionId || user.nicepayBid)
   const paymentProvider = user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
+
+  // Locale-based payment provider filtering:
+  // ko → NicePay only (hide PayPal), en → PayPal only (hide NicePay)
+  const isKo = locale === 'ko'
   const paypalPlanIds: Record<string, string> = {}
-  for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
-    if (value) paypalPlanIds[key] = value
+  if (!isKo) {
+    for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
+      if (value) paypalPlanIds[key] = value
+    }
   }
-  const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
+  const paypalClientId = isKo ? '' : (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim()
+  const nicepayClientKey = isKo ? (process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim() : ''
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
@@ -66,7 +73,7 @@ export default async function PricingPage({
         userId={user.id}
         paypalClientId={paypalClientId}
         paypalPlanIds={paypalPlanIds}
-        nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}
+        nicepayClientKey={nicepayClientKey}
         customerName={user.name}
         customerEmail={user.email}
         showRegenerationOffer={sp.offer === 'regeneration'}
