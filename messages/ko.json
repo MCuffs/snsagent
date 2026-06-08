@@ -321,6 +321,8 @@
     "foreign_customer": "해외 고객",
     "paypal": "PayPal 해외 결제",
     "payment_setup": "결제 설정 준비 중",
+    "per_month": "/월",
+    "processing": "처리 중...",
     "one_time_eyebrow": "One-time option",
     "one_time_title": "AI 재생성 1회 이용권",
     "one_time_desc": "25,000원 플랜 대신 3,000원으로 1회 이용을 추가로 진행해보세요",

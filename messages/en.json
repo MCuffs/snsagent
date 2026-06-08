@@ -321,6 +321,8 @@
     "foreign_customer": "International",
     "paypal": "PayPal international",
     "payment_setup": "Payment setup in progress",
+    "per_month": "/mo",
+    "processing": "Processing...",
     "one_time_eyebrow": "One-time option",
     "one_time_title": "1 AI Regeneration Pass",
     "one_time_desc": "Try one AI regeneration for ₩3,000 instead of the full ₩25,000 plan",
