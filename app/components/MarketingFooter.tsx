@@ -19,6 +19,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
   }
 
   const label = (ko: string, key: string) => (t ? (t as (k: string) => string)(key) : ko)
+  const showKoreanBusinessInfo = locale === 'ko'
 
   return (
     <footer className="border-t border-[#e9e4db] bg-[#f6f4ef] pb-10 pt-16 text-[#171714]">
@@ -59,12 +60,38 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
         <div className="mt-16 flex flex-col justify-between gap-3 border-t border-[#e0dbd2] pt-7 text-xs text-[#847d73] sm:flex-row">
           <p>&copy; 2026 Shuffla. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link href={`${prefix}/terms`} className="hover:text-[#171714]">Terms</Link>
-            <Link href={`${prefix}/privacy`} className="hover:text-[#171714]">Privacy</Link>
+            <Link href={`${prefix}/terms`} className="hover:text-[#171714]">
+              {showKoreanBusinessInfo ? '이용약관' : 'Terms'}
+            </Link>
+            <Link href={`${prefix}/privacy`} className="hover:text-[#171714]">
+              {showKoreanBusinessInfo ? '개인정보처리방침' : 'Privacy'}
+            </Link>
           </div>
         </div>
+        {showKoreanBusinessInfo && (
+          <div className="mt-6 border-t border-[#e0dbd2] pt-6 text-xs leading-6 text-[#847d73]">
+            <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+              <BusinessInfoItem label="상호" value="파랑버섯 스튜디오" />
+              <BusinessInfoItem label="대표자명" value="정민수" />
+              <BusinessInfoItem label="사업자등록번호" value="354-14-0333" />
+              <BusinessInfoItem label="주소" value="서울특별시 영등포구 양평로 22나길 7-1" />
+              <BusinessInfoItem label="전화번호" value="010-8777-0605" />
+              <BusinessInfoItem label="이메일" value="alstnwjd0424@naver.com" />
+              <BusinessInfoItem label="통신판매업 신고번호" value="2026-서울영등포-1320호" />
+            </dl>
+          </div>
+        )}
       </div>
     </footer>
+  )
+}
+
+function BusinessInfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-1.5">
+      <dt className="shrink-0 font-semibold text-[#70695f]">{label} :</dt>
+      <dd>{value}</dd>
+    </div>
   )
 }
 

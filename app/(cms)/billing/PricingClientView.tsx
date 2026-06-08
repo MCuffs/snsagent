@@ -8,6 +8,9 @@ import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@pa
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 import { analytics } from '../../../lib/analytics/thinkingdata'
 
+const NICEPAY_SCRIPT_ID = 'nicepay-sdk-script'
+const NICEPAY_SCRIPT_SRC = 'https://pay.nicepay.co.kr/v1/js/'
+
 declare global {
   interface Window {
     gtag?: (command: string, action: string, params: Record<string, unknown>) => void
@@ -48,10 +51,6 @@ interface PricingClientViewProps {
   locale?: string
 }
 
-function formatLimit(limit: number) {
-  return `${limit}`
-}
-
 export default function PricingClientView(props: PricingClientViewProps) {
   if (!props.paypalClientId) return <PricingGrid {...props} />
 
@@ -88,6 +87,7 @@ function PricingGrid({
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
+  const [nicepayReady, setNicepayReady] = useState(false)
 
   // Locale-based payment method determination
   const showNicePay = locale === 'ko' && !!nicepayClientKey
@@ -114,17 +114,49 @@ function PricingGrid({
   }, [])
 
   useEffect(() => {
-    if (!nicepayClientKey || window.AUTHNICE) return
-
-    const script = document.createElement('script')
-    script.src = 'https://pay.nicepay.co.kr/v1/js/'
-    script.async = true
-    script.onerror = () => setError(t('nicepay_load_error'))
-    document.body.appendChild(script)
-    return () => {
-      document.body.removeChild(script)
+    if (!showNicePay) {
+      return
     }
-  }, [nicepayClientKey, t])
+
+    let active = true
+    let script = document.getElementById(NICEPAY_SCRIPT_ID) as HTMLScriptElement | null
+
+    const handleLoad = () => {
+      if (!active) return
+      const isReady = typeof window.AUTHNICE?.requestPay === 'function'
+      setNicepayReady(isReady)
+      if (!isReady) {
+        setError(t('nicepay_load_error'))
+      }
+    }
+
+    const handleError = () => {
+      if (!active) return
+      setNicepayReady(false)
+      setError(t('nicepay_load_error'))
+    }
+
+    if (!script) {
+      script = document.createElement('script')
+      script.id = NICEPAY_SCRIPT_ID
+      script.src = NICEPAY_SCRIPT_SRC
+      script.async = true
+      document.body.appendChild(script)
+    }
+
+    script.addEventListener('load', handleLoad)
+    script.addEventListener('error', handleError)
+
+    if (window.AUTHNICE?.requestPay) {
+      window.setTimeout(handleLoad, 0)
+    }
+
+    return () => {
+      active = false
+      script.removeEventListener('load', handleLoad)
+      script.removeEventListener('error', handleError)
+    }
+  }, [showNicePay, t])
 
   const cancelSubscription = async () => {
     if (!confirm(t('cancel_confirm'))) return
@@ -156,7 +188,7 @@ function PricingGrid({
       setError(t('nicepay_key_missing'))
       return
     }
-    if (!window.AUTHNICE) {
+    if (!nicepayReady || !window.AUTHNICE?.requestPay) {
       setError(t('nicepay_loading'))
       return
     }
