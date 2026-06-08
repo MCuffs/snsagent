@@ -76,6 +76,14 @@ export function getUserFacingGenerationError(error: unknown) {
   }
 
   const message = error instanceof Error ? error.message : String(error)
+  if (
+    message.includes('Pexels') ||
+    message.includes('No usable Pexels image') ||
+    message.includes('Background image generation failed')
+  ) {
+    return 'Pexels에서 카드 배경 이미지를 가져오지 못했습니다. 검색어를 넓혀 다시 시도하도록 조정했으니 잠시 후 다시 생성해 주세요.'
+  }
+
   if (message.includes('fetch failed') || message.includes('ETIMEDOUT')) {
     return '외부 AI 또는 이미지 서비스 연결이 지연되고 있습니다. 잠시 후 다시 시도해주세요.'
   }

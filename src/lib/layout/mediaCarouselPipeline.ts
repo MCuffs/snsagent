@@ -414,7 +414,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         backgroundImageUrl = background.imageUrl
       } catch (err) {
         console.error('[MediaCarouselPipeline] Background image generation failed', err)
-        throw new Error(`Background image generation failed for slide ${slide.slideNumber}. Please try again.`)
+        const reason = err instanceof Error ? err.message : String(err)
+        throw new Error(`Background image generation failed for slide ${slide.slideNumber}: ${reason}`)
       }
 
       analyzeReferencePattern({

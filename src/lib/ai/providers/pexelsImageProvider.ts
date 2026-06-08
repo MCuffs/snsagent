@@ -1,5 +1,5 @@
 import type { ImageProvider } from '../imageProvider'
-import { buildCommonsSearchQuery } from './freeStockImageProvider'
+import { sanitizeImagePrompt } from '../imageProvider'
 
 interface PexelsPhoto {
   id: number
@@ -22,6 +22,38 @@ interface PexelsSearchResponse {
 const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search'
 const cache = new Map<string, string>()
 
+const PEXELS_STOPWORDS = new Set([
+  'background', 'image', 'photo', 'photograph', 'only', 'clean', 'empty', 'space', 'layout',
+  'frame', 'instagram', 'carousel', 'card', 'news', 'text', 'typography', 'headline', 'body',
+  'slide', 'visual', 'direction', 'editorial', 'professional', 'brand', 'style', 'mood',
+  'dark', 'light', 'minimal', 'high', 'contrast', 'without', 'avoid', 'blank', 'copy',
+])
+
+const SUBJECT_KEYWORDS: Array<[RegExp, string[]]> = [
+  [/AI|인공지능|기술|테크|반도체|메모리|데이터|로봇|클라우드|삼성|현대차|네이버|SK|하이닉스/u, ['technology', 'office']],
+  [/기업|회사|비즈니스|시장|투자|주가|경제|협력|공급망/u, ['business', 'meeting']],
+  [/식단|다이어트|건강|영양|단백질|채소|식사|음식/u, ['healthy', 'food']],
+  [/화장품|뷰티|피부|스킨케어|선크림|메이크업/u, ['skincare', 'beauty']],
+  [/패션|의류|가방|스타일|코디/u, ['fashion', 'style']],
+  [/여행|호텔|휴가|공항|도시/u, ['travel', 'city']],
+  [/운동|피트니스|헬스|러닝|요가/u, ['fitness', 'workout']],
+  [/카페|커피|디저트|베이커리/u, ['coffee', 'cafe']],
+  [/교육|강의|학습|체크리스트|가이드/u, ['workspace', 'notebook']],
+]
+
+const STYLE_KEYWORDS: Array<[RegExp, string[]]> = [
+  [/minimal|clean|미니멀|깔끔|여백/u, ['minimal']],
+  [/dark|editorial|bold|다크|강렬|에디토리얼/u, ['editorial']],
+  [/warm|lifestyle|감성|따뜻/u, ['lifestyle']],
+  [/modern|professional|전문|신뢰/u, ['modern']],
+]
+
+const UNIVERSAL_PEXELS_QUERIES = [
+  'modern workspace',
+  'business background',
+  'abstract texture',
+]
+
 export class PexelsImageProvider implements ImageProvider {
   private apiKey: string
 
@@ -36,23 +68,61 @@ export class PexelsImageProvider implements ImageProvider {
     prompt: string,
     options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
-    const query = buildPexelsSearchQuery(prompt)
-    const cacheKey = `${query}:${options?.size || ''}`
+    const queries = buildPexelsSearchQueries(prompt)
+    const cacheKey = `${queries.join('|')}:${options?.size || ''}`
     const cached = cache.get(cacheKey)
     if (cached) return { imageUrl: cached }
 
-    const imageUrl = await searchPexels(query, this.apiKey)
-    if (imageUrl) {
-      cache.set(cacheKey, imageUrl)
-      return { imageUrl }
+    for (const query of queries) {
+      const queryCacheKey = `${query}:${options?.size || ''}`
+      const queryCached = cache.get(queryCacheKey)
+      if (queryCached) {
+        cache.set(cacheKey, queryCached)
+        return { imageUrl: queryCached }
+      }
+
+      const imageUrl = await searchPexels(query, this.apiKey)
+      if (imageUrl) {
+        cache.set(queryCacheKey, imageUrl)
+        cache.set(cacheKey, imageUrl)
+        return { imageUrl }
+      }
     }
 
-    throw new Error(`No usable Pexels image was found for query "${query}". Image generation fallback is disabled.`)
+    throw new Error(`No usable Pexels image was found for queries "${queries.join(', ')}". Image generation fallback is disabled.`)
   }
 }
 
 export function buildPexelsSearchQuery(prompt: string) {
-  return buildCommonsSearchQuery(prompt)
+  return buildPexelsSearchQueries(prompt)[0]
+}
+
+export function buildPexelsSearchQueries(prompt: string) {
+  const sanitized = sanitizeImagePrompt(prompt)
+  const translated = [
+    ...SUBJECT_KEYWORDS.flatMap(([pattern, keywords]) => pattern.test(sanitized) ? keywords : []),
+    ...STYLE_KEYWORDS.flatMap(([pattern, keywords]) => pattern.test(sanitized) ? keywords : []),
+  ]
+
+  const englishTokens = sanitized
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .map(token => token.trim().toLowerCase())
+    .filter(token => token.length >= 3)
+    .filter(token => !PEXELS_STOPWORDS.has(token))
+    .filter(token => !/^\d+$/.test(token))
+    .filter(token => !/[가-힣]/u.test(token))
+    .slice(0, 5)
+
+  const primaryTokens = Array.from(new Set([...translated, ...englishTokens])).slice(0, 4)
+  const primary = primaryTokens.length > 0 ? primaryTokens.join(' ') : 'modern workspace'
+  const subjectOnly = translated.length > 0 ? Array.from(new Set(translated)).slice(0, 3).join(' ') : ''
+
+  return Array.from(new Set([
+    primary,
+    subjectOnly,
+    ...UNIVERSAL_PEXELS_QUERIES,
+  ].filter(Boolean)))
 }
 
 async function searchPexels(query: string, apiKey: string) {
@@ -74,6 +144,9 @@ async function searchPexels(query: string, apiKey: string) {
         'User-Agent': 'Shuffla/1.0',
       },
     })
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`Pexels API rejected the configured key with status ${response.status}.`)
+    }
     if (!response.ok) return null
 
     const data = await response.json() as PexelsSearchResponse
@@ -106,6 +179,6 @@ function scorePexelsPhoto(photo: PexelsPhoto, query: string) {
 }
 
 function getTimeoutMs() {
-  const value = Number(process.env.PEXELS_TIMEOUT_MS || process.env.FREE_STOCK_TIMEOUT_MS || 2500)
-  return Number.isFinite(value) ? Math.max(300, Math.min(value, 6000)) : 2500
+  const value = Number(process.env.PEXELS_TIMEOUT_MS || process.env.FREE_STOCK_TIMEOUT_MS || 4500)
+  return Number.isFinite(value) ? Math.max(1000, Math.min(value, 8000)) : 4500
 }
