@@ -78,6 +78,7 @@ export default async function PricingPage({
         customerEmail={user.email}
         showRegenerationOffer={sp.offer === 'regeneration'}
         paymentSuccess={sp.success === 'true'}
+        locale={locale}
       />
     </div>
   )

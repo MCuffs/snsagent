@@ -45,6 +45,7 @@ interface PricingClientViewProps {
   customerEmail: string
   showRegenerationOffer: boolean
   paymentSuccess?: boolean
+  locale?: string
 }
 
 function formatLimit(limit: number) {
@@ -80,12 +81,17 @@ function PricingGrid({
   customerEmail: _customerEmail,
   showRegenerationOffer,
   paymentSuccess,
+  locale = 'ko',
 }: PricingClientViewProps) {
   const router = useRouter()
   const t = useTranslations('billing')
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
+
+  // Locale-based payment method determination
+  const showNicePay = locale === 'ko' && !!nicepayClientKey
+  const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
 
   // Google Ads conversion tracking
   useEffect(() => {
@@ -242,16 +248,19 @@ function PricingGrid({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+        <div className="rounded-xl border border-red-200 bg-red-50/50 px-5 py-4 text-sm font-medium text-red-700 backdrop-blur-sm">
           {error}
         </div>
       )}
 
       {hasSubscription && (
-        <div className="flex items-center justify-between rounded-lg border border-[#ece9e0] bg-[#faf8f4] px-5 py-4">
-          <p className="text-sm font-bold text-[#5d584f]">{t('active_subscription')}</p>
+        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+            <p className="text-sm font-semibold text-slate-700">{t('active_subscription')}</p>
+          </div>
           <button
             type="button"
             disabled={canceling}
@@ -265,50 +274,58 @@ function PricingGrid({
       )}
 
       {currentPlan === 'FREE' && (
-        <div className="rounded-lg border border-[#ece9e0] bg-white px-5 py-4 text-sm font-bold text-[#5d584f]">
-          {t('free_plan_notice')}
+        <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-600">{t('free_plan_notice')}</p>
         </div>
       )}
 
       {(showRegenerationOffer || currentPlan === 'LITE') && (
-        <article className="rounded-xl border border-[#f0cdb7] bg-[#fff8f2] p-6">
-          <p className="text-[11px] font-black uppercase tracking-widest text-[#b94718]">{t('one_time_eyebrow')}</p>
+        <article className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/50 via-orange-50/30 to-white p-6 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700">{t('one_time_eyebrow')}</p>
           <div className="mt-3 flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
-              <h2 className="text-xl font-black tracking-tight text-[#171411]">{t('one_time_title')}</h2>
-              <p className="mt-2 text-sm font-bold text-[#5d584f]">{t('one_time_desc')}</p>
-              <p className="mt-2 text-xs leading-5 text-[#746a62]">{t('one_time_detail')}</p>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">{t('one_time_title')}</h2>
+              <p className="mt-2 text-sm font-medium text-slate-600">{t('one_time_desc')}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{t('one_time_detail')}</p>
             </div>
             <div className="w-full shrink-0 md:w-64">
               {currentPlan === 'LITE' ? (
-                <div className="rounded-lg bg-[#f1f0eb] px-4 py-3 text-center text-sm font-bold text-[#5d584f]">
+                <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-600">
                   {t('one_time_used')}
                 </div>
-              ) : nicepayClientKey ? (
+              ) : showNicePay ? (
                 <button
                   type="button"
                   onClick={() => handleNicepayPayment('LITE')}
                   disabled={processingPayment !== null}
-                  className="w-full rounded-lg bg-[#111318] py-3 text-sm font-black text-white transition hover:bg-[#292c32] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
-                  {processingPayment === 'LITE' ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      처리 중...
-                    </span>
-                  ) : (
-                    t('one_time_cta_nicepay')
-                  )}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {processingPayment === 'LITE' ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        처리 중...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        {t('one_time_cta_nicepay')}
+                      </>
+                    )}
+                  </span>
                 </button>
               ) : (
-                <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
+                <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
               )}
             </div>
           </div>
         </article>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
@@ -317,29 +334,39 @@ function PricingGrid({
           return (
             <article
               key={planKey}
-              className={`panel rounded-lg p-6 ${isCurrentPlan ? 'outline outline-2 outline-[#b94718]/20' : ''}`}
+              className={`group relative overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
+                isCurrentPlan
+                  ? 'border-slate-900 shadow-xl ring-2 ring-slate-900/10'
+                  : 'border-slate-200 hover:border-slate-400 hover:shadow-lg'
+              }`}
             >
-              <div className="mb-6">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-black tracking-tight text-neutral-950">{plan.name}</h2>
-                  {isCurrentPlan && (
-                    <span className="rounded-full bg-[#f1f0eb] px-2 py-1 text-[10px] font-bold text-[#6f6a61]">
-                      {t('current_plan')}
-                    </span>
-                  )}
+              <div className="p-8">
+                <div className="mb-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight text-slate-900">{plan.name}</h2>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-600">{plan.description}</p>
+                    </div>
+                    {isCurrentPlan && (
+                      <span className="shrink-0 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                        {t('current_plan')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold tracking-tight text-slate-900">{plan.price}</span>
+                    <span className="text-sm text-slate-500">/월</span>
+                  </div>
                 </div>
-                <p className="mt-2 min-h-10 text-sm leading-5 text-[#6f6a61]">{plan.description}</p>
-                <p className="mt-5 text-2xl font-black tracking-tight text-neutral-950">{plan.price}</p>
-              </div>
 
-              <div className="space-y-3 border-y border-[#ece9e0] py-5 text-sm">
-                <Feature>{t('feature_generation_count', { limit: formatLimit(plan.monthlyCardLimit) })}</Feature>
-                <Feature>{t('feature_history_days', { days: plan.historyRetentionDays })}</Feature>
-                <Feature>{t('feature_regen_campaign')}</Feature>
-                <Feature>{t('feature_edit_ref')}</Feature>
-              </div>
+                <div className="space-y-3 border-t border-slate-100 py-6">
+                  <Feature>{t('feature_generation_count', { limit: formatLimit(plan.monthlyCardLimit) })}</Feature>
+                  <Feature>{t('feature_history_days', { days: plan.historyRetentionDays })}</Feature>
+                  <Feature>{t('feature_regen_campaign')}</Feature>
+                  <Feature>{t('feature_edit_ref')}</Feature>
+                </div>
 
-              <div className="mt-6">
+                <div className="mt-6">
                 {isCurrentPlan ? (
                   <button type="button" disabled className="btn-secondary w-full opacity-60">
                     {t('in_use')}
@@ -350,31 +377,32 @@ function PricingGrid({
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    {nicepayClientKey && (
+                    {showNicePay && (
                       <button
                         type="button"
                         onClick={() => handleNicepayPayment(planKey)}
                         disabled={processingPayment !== null}
-                        className="w-full rounded-lg bg-[#e8173e] py-2.5 text-sm font-black text-white transition-all hover:bg-[#c90f32] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                       >
-                        {processingPayment === planKey ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            처리 중...
-                          </span>
-                        ) : (
-                          t('domestic_nicepay')
-                        )}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <span className="relative flex items-center justify-center gap-2">
+                          {processingPayment === planKey ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              처리 중...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                              </svg>
+                              {t('domestic_nicepay')}
+                            </>
+                          )}
+                        </span>
                       </button>
                     )}
-                    {nicepayClientKey && paypalPlanId && (
-                      <div className="flex items-center gap-3 py-1 text-[11px] font-bold text-[#6f6a61]">
-                        <span className="h-px flex-1 bg-[#ece9e0]" />
-                        {t('foreign_divider')}
-                        <span className="h-px flex-1 bg-[#ece9e0]" />
-                      </div>
-                    )}
-                    {paypalPlanId && (
+                    {showPayPal && paypalPlanId && (
                       <PayPalSubscribeButton
                         planKey={planKey}
                         planId={paypalPlanId}
@@ -384,11 +412,12 @@ function PricingGrid({
                         onError={setError}
                       />
                     )}
-                    {!nicepayClientKey && !paypalPlanId && (
-                      <p className="text-center text-xs font-bold text-[#6f6a61]">{t('payment_setup')}</p>
+                    {!showNicePay && !showPayPal && (
+                      <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
                   </div>
                 )}
+                </div>
               </div>
             </article>
           )
