@@ -27,7 +27,7 @@ function getRootLocale(request: NextRequest) {
   return routing.defaultLocale
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Pass through API routes, static files, and Next.js internals
