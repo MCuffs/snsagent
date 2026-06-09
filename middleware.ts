@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware'
 import { type NextRequest, NextResponse } from 'next/server'
 import { routing } from './i18n/routing'
-import { readSessionEmail, SESSION_COOKIE_NAME } from './lib/auth/session'
+import { readSessionEmailEdge, SESSION_COOKIE_NAME } from './lib/auth/session-edge'
 import { isAdminEmail } from './lib/auth/admin-emails'
 
 const intlMiddleware = createMiddleware(routing)
@@ -43,7 +43,7 @@ export function middleware(request: NextRequest) {
   // 1. Admin route authentication guard
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     const token = request.cookies.get(SESSION_COOKIE_NAME)?.value
-    const email = readSessionEmail(token)
+    const email = await readSessionEmailEdge(token)
     if (!email) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
@@ -76,7 +76,7 @@ export function middleware(request: NextRequest) {
 
   if (isProtected) {
     const token = request.cookies.get(SESSION_COOKIE_NAME)?.value
-    const email = readSessionEmail(token)
+    const email = await readSessionEmailEdge(token)
     if (!email) {
       return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
     }
