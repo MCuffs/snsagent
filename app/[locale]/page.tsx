@@ -49,7 +49,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   const { locale } = await params
   const isEn = locale === 'en'
   const authenticated = Boolean(await getSessionUser())
-  const accessHref = authenticated ? `/${locale}/concept` : '/api/auth/google/start'
+  const accessHref = authenticated ? `/${locale}/concept` : `/${locale}/login`
   const t = await getTranslations('landing')
   const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 

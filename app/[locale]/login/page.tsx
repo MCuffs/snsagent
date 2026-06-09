@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail } from 'lucide-react'
 import { getSessionUser, loginAction } from '../../actions'
 import { getTranslations } from 'next-intl/server'
 
@@ -61,15 +61,6 @@ export default async function LoginPage({
     }
   }
 
-  async function handleDemoLogin() {
-    'use server'
-    const demoEmail = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
-    const result = await loginAction(demoEmail, 'Demo User')
-    if (result.success) {
-      redirect(`/${locale}/concept`)
-    }
-  }
-
   return (
     <main className="app-shell min-h-screen text-[#1f1512]">
       <header className="flex h-[76px] items-center justify-between border-b border-[#ece2d6] bg-[#fffdf8]/88 px-6 backdrop-blur-xl lg:px-12">
@@ -119,73 +110,48 @@ export default async function LoginPage({
               </div>
             )}
 
-            <Link
-              href="/api/auth/google/start"
-              prefetch={false}
-              className="mb-3 flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-lg font-black transition hover:bg-[#fff8f0]"
-            >
-              <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-base font-black text-[#4285f4]">
-                G
-              </span>
-              {t('google_cta')}
-            </Link>
-            <p className="mb-6 text-center text-xs text-[#a29a91]">{t('trust_hint')}</p>
+            <p className="mb-6 text-center text-sm font-bold text-[#171714]">
+              {isEn ? 'Sign up or log in' : '신규 가입 및 로그인'}
+            </p>
 
-            {(() => {
-              return (
-                <>
-                  <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
-                    <div className="h-px flex-1 bg-[#e8dfd4]" />
-                    {locale === 'en' ? 'or' : '또는'}
-                    <div className="h-px flex-1 bg-[#e8dfd4]" />
-                  </div>
+            <form action={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="mb-2 block text-sm font-black">
+                  {t('email_label')}
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder={t('email_placeholder')}
+                    required
+                    className="field h-14 pl-11 pr-4 text-base"
+                  />
+                </div>
+              </div>
 
-                  <form action={handleSubmit} className="space-y-5">
-                    <div>
-                      <label htmlFor="email" className="mb-2 block text-sm font-black">
-                        {t('email_label')}
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
-                        <input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder={t('email_placeholder')}
-                          required
-                          className="field h-14 pl-11 pr-4 text-base"
-                        />
-                      </div>
-                    </div>
+              <div>
+                <label htmlFor="name" className="mb-2 block text-sm font-black">
+                  {t('name_label')}
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder={t('name_placeholder')}
+                  className="field h-14 px-4 text-base"
+                />
+              </div>
 
-                    <div>
-                      <label htmlFor="name" className="mb-2 block text-sm font-black">
-                        {t('name_label')}
-                      </label>
-                      <input
-                        id="name"
-                        name="name"
-                        type="text"
-                        placeholder={t('name_placeholder')}
-                        className="field h-14 px-4 text-base"
-                      />
-                    </div>
+              <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
+                {isEn ? 'Continue' : '시작하기'}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </form>
 
-                    <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
-                      {t('email_cta')}
-                      <ArrowRight className="h-5 w-5" />
-                    </button>
-                  </form>
-
-                  <form action={handleDemoLogin} className="mt-4">
-                    <button type="submit" className="btn-secondary w-full rounded-[5px]">
-                      <ShieldCheck className="h-4 w-4 text-[#ff4f0a]" />
-                      {t('demo_cta')}
-                    </button>
-                  </form>
-                </>
-              )
-            })()}
+            <p className="mt-5 text-center text-xs text-[#a29a91]">{t('trust_hint')}</p>
           </div>
         </div>
       </section>
@@ -197,8 +163,8 @@ function getLoginErrorMessage(error: string, locale: string) {
   const isEn = locale === 'en'
   const map: Record<string, string> = {
     google_config_missing: isEn
-      ? 'Google OAuth environment variables are missing. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env and restart the dev server.'
-      : 'Google OAuth 환경변수가 없습니다. .env에 GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 입력한 뒤 dev 서버를 재시작하세요.',
+      ? 'Google OAuth environment variables are missing.'
+      : 'Google OAuth 환경변수가 없습니다.',
     google_callback_invalid: isEn
       ? 'Invalid Google login response.'
       : 'Google 로그인 응답이 올바르지 않습니다.',
@@ -209,9 +175,9 @@ function getLoginErrorMessage(error: string, locale: string) {
       ? 'An error occurred during Google login.'
       : 'Google 로그인 처리 중 오류가 발생했습니다.',
     database_unavailable: isEn
-      ? 'Login succeeded but the database is unavailable. Check your DATABASE_URL and restart the dev server.'
+      ? 'Login succeeded but the database is unavailable.'
       : '로그인은 완료됐지만 데이터베이스에 연결할 수 없습니다.',
-    access_denied: isEn ? 'Google login was canceled.' : 'Google 로그인이 취소되었습니다.',
+    access_denied: isEn ? 'Login was canceled.' : '로그인이 취소되었습니다.',
   }
   return map[error] || (isEn ? 'An error occurred during login.' : '로그인 중 오류가 발생했습니다.')
 }
