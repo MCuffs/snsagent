@@ -290,6 +290,7 @@ function hasIncompleteEnglishEnding(value: string) {
 
 function hasBrokenKoreanParticle(value: string) {
   return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
+    /[가-힣]{2,}의의/u.test(value) ||
     /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
     /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
 }
@@ -316,7 +317,7 @@ function hasOffTopicSensationalAngle(value: string, topic: string) {
 function hasIncompleteFinalSentence(value: string) {
   const normalized = value.trim()
   if (!/[.!?。！？]$/u.test(normalized)) return false
-  return !/(?:다|요|죠|세요|십시오|니다|습니다)[.!?。！？]$/u.test(normalized)
+  return !/(?:다|요|죠|세요|십시오|니다|습니다|것|점|중|전|후|필요|추천|체크|확인)[.!?。！？]$/u.test(normalized)
 }
 
 function normalizeForComparison(value: string) {

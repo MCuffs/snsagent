@@ -524,12 +524,23 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     })
   }
 
-  if (!semanticQuality.passed) {
+  const confirmedCopyProvided = Boolean(input.confirmedSlides?.length)
+  if (!semanticQuality.passed && !confirmedCopyProvided) {
     const failedSlides = semanticQuality.issues
       .filter(issue => issue.severity === 'block')
       .map(issue => `slide ${issue.slideNumber}: ${issue.message}`)
       .join('; ')
     throw new Error(`Generated carousel copy failed the final semantic quality guard and was not saved. ${failedSlides}`)
+  }
+
+  if (!semanticQuality.passed && confirmedCopyProvided) {
+    agentReportLogs.push({
+      agentName: 'SemanticCopyGuard',
+      role: 'final-copy-quality',
+      status: 'warn',
+      message: 'Confirmed user-reviewed copy had semantic warnings, so the campaign was saved for review instead of being blocked.',
+      timestamp: new Date().toISOString(),
+    })
   }
 
   const slideQualityIssues = slides.flatMap(slide =>
@@ -554,9 +565,10 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const semanticScore = calculateSemanticQualityScore(semanticQuality)
   const slideQualityScore = calculateSlideQualityScore(slideQualityIssues.length)
   const finalQualityScore = Math.min(qualityRes.score, editorialQuality.score, semanticScore, slideQualityScore)
+  const semanticPassedForStatus = semanticQuality.passed || confirmedCopyProvided
   const qualityPassed = qualityRes.passed &&
     editorialQuality.passed &&
-    semanticQuality.passed &&
+    semanticPassedForStatus &&
     slides.every(slide => slide.qualityCheck.passed)
 
   const agentReport: AgentReport & {

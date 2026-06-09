@@ -1170,19 +1170,25 @@ function CopyPreviewPanel({
     setEditedSlides(prev => prev.map(s => s.slideNumber === slideNumber ? { ...s, [field]: value } : s))
   }
 
+  const totalCharacters = editedSlides.reduce((sum, slide) => sum + slide.headline.length + slide.body.length, 0)
+
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-gradient-to-br from-[#FFFDFB] via-[#FAF7F2] to-[#F5F1E9] text-[#2C1E1A]">
       {/* Header */}
-      <div className="shrink-0 border-b border-[#EAEAEA] bg-white px-5 py-3">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4">
+      <div className="shrink-0 border-b border-[#EFEAE2] bg-[#FFFDFB]/88 px-5 py-4 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-[#171717]">{t('copy_preview_title')}</h2>
-            <p className="mt-0.5 truncate text-xs text-[#737373]">{t('copy_preview_desc')}</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#E5DDD3] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#9E7D68] shadow-[0_3px_12px_rgba(158,125,104,0.05)]">
+              <Sparkle className="h-3 w-3" />
+              Copy Desk
+            </div>
+            <h2 className="mt-2 text-lg font-black tracking-[-0.02em] text-[#2C1E1A]">{t('copy_preview_title')}</h2>
+            <p className="mt-1 truncate text-xs font-semibold text-[#8C7E7A]">{t('copy_preview_desc')}</p>
           </div>
           <button
             type="button"
             onClick={onBack}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#E5E5E5] bg-white px-2.5 py-1.5 text-xs font-medium text-[#525252] transition-colors hover:bg-[#F7F7F7]"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#E5DDD3] bg-white px-3 py-2 text-xs font-black text-[#5C4E4B] shadow-sm transition-all hover:border-[#C9B29F] hover:bg-[#FFF8F1]"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             {t('copy_preview_back')}
@@ -1193,50 +1199,58 @@ function CopyPreviewPanel({
       {/* Slide list */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {error && (
-          <div className="mx-auto mb-4 max-w-3xl rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+          <div className="mx-auto mb-4 max-w-4xl rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
             {error}
           </div>
         )}
 
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+        <div className="mx-auto flex max-w-4xl flex-col gap-3">
           {editedSlides.map((slide, idx) => (
             <motion.div
               key={slide.slideNumber}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1], delay: idx * 0.04 }}
-              className="rounded-lg border border-[#E8E8E8] bg-white p-3 transition-colors focus-within:border-[#A3A3A3] hover:border-[#D4D4D4]"
+              className="group rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB]/92 p-4 shadow-[0_8px_28px_rgba(158,125,104,0.05)] transition-all focus-within:border-[#B88E76] focus-within:bg-white hover:border-[#D7C7B8] hover:bg-white"
             >
-              <div className="grid gap-3 sm:grid-cols-[72px_minmax(0,1fr)]">
+              <div className="grid gap-4 sm:grid-cols-[92px_minmax(0,1fr)]">
                 <div className="flex items-center gap-2 sm:block">
-                  <span className="text-xs font-semibold text-[#171717]">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2C1E1A] text-xs font-black text-[#FFFDF8] shadow-[0_8px_18px_rgba(44,30,26,0.12)]">
                     {String(slide.slideNumber).padStart(2, '0')}
                   </span>
-                  <span className="rounded-sm bg-[#F5F5F5] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[#737373] sm:mt-1 sm:block sm:w-fit">
-                    {slide.role}
-                  </span>
+                  <div className="min-w-0 sm:mt-3">
+                    <span className="inline-flex max-w-full rounded-full border border-[#E8DCCB] bg-[#F8F4EE] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#9E7D68]">
+                      <span className="truncate">{slide.role}</span>
+                    </span>
+                  </div>
                 </div>
                 <div className="min-w-0">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#A69282]">
+                      {locale === 'en' ? 'Headline' : '제목'}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#C2B5AA]">{slide.headline.length}</span>
+                  </div>
                   <input
                     type="text"
                     value={slide.headline}
                     onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
                     placeholder={locale === 'en' ? 'Headline' : '제목'}
-                    className="h-9 w-full rounded-md border border-[#E5E5E5] bg-white px-2.5 text-sm font-semibold text-[#171717] outline-none transition-colors placeholder:text-[#A3A3A3] focus:border-[#525252]"
+                    className="h-11 w-full rounded-xl border border-[#E6DFD5] bg-white px-3 text-base font-black tracking-[-0.01em] text-[#2C1E1A] outline-none transition-all placeholder:text-[#C2B5AA] focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/8"
                   />
                   <div className="mt-2">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[10px] font-medium uppercase text-[#737373]">
+                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#A69282]">
                         {locale === 'en' ? 'Body copy' : '본문'}
                       </span>
-                      <span className="text-[10px] text-[#A3A3A3]">{slide.body.length}</span>
+                      <span className="text-[10px] font-bold text-[#C2B5AA]">{slide.body.length}</span>
                     </div>
                     <textarea
                       value={slide.body}
                       onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
                       placeholder={locale === 'en' ? 'Body copy' : '본문'}
                       rows={3}
-                      className="min-h-[84px] w-full resize-y rounded-md border border-[#E5E5E5] bg-white px-2.5 py-2 text-xs leading-5 text-[#404040] outline-none transition-colors placeholder:text-[#A3A3A3] focus:border-[#525252]"
+                      className="min-h-[96px] w-full resize-y rounded-xl border border-[#E6DFD5] bg-white px-3 py-2.5 text-sm font-semibold leading-6 text-[#5C4E4B] outline-none transition-all placeholder:text-[#C2B5AA] focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/8"
                     />
                   </div>
                 </div>
@@ -1246,14 +1260,14 @@ function CopyPreviewPanel({
         </div>
 
         {/* Image attach */}
-        <div className="mx-auto mt-4 max-w-3xl rounded-lg border border-[#E8E8E8] bg-white p-3">
+        <div className="mx-auto mt-4 max-w-4xl rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB]/92 p-4 shadow-[0_8px_28px_rgba(158,125,104,0.05)]">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-[#171717]">{t('attach_image')}</p>
-              <p className="mt-0.5 text-[10px] text-[#737373]">{t('attach_image_desc')}</p>
+              <p className="text-xs font-black text-[#2C1E1A]">{t('attach_image')}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-[#8C7E7A]">{t('attach_image_desc')}</p>
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-xs font-medium text-[#171717] transition-colors hover:bg-[#F7F7F7]">
-              <ImagePlus className="h-3.5 w-3.5 text-[#525252]" />
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-black text-[#2C1E1A] shadow-sm transition-all hover:border-[#9E7D68] hover:bg-[#FFF8F1]">
+              <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
               {t('select_file')}
               <input
                 type="file"
@@ -1274,12 +1288,12 @@ function CopyPreviewPanel({
           {referenceFiles.length > 0 && (
             <div className="mt-3 space-y-1.5">
               {referenceFiles.map((file) => (
-                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded-md border border-[#E8E8E8] bg-[#FAFAFA] px-2.5 py-1.5 text-xs text-[#525252]">
+                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded-xl border border-[#EBE2D9] bg-[#FDFBF7] px-3 py-1.5 text-xs text-[#5C4E4B]">
                   <span className="truncate font-medium">{file.name}</span>
                   <button
                     type="button"
                     onClick={() => setReferenceFiles(prev => prev.filter(f => f !== file))}
-                    className="rounded p-1 text-[#737373] hover:bg-[#EDEDED]"
+                    className="rounded-full p-1 text-[#8C7E7A] transition-colors hover:bg-[#EBE2D9]/70"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1293,12 +1307,18 @@ function CopyPreviewPanel({
       </div>
 
       {/* Sticky bottom bar */}
-      <div className="shrink-0 border-t border-[#EAEAEA] bg-white px-5 py-3">
-        <div className="mx-auto max-w-3xl">
+      <div className="shrink-0 border-t border-[#EFEAE2] bg-[#FFFDFB]/90 px-5 py-3.5 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-4xl items-center gap-4">
+          <div className="hidden min-w-0 flex-1 sm:block">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#A69282]">
+              {editedSlides.length} slides · {totalCharacters} chars
+            </p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-[#5C4E4B]">{t('copy_preview_desc')}</p>
+          </div>
           <button
             type="button"
             onClick={() => onConfirm(editedSlides)}
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-[#171717] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2A2A2A] active:bg-[#000]"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#2C1E1A] px-5 py-3 text-sm font-black text-[#FFFDF8] shadow-[0_14px_34px_rgba(44,30,26,0.18)] transition-all hover:bg-[#3B302C] active:scale-[0.99] sm:w-auto sm:min-w-[220px]"
           >
             <Sparkles className="h-4 w-4" />
             {t('copy_preview_confirm')}
