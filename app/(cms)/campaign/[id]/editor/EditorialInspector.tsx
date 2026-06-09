@@ -187,6 +187,56 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
   )
 }
 
+function DragNumberInput({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+  className,
+}: {
+  value: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+  label?: string
+  className?: string
+}) {
+  const startRef = useRef<{ y: number; value: number } | null>(null)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    startRef.current = { y: e.clientY, value }
+    const onMove = (me: MouseEvent) => {
+      if (!startRef.current) return
+      const delta = Math.round((startRef.current.y - me.clientY) / 2)
+      const next = Math.min(max, Math.max(min, startRef.current.value + delta))
+      onChange(next)
+    }
+    const onUp = () => {
+      startRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <input
+      type="number"
+      aria-label={label}
+      value={value}
+      min={min}
+      max={max}
+      onChange={e => onChange(Math.min(max, Math.max(min, Number(e.target.value))))}
+      onMouseDown={handleMouseDown}
+      title="위아래로 드래그해서 크기 조절"
+      className={`cursor-ns-resize select-none ${className ?? ''}`}
+    />
+  )
+}
+
 function TextPanel({
   layer,
   target,
@@ -220,7 +270,14 @@ function TextPanel({
           <option value="serif">Editorial Serif</option>
           <option value="magazine">Magazine</option>
         </select>
-        <input type="number" aria-label={t('font_size')} value={layer.fontSize || 24} min={10} max={180} onChange={event => onChange({ fontSize: Number(event.target.value) })} className="field h-10 px-2 text-xs font-bold text-center" />
+        <DragNumberInput
+          label={t('font_size')}
+          value={layer.fontSize || 24}
+          min={10}
+          max={180}
+          onChange={value => onChange({ fontSize: value })}
+          className="field h-10 px-2 text-xs font-bold text-center"
+        />
         <input type="color" aria-label={t('text_color')} value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
       </div>
       <div className="flex gap-2">

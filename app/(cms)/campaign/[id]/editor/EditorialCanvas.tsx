@@ -10,9 +10,12 @@ import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/t
 const SCALE = 0.5
 
 // Floating toolbar that appears over selected text in contentEditable layers
-function SelectionToolbar() {
+function SelectionToolbar({ slideId }: { slideId: string }) {
   const t = useTranslations('campaign')
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const selectedLayerId = useEditorialStore(state => state.selectedLayerId)
+  const documents = useEditorialStore(state => state.documents)
+  const updateLayer = useEditorialStore(state => state.updateLayer)
 
   useEffect(() => {
     const update = () => {
@@ -24,7 +27,7 @@ function SelectionToolbar() {
       if (!editable) { setPos(null); return }
       const r = range.getBoundingClientRect()
       if (r.width === 0) { setPos(null); return }
-      setPos({ top: r.top - 40, left: r.left + r.width / 2 })
+      setPos({ top: r.top - 44, left: r.left + r.width / 2 })
     }
     document.addEventListener('selectionchange', update)
     return () => document.removeEventListener('selectionchange', update)
@@ -32,17 +35,30 @@ function SelectionToolbar() {
 
   if (!pos) return null
 
-  const apply = (command: string) => {
+  const layer = selectedLayerId
+    ? documents[slideId]?.layers.find(l => l.id === selectedLayerId)
+    : null
+
+  const applyStyle = (command: 'bold' | 'italic' | 'underline') => {
+    // Apply visual via execCommand so the contentEditable reflects it
     document.execCommand(command)
-    const sel = window.getSelection()
-    const el = (sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement)?.closest('[contenteditable="true"]') as HTMLElement | null
-    if (el) {
-      // Trigger blur to save the style change, then restore focus after a tick
-      const event = new FocusEvent('blur', { bubbles: true })
-      el.dispatchEvent(event)
-      setTimeout(() => el.focus(), 0)
+
+    if (!layer || !selectedLayerId) return
+
+    // Immediately persist to store — don't rely on onBlur
+    if (command === 'bold') {
+      const current = layer.fontWeight ?? 400
+      updateLayer(slideId, selectedLayerId, { fontWeight: current >= 700 ? 400 : 700 })
+    } else if (command === 'italic') {
+      updateLayer(slideId, selectedLayerId, { italic: !layer.italic })
+    } else if (command === 'underline') {
+      updateLayer(slideId, selectedLayerId, { underline: !layer.underline })
     }
   }
+
+  const isBold = (layer?.fontWeight ?? 400) >= 700
+  const isItalic = !!layer?.italic
+  const isUnderline = !!layer?.underline
 
   return (
     <div
@@ -50,13 +66,28 @@ function SelectionToolbar() {
       className="flex items-center gap-0.5 rounded-lg border border-[#333] bg-[#1a1a1a] px-1.5 py-1 shadow-2xl"
       onMouseDown={e => e.preventDefault()}
     >
-      <button type="button" onClick={() => apply('bold')} title={t('bold')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button
+        type="button"
+        onClick={() => applyStyle('bold')}
+        title={t('bold')}
+        className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${isBold ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+      >
         <Bold className="h-3.5 w-3.5" />
       </button>
-      <button type="button" onClick={() => apply('italic')} title={t('italic')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button
+        type="button"
+        onClick={() => applyStyle('italic')}
+        title={t('italic')}
+        className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${isItalic ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+      >
         <Italic className="h-3.5 w-3.5" />
       </button>
-      <button type="button" onClick={() => apply('underline')} title={t('underline')} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/15 hover:text-white">
+      <button
+        type="button"
+        onClick={() => applyStyle('underline')}
+        title={t('underline')}
+        className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${isUnderline ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
+      >
         <Underline className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -114,7 +145,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
   return (
     <div className="relative">
-      <SelectionToolbar />
+      <SelectionToolbar slideId={slideId} />
       <div className="mb-3 flex items-center justify-between text-[11px] font-bold text-white/60">
         <span className="flex items-center gap-2"><Move className="h-3.5 w-3.5" /> {t('canvas_instruction')}</span>
         <span>{t('canvas_safe_zone')}</span>
