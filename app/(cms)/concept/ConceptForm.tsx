@@ -241,6 +241,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
     setIsSaving(true)
     setError(null)
     setSuccess(null)
+    analytics.brandCreateStart()
 
     try {
       const res = await saveBrandAction(brandId, {

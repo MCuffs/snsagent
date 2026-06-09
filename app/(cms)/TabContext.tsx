@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { analytics } from '../../lib/analytics/thinkingdata'
 
 interface TabContextType {
   activeTab: string
@@ -16,7 +17,9 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
   const [activeTab, setActiveTabState] = useState(initialTab)
 
   const setActiveTab = (tab: string) => {
+    const prevTab = activeTab
     setActiveTabState(tab)
+    analytics.tabSwitch(prevTab, tab)
     const params = new URLSearchParams(window.location.search)
     if (tab === 'concept') {
       params.delete('tab')
