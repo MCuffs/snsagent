@@ -338,21 +338,8 @@ export class VisualConceptAgent {
     })
 
     const processedSlides = params.slides.map((slide) => {
-      // 레이아웃 검토 및 비주얼 프롬프트 가이드 생성
-      const hasStat = /[\d%]/.test(`${slide.headline} ${slide.body}`)
-      let layoutType = slide.layoutType
-
-      if (hasStat && layoutType !== 'stat-highlight') {
-        layoutType = 'stat-highlight'
-        this.log('info', `슬라이드 ${slide.slideNumber}번: 수치 데이터 감지로 'stat-highlight' 레이아웃 재배치.`)
-      }
-
-      this.log('info', `슬라이드 ${slide.slideNumber}번: 비주얼 컨셉 분석 완료. 메인 컬러(${params.brandMainColor || '기본'}) 및 레이아웃형(${layoutType}) 매칭 완료.`)
-
-      return {
-        ...slide,
-        layoutType,
-      }
+      this.log('info', `슬라이드 ${slide.slideNumber}번: 비주얼 컨셉 분석 완료. 메인 컬러(${params.brandMainColor || '기본'}) 및 레이아웃형(${slide.layoutType}) 매칭 완료.`)
+      return slide
     })
 
     this.log('success', `비주얼 컨셉 기획 및 타이포그래피 계획 수립 완료.`)

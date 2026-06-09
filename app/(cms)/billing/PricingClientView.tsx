@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, CreditCard, Loader2, X } from 'lucide-react'
 import { FUNDING, PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 import { analytics } from '../../../lib/analytics/thinkingdata'
@@ -97,6 +97,7 @@ function PricingGrid({
   const [canceling, setCanceling] = useState(false)
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
   const [nicepayReady, setNicepayReady] = useState(false)
+  const [cardModalPlan, setCardModalPlan] = useState<string | null>(null)
 
   // Locale-based payment method determination
   const showNicePay = locale === 'ko' && !!nicepayClientKey
@@ -314,8 +315,45 @@ function PricingGrid({
     }
   }
 
+  const handleCardDirectPayment = async (planKey: string, cardData: {
+    cardNo: string; cardExpire: string; idNo: string; cardPw: string
+  }) => {
+    setError('')
+    setProcessingPayment(planKey)
+    try {
+      const res = await fetch('/api/nicepay/card-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey, ...cardData }),
+      })
+      const data = await res.json() as { error?: string; offer?: string }
+      if (!res.ok) {
+        setError(data.error || t('nicepay_approve_failed'))
+        setProcessingPayment(null)
+        return
+      }
+      setCardModalPlan(null)
+      if (data.offer === 'regeneration') {
+        router.push('/billing?success=true&offer=regeneration')
+      } else {
+        router.push('/billing?success=true')
+      }
+    } catch {
+      setError(t('network_error'))
+      setProcessingPayment(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {cardModalPlan && (
+        <CardInfoModal
+          planKey={cardModalPlan}
+          processing={processingPayment === cardModalPlan}
+          onSubmit={(data) => handleCardDirectPayment(cardModalPlan, data)}
+          onClose={() => { setCardModalPlan(null); setProcessingPayment(null) }}
+        />
+      )}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50/50 px-5 py-4 text-sm font-medium text-red-700 backdrop-blur-sm">
           {error}
@@ -361,29 +399,27 @@ function PricingGrid({
                   {t('one_time_used')}
                 </div>
               ) : showNicePay ? (
-                <button
-                  type="button"
-                  onClick={() => handleNicepayPayment('LITE')}
-                  disabled={processingPayment !== null}
-                  className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  <span className="relative flex items-center justify-center gap-2">
-                    {processingPayment === 'LITE' ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t('processing')}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                        </svg>
-                        {t('one_time_cta_nicepay')}
-                      </>
-                    )}
-                  </span>
-                </button>
+                      <button
+                          type="button"
+                          onClick={() => handleNicepayPayment('LITE')}
+                          disabled={processingPayment !== null}
+                          className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                          <span className="relative flex items-center justify-center gap-2">
+                            {processingPayment === 'LITE' ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                {t('processing')}
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="h-4 w-4" />
+                                {t('one_time_cta_nicepay')}
+                              </>
+                            )}
+                          </span>
+                        </button>
               ) : (
                 <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
               )}
@@ -449,7 +485,7 @@ function PricingGrid({
                     {showNicePay && (
                       <button
                         type="button"
-                        onClick={() => handleNicepayPayment(planKey)}
+                        onClick={() => setCardModalPlan(planKey)}
                         disabled={processingPayment !== null}
                         className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                       >
@@ -462,9 +498,7 @@ function PricingGrid({
                             </>
                           ) : (
                             <>
-                              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                              </svg>
+                              <CreditCard className="h-4 w-4" />
                               {t('domestic_nicepay')}
                             </>
                           )}
@@ -584,6 +618,148 @@ function Feature({ children }: { children: React.ReactNode }) {
     <div className="flex items-center gap-2 text-[#5d584f]">
       <Check className="h-4 w-4 text-[#b94718]" />
       <span>{children}</span>
+    </div>
+  )
+}
+
+function CardInfoModal({
+  planKey,
+  processing,
+  onSubmit,
+  onClose,
+}: {
+  planKey: string
+  processing: boolean
+  onSubmit: (data: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }) => void
+  onClose: () => void
+}) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [cardNo, setCardNo] = useState('')
+  const [cardExpire, setCardExpire] = useState('')
+  const [idNo, setIdNo] = useState('')
+  const [cardPw, setCardPw] = useState('')
+  const [formError, setFormError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    const rawCard = cardNo.replace(/-/g, '')
+    if (!/^\d{14,16}$/.test(rawCard)) { setFormError('카드번호를 올바르게 입력해 주세요.'); return }
+    if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
+    if (!/^\d{6}(\d{4})?$/.test(idNo)) { setFormError('생년월일(6자리) 또는 사업자번호(10자리)를 입력해 주세요.'); return }
+    if (!/^\d{2}$/.test(cardPw)) { setFormError('비밀번호 앞 2자리를 입력해 주세요.'); return }
+    // 유효기간 MM/YY → YYMM 변환
+    const [mm, yy] = cardExpire.split('/')
+    onSubmit({ cardNo: rawCard, cardExpire: `${yy}${mm}`, idNo, cardPw })
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={(e) => { if (e.target === overlayRef.current && !processing) onClose() }}
+    >
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-slate-700" />
+            <h2 className="text-lg font-bold text-slate-900">카드 정보 입력</h2>
+          </div>
+          <button type="button" onClick={onClose} disabled={processing} className="text-slate-400 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="mb-6 text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">Shuffla {planKey}</span> 정기 구독 등록을 위해 카드 정보를 입력해 주세요.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">카드번호</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="0000 - 0000 - 0000 - 0000"
+              maxLength={19}
+              value={cardNo}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 16)
+                setCardNo(v.replace(/(.{4})/g, '$1-').replace(/-$/, ''))
+              }}
+              required
+              className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm tracking-widest outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">유효기간</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="MM / YY"
+                maxLength={5}
+                value={cardExpire}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 4)
+                  setCardExpire(v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v)
+                }}
+                required
+                className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm tracking-widest outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">비밀번호 앞 2자리</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                placeholder="••"
+                maxLength={2}
+                value={cardPw}
+                onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                required
+                className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">생년월일 6자리 <span className="font-normal text-slate-400">(법인카드: 사업자번호 10자리)</span></label>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="YYMMDD"
+              maxLength={10}
+              value={idNo}
+              onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              required
+              className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm tracking-widest outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            />
+          </div>
+
+          {formError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</p>
+          )}
+
+          <p className="text-xs text-slate-400">
+            카드 정보는 나이스페이 보안 서버로 직접 전송되며 Shuffla 서버에 저장되지 않습니다.
+          </p>
+
+          <button
+            type="submit"
+            disabled={processing}
+            className="w-full rounded-xl bg-slate-900 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {processing ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                결제 처리 중...
+              </span>
+            ) : '결제하기'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

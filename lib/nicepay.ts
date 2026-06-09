@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { createHash, createCipheriv } from 'crypto'
 import { PRICING_PLANS, SubscriptionPlan } from './limits-types'
 
 const NICEPAY_BASE_URL = 'https://api.nicepay.co.kr'
@@ -149,4 +149,35 @@ export function nextMonthlyBillingDate(from: Date) {
   const next = new Date(from)
   next.setUTCMonth(next.getUTCMonth() + 1)
   return next
+}
+
+// 나이스페이 카드정보 직접입력 빌링키 발급 (AES-128-ECB 암호화)
+export function encryptCardData(value: string): string {
+  const secretKey = process.env.NICEPAY_SECRET_KEY?.trim()
+  if (!secretKey) throw new Error('NICEPAY_SECRET_KEY is not set')
+  // 나이스페이는 secretKey 앞 16자리를 AES-128 키로 사용
+  const key = Buffer.from(secretKey.slice(0, 16), 'utf8')
+  const cipher = createCipheriv('aes-128-ecb', key, null)
+  cipher.setAutoPadding(true)
+  return Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]).toString('base64')
+}
+
+export interface CardDirectBillingKeyInput {
+  orderId: string
+  cardNo: string       // 카드번호 (하이픈 없이)
+  cardExpire: string   // 유효기간 YYMM
+  idNo: string         // 생년월일 6자리 또는 사업자번호 10자리
+  cardPw: string       // 비밀번호 앞 2자리
+}
+
+export async function issueDirectBillingKey(input: CardDirectBillingKeyInput): Promise<NicepayBillingKey> {
+  return callNicepay<NicepayBillingKey>('/v1/subscribe/regist', {
+    method: 'POST',
+    body: JSON.stringify({
+      encData: encryptCardData(
+        `cardNo=${input.cardNo}&cardExpire=${input.cardExpire}&idNo=${input.idNo}&cardPw=${input.cardPw}`
+      ),
+      orderId: input.orderId,
+    }),
+  })
 }

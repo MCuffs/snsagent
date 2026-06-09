@@ -131,59 +131,61 @@ export default async function LoginPage({
             </Link>
             <p className="mb-6 text-center text-xs text-[#a29a91]">{t('trust_hint')}</p>
 
-            {process.env.NODE_ENV !== 'production' && (
-              <>
-                <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
-                  <div className="h-px flex-1 bg-[#e8dfd4]" />
-                  {locale === 'en' ? 'or' : '또는'}
-                  <div className="h-px flex-1 bg-[#e8dfd4]" />
-                </div>
+            {(() => {
+              return (
+                <>
+                  <div className="mb-7 flex items-center gap-5 text-sm font-bold text-[#a29a91]">
+                    <div className="h-px flex-1 bg-[#e8dfd4]" />
+                    {locale === 'en' ? 'or' : '또는'}
+                    <div className="h-px flex-1 bg-[#e8dfd4]" />
+                  </div>
 
-                <form action={handleSubmit} className="space-y-5">
-                  <div>
-                    <label htmlFor="email" className="mb-2 block text-sm font-black">
-                      {t('email_label')}
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
+                  <form action={handleSubmit} className="space-y-5">
+                    <div>
+                      <label htmlFor="email" className="mb-2 block text-sm font-black">
+                        {t('email_label')}
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#746a62]" />
+                        <input
+                          id="email"
+                          name="email"
+                          type="email"
+                          placeholder={t('email_placeholder')}
+                          required
+                          className="field h-14 pl-11 pr-4 text-base"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="name" className="mb-2 block text-sm font-black">
+                        {t('name_label')}
+                      </label>
                       <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder={t('email_placeholder')}
-                        required
-                        className="field h-14 pl-11 pr-4 text-base"
+                        id="name"
+                        name="name"
+                        type="text"
+                        placeholder={t('name_placeholder')}
+                        className="field h-14 px-4 text-base"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <label htmlFor="name" className="mb-2 block text-sm font-black">
-                      {t('name_label')}
-                    </label>
-                    <input
-                      id="name"
-                      name="name"
-                      type="text"
-                      placeholder={t('name_placeholder')}
-                      className="field h-14 px-4 text-base"
-                    />
-                  </div>
+                    <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
+                      {t('email_cta')}
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                  </form>
 
-                  <button type="submit" className="btn-primary w-full rounded-[5px] text-lg">
-                    {t('email_cta')}
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
-                </form>
-
-                <form action={handleDemoLogin} className="mt-4">
-                  <button type="submit" className="btn-secondary w-full rounded-[5px]">
-                    <ShieldCheck className="h-4 w-4 text-[#ff4f0a]" />
-                    {t('demo_cta')}
-                  </button>
-                </form>
-              </>
-            )}
+                  <form action={handleDemoLogin} className="mt-4">
+                    <button type="submit" className="btn-secondary w-full rounded-[5px]">
+                      <ShieldCheck className="h-4 w-4 text-[#ff4f0a]" />
+                      {t('demo_cta')}
+                    </button>
+                  </form>
+                </>
+              )
+            })()}
           </div>
         </div>
       </section>

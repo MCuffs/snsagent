@@ -15,6 +15,12 @@ export default function PrivacyPage() {
         <h1 className="mt-5 text-4xl font-semibold tracking-[-0.05em] md:text-5xl">개인정보 처리 안내</h1>
         <div className="mt-10 space-y-8 text-sm leading-7 text-[#625c53]">
           <section>
+            <h2 className="text-base font-semibold text-[#171714]">개인정보 처리자</h2>
+            <p className="mt-3">
+              <strong>파랑버섯 스튜디오</strong>(이하 "회사")는 Shuffla 서비스 제공을 위해 아래와 같이 개인정보를 처리합니다.
+            </p>
+          </section>
+          <section>
             <h2 className="text-base font-semibold text-[#171714]">수집하는 정보</h2>
             <p className="mt-3">
               Shuffla는 로그인 계정 정보, 브랜드 설정, 생성 요청, 편집 결과, 결제 상태처럼 서비스 제공에 필요한 정보를 저장합니다.

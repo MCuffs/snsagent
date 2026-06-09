@@ -15,6 +15,12 @@ export default function TermsPage() {
         <h1 className="mt-5 text-4xl font-semibold tracking-[-0.05em] md:text-5xl">서비스 이용약관</h1>
         <div className="mt-10 space-y-8 text-sm leading-7 text-[#625c53]">
           <section>
+            <h2 className="text-base font-semibold text-[#171714]">서비스 제공자</h2>
+            <p className="mt-3">
+              본 서비스는 <strong>파랑버섯 스튜디오</strong>(이하 "회사")가 운영하는 AI 콘텐츠 제작 도구 Shuffla를 통해 제공됩니다.
+            </p>
+          </section>
+          <section>
             <h2 className="text-base font-semibold text-[#171714]">서비스 범위</h2>
             <p className="mt-3">
               Shuffla는 브랜드 분석, 카드뉴스 생성, 편집, 다운로드를 제공하는 AI 콘텐츠 제작 도구입니다.

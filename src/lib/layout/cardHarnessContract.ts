@@ -155,7 +155,6 @@ function normalizeCopy(value: string) {
 function hasBrokenHeadline(value: string) {
   const normalized = normalizeCopy(value)
   if (!normalized) return true
-  if (/[A-Za-z]{3,}/.test(normalized)) return true
   if (/^(오는|비|신입|아침)\s*기준\s*저장$/.test(normalized)) return true
   if (/만들고 싶은|싶은 루틴|온라인 쇼핑몰 첫$|소상공인이 온라인|(첫 화면|아침 루틴|비 오는 러닝|카드뉴스 제목)가/.test(normalized)) return true
   if (/인스타그램\s*카드뉴스$/.test(normalized)) return true
@@ -168,7 +167,6 @@ function hasBrokenHeadline(value: string) {
 function hasBrokenKoreanCopy(value: string) {
   const normalized = normalizeCopy(value)
   if (!normalized) return true
-  if (/[A-Za-z]{3,}/.test(normalized)) return true
   if (/^[가-힣A-Za-z]{1,8}:\s*/.test(normalized)) return true
   if (/(첫 화면|아침 루틴|비 오는 러닝|카드뉴스 제목)는/.test(normalized)) return true
   if (/(첫 화면|아침 루틴|비 오는 러닝|카드뉴스 제목).*(먹기|보관|섭취량|하루 분량|양과 보관|양, 보관)/.test(normalized)) return true

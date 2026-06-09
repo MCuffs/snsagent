@@ -15,7 +15,6 @@ import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
 import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
-import { buildStoryOntology, getStoryNode } from '../copywriting/storyOntology'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -176,7 +175,6 @@ export async function previewMediaCarouselCopy(input: MediaCarouselInput): Promi
   })
   let plannedSlides = planMediaSlides(input, editorialPlan)
   plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
-  plannedSlides = enforceHarnessCopy(input, plannedSlides)
   return plannedSlides.map(s => ({
     slideNumber: s.slideNumber,
     role: s.role,
@@ -281,7 +279,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   } else {
     plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
   }
-  plannedSlides = enforceHarnessCopy(input, plannedSlides)
+  // NOTE: harness is applied once at the end of the agent pipeline — do not enforce here
 
   // 1. Initialize Agents
   const brandAgent = new BrandIdentityAgent()
@@ -329,7 +327,6 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   })
   agentSlides = copyRes.slides
   agentReportLogs.push(...copyRes.logs)
-  agentSlides = enforceHarnessAgentCopy(input, agentSlides)
 
   // 4. Execute VisualConceptAgent
   const visualRes = visualAgent.run({
@@ -702,7 +699,7 @@ async function generateMediaSlideCopies(
   const client = getLLMClient()
 
   const slideDescriptions = slides
-    .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${s.body || rolePurpose(s.role)}`)
+    .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${rolePurpose(s.role)}`)
     .join('\n')
 
   // Separate RSS context block (always include fully) from rest of keyContent
@@ -738,9 +735,7 @@ async function generateMediaSlideCopies(
       : 'You are an English Instagram carousel copywriter in the style of Morning Brew or The Hustle. Write native, punchy, editorial social copy. Headline = 4–7 words, one bold thesis. Body = 1–2 complete sentences, specific insight only. Do not invent unverified claims. Return valid JSON only.')
     : (isGeneral
       ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 뉴스 앵커처럼 정보를 전달하지 마세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. "보도에 따르면", "발표에 따르면" 같은 번역투는 절대 금지입니다. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
-      : (knowledgeCtx
-        ? `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`
-        : '당신은 정확성을 우선하는 한국 SNS 카드뉴스 에디터입니다. 제공된 자료에서 확인할 수 없는 사실이나 수치는 쓰지 말고, 슬라이드 간 서사를 정돈해 유효한 JSON으로만 응답하세요. 에디토리얼 톤을 유지하세요.'))
+      : `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`)
 
   const languageRule = isEnglish
     ? 'Write every headline, body, caption, and hashtag in natural English only. Do not use Korean in any field.'
@@ -1246,22 +1241,15 @@ function hasUnsupportedNumericClaim(copy: string, groundingText: string) {
 
 function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDirectorPlan): MediaSlidePlan[] {
   const parsed = input.briefing?.structurePreview?.length ? [] : parseSlideLines(input.keyContent)
-  const ontology = buildStoryOntology({
-    topic: input.topic,
-    category: input.category,
-    sourceMaterial: input.keyContent,
-    editorialPlan,
-  })
   return editorialPlan.slides.map((slidePlan, index) => {
     const item = parsed[index] || parsed[index - 1] || parsed[0]
-    const storyNode = getStoryNode(ontology, slidePlan.slideNumber)
     const briefingHint = input.briefing?.structurePreview?.find(slide => slide.slideNumber === slidePlan.slideNumber)?.description
     const headline = slidePlan.role === 'hook'
       ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
       : item?.headline || conciseHintHeadline(briefingHint) || input.topic
     const body = slidePlan.role === 'save-cta'
       ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 140)
-      : item?.body || briefingHint || slidePlan.briefingInstruction || ontologyFallbackBody(input.topic, storyNode)
+      : item?.body || briefingHint || slidePlan.briefingInstruction || ''
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
@@ -1330,27 +1318,6 @@ function summarize(value: string, maxLength: number) {
   const clean = value.replace(/\s+/g, ' ').trim()
   if (clean.length <= maxLength) return clean
   return `${clean.slice(0, maxLength).replace(/\s+\S*$/, '')}.`
-}
-
-function ontologyFallbackBody(topic: string, node: ReturnType<typeof getStoryNode>) {
-  if (!node) return summarize(topic, 180)
-  const signal = node.mustInclude.find(item => item && !/one |specific |reader |only verified/i.test(item)) || topic
-  switch (node.role) {
-    case 'hook':
-      return `${signal}을(를) 그냥 좋다고 말하면 기억에 남지 않습니다. 첫 장에서는 왜 지금 이 주제를 다시 봐야 하는지 한 가지 장면으로 열어야 합니다.`
-    case 'context':
-      return `${signal}은(는) 독자가 실제로 먹고, 쓰고, 비교하는 순간과 연결될 때 설득력이 생깁니다. 다음 장에서는 그 상황에서 무엇을 먼저 봐야 하는지 좁혀갑니다.`
-    case 'key-point':
-      return `${signal}을(를) 판단할 때는 장점의 개수보다 먼저 볼 기준이 필요합니다. 이 기준이 잡혀야 뒤의 디테일이 단순 정보가 아니라 선택 근거로 읽힙니다.`
-    case 'detail':
-    case 'stat':
-      return `${signal} 같은 구체 요소가 있어야 본문이 설명에서 멈추지 않습니다. 맛, 성분, 사용 장면, 비교 포인트 중 하나를 붙이면 독자가 바로 판단할 수 있습니다.`
-    case 'summary':
-    case 'save-cta':
-      return `${signal}을(를) 기억할 때는 핵심 장면과 확인 포인트를 같이 남겨두는 편이 좋습니다. 저장해두고 실제로 비교할 때 다시 꺼내보세요.`
-    default:
-      return `${signal}을(를) 중심으로 구체적인 상황과 판단 포인트를 함께 보여줘야 합니다. 그래야 슬라이드가 따로 놀지 않고 다음 이야기로 이어집니다.`
-  }
 }
 
 function toMediaLayout(layoutType: LayoutType): LayoutType {
