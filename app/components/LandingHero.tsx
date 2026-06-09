@@ -14,6 +14,9 @@ const COL_A = [CARDS[0], CARDS[3], CARDS[6], CARDS[9],  CARDS[12], CARDS[15]]
 const COL_B = [CARDS[1], CARDS[4], CARDS[7], CARDS[10], CARDS[13], CARDS[16]]
 const COL_C = [CARDS[2], CARDS[5], CARDS[8], CARDS[11], CARDS[14]]
 
+// 페이지 배경색 — 갤러리 상하단 페이드와 통일
+const BG = '#fbfaf7'
+
 interface Props {
   authenticated: boolean
   accessHref: string
@@ -47,21 +50,22 @@ export function LandingHero({
   return (
     <section
       ref={containerRef}
-      className="relative min-h-screen overflow-hidden bg-[#0a0a0a]"
+      className="relative overflow-hidden"
+      style={{ background: BG }}
     >
-      {/* 미묘한 그라디언트 글로우 */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(255,255,255,0.04),transparent)]" />
+      {/* 은은한 중앙 글로우 */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_30%,rgba(237,98,56,0.05),transparent)]" />
 
       {/* ── 히어로 텍스트 ─────────────────────────────── */}
-      <div className="relative z-10 mx-auto max-w-5xl px-5 pt-32 text-center md:pt-40">
+      <div className="relative z-10 mx-auto max-w-5xl px-5 pt-28 text-center md:pt-36">
         {/* 뱃지 */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-white/60 backdrop-blur-sm"
+          className="inline-flex items-center gap-2 rounded-full border border-[#e8e2d8] bg-white/80 px-4 py-1.5 text-xs font-medium text-[#716a60]"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[#ed6238]" />
           {badgeText}
         </motion.div>
 
@@ -70,7 +74,7 @@ export function LandingHero({
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 whitespace-pre-line text-[clamp(3rem,9vw,7.5rem)] font-bold leading-[0.92] tracking-[-0.06em] text-white"
+          className="mt-7 whitespace-pre-line text-[clamp(3rem,9vw,7.5rem)] font-bold leading-[0.92] tracking-[-0.06em] text-[#171714]"
         >
           {headline}
         </motion.h1>
@@ -80,7 +84,7 @@ export function LandingHero({
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto mt-6 max-w-xl whitespace-pre-line text-[15px] leading-8 text-white/50 md:text-base"
+          className="mx-auto mt-6 max-w-xl whitespace-pre-line text-[15px] leading-8 text-[#746e65] md:text-base"
         >
           {sub}
         </motion.p>
@@ -94,7 +98,7 @@ export function LandingHero({
         >
           <Link
             href={accessHref}
-            className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-[#0a0a0a] transition-all hover:bg-white/90 hover:scale-[1.02]"
+            className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#171714] px-7 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:bg-[#302c26]"
           >
             {authenticated ? ctaContinue : ctaStart}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -106,7 +110,7 @@ export function LandingHero({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.46 }}
-            className="mt-3 text-xs text-white/25"
+            className="mt-3 text-xs text-[#a89e94]"
           >
             {ctaFreeHint}
           </motion.p>
@@ -114,28 +118,34 @@ export function LandingHero({
       </div>
 
       {/* ── 카드 갤러리 그리드 ────────────────────────── */}
-      <div className="relative z-10 mt-20 px-4 pb-0">
-        {/* 상단 페이드 마스크 — 텍스트와 자연스럽게 연결 */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-32 bg-gradient-to-b from-[#0a0a0a] to-transparent" />
-        {/* 하단 페이드 마스크 */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-48 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
+      <div className="relative z-10 mt-16 px-4 pb-0">
+        {/* 상단 페이드 — 텍스트 영역에서 갤러리로 부드럽게 연결 */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40"
+          style={{ background: `linear-gradient(to bottom, ${BG}, transparent)` }}
+        />
+        {/* 하단 페이드 — 다음 섹션으로 자연스럽게 연결 */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-56"
+          style={{ background: `linear-gradient(to top, ${BG} 20%, transparent)` }}
+        />
 
         <div className="mx-auto grid max-w-[1300px] grid-cols-3 gap-3 md:gap-4">
-          {/* 열 A — 위로 */}
+          {/* 열 A */}
           <motion.div style={{ y: yA }} className="flex flex-col gap-3 md:gap-4">
             {COL_A.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="left" />
             ))}
           </motion.div>
 
-          {/* 열 B — 아래로 (약간 아래로 시작) */}
+          {/* 열 B — 약간 아래로 시작해서 엇갈림 효과 */}
           <motion.div style={{ y: yB }} className="flex flex-col gap-3 pt-8 md:gap-4 md:pt-12">
             {COL_B.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="up" />
             ))}
           </motion.div>
 
-          {/* 열 C — 위로 (빠르게) */}
+          {/* 열 C */}
           <motion.div style={{ y: yC }} className="flex flex-col gap-3 md:gap-4">
             {COL_C.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="right" />
@@ -168,7 +178,7 @@ function CardItem({ src, index, direction }: { src: string; index: number; direc
         delay: index * 0.07,
         ease: [0.16, 1, 0.3, 1],
       }}
-      className="overflow-hidden rounded-xl"
+      className="overflow-hidden rounded-xl shadow-sm"
     >
       <Image
         src={src}
