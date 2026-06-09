@@ -28,7 +28,7 @@ loadEnv(resolve(process.cwd(), '.env.local'))
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || undefined
-const MODEL = process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4o'
+const MODEL = process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-5.5'
 
 if (!OPENAI_API_KEY) { console.error('❌ OPENAI_API_KEY not found'); process.exit(1) }
 

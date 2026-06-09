@@ -23,7 +23,7 @@ export interface LLMRequestOptions {
   }
 }
 
-export const DEFAULT_TEXT_MODEL = 'gpt-5.4'
+export const DEFAULT_TEXT_MODEL = 'gpt-5.5'
 
 export class MockLLMClient implements LLMClient {
   async generateJson<T>(stepName: string, _prompt: string, fallback: () => T): Promise<T> {
