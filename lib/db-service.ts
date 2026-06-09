@@ -386,6 +386,51 @@ export const dbService = {
     return user!
   },
 
+  async createUserWithPassword(email: string, passwordHash: string, name?: string): Promise<User> {
+    if (!isMock()) {
+      try {
+        return await prisma.user.create({
+          data: { email, name, passwordHash, plan: 'FREE' },
+        }) as unknown as User
+      } catch (err) {
+        console.warn('Prisma createUserWithPassword failed', err)
+        await saveErrorLog(null, 'createUserWithPassword', err, { email })
+        throw err
+      }
+    }
+    const db = initMockDb()
+    const user = {
+      id: `u-${Date.now()}`,
+      email,
+      name: name || email.split('@')[0],
+      plan: 'FREE',
+      accountStatus: 'active',
+      passwordHash,
+      paypalSubscriptionId: null,
+      paypalSubscriptionStatus: null,
+      tossCustomerKey: null,
+      tossBillingKey: null,
+      tossPaymentKey: null,
+      tossLastOrderId: null,
+      tossSubscriptionStatus: null,
+      tossNextBillingAt: null,
+      tossLastPaidAt: null,
+      tossCanceledAt: null,
+      nicepayBid: null,
+      nicepaySubscriptionStatus: null,
+      nicepayNextBillingAt: null,
+      nicepayLastPaidAt: null,
+      nicepayCanceledAt: null,
+      nicepayLastOrderId: null,
+      brandDna: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.users.push(user as any)
+    return hydrateUser(user as unknown as StoredUser)
+  },
+
   async updateUserPlan(userId: string, plan: string): Promise<User> {
     if (!isMock()) {
       try {

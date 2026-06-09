@@ -13,6 +13,7 @@ model User {
   id                       String                 @id @default(uuid())
   email                    String                 @unique
   name                     String?
+  passwordHash             String?
   plan                     String                 @default("FREE") // FREE, LITE, PRO, UNLIMITED
   accountStatus            String                 @default("active") // active, blocked
   paypalSubscriptionId     String?                @unique

@@ -21,6 +21,7 @@ import { layerByType, parseEditorialDocument, resolveEditableBackgroundImageUrl,
 import { renderEditorialDocument } from '../src/lib/editor/renderer'
 import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
+import { hashPassword, verifyPassword } from '../lib/password'
 import { buildBrandDnaFromProfile, formatBrandDnaForPrompt } from '../lib/brand-dna'
 import { collectBrandUrlContext } from '../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../lib/purchase-persuasion'
@@ -168,6 +169,42 @@ export async function loginAction(email: string, name?: string) {
   cookieStore.set(SESSION_COOKIE_NAME, createSessionToken(user.email), sessionCookieOptions())
   cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
 
+  return { success: true as const, user }
+}
+
+// Self-hosted signup — email + password + name
+export async function registerAction(email: string, password: string, name?: string) {
+  if (!email || !email.includes('@')) return failed('올바른 이메일 주소를 입력해주세요.')
+  if (!password || password.length < 8) return failed('비밀번호는 8자 이상이어야 합니다.')
+
+  const normalizedEmail = email.trim().toLowerCase()
+  const existing = await dbService.getUserByEmail(normalizedEmail)
+  if (existing) return failed('이미 가입된 이메일입니다. 로그인해 주세요.')
+
+  const ph = await hashPassword(password)
+  const user = await dbService.createUserWithPassword(normalizedEmail, ph, name?.trim() || normalizedEmail.split('@')[0])
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE_NAME, createSessionToken(user.email), sessionCookieOptions())
+  cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
+  return { success: true as const, user }
+}
+
+// Self-hosted login — email + password
+export async function loginWithPasswordAction(email: string, password: string) {
+  if (!email || !email.includes('@')) return failed('올바른 이메일 주소를 입력해주세요.')
+  if (!password) return failed('비밀번호를 입력해주세요.')
+
+  const normalizedEmail = email.trim().toLowerCase()
+  const user = await dbService.getUserByEmail(normalizedEmail)
+  if (!user || !(user as User & { passwordHash?: string }).passwordHash) {
+    return failed('이메일 또는 비밀번호가 올바르지 않습니다.')
+  }
+  const ok = await verifyPassword(password, (user as User & { passwordHash: string }).passwordHash)
+  if (!ok) return failed('이메일 또는 비밀번호가 올바르지 않습니다.')
+
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE_NAME, createSessionToken(user.email), sessionCookieOptions())
+  cookieStore.delete(LEGACY_SESSION_COOKIE_NAME)
   return { success: true as const, user }
 }
 
