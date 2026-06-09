@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, RotateCcw, Sparkles, Trash2, Type, Underline, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
+import type { PexelsBackgroundCandidate } from '../../../../../src/lib/ai/providers/pexelsImageProvider'
 
 type EditorTab = 'text' | 'background' | 'overlay' | 'image' | 'templates'
 
@@ -22,11 +23,13 @@ interface Props {
   busy: boolean
   originalBackgroundUrl: string | null
   onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onApplyPexelsBackground: (image: PexelsBackgroundCandidate) => void
+  onLoadPexelsBackgrounds: (slideId: string) => Promise<{ success: true; images: PexelsBackgroundCandidate[] } | { success: false; error: string }>
   onResetBackground: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, slideNumber, busy, originalBackgroundUrl, onApplyBackground, onResetBackground, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, slideNumber, busy, originalBackgroundUrl, onApplyBackground, onApplyPexelsBackground, onLoadPexelsBackgrounds, onResetBackground, onImageUpload }: Props) {
   const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
@@ -142,9 +145,12 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
         )}
         {tab === 'background' && (
           <BackgroundPanel
+            slideId={slideId}
             busy={busy}
             originalBackgroundUrl={originalBackgroundUrl}
             onApplyBackground={onApplyBackground}
+            onApplyPexelsBackground={onApplyPexelsBackground}
+            onLoadPexelsBackgrounds={onLoadPexelsBackgrounds}
             onResetBackground={onResetBackground}
           />
         )}
@@ -291,14 +297,20 @@ function OverlayPanel({
 }
 
 function BackgroundPanel({
+  slideId,
   busy,
   originalBackgroundUrl,
   onApplyBackground,
+  onApplyPexelsBackground,
+  onLoadPexelsBackgrounds,
   onResetBackground,
 }: {
+  slideId: string
   busy: boolean
   originalBackgroundUrl: string | null
   onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onApplyPexelsBackground: (image: PexelsBackgroundCandidate) => void
+  onLoadPexelsBackgrounds: (slideId: string) => Promise<{ success: true; images: PexelsBackgroundCandidate[] } | { success: false; error: string }>
   onResetBackground: () => void
 }) {
   const t = useTranslations('campaign')
@@ -308,6 +320,32 @@ function BackgroundPanel({
   const [scale, setScale] = useState(100)
   const [offsetX, setOffsetX] = useState(50)
   const [offsetY, setOffsetY] = useState(50)
+  const [pexelsImages, setPexelsImages] = useState<PexelsBackgroundCandidate[]>([])
+  const [pexelsLoading, setPexelsLoading] = useState(false)
+  const [pexelsError, setPexelsError] = useState<string | null>(null)
+
+  const loadPexels = useCallback(async () => {
+    setPexelsLoading(true)
+    setPexelsError(null)
+    try {
+      const result = await onLoadPexelsBackgrounds(slideId)
+      if (!result.success) {
+        setPexelsError(result.error)
+        setPexelsImages([])
+        return
+      }
+      setPexelsImages(result.images)
+    } finally {
+      setPexelsLoading(false)
+    }
+  }, [onLoadPexelsBackgrounds, slideId])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadPexels()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadPexels])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -392,6 +430,51 @@ function BackgroundPanel({
       <button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> {t('replace_background')}
       </button>
+      <div className="rounded-lg border border-[#e8dfd4] bg-white p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-[#1f1512]">Pexels 배경</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-[#746a62]">다른 이미지를 선택하면 바로 배경으로 적용됩니다.</p>
+          </div>
+          <button
+            type="button"
+            disabled={busy || pexelsLoading}
+            onClick={loadPexels}
+            className="rounded-md border border-[#e8dfd4] px-2.5 py-1.5 text-[10px] font-black text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff] disabled:opacity-40"
+          >
+            {pexelsLoading ? '불러오는 중' : '새로고침'}
+          </button>
+        </div>
+        {pexelsError && (
+          <p className="rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-bold text-red-600">{pexelsError}</p>
+        )}
+        {pexelsLoading && pexelsImages.length === 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="aspect-[4/5] animate-pulse rounded-md bg-[#f1eee8]" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid max-h-[260px] grid-cols-3 gap-2 overflow-y-auto pr-1">
+            {pexelsImages.map(image => (
+              <button
+                key={image.id}
+                type="button"
+                disabled={busy}
+                onClick={() => onApplyPexelsBackground(image)}
+                className="group overflow-hidden rounded-md border border-[#e8dfd4] bg-[#f8f3e9] transition hover:border-[#ff4f0a] disabled:opacity-50"
+                title={image.alt}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={image.previewUrl} alt={image.alt} className="aspect-[4/5] w-full object-cover transition group-hover:scale-105" />
+              </button>
+            ))}
+          </div>
+        )}
+        {!pexelsLoading && pexelsImages.length === 0 && !pexelsError && (
+          <p className="py-3 text-center text-[10px] font-bold text-[#9a8d82]">추천 이미지를 찾지 못했습니다.</p>
+        )}
+      </div>
       {originalBackgroundUrl && (
         <button
           type="button"

@@ -18,7 +18,9 @@ import {
   exportEditorialSlideAction,
   resetSlideEditorDocumentAction,
   updatePostDetailsAction,
+  searchPexelsBackgroundsAction,
 } from '../../../actions'
+import type { PexelsBackgroundCandidate } from '../../../../src/lib/ai/providers/pexelsImageProvider'
 import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
 import { applyBrandStyleMemory, parseEditorialDocument } from '../../../../src/lib/editor/document'
 import type { EditorialLayer } from '../../../../src/lib/editor/types'
@@ -447,6 +449,41 @@ export default function CampaignResultView({
     }
   }
 
+  const handlePexelsBackgroundSelect = async (image: PexelsBackgroundCandidate) => {
+    if (!activeSlide || !activeDocument) return
+    const slideId = activeSlide.id
+    setEditorBusy(true)
+    setMessage(null)
+    setUploadToast({ status: 'uploading', text: 'Pexels 배경 적용 중', progress: 55 })
+
+    try {
+      const nextDocument = {
+        ...activeDocument,
+        layers: activeDocument.layers.map(layer =>
+          layer.type === 'background'
+            ? { ...layer, imageUrl: image.imageUrl, scale: 1, x: 0, y: 0 }
+            : layer
+        ),
+      }
+      updateDocument(slideId, () => nextDocument)
+      setUploadToast({ status: 'uploading', text: '카드에 반영 중', progress: 80 })
+      const result = await saveEditorialDocumentAction(slideId, JSON.stringify(nextDocument), true)
+      if (!result.success) {
+        setUploadToast({ status: 'error', text: result.error || t('message_background_error'), progress: 0 })
+        setTimeout(() => setUploadToast(null), 4000)
+        return
+      }
+      applyServerSlide(result.slide as Slide, result.document)
+      setUploadToast({ status: 'done', text: 'Pexels 배경이 적용됐습니다', progress: 100 })
+      setTimeout(() => setUploadToast(null), 2500)
+    } catch (error) {
+      setUploadToast({ status: 'error', text: getErrorMessage(error, t('message_background_save_error')), progress: 0 })
+      setTimeout(() => setUploadToast(null), 4000)
+    } finally {
+      setEditorBusy(false)
+    }
+  }
+
   const handleImageStickerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -820,6 +857,8 @@ export default function CampaignResultView({
                     busy={editorBusy}
                     originalBackgroundUrl={activeSlide.backgroundImageUrl}
                     onApplyBackground={handleBackgroundUpload}
+                    onApplyPexelsBackground={handlePexelsBackgroundSelect}
+                    onLoadPexelsBackgrounds={searchPexelsBackgroundsAction}
                     onResetBackground={handleResetBackground}
                     onImageUpload={() => imgFileInputRef.current?.click()}
                   />

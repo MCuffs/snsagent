@@ -11,6 +11,7 @@ import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from 
 import { isSubscriptionPlan, normalizePlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageModel, getPipelineImageProvider } from '../src/lib/ai/providers'
+import { searchPexelsBackgroundCandidates } from '../src/lib/ai/providers/pexelsImageProvider'
 import { getCopywritingModel, getTextGenerationModel, temperatureOption } from '../src/lib/ai/llmClient'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { renderMediaCard } from '../src/lib/layout/renderer'
@@ -738,6 +739,29 @@ export async function replaceBackgroundAction(
     return { success: true as const, slide }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '배경 교체에 실패했습니다.'))
+  }
+}
+
+export async function searchPexelsBackgroundsAction(slideId: string) {
+  const user = await getSessionUser()
+  if (!user) return unauthenticated()
+
+  try {
+    const existingSlide = await dbService.getSlide(slideId)
+    if (!existingSlide) return failed('슬라이드를 찾을 수 없습니다.')
+    if (existingSlide.campaign.userId !== user.id) return forbidden()
+
+    const queryPrompt = [
+      existingSlide.designPrompt,
+      existingSlide.headline,
+      existingSlide.body,
+      existingSlide.campaign.productName,
+      existingSlide.campaign.keyBenefits,
+    ].filter(Boolean).join('\n')
+    const images = await searchPexelsBackgroundCandidates(queryPrompt, undefined, 12)
+    return { success: true as const, images }
+  } catch (err: unknown) {
+    return failed(getErrorMessage(err, 'Pexels 이미지를 불러오지 못했습니다.'))
   }
 }
 

@@ -12,12 +12,10 @@ import { renderMediaCard } from './renderer'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
-import { formatBrandDnaForPrompt } from '../../../lib/brand-dna'
 import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
-import { buildStoryOntology, formatStoryOntologyForPrompt, getStoryNode } from '../copywriting/storyOntology'
-import { buildAntiPatternRule, buildHeadlineStyleGuidance, buildBodyStyleGuidance } from '../copywriting/copyStyleRules'
+import { buildStoryOntology, getStoryNode } from '../copywriting/storyOntology'
 import {
   BrandIdentityAgent,
   CopywritingAgent,
@@ -27,13 +25,12 @@ import {
   type AgentReportItem,
   type AgentSlideData
 } from '../carousel/agents'
-import { buildCopyKnowledgeContext, formatKnowledgeContextForPrompt } from '../copywriting/copyKnowledgeBase'
-import { formatDomainCopyGuidance, resolveGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
+import { buildCopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
+import { resolveGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
 import type { BrandProfile, CampaignInput } from '../carousel/types'
 import {
   buildEditorialDirectorPlan,
   evaluateEditorialCarousel,
-  formatEditorialPlanForPrompt,
   type EditorialBriefing,
   type EditorialDirectorPlan,
   type EditorialQualityReport,
@@ -705,8 +702,7 @@ async function generateMediaSlideCopies(
   const client = getLLMClient()
 
   const slideDescriptions = slides
-    .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${rolePurpose(s.role)}
-  - 기획 단서: ${s.headline}${s.body ? ` / ${s.body}` : ''}`)
+    .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${s.body || rolePurpose(s.role)}`)
     .join('\n')
 
   // Separate RSS context block (always include fully) from rest of keyContent
@@ -717,21 +713,13 @@ async function generateMediaSlideCopies(
   const baseContent = rssStart > 0 ? fullContent.slice(0, rssStart).trim() : fullContent
   const rssContent = rssStart > 0 ? fullContent.slice(rssStart) : ''
 
-  // Keep base content to 2500 chars + full RSS block (up to 2000 chars)
+  // Keep source context short. Long planning documents make the model copy internal labels.
   const sourceMaterial = [
-    baseContent.slice(0, 2500),
-    rssContent.slice(0, 2000),
+    simplifyCopySourceMaterial(baseContent).slice(0, 1800),
+    rssContent.slice(0, 1200),
   ].filter(Boolean).join('\n\n')
 
   const isGeneral = input.generationMode === 'general'
-  const brandDnaSection = (input.brandDna && !isGeneral)
-    ? `\n브랜드 DNA (카피에 반드시 반영):\n${formatBrandDnaForPrompt(input.brandDna)}\n`
-    : ''
-
-  const knowledgeSection = (knowledgeCtx && !isGeneral)
-    ? `\n${formatKnowledgeContextForPrompt(knowledgeCtx)}\n`
-    : ''
-  const editorialPlanSection = formatEditorialPlanForPrompt(editorialPlan)
   console.info('[DomainProfile:copy]', {
     source: 'resolved',
     topic: input.topic,
@@ -742,14 +730,6 @@ async function generateMediaSlideCopies(
     label: domainProfile.label,
     anchors: domainProfile.requiredCopyAnchors,
   })
-  const domainGuidanceSection = formatDomainCopyGuidance(domainProfile)
-  const storyOntology = buildStoryOntology({
-    topic: input.topic,
-    category: input.category,
-    sourceMaterial,
-    editorialPlan,
-  })
-  const storyOntologySection = formatStoryOntologyForPrompt(storyOntology)
   const isEnglish = input.language === 'en'
 
   const systemPrompt = isEnglish
@@ -785,49 +765,23 @@ async function generateMediaSlideCopies(
 
   const prompt = isEnglish ? `Write English Instagram carousel card copy.
 
-${editorialPlanSection}
+Topic: ${input.topic}
+Goal: ${input.objective || input.contentType}
+Tone: ${isGeneral ? 'clear editorial news voice' : (input.brandToneOfVoice || 'professional and credible')}
 
-${domainGuidanceSection}
-
-${storyOntologySection}
-
-Brand info:
-- Brand: ${isGeneral ? 'General news/info channel' : input.brandName}
-- Industry: ${isGeneral ? 'News / Information / Trends' : (input.brandIndustry || 'unspecified')}
-- Tone: ${isGeneral ? 'Objective and trustworthy' : (input.brandToneOfVoice || 'professional and credible')}
-- Forbidden words: ${isGeneral ? 'none' : (input.brandForbiddenWords || 'none')}
-${brandDnaSection}${knowledgeSection}
-Content brief:
-- Topic: ${input.topic}
-- Goal: ${input.objective || input.contentType}
-- Content type: ${input.contentType}
-- Visual style: ${input.visualHint || 'dark-editorial'}
-
-Source material and facts:
+Reference facts and brief:
 ${sourceMaterial || 'No additional source material.'}
 
-Slide structure:
+Required slide flow:
 ${slideDescriptions}
 
-${buildHeadlineStyleGuidance('en')}
-
-${buildBodyStyleGuidance('en')}
-
-${buildAntiPatternRule('en')}
-
 Rules:
-- headline: max 40 characters (including spaces). Bold thesis statement, 4–7 words. No numbering like "1.", "2.". No summary labels like "at a glance" or "here's what to know".
-- body: 1–2 complete sentences, 60–120 characters. One specific insight per slide — no vague filler.
-- Vary sentence structure across slides. Don't end every sentence the same way.
-- body must end with a complete sentence. Never cut mid-thought or mid-clause.
-- Each slide adds one new angle. Do not repeat information from previous slides.
-- hook slide: grab attention immediately with a counterintuitive or surprising angle.
-- stat slide: use only numbers from the provided source material.
-- save-cta / summary slide: wrap the key insight and include one clear action — but avoid cliché "save this for later" framing.
-- Do not invent stats, rankings, endorsements, or effects not in the source material.
-- Avoid vague filler phrases like "a key consideration", "an important factor", "in today's world".
-- Do not write internal planning tokens (guiding question, STORY ONTOLOGY, visualDirection, etc.) in card copy.
-- Overall flow: hook → context/evidence → core insight → action/summary.${hasRssContext ? `\n- Real-time news context is provided. The hook and body copy must reference actual article angles, keywords, and trends from those articles.` : ''}${researchInstruction}
+- Write exactly ${slides.length} slides.
+- headline: max 40 characters, no numbering, no planning labels.
+- body: 1-2 complete sentences, 60-130 characters.
+- Do not copy labels like "Goal", "Content type", "Slide flow", "Hook", "Summary".
+- Each slide must add a new useful point about the topic.
+- Use only facts supported by the reference brief.${hasRssContext ? `\n- Use only topic-relevant real-time news angles.` : ''}${researchInstruction}
 - ${languageRule}
 
 JSON response format:
@@ -837,59 +791,24 @@ JSON response format:
   ]
 }` : `한국 인스타그램 카드뉴스 카피를 작성해주세요.
 
-${editorialPlanSection}
+주제: ${input.topic}
+목표: ${input.objective || input.contentType}
+톤: ${isGeneral ? '명확하고 읽기 쉬운 정보/트렌드 에디토리얼 톤' : (input.brandToneOfVoice || '전문적이고 신뢰감 있게')}
 
-${domainGuidanceSection}
-
-${storyOntologySection}
-
-브랜드 정보:
-- 브랜드명: ${isGeneral ? '일반 정보/뉴스 전달용' : input.brandName}
-- 업종: ${isGeneral ? '시사/정보/트렌드' : (input.brandIndustry || '미지정')}
-- 톤앤매너: ${isGeneral ? '객관적이고 신뢰감 있게' : (input.brandToneOfVoice || '전문적이고 신뢰감 있게')}
-- 금지어: ${isGeneral ? '없음' : (input.brandForbiddenWords || '없음')}
-${brandDnaSection}${knowledgeSection}
-콘텐츠 기획:
-- 주제(상품): ${input.topic}
-- 캠페인 목표: ${input.objective || input.contentType}
-- 콘텐츠 유형: ${input.contentType}
-- 비주얼 스타일: ${input.visualHint || 'dark-editorial'}
-
-제공된 사실 및 기획 자료:
+참고 근거:
 ${sourceMaterial || '추가 자료 없음'}
 
-슬라이드 구성:
+슬라이드 흐름:
 ${slideDescriptions}
 
-${buildHeadlineStyleGuidance('ko')}
-
-${buildBodyStyleGuidance('ko')}
-
-${buildAntiPatternRule('ko')}
-
 규칙:
-- headline: 24자 이하, 강렬하고 구체적 (공백 포함). "1.", "2." 같은 숫자 번호로 시작하지 마세요. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
-- body: 일반 슬라이드는 80~150자, 마무리 슬라이드는 70~120자 권장. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
-- body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체("~잖아요", "~라고요?")도 피하세요. 에디토리얼 톤을 유지하면서 문장 구조를 다양하게 하세요.
-- body는 글자수를 억지로 줄이기보다 의미 있는 정보량을 우선하세요. 단, 한 슬라이드에 수치가 너무 많아지면 읽기 어려우므로 핵심 수치 1~2개만 선택하세요.
-- body에는 주제의 구체 정보(특징/사용 장면/비교 포인트/주의할 점 중 최소 1개)를 담으세요.
-- DOMAIN GUIDANCE는 참고하되, 상품 맥락에 맞는 표현만 자연스럽게 사용하세요.
-- DOMAIN GUIDANCE의 금지 표현이나 다른 업종의 표현을 쓰지 마세요.
-- "생활 속 선택", "중요한 기준", "반복되는 상황", "선택 이유", "더 오래 기억"처럼 어디에나 붙는 추상 문구를 쓰지 마세요.
-- 각 슬라이드는 STORY ONTOLOGY의 의미만 참고하고, guiding question, transition 같은 내부 기획 용어는 절대 카피에 쓰지 마세요.
-- body는 한 슬라이드 안에서 독자가 이해할 수 있는 구체 정보, 이유, 실천 기준을 함께 담되, 과도하게 길면 다음 슬라이드와 역할을 나눠 전개하세요.
-- body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요. 문장을 줄여야 하면 중간을 자르지 말고 완성 문장 단위로 다시 작성하세요.${rssInstruction}
-- 전체 흐름은 관심 유도 → 이해/근거 → 핵심 가치 → 정리 또는 행동 촉구 순서로 이어져야 하며, 같은 정보를 반복하지 마세요
-- 각 슬라이드는 지정된 역할과 기획 단서를 발전시키되 앞뒤 슬라이드와 자연스럽게 연결하세요
-- hook 슬라이드: 독자의 시선을 즉시 잡되 사실로 확인되지 않은 효과를 단정하지 마세요
-- stat 슬라이드: 제공된 사실 및 기획 자료에 있는 수치만 사용하세요
-- save-cta / summary 슬라이드: 핵심 내용을 짧게 정리한 뒤 "저장", "확인", "체크", "비교" 중 하나의 행동을 반드시 포함하세요
-- 제공된 사실 및 브랜드 DNA에 없는 수치, 할인율, 순위, 인증, 성분, 후기, 성능 또는 효능을 새로 만들지 마세요
-- 자료가 부족하면 검증 가능한 특징을 단정하지 말고 주제와 브랜드 관점 중심으로 표현하세요
-- 금지어·과장표현(혁신적인, 최고의, 완벽한) 사용 금지
-- 캠페인 목표는 카피의 방향성으로만 사용하고, 목표 문구 자체를 카피에 쓰지 마세요${researchInstruction}
+- 총 ${slides.length}개 슬라이드를 작성하세요.
+- headline은 24자 이하. 숫자 번호, "콘텐츠 방향", "기획 목표", "슬라이드별 기획 흐름", "Hook", "Summary" 같은 기획 라벨 금지.
+- body는 1~2개의 완성 문장, 70~140자 권장.
+- 참고 근거를 그대로 복사하지 말고 독자가 읽을 카드뉴스 문장으로 바꾸세요.
+- 각 슬라이드는 앞 슬라이드와 다른 정보를 말해야 합니다.
+- 확인되지 않은 수치, 순위, 효과는 만들지 마세요.${rssInstruction}${researchInstruction}
 - ${languageRule}
-- "daily use scene", "mirror audience life", "one defining object", "imagePurpose", "guiding question", "STORY ONTOLOGY", "visualDirection" 같은 영어 기획 토큰은 절대 출력하지 마세요.
 
 JSON 응답 형식:
 {
@@ -960,7 +879,6 @@ JSON 응답 형식:
     domainProfile,
     sourceMaterial,
     systemPrompt,
-    storyOntologySection,
   })
 }
 
@@ -971,7 +889,6 @@ async function enforceSemanticMeaning(params: {
   domainProfile: DomainProfile
   sourceMaterial: string
   systemPrompt: string
-  storyOntologySection: string
 }): Promise<MediaSlidePlan[]> {
   const initialReport = evaluateSemanticCopy({
     topic: params.input.topic,
@@ -998,8 +915,6 @@ Goal: ${params.input.objective || params.input.contentType}
 
 Source material:
 ${params.sourceMaterial || 'No additional source material.'}
-
-${params.storyOntologySection}
 
 Weak slides and issues:
 ${weakSlides.map(slide => {
@@ -1034,8 +949,6 @@ Return JSON only:
 
 제공 자료:
 ${params.sourceMaterial || '추가 자료 없음'}
-
-${params.storyOntologySection}
 
 약한 슬라이드와 문제:
 ${weakSlides.map(slide => {
@@ -1332,7 +1245,7 @@ function hasUnsupportedNumericClaim(copy: string, groundingText: string) {
 }
 
 function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDirectorPlan): MediaSlidePlan[] {
-  const parsed = parseSlideLines(input.keyContent)
+  const parsed = input.briefing?.structurePreview?.length ? [] : parseSlideLines(input.keyContent)
   const ontology = buildStoryOntology({
     topic: input.topic,
     category: input.category,
@@ -1342,12 +1255,13 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
   return editorialPlan.slides.map((slidePlan, index) => {
     const item = parsed[index] || parsed[index - 1] || parsed[0]
     const storyNode = getStoryNode(ontology, slidePlan.slideNumber)
+    const briefingHint = input.briefing?.structurePreview?.find(slide => slide.slideNumber === slidePlan.slideNumber)?.description
     const headline = slidePlan.role === 'hook'
       ? input.briefing?.hookDirection || input.title || item?.headline || input.topic
-      : item?.headline || input.topic
+      : item?.headline || conciseHintHeadline(briefingHint) || input.topic
     const body = slidePlan.role === 'save-cta'
       ? input.briefing?.recommendedCta || input.brandCtaStyle || summarize(input.keyContent, 140)
-      : item?.body || slidePlan.briefingInstruction || ontologyFallbackBody(input.topic, storyNode)
+      : item?.body || briefingHint || slidePlan.briefingInstruction || ontologyFallbackBody(input.topic, storyNode)
     return {
       slideNumber: slidePlan.slideNumber,
       role: slidePlan.role,
@@ -1366,6 +1280,15 @@ function planMediaSlides(input: MediaCarouselInput, editorialPlan: EditorialDire
   })
 }
 
+function conciseHintHeadline(value?: string) {
+  if (!value) return ''
+  return value
+    .replace(/^(?:Hook|Issue\s*\d+|Trend\s*\d+|Insight|Summary|CTA|Save|Context)\s*[:：-]\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 28)
+}
+
 function parseSlideLines(content: string) {
   return content
     .split(/\n+/)
@@ -1380,6 +1303,18 @@ function parseSlideLines(content: string) {
     })
     .filter(item => item.headline.length > 0)
     .slice(0, 10)
+}
+
+function simplifyCopySourceMaterial(value: string) {
+  const blockedLabels = /^(?:주제|콘텐츠 방향|기획 목표|훅 방향|브랜드 해석|권장 행동|슬라이드별 기획 흐름|브랜드 정보|콘텐츠 기획)\s*[:：]/u
+  return value
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !blockedLabels.test(line))
+    .filter(line => !/^\d+\.\s*(?:Hook|Issue|Trend|Insight|Summary|CTA|Save)/i.test(line))
+    .join('\n')
+    .trim()
 }
 
 function trimHeadline(value: string) {

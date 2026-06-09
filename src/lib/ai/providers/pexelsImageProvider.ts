@@ -1,7 +1,7 @@
 import type { ImageProvider } from '../imageProvider'
 import { sanitizeImagePrompt } from '../imageProvider'
 
-interface PexelsPhoto {
+export interface PexelsPhoto {
   id: number
   width: number
   height: number
@@ -17,6 +17,15 @@ interface PexelsPhoto {
 
 interface PexelsSearchResponse {
   photos?: PexelsPhoto[]
+}
+
+export interface PexelsBackgroundCandidate {
+  id: number
+  alt: string
+  width: number
+  height: number
+  imageUrl: string
+  previewUrl: string
 }
 
 const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search'
@@ -125,7 +134,41 @@ export function buildPexelsSearchQueries(prompt: string) {
   ].filter(Boolean)))
 }
 
+export async function searchPexelsBackgroundCandidates(prompt: string, apiKey = process.env.PEXELS_API_KEY, limit = 12) {
+  if (!apiKey) throw new Error('PEXELS_API_KEY is not configured.')
+  const candidates: PexelsBackgroundCandidate[] = []
+  const seen = new Set<number>()
+
+  for (const query of buildPexelsSearchQueries(prompt)) {
+    const photos = await searchPexelsPhotos(query, apiKey, Math.max(limit, 12)).catch(() => [])
+    for (const photo of photos) {
+      if (seen.has(photo.id)) continue
+      const imageUrl = photo.src?.large2x || photo.src?.portrait || photo.src?.large || photo.src?.original
+      const previewUrl = photo.src?.portrait || photo.src?.large || imageUrl
+      if (!imageUrl || !previewUrl) continue
+      seen.add(photo.id)
+      candidates.push({
+        id: photo.id,
+        alt: photo.alt || query,
+        width: photo.width,
+        height: photo.height,
+        imageUrl,
+        previewUrl,
+      })
+      if (candidates.length >= limit) return candidates
+    }
+  }
+
+  return candidates
+}
+
 async function searchPexels(query: string, apiKey: string) {
+  const candidates = await searchPexelsPhotos(query, apiKey, 20)
+  const best = candidates[0]
+  return best?.src?.large2x || best?.src?.portrait || best?.src?.large || best?.src?.original || null
+}
+
+async function searchPexelsPhotos(query: string, apiKey: string, perPage: number) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), getTimeoutMs())
 
@@ -133,7 +176,7 @@ async function searchPexels(query: string, apiKey: string) {
     const params = new URLSearchParams({
       query,
       orientation: 'portrait',
-      per_page: '20',
+      per_page: String(Math.min(Math.max(perPage, 1), 40)),
       size: 'large',
     })
 
@@ -147,15 +190,12 @@ async function searchPexels(query: string, apiKey: string) {
     if (response.status === 401 || response.status === 403) {
       throw new Error(`Pexels API rejected the configured key with status ${response.status}.`)
     }
-    if (!response.ok) return null
+    if (!response.ok) return []
 
     const data = await response.json() as PexelsSearchResponse
-    const candidates = (data.photos || [])
+    return (data.photos || [])
       .filter(isUsablePhoto)
       .sort((a, b) => scorePexelsPhoto(b, query) - scorePexelsPhoto(a, query))
-
-    const best = candidates[0]
-    return best?.src?.large2x || best?.src?.portrait || best?.src?.large || best?.src?.original || null
   } finally {
     clearTimeout(timeout)
   }
