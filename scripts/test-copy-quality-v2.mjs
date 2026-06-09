@@ -29,6 +29,7 @@ loadEnv(resolve(process.cwd(), '.env.local'))
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || undefined
 const MODEL = process.env.OPENAI_COPY_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-5.5'
+const temperatureOption = (model, temperature) => /^(gpt-5|o\d)/.test(model) ? {} : { temperature }
 
 if (!OPENAI_API_KEY) { console.error('❌ OPENAI_API_KEY not found'); process.exit(1) }
 
@@ -277,7 +278,7 @@ async function runTest(tc, failureLog) {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.35,
+      ...temperatureOption(MODEL, 0.35),
       response_format: { type: 'json_object' },
     })
     const raw = res.choices[0]?.message?.content || '{}'

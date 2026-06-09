@@ -11,7 +11,7 @@ import { fetchNaverStoreProducts, buildStoreContext, extractSmartStoreId } from 
 import { isSubscriptionPlan, normalizePlan } from '../lib/limits-types'
 import { generateCarouselCampaign } from '../src/lib/carousel/pipeline'
 import { getPipelineImageModel, getPipelineImageProvider } from '../src/lib/ai/providers'
-import { getCopywritingModel, getTextGenerationModel } from '../src/lib/ai/llmClient'
+import { getCopywritingModel, getTextGenerationModel, temperatureOption } from '../src/lib/ai/llmClient'
 import { LAYOUT_DEFINITIONS, type LayoutType } from '../src/lib/layout/layoutTypes'
 import { renderMediaCard } from '../src/lib/layout/renderer'
 import { planTypography } from '../src/lib/layout/typographyEngine'
@@ -519,9 +519,10 @@ export async function rewriteEditorialCopyAction(
     const apiKey = process.env.OPENAI_API_KEY
     if (isConfiguredOpenAIKey(apiKey)) {
       const openai = new OpenAI({ apiKey })
+      const model = getTextGenerationModel()
       const response = await openai.chat.completions.create({
-        model: getTextGenerationModel(),
-        temperature: 0.7,
+        model,
+        ...temperatureOption(model, 0.7),
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: '당신은 한국 프리미엄 에디토리얼 카피라이터입니다. 슬라이드 문구만 개선하고 유효한 JSON만 반환하세요.' },
@@ -1323,11 +1324,12 @@ ${purchasePersuasionText}
   "uniqueSellingPoints": ["차별화 포인트 최대 3개"],
   "categoryKeywords": ["업종 관련 키워드 최대 5개"]
 }`
+        const signalModel = getTextGenerationModel()
         const signalResponse = await openai.chat.completions.create({
-          model: getTextGenerationModel(),
+          model: signalModel,
           messages: [{ role: 'user', content: signalPrompt }],
           response_format: { type: 'json_object' },
-          temperature: 0,
+          ...temperatureOption(signalModel, 0),
           max_completion_tokens: 600,
         })
         const signals = JSON.parse(signalResponse.choices[0].message.content || '{}')
@@ -1406,8 +1408,9 @@ ${purchasePersuasionText}
 - avoidVisuals: 이 브랜드에 어울리지 않는 비주얼 스타일 (최대 4개)
 
 JSON 형식으로만 응답하세요:`
+        const copyModel = getCopywritingModel()
         const aiResponse = await openai.chat.completions.create({
-          model: getCopywritingModel(),
+          model: copyModel,
           messages: [
             { role: 'system', content: isEn
               ? 'You are a brand strategy AI. Return ONLY valid JSON. No markdown bold (**).'
@@ -1415,7 +1418,7 @@ JSON 형식으로만 응답하세요:`
             { role: 'user', content: synthPrompt },
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.2,
+          ...temperatureOption(copyModel, 0.2),
         })
         const rawJson = aiResponse.choices[0].message.content
         if (!rawJson) throw new Error('AI analysis failed: empty response.')
@@ -2102,9 +2105,10 @@ Respond ONLY with a valid JSON object matching this structure:
       jsonText = data.choices?.[0]?.message?.content || ''
     } else if (useOpenAI) {
       const openai = new OpenAI({ apiKey: openaiKey })
+      const model = getTextGenerationModel()
       const response = await openai.chat.completions.create({
-        model: getTextGenerationModel(),
-        temperature: 0.1,
+        model,
+        ...temperatureOption(model, 0.1),
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }]
       })

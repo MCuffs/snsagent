@@ -151,8 +151,12 @@ export function getTextGenerationModel() {
   return normalizeModelName(process.env.OPENAI_TEXT_MODEL, DEFAULT_TEXT_MODEL)
 }
 
-function supportsCustomTemperature(model: string) {
+export function supportsCustomTemperature(model: string) {
   return !/^(gpt-5|o\d)/.test(model)
+}
+
+export function temperatureOption(model: string, temperature: number) {
+  return supportsCustomTemperature(model) ? { temperature } : {}
 }
 
 export async function withJsonRetry<T>(
