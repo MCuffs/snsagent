@@ -29,7 +29,9 @@ export interface PexelsBackgroundCandidate {
 }
 
 const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search'
-const cache = new Map<string, string>()
+
+// Per-process query-level cache: avoids re-fetching identical queries across slides
+const queryCache = new Map<string, PexelsPhoto[]>()
 
 const PEXELS_STOPWORDS = new Set([
   'background', 'image', 'photo', 'photograph', 'only', 'clean', 'empty', 'space', 'layout',
@@ -65,6 +67,8 @@ const UNIVERSAL_PEXELS_QUERIES = [
 
 export class PexelsImageProvider implements ImageProvider {
   private apiKey: string
+  // Tracks used photo IDs within a single generation run to guarantee unique backgrounds
+  private usedPhotoIds = new Set<number>()
 
   constructor(apiKey = process.env.PEXELS_API_KEY) {
     if (!apiKey) {
@@ -73,27 +77,51 @@ export class PexelsImageProvider implements ImageProvider {
     this.apiKey = apiKey
   }
 
+  /** Reset used-photo tracking between carousel generation runs */
+  resetUsedPhotos() {
+    this.usedPhotoIds.clear()
+  }
+
   async generateImage(
     prompt: string,
-    options?: { size?: string; productImageUrls?: string[] }
+    _options?: { size?: string; productImageUrls?: string[] }
   ): Promise<{ imageUrl: string }> {
     const queries = buildPexelsSearchQueries(prompt)
-    const cacheKey = `${queries.join('|')}:${options?.size || ''}`
-    const cached = cache.get(cacheKey)
-    if (cached) return { imageUrl: cached }
 
-    for (const query of queries) {
-      const queryCacheKey = `${query}:${options?.size || ''}`
-      const queryCached = cache.get(queryCacheKey)
-      if (queryCached) {
-        cache.set(cacheKey, queryCached)
-        return { imageUrl: queryCached }
+    // Fetch all queries in parallel, using the per-process cache for dedup
+    const allPhotosPerQuery = await Promise.all(
+      queries.map(q => searchPexelsPhotos(q, this.apiKey, 30).catch(() => [] as PexelsPhoto[]))
+    )
+
+    // Merge, deduplicate by photo id
+    const seen = new Map<number, PexelsPhoto>()
+    for (const photos of allPhotosPerQuery) {
+      for (const photo of photos) {
+        if (!seen.has(photo.id)) seen.set(photo.id, photo)
       }
+    }
 
-      const imageUrl = await searchPexels(query, this.apiKey)
+    // Sort by score against the primary query
+    const primaryQuery = queries[0]
+    const ranked = [...seen.values()].sort(
+      (a, b) => scorePexelsPhoto(b, primaryQuery) - scorePexelsPhoto(a, primaryQuery)
+    )
+
+    // Pick the first photo not already used in this run
+    for (const photo of ranked) {
+      if (this.usedPhotoIds.has(photo.id)) continue
+      const imageUrl = photo.src?.large2x || photo.src?.portrait || photo.src?.large || photo.src?.original
+      if (!imageUrl) continue
+      this.usedPhotoIds.add(photo.id)
+      return { imageUrl }
+    }
+
+    // All candidates exhausted — relax uniqueness and return best available
+    const best = ranked[0]
+    if (best) {
+      const imageUrl = best.src?.large2x || best.src?.portrait || best.src?.large || best.src?.original
       if (imageUrl) {
-        cache.set(queryCacheKey, imageUrl)
-        cache.set(cacheKey, imageUrl)
+        this.usedPhotoIds.add(best.id)
         return { imageUrl }
       }
     }
@@ -136,11 +164,16 @@ export function buildPexelsSearchQueries(prompt: string) {
 
 export async function searchPexelsBackgroundCandidates(prompt: string, apiKey = process.env.PEXELS_API_KEY, limit = 12) {
   if (!apiKey) throw new Error('PEXELS_API_KEY is not configured.')
-  const candidates: PexelsBackgroundCandidate[] = []
-  const seen = new Set<number>()
+  const queries = buildPexelsSearchQueries(prompt)
 
-  for (const query of buildPexelsSearchQueries(prompt)) {
-    const photos = await searchPexelsPhotos(query, apiKey, Math.max(limit, 12)).catch(() => [])
+  // Fetch all queries in parallel
+  const allResults = await Promise.all(
+    queries.map(q => searchPexelsPhotos(q, apiKey, Math.max(limit, 12)).catch(() => [] as PexelsPhoto[]))
+  )
+
+  const seen = new Set<number>()
+  const candidates: PexelsBackgroundCandidate[] = []
+  for (const photos of allResults) {
     for (const photo of photos) {
       if (seen.has(photo.id)) continue
       const imageUrl = photo.src?.large2x || photo.src?.portrait || photo.src?.large || photo.src?.original
@@ -149,7 +182,7 @@ export async function searchPexelsBackgroundCandidates(prompt: string, apiKey = 
       seen.add(photo.id)
       candidates.push({
         id: photo.id,
-        alt: photo.alt || query,
+        alt: photo.alt || queries[0],
         width: photo.width,
         height: photo.height,
         imageUrl,
@@ -162,13 +195,11 @@ export async function searchPexelsBackgroundCandidates(prompt: string, apiKey = 
   return candidates
 }
 
-async function searchPexels(query: string, apiKey: string) {
-  const candidates = await searchPexelsPhotos(query, apiKey, 20)
-  const best = candidates[0]
-  return best?.src?.large2x || best?.src?.portrait || best?.src?.large || best?.src?.original || null
-}
+async function searchPexelsPhotos(query: string, apiKey: string, perPage: number): Promise<PexelsPhoto[]> {
+  const cacheKey = `${query}:${perPage}`
+  const cached = queryCache.get(cacheKey)
+  if (cached) return cached
 
-async function searchPexelsPhotos(query: string, apiKey: string, perPage: number) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), getTimeoutMs())
 
@@ -193,9 +224,12 @@ async function searchPexelsPhotos(query: string, apiKey: string, perPage: number
     if (!response.ok) return []
 
     const data = await response.json() as PexelsSearchResponse
-    return (data.photos || [])
+    const results = (data.photos || [])
       .filter(isUsablePhoto)
       .sort((a, b) => scorePexelsPhoto(b, query) - scorePexelsPhoto(a, query))
+
+    queryCache.set(cacheKey, results)
+    return results
   } finally {
     clearTimeout(timeout)
   }

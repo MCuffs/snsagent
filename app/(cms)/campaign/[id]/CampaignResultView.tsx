@@ -221,7 +221,6 @@ export default function CampaignResultView({
   useEffect(() => {
     const pasteHandler = async (e: ClipboardEvent) => {
       if (!activeSlide || !activeDocument) return
-      // Only handle when not typing in a text field
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
 
@@ -235,30 +234,9 @@ export default function CampaignResultView({
       await uploadAndAddImageLayer(file)
     }
 
-    const keyHandler = async (e: KeyboardEvent) => {
-      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return
-      if (!activeSlide || !activeDocument) return
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
-      try {
-        const items = await navigator.clipboard.read()
-        for (const item of items) {
-          const imageType = item.types.find(t => t.startsWith('image/'))
-          if (imageType) {
-            const blob = await item.getType(imageType)
-            const file = new File([blob], `pasted-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType })
-            await uploadAndAddImageLayer(file)
-            break
-          }
-        }
-      } catch { /* permission denied or no image */ }
-    }
-
     window.addEventListener('paste', pasteHandler)
-    window.addEventListener('keydown', keyHandler)
     return () => {
       window.removeEventListener('paste', pasteHandler)
-      window.removeEventListener('keydown', keyHandler)
     }
   }, [activeSlide, activeDocument, uploadAndAddImageLayer])
 
