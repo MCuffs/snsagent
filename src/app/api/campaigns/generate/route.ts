@@ -126,32 +126,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // Fetch real-time RSS only when articles match the user's actual topic.
-      try {
-        const keywords = extractGenerationKeywords(body.topic, [
-          body.category || '',
-          body.contentType || '',
-        ])
-
-        const rssResult = await fetchRssForGeneration({
-          category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
-          keywords,
-          topic: body.topic,
-          limit: 5,
-          language: body.language || 'ko',
-        })
-
-        const rssContext = buildRssContext(rssResult, body.language || 'ko')
-        if (rssContext) {
-          enrichedKeyContent = `${enrichedKeyContent}\n\n${rssContext}`
-          console.log(`[RSS] Injected ${rssResult.articles.length} articles (matched: ${rssResult.matched}) into keyContent`)
-        } else {
-          console.log(`[RSS] Skipped unrelated articles for topic "${body.topic}"`)
-        }
-      } catch (rssErr) {
-        console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
-      }
-
+      let researchContext = ''
       try {
         const researchBrief = await buildCarouselResearchBrief({
           topic: body.topic!,
@@ -161,7 +136,7 @@ export async function POST(request: Request) {
           slideCount: normalizeSlideCount(body.slideCount),
           language: body.language || 'ko',
         })
-        const researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
+        researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
         if (researchContext) {
           enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
           console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}"`)
@@ -170,6 +145,37 @@ export async function POST(request: Request) {
         }
       } catch (researchErr) {
         console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
+      }
+
+      // RSS is now a fallback only. Raw news blocks can add weakly related health/trend items,
+      // so prefer the topic-filtered Web search research brief whenever it exists.
+      if (!researchContext) {
+        try {
+          const keywords = extractGenerationKeywords(body.topic, [
+            body.category || '',
+            body.contentType || '',
+          ])
+
+          const rssResult = await fetchRssForGeneration({
+            category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
+            keywords,
+            topic: body.topic,
+            limit: 5,
+            language: body.language || 'ko',
+          })
+
+          const rssContext = buildRssContext(rssResult, body.language || 'ko')
+          if (rssContext) {
+            enrichedKeyContent = `${enrichedKeyContent}\n\n${rssContext}`
+            console.log(`[RSS] Injected fallback ${rssResult.articles.length} articles (matched: ${rssResult.matched}) into keyContent`)
+          } else {
+            console.log(`[RSS] Skipped unrelated articles for topic "${body.topic}"`)
+          }
+        } catch (rssErr) {
+          console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
+        }
+      } else {
+        console.log(`[RSS] Skipped raw RSS because research brief exists for topic "${body.topic}"`)
       }
 
       const result = await generateMediaCarousel({

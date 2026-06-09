@@ -53,8 +53,8 @@ export async function POST(request: Request) {
   if (!brand) return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
 
   const language = body.language || 'ko'
-  const productContextPromise = body.productUrl
-    ? (async () => {
+  const productContext = body.productUrl
+    ? await (async () => {
       const productContext = await collectBrandUrlContext(body.productUrl!)
       const apiKey = process.env.OPENAI_API_KEY
       let productSummary = productContext.promptContext.slice(0, 3500)
@@ -72,25 +72,14 @@ export async function POST(request: Request) {
       }
       return `[Product Page Purchase Persuasion]\n${productSummary}`
     })().catch(() => '')
-    : Promise.resolve('')
+    : ''
 
-  const rssContextPromise = (async () => {
-    const keywords = extractGenerationKeywords(body.topic, [body.category || '', body.contentType || ''])
-    const rssResult = await fetchRssForGeneration({
-      category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
-      keywords,
-      topic: body.topic,
-      limit: 5,
-      language,
-    })
-    return buildRssContext(rssResult, language)
-  })().catch(() => '')
-
-  const researchContextPromise = (async () => {
+  const baseKeyContent = [body.keyContent, productContext].filter(Boolean).join('\n\n')
+  const researchContext = await (async () => {
     const researchBrief = await buildCarouselResearchBrief({
       topic: body.topic,
       category: body.category,
-      keyContent: body.keyContent,
+      keyContent: baseKeyContent,
       contentType: body.contentType,
       slideCount: body.slideCount ?? 5,
       language,
@@ -98,12 +87,21 @@ export async function POST(request: Request) {
     return formatResearchBriefForPrompt(researchBrief, language)
   })().catch(() => '')
 
-  const enrichmentSections = await Promise.all([
-    productContextPromise,
-    rssContextPromise,
-    researchContextPromise,
-  ])
-  const enrichedKeyContent = [body.keyContent, ...enrichmentSections.filter(Boolean)].join('\n\n')
+  const rssContext = researchContext
+    ? ''
+    : await (async () => {
+      const keywords = extractGenerationKeywords(body.topic, [body.category || '', body.contentType || ''])
+      const rssResult = await fetchRssForGeneration({
+        category: inferRssCategory(body.topic, body.category || brand.industry || 'information'),
+        keywords,
+        topic: body.topic,
+        limit: 5,
+        language,
+      })
+      return buildRssContext(rssResult, language)
+    })().catch(() => '')
+
+  const enrichedKeyContent = [baseKeyContent, researchContext, rssContext].filter(Boolean).join('\n\n')
 
   const slides = await previewMediaCarouselCopy({
     userId: user.id,

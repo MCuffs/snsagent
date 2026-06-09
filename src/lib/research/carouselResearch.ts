@@ -12,7 +12,7 @@ import { formatDomainCopyGuidance, getDomainProfileForText, getGenerationDomainP
 export interface ResearchSource {
   title: string
   url: string
-  provider: 'wikipedia' | 'duckduckgo' | 'usda' | 'rss'
+  provider: 'openai-web' | 'wikipedia' | 'duckduckgo' | 'usda' | 'rss'
 }
 
 export interface SlideEvidence {
@@ -633,7 +633,7 @@ function normalizeResearchSources(value: unknown): ResearchSource[] {
       const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
       const title = typeof record.title === 'string' ? record.title.trim() : ''
       const url = typeof record.url === 'string' ? record.url.trim() : ''
-      const provider = typeof record.provider === 'string' && ['wikipedia', 'duckduckgo', 'usda', 'rss'].includes(record.provider)
+      const provider = typeof record.provider === 'string' && ['openai-web', 'wikipedia', 'duckduckgo', 'usda', 'rss'].includes(record.provider)
         ? record.provider as ResearchSource['provider']
         : 'duckduckgo'
       return { title, url, provider }
@@ -647,7 +647,7 @@ function extractResponseSources(response: unknown): ResearchSource[] {
   return urls.slice(0, 8).map(url => ({
     title: new URL(url).hostname,
     url,
-    provider: 'duckduckgo' as const,
+    provider: 'openai-web' as const,
   }))
 }
 
