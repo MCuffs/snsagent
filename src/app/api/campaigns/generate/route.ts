@@ -127,29 +127,34 @@ export async function POST(request: Request) {
       }
 
       let researchContext = ''
-      try {
-        const researchBrief = await buildCarouselResearchBrief({
-          topic: body.topic!,
-          category: body.category,
-          keyContent: enrichedKeyContent,
-          contentType: body.contentType,
-          slideCount: normalizeSlideCount(body.slideCount),
-          language: body.language || 'ko',
-        })
-        researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
-        if (researchContext) {
-          enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
-          console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}"`)
-        } else {
-          console.log(`[ResearchBrief] No topic-matched external research found for "${body.topic}"`)
+      const hasConfirmedSlides = Boolean(body.confirmedSlides?.length)
+      if (hasConfirmedSlides) {
+        console.log(`[ResearchBrief] Skipped because confirmed copy was provided for topic "${body.topic}"`)
+      } else {
+        try {
+          const researchBrief = await buildCarouselResearchBrief({
+            topic: body.topic!,
+            category: body.category,
+            keyContent: enrichedKeyContent,
+            contentType: body.contentType,
+            slideCount: normalizeSlideCount(body.slideCount),
+            language: body.language || 'ko',
+          })
+          researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
+          if (researchContext) {
+            enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
+            console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}"`)
+          } else {
+            console.log(`[ResearchBrief] No topic-matched external research found for "${body.topic}"`)
+          }
+        } catch (researchErr) {
+          console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
         }
-      } catch (researchErr) {
-        console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
       }
 
       // RSS is now a fallback only. Raw news blocks can add weakly related health/trend items,
       // so prefer the topic-filtered Web search research brief whenever it exists.
-      if (!researchContext) {
+      if (!researchContext && !hasConfirmedSlides) {
         try {
           const keywords = extractGenerationKeywords(body.topic, [
             body.category || '',
@@ -175,7 +180,7 @@ export async function POST(request: Request) {
           console.warn('[RSS] Failed to fetch RSS context, continuing without it:', rssErr)
         }
       } else {
-        console.log(`[RSS] Skipped raw RSS because research brief exists for topic "${body.topic}"`)
+        console.log(`[RSS] Skipped raw RSS because ${hasConfirmedSlides ? 'confirmed copy was provided' : 'research brief exists'} for topic "${body.topic}"`)
       }
 
       const result = await generateMediaCarousel({

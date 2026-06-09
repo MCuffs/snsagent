@@ -53,8 +53,8 @@ export async function POST(request: Request) {
   if (!brand) return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
 
   const language = body.language || 'ko'
-  const productContext = body.productUrl
-    ? await (async () => {
+  const productContextPromise = body.productUrl
+    ? (async () => {
       const productContext = await collectBrandUrlContext(body.productUrl!)
       const apiKey = process.env.OPENAI_API_KEY
       let productSummary = productContext.promptContext.slice(0, 3500)
@@ -74,18 +74,21 @@ export async function POST(request: Request) {
     })().catch(() => '')
     : ''
 
-  const baseKeyContent = [body.keyContent, productContext].filter(Boolean).join('\n\n')
-  const researchContext = await (async () => {
+  const researchContextPromise = (async () => {
     const researchBrief = await buildCarouselResearchBrief({
       topic: body.topic,
       category: body.category,
-      keyContent: baseKeyContent,
+      keyContent: body.keyContent,
       contentType: body.contentType,
       slideCount: body.slideCount ?? 5,
       language,
+      mode: 'fast',
     })
     return formatResearchBriefForPrompt(researchBrief, language)
   })().catch(() => '')
+
+  const [productContext, researchContext] = await Promise.all([productContextPromise, researchContextPromise])
+  const baseKeyContent = [body.keyContent, productContext].filter(Boolean).join('\n\n')
 
   const rssContext = researchContext
     ? ''

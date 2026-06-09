@@ -39,6 +39,7 @@ interface ResearchInput {
   contentType?: string
   slideCount: number
   language?: 'ko' | 'en'
+  mode?: 'fast' | 'full'
 }
 
 const FOOD_TRANSLATIONS: Record<string, string> = {
@@ -66,11 +67,28 @@ export async function buildCarouselResearchBrief(input: ResearchInput): Promise<
   })
   const userIntent = inferUserIntent(input.topic, input.contentType)
   const queries = buildQueries(subject, userIntent, input.language || 'ko', domainProfile)
+  const directBriefPromise = input.mode === 'fast'
+    ? buildDirectResearchBrief(input, subject, userIntent, queries, domainProfile)
+    : Promise.resolve<CarouselResearchBrief | null>(null)
   const openAIWebBrief = await buildOpenAIWebResearchBrief(input, subject, userIntent, queries)
   if (openAIWebBrief && openAIWebBrief.verifiedFacts.length >= 3) {
     return openAIWebBrief
   }
 
+  if (input.mode === 'fast') {
+    return await directBriefPromise
+  }
+
+  return buildDirectResearchBrief(input, subject, userIntent, queries, domainProfile)
+}
+
+async function buildDirectResearchBrief(
+  input: ResearchInput,
+  subject: string,
+  userIntent: string,
+  queries: string[],
+  domainProfile: ReturnType<typeof getGenerationDomainProfile>
+): Promise<CarouselResearchBrief | null> {
   const shouldFetchFoodData = domainProfile.domain === 'food' || domainProfile.domain === 'health'
   const [wiki, duck, usda, rss] = await Promise.all([
     fetchWikipediaFacts(subject, input.language || 'ko'),
@@ -149,6 +167,8 @@ async function buildOpenAIWebResearchBrief(
       tool_choice: 'required' as never,
       include: ['web_search_call.action.sources'] as never,
       input: prompt,
+    } as never, {
+      timeout: getWebResearchTimeoutMs(input.mode),
     } as never)
 
     const outputText = extractResponseOutputText(response)
@@ -216,6 +236,12 @@ async function buildOpenAIWebResearchBrief(
     })
     return null
   }
+}
+
+function getWebResearchTimeoutMs(mode?: ResearchInput['mode']) {
+  const envValue = Number(process.env.OPENAI_WEB_RESEARCH_TIMEOUT_MS)
+  if (Number.isFinite(envValue) && envValue >= 1000) return envValue
+  return mode === 'fast' ? 4500 : 9000
 }
 
 function buildOpenAIWebResearchPrompt(input: ResearchInput, subject: string, userIntent: string, queries: string[]) {
