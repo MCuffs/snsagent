@@ -5,29 +5,10 @@ import { list } from '@vercel/blob'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
-// Simple in-memory sliding window rate limiter
-const rateLimitCache = new Map<string, number[]>()
-const RATE_LIMIT_COUNT = 10
-const RATE_LIMIT_WINDOW_MS = 60000 // 1 minute
-
-function isRateLimited(userId: string): boolean {
-  const now = Date.now()
-  const timestamps = rateLimitCache.get(userId) || []
-  
-  // Keep timestamps within the last 1 minute window
-  const activeTimestamps = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS)
-  
-  if (activeTimestamps.length >= RATE_LIMIT_COUNT) {
-    return true
-  }
-  
-  activeTimestamps.push(now)
-  rateLimitCache.set(userId, activeTimestamps)
-  return false
-}
 
 // Storage quota definitions
 const QUOTA_FREE = 20 * 1024 * 1024 // 20MB
@@ -82,7 +63,8 @@ export async function POST(request: Request) {
   }
 
   // 1. Rate Limiting Check
-  if (isRateLimited(user.id)) {
+  const rateLimitResult = await checkRateLimit(`upload:${user.id}`, RATE_LIMIT_PRESETS.upload)
+  if (rateLimitResult.limited) {
     return NextResponse.json(
       { error: '요청이 너무 많습니다. 1분 후에 다시 시도해주세요.' },
       { status: 429 }

@@ -8,8 +8,6 @@ import { FUNDING, PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } 
 import { PRICING_PLANS, SubscriptionPlan } from '../../../lib/limits-types'
 import { analytics } from '../../../lib/analytics/thinkingdata'
 
-const NICEPAY_SCRIPT_ID = 'nicepay-sdk-script'
-const NICEPAY_SCRIPT_SRC = 'https://pay.nicepay.co.kr/v1/js/'
 
 declare global {
   interface Window {
@@ -85,8 +83,8 @@ function PricingGrid({
   paypalPlanIds,
   nicepayClientKey,
   nicepayReturnTokens,
-  customerName,
-  customerEmail,
+  customerName: _customerName,
+  customerEmail: _customerEmail,
   showRegenerationOffer,
   paymentSuccess,
   locale = 'ko',
@@ -96,7 +94,6 @@ function PricingGrid({
   const [error, setError] = useState('')
   const [canceling, setCanceling] = useState(false)
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
-  const [nicepayReady, setNicepayReady] = useState(false)
   const [cardModalPlan, setCardModalPlan] = useState<string | null>(null)
 
   // Locale-based payment method determination
@@ -123,51 +120,6 @@ function PricingGrid({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (!showNicePay) {
-      return
-    }
-
-    let active = true
-    let script = document.getElementById(NICEPAY_SCRIPT_ID) as HTMLScriptElement | null
-
-    const handleLoad = () => {
-      if (!active) return
-      const isReady = typeof window.AUTHNICE?.requestPay === 'function'
-      setNicepayReady(isReady)
-      if (!isReady) {
-        setError(t('nicepay_load_error'))
-      }
-    }
-
-    const handleError = () => {
-      if (!active) return
-      setNicepayReady(false)
-      setError(t('nicepay_load_error'))
-    }
-
-    if (!script) {
-      script = document.createElement('script')
-      script.id = NICEPAY_SCRIPT_ID
-      script.src = NICEPAY_SCRIPT_SRC
-      script.async = true
-      document.body.appendChild(script)
-    }
-
-    script.addEventListener('load', handleLoad)
-    script.addEventListener('error', handleError)
-
-    if (window.AUTHNICE?.requestPay) {
-      window.setTimeout(handleLoad, 0)
-    }
-
-    return () => {
-      active = false
-      script.removeEventListener('load', handleLoad)
-      script.removeEventListener('error', handleError)
-    }
-  }, [showNicePay, t])
-
   const cancelSubscription = async () => {
     if (!confirm(t('cancel_confirm'))) return
     setCanceling(true)
@@ -193,32 +145,27 @@ function PricingGrid({
     }
   }
 
-  const handleNicepayPayment = (planKey: string) => {
-    if (!nicepayClientKey) {
-      setError(t('nicepay_key_missing'))
-      return
-    }
+  const handleCardDirectPayment = async (data: {
+    cardNo: string
+    cardExpire: string
+    idNo: string
+    cardPw: string
+  }) => {
+    if (!cardModalPlan) return
+    const planKey = cardModalPlan
     const returnToken = nicepayReturnTokens[planKey]
     if (!returnToken) {
       setError(t('nicepay_start_failed'))
       return
     }
-    if (!nicepayReady || !window.AUTHNICE?.requestPay) {
-      setError(t('nicepay_loading'))
-      return
-    }
-    
+
     setError('')
     setProcessingPayment(planKey)
-    
+
     const PLAN_AMOUNTS: Record<string, number> = { LITE: 3000, PRO: 25000, UNLIMITED: 39000 }
     const amount = PLAN_AMOUNTS[planKey] ?? 0
     const orderId = `shuffla_regist_${Date.now()}_${planKey}`
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    const returnUrl = new URL('/api/nicepay/return', appUrl)
-    returnUrl.searchParams.set('token', returnToken)
-    returnUrl.searchParams.set('locale', locale)
-    
+
     analytics.planSelectClick(planKey, currentPlan, {
       payment_provider: 'nicepay',
       amount,
@@ -230,115 +177,66 @@ function PricingGrid({
       order_id: orderId,
     })
 
-    const timeoutId = window.setTimeout(() => {
-      setError(t('nicepay_start_failed'))
-      setProcessingPayment(null)
-    }, 120000)
-
     try {
-      window.AUTHNICE.requestPay({
-        clientId: nicepayClientKey,
-        method: 'card',
-        orderId,
-        amount,
-        goodsName: `Shuffla ${planKey} 월 구독`,
-        returnUrl: returnUrl.toString(),
-        mallReserved: returnToken,
-        buyerName: customerName || undefined,
-        buyerEmail: customerEmail || undefined,
-        fnError: (result) => {
-          window.clearTimeout(timeoutId)
-          analytics.paymentFailed(planKey, 'nicepay', result.errorMsg || 'sdk_error', {
-            order_id: orderId,
-          })
-          setError(result.errorMsg || t('nicepay_start_failed'))
-          setProcessingPayment(null)
-        },
-        fnClose: async (result) => {
-          window.clearTimeout(timeoutId)
-          if (!result.tid || !result.authToken || result.resultCode !== '0000') {
-            if (result.resultCode && result.resultCode !== '0000') {
-              setError(result.resultMsg || t('payment_canceled_msg'))
-            }
-            setProcessingPayment(null)
-            return
-          }
-          try {
-            const res = await fetch('/api/nicepay/approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tid: result.tid,
-                authToken: result.authToken,
-                orderId: result.orderId ?? orderId,
-                plan: planKey,
-              }),
-            })
-            const data = await res.json() as { error?: string; offer?: string }
-            if (!res.ok) {
-              analytics.paymentFailed(planKey, 'nicepay', data.error || 'api_error', {
-                amount,
-                currency: 'KRW',
-                order_id: result.orderId ?? orderId,
-              })
-              setError(data.error || t('nicepay_approve_failed'))
-              setProcessingPayment(null)
-            } else if (data.offer === 'regeneration') {
-              analytics.paymentSuccess(planKey, 'nicepay', {
-                amount,
-                currency: 'KRW',
-                order_id: result.orderId ?? orderId,
-                offer_type: 'regeneration',
-              })
-              router.push('/billing?success=true&offer=regeneration')
-            } else {
-              analytics.paymentSuccess(planKey, 'nicepay', {
-                amount,
-                currency: 'KRW',
-                order_id: result.orderId ?? orderId,
-              })
-              router.push('/billing?success=true')
-            }
-          } catch (err) {
-            console.error('Payment approval error:', err)
-            setError(t('network_error'))
-            setProcessingPayment(null)
-          }
-        },
-      })
-    } catch (err) {
-      window.clearTimeout(timeoutId)
-      console.error('NicePay requestPay error:', err)
-      analytics.paymentFailed(planKey, 'nicepay', 'request_pay_exception', { order_id: orderId })
-      setError(t('nicepay_start_failed'))
-      setProcessingPayment(null)
-    }
-  }
+      const [encodedPayload] = returnToken.split('.')
+      if (!encodedPayload) {
+        throw new Error('Invalid payment token format')
+      }
 
-  const handleCardDirectPayment = async (planKey: string, cardData: {
-    cardNo: string; cardExpire: string; idNo: string; cardPw: string
-  }) => {
-    setError('')
-    setProcessingPayment(planKey)
-    try {
+      const decodeBase64Url = (str: string) => {
+        let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+        while (base64.length % 4) {
+          base64 += '='
+        }
+        return atob(base64)
+      }
+
+      const payloadObj = JSON.parse(decodeBase64Url(encodedPayload))
+      const encryptionKey = payloadObj.encryptionKey
+      if (!encryptionKey) {
+        throw new Error('Encryption key missing from payment token')
+      }
+
+      const plaintext = `cardNo=${data.cardNo}&cardExpire=${data.cardExpire}&idNo=${data.idNo}&cardPw=${data.cardPw}`
+      const { ciphertext, iv } = await encryptCardDataClient(plaintext, encryptionKey)
+
       const res = await fetch('/api/nicepay/card-register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planKey, ...cardData }),
+        body: JSON.stringify({
+          token: returnToken,
+          ciphertext,
+          iv,
+          plan: planKey,
+        }),
       })
-      const data = await res.json() as { error?: string; offer?: string }
+
+      const responseData = await res.json() as { error?: string; offer?: string }
+
       if (!res.ok) {
-        setError(data.error || t('nicepay_approve_failed'))
+        analytics.paymentFailed(planKey, 'nicepay', responseData.error || 'api_error', {
+          amount,
+          currency: 'KRW',
+          order_id: orderId,
+        })
+        setError(responseData.error || t('nicepay_approve_failed'))
         setProcessingPayment(null)
-        return
-      }
-      setCardModalPlan(null)
-      if (data.offer === 'regeneration') {
-        router.push('/billing?success=true&offer=regeneration')
       } else {
-        router.push('/billing?success=true')
+        analytics.paymentSuccess(planKey, 'nicepay', {
+          amount,
+          currency: 'KRW',
+          order_id: orderId,
+          offer_type: responseData.offer === 'regeneration' ? 'regeneration' : undefined,
+        })
+        setCardModalPlan(null)
+        if (responseData.offer === 'regeneration') {
+          router.push('/billing?success=true&offer=regeneration')
+        } else {
+          router.push('/billing?success=true')
+        }
       }
-    } catch {
+    } catch (err) {
+      console.error('Payment direct registration error:', err)
       setError(t('network_error'))
       setProcessingPayment(null)
     }
@@ -346,14 +244,6 @@ function PricingGrid({
 
   return (
     <div className="space-y-6">
-      {cardModalPlan && (
-        <CardInfoModal
-          planKey={cardModalPlan}
-          processing={processingPayment === cardModalPlan}
-          onSubmit={(data) => handleCardDirectPayment(cardModalPlan, data)}
-          onClose={() => { setCardModalPlan(null); setProcessingPayment(null) }}
-        />
-      )}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50/50 px-5 py-4 text-sm font-medium text-red-700 backdrop-blur-sm">
           {error}
@@ -401,7 +291,7 @@ function PricingGrid({
               ) : showNicePay ? (
                       <button
                           type="button"
-                          onClick={() => handleNicepayPayment('LITE')}
+                          onClick={() => setCardModalPlan('LITE')}
                           disabled={processingPayment !== null}
                           className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
@@ -529,6 +419,14 @@ function PricingGrid({
           )
         })}
       </div>
+      {cardModalPlan && (
+        <CardInfoModal
+          planKey={cardModalPlan}
+          processing={processingPayment !== null}
+          onSubmit={handleCardDirectPayment}
+          onClose={() => setCardModalPlan(null)}
+        />
+      )}
     </div>
   )
 }
@@ -620,6 +518,45 @@ function Feature({ children }: { children: React.ReactNode }) {
       <span>{children}</span>
     </div>
   )
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+async function encryptCardDataClient(plainText: string, keyBase64: string): Promise<{ ciphertext: string; iv: string }> {
+  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0))
+
+  const cryptoKey = await window.crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  )
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12))
+
+  const encoder = new TextEncoder()
+  const encodedText = encoder.encode(plainText)
+
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv,
+    },
+    cryptoKey,
+    encodedText
+  )
+
+  return {
+    ciphertext: toBase64(new Uint8Array(ciphertextBuffer)),
+    iv: toBase64(iv),
+  }
 }
 
 function CardInfoModal({
@@ -763,3 +700,4 @@ function CardInfoModal({
     </div>
   )
 }
+

@@ -372,7 +372,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   // Rate limiting: 5 requests per 10 minutes per user
-  const rateLimitResult = checkRateLimit(`generate-agent:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
+  const rateLimitResult = await checkRateLimit(`generate-agent:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
   if (rateLimitResult.limited) {
     return NextResponse.json(
       { error: '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해 주세요.' },
@@ -486,8 +486,8 @@ export async function POST(request: Request) {
       })() : Promise.resolve(null),
     ])
 
-    let scrapedContext = scrapeResult.scraped
-    let purchasePersuasionContext = scrapeResult.persuasion
+    const scrapedContext = scrapeResult.scraped
+    const purchasePersuasionContext = scrapeResult.persuasion
     let rssContext = ''
     if (rssResult && rssResult.matched && rssResult.articles.length > 0) {
       const lines = [

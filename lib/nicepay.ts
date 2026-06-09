@@ -1,4 +1,4 @@
-import { createHash, createCipheriv } from 'crypto'
+import { createHash, createCipheriv, createDecipheriv } from 'crypto'
 import { PRICING_PLANS, SubscriptionPlan } from './limits-types'
 
 const NICEPAY_BASE_URL = 'https://api.nicepay.co.kr'
@@ -181,3 +181,26 @@ export async function issueDirectBillingKey(input: CardDirectBillingKeyInput): P
     }),
   })
 }
+
+// Client-Side Encryption (AES-256-GCM) 복호화
+export function decryptCardDataServer(ciphertextBase64: string, ivBase64: string, keyBase64: string): string {
+  const key = Buffer.from(keyBase64, 'base64')
+  const iv = Buffer.from(ivBase64, 'base64')
+  const ciphertext = Buffer.from(ciphertextBase64, 'base64')
+
+  const tagLength = 16
+  const tag = ciphertext.subarray(ciphertext.length - tagLength)
+  const encrypted = ciphertext.subarray(0, ciphertext.length - tagLength)
+
+  const decipher = createDecipheriv('aes-256-gcm', key, iv)
+  decipher.setAuthTag(tag)
+
+  const decrypted = Buffer.concat([
+    decipher.update(encrypted),
+    decipher.final()
+  ])
+
+  return decrypted.toString('utf8')
+}
+
+

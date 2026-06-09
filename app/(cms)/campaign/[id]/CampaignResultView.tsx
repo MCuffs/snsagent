@@ -638,22 +638,10 @@ export default function CampaignResultView({
       const results = await Promise.all(
         slides.map(async slide => {
           const doc = documents[slide.id]
-          // Only re-export if the slide was edited (has dirty document)
-          if (doc && dirtySlides[slide.id]) {
-            const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc), 'png', 1)
-            if (!result.success) throw new Error(result.error)
-            const response = await fetch(result.url, { cache: 'force-cache' })
-            return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
-          }
-          // Use existing image for unedited slides
-          if (!slide.imageUrl) {
-            // Fallback: re-export if no image URL
-            const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)
-            if (!result.success) throw new Error(result.error)
-            const response = await fetch(result.url, { cache: 'force-cache' })
-            return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
-          }
-          const response = await fetch(slide.imageUrl, { cache: 'force-cache' })
+          // Always export the slide to match the editor canvas layout
+          const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)
+          if (!result.success) throw new Error(result.error)
+          const response = await fetch(result.url, { cache: 'force-cache' })
           return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
         })
       )

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
-  const rateLimitResult = checkRateLimit(`copy-preview:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
+  const rateLimitResult = await checkRateLimit(`copy-preview:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
   if (rateLimitResult.limited) {
     return NextResponse.json({ error: '잠시 후 다시 시도해 주세요.' }, { status: 429 })
   }

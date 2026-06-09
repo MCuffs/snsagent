@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { getSubscription, planFromPayPalPlanId } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
 import { formatMissingConfigMessage, getPayPalConfigStatus } from '../../../../lib/runtime-diagnostics'
 
 export const runtime = 'nodejs'
+
+const activateSchema = z.object({
+  subscriptionId: z.string().min(1, 'subscriptionId는 필수입니다.'),
+})
 
 export async function POST(request: Request) {
   try {
@@ -20,12 +25,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: formatMissingConfigMessage('PayPal', config.missing) }, { status: 503 })
     }
 
-    const body = await request.json() as { subscriptionId?: string }
-    if (!body.subscriptionId) {
-      return NextResponse.json({ error: '유효하지 않은 요청입니다.' }, { status: 400 })
+    const body = await request.json()
+    const validation = activateSchema.safeParse(body)
+    if (!validation.success) {
+      const firstError = validation.error.issues[0]?.message || '잘못된 입력값입니다.'
+      return NextResponse.json({ error: firstError }, { status: 400 })
     }
 
-    const subscription = await getSubscription(body.subscriptionId)
+    const { subscriptionId } = validation.data
+
+    const subscription = await getSubscription(subscriptionId)
     if (subscription.status !== 'ACTIVE' && subscription.status !== 'APPROVED') {
       return NextResponse.json({ error: '구독이 활성화되지 않았습니다.' }, { status: 400 })
     }
@@ -34,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Subscription owner does not match the current user.' }, { status: 403 })
     }
 
-    const existingOwner = await dbService.getUserByPayPalSubscriptionId(body.subscriptionId)
+    const existingOwner = await dbService.getUserByPayPalSubscriptionId(subscriptionId)
     if (existingOwner && existingOwner.id !== user.id) {
       return NextResponse.json({ error: 'Subscription is already linked to another user.' }, { status: 409 })
     }
@@ -45,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     await dbService.updateUserPayPal(user.id, {
-      paypalSubscriptionId: body.subscriptionId,
+      paypalSubscriptionId: subscriptionId,
       paypalSubscriptionStatus: subscription.status,
       plan,
     })

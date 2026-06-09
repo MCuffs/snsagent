@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'crypto'
-import { getSessionSigningSecret } from './env'
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto'
+import { getNicepayReturnTokenSecret } from './env'
 import { isPaidPlan, PaidPlan } from './nicepay'
+
 
 const TOKEN_TTL_MS = 60 * 60 * 1000
 
@@ -8,13 +9,16 @@ export interface NicepayReturnTokenPayload {
   userId: string
   plan: PaidPlan
   expiresAt: number
+  encryptionKey: string
 }
 
 export function createNicepayReturnToken(userId: string, plan: PaidPlan, now = Date.now()) {
+  const encryptionKey = randomBytes(32).toString('base64')
   const payload = {
     userId,
     plan,
     expiresAt: now + TOKEN_TTL_MS,
+    encryptionKey,
   } satisfies NicepayReturnTokenPayload
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
   return `${encoded}.${sign(encoded)}`
@@ -44,5 +48,5 @@ export function readNicepayReturnToken(token: string | null | undefined, now = D
 }
 
 function sign(payload: string) {
-  return createHmac('sha256', getSessionSigningSecret()).update(payload).digest('base64url')
+  return createHmac('sha256', getNicepayReturnTokenSecret()).update(payload).digest('base64url')
 }

@@ -1,20 +1,24 @@
+import { z } from 'zod'
 import { dbService } from '../../../../lib/db-service'
 import { nextMonthlyBillingDate } from '../../../../lib/nicepay'
 import { unauthorizedJson, verifyRequestSecret } from '../../../../lib/security'
 
 export const runtime = 'nodejs'
 
+const webhookSchema = z.object({
+  eventType: z.string().optional(),
+  type: z.string().optional(),
+  tid: z.string().optional(),
+  resultCode: z.string().optional(),
+  bid: z.string().optional(),
+  resultMsg: z.string().optional(),
+})
+
 function nicepayOk() {
   return new Response('OK', {
     status: 200,
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   })
-}
-
-function webhookString(value: unknown) {
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return ''
 }
 
 export async function POST(request: Request) {
@@ -33,18 +37,26 @@ export async function POST(request: Request) {
 
   const rawBody = await request.text()
 
-  let body: Record<string, unknown>
+  let parsedBody: unknown
   try {
-    body = JSON.parse(rawBody)
+    parsedBody = JSON.parse(rawBody)
   } catch {
     console.warn('[NicePay Webhook] Received non-JSON webhook verification request')
     return nicepayOk()
   }
 
-  const eventType = webhookString(body.eventType) || webhookString(body.type)
-  const tid = webhookString(body.tid)
-  const resultCode = webhookString(body.resultCode)
-  const bid = webhookString(body.bid)
+  const validation = webhookSchema.safeParse(parsedBody)
+  if (!validation.success) {
+    console.warn('[NicePay Webhook] Invalid webhook payload format:', validation.error.message)
+    return nicepayOk()
+  }
+
+  const data = validation.data
+  const eventType = data.eventType || data.type || ''
+  const tid = data.tid || ''
+  const resultCode = data.resultCode || ''
+  const bid = data.bid || ''
+
 
   console.log(`[NicePay Webhook] eventType=${eventType} resultCode=${resultCode} hasTid=${Boolean(tid)} hasBid=${Boolean(bid)}`)
 
@@ -53,7 +65,7 @@ export async function POST(request: Request) {
       await handleBillingSuccess({ tid, bid })
     }
     if (eventType === 'BILLING_FAIL' || (resultCode && resultCode !== '0000' && bid)) {
-      await handleBillingFail({ bid, resultCode, resultMsg: webhookString(body.resultMsg) })
+      await handleBillingFail({ bid, resultCode, resultMsg: data.resultMsg || '' })
     }
     if (eventType === 'BILLING_EXPIRE') {
       await handleBillingExpire({ bid })

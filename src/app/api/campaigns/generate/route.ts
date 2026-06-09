@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     // Rate limiting: 5 requests per 10 minutes per user
-    const rateLimitResult = checkRateLimit(`campaign-generate:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
+    const rateLimitResult = await checkRateLimit(`campaign-generate:${user.id}`, RATE_LIMIT_PRESETS.aiGeneration)
     if (rateLimitResult.limited) {
       return NextResponse.json(
         { error: '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해 주세요.' },
