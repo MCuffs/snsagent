@@ -6,13 +6,31 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
-// 17장의 카드뉴스 이미지
-const CARDS = Array.from({ length: 17 }, (_, i) => `/front/card-${String(i + 1).padStart(2, '0')}.png`)
-
-// 3열 그리드 배분
-const COL_A = [CARDS[0], CARDS[3], CARDS[6], CARDS[9],  CARDS[12], CARDS[15]]
-const COL_B = [CARDS[1], CARDS[4], CARDS[7], CARDS[10], CARDS[13], CARDS[16]]
-const COL_C = [CARDS[2], CARDS[5], CARDS[8], CARDS[11], CARDS[14]]
+// 17장 이미지를 시각적으로 섞어서 배치 (비슷한 톤끼리 인접하지 않도록)
+// 패션계열: 01~09, 뷰티/정보계열: 10~17
+const COL_A = [
+  '/front/card-01.png',  // 비버 스트리트 (다크)
+  '/front/card-10.png',  // 스킨케어 (라이트)
+  '/front/card-04.png',  // 비버 블루 (쿨)
+  '/front/card-13.png',  // 호두 (뉴트럴)
+  '/front/card-07.png',  // 럭셔리 미러 (다크)
+  '/front/card-16.png',  // 강아지 (라이트)
+]
+const COL_B = [
+  '/front/card-03.png',  // 오버핏 후드 (그레이)
+  '/front/card-11.png',  // 스킨케어2 (핑크)
+  '/front/card-06.png',  // MATTY BOY 포트레이트 (버건디)
+  '/front/card-14.png',  // 호두2 (브라운)
+  '/front/card-02.png',  // 비버 사이즈 비율 (다크)
+  '/front/card-17.png',  // GRAPH JUICE (퍼플)
+]
+const COL_C = [
+  '/front/card-05.png',  // 비버 핑크 후드 (라이트)
+  '/front/card-12.png',  // 스킨케어3
+  '/front/card-08.png',  // MATTY BOY 아웃핏 (다크)
+  '/front/card-15.png',  // 남자 스타일링 (모노)
+  '/front/card-09.png',  // MATTY BOY 730 (컬러풀)
+]
 
 // 페이지 배경색 — 갤러리 상하단 페이드와 통일
 const BG = '#fbfaf7'
@@ -40,17 +58,21 @@ export function LandingHero({
   badgeText,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end start'] })
+  // 갤러리 영역만 스크롤 추적 — section 전체가 아니라 갤러리 wrapper를 기준으로
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start start', 'end end'],
+  })
 
-  // 열마다 다른 방향으로 스크롤 패럴렉스
-  const yA = useTransform(scrollYProgress, [0, 1], ['0%', '-12%'])
-  const yB = useTransform(scrollYProgress, [0, 1], ['0%', '8%'])
-  const yC = useTransform(scrollYProgress, [0, 1], ['0%', '-18%'])
+  // 패럴렉스 폭을 줄여 상단 이탈 방지 (-6% / +5% / -8%)
+  const yA = useTransform(scrollYProgress, [0, 1], ['0%', '-6%'])
+  const yB = useTransform(scrollYProgress, [0, 1], ['0%', '5%'])
+  const yC = useTransform(scrollYProgress, [0, 1], ['0%', '-8%'])
 
   return (
     <section
       ref={containerRef}
-      className="relative overflow-hidden"
+      className="relative"
       style={{ background: BG }}
     >
       {/* 은은한 중앙 글로우 */}
@@ -118,16 +140,17 @@ export function LandingHero({
       </div>
 
       {/* ── 카드 갤러리 그리드 ────────────────────────── */}
-      <div className="relative z-10 mt-16 px-4 pb-0">
+      {/* overflow-hidden으로 패럴렉스 이탈 차단 */}
+      <div className="relative z-10 mt-16 overflow-hidden px-4 pb-0">
         {/* 상단 페이드 — 텍스트 영역에서 갤러리로 부드럽게 연결 */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40"
-          style={{ background: `linear-gradient(to bottom, ${BG}, transparent)` }}
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-48"
+          style={{ background: `linear-gradient(to bottom, ${BG} 10%, transparent)` }}
         />
         {/* 하단 페이드 — 다음 섹션으로 자연스럽게 연결 */}
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-56"
-          style={{ background: `linear-gradient(to top, ${BG} 20%, transparent)` }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-64"
+          style={{ background: `linear-gradient(to top, ${BG} 30%, transparent)` }}
         />
 
         <div className="mx-auto grid max-w-[1300px] grid-cols-3 gap-3 md:gap-4">
@@ -138,8 +161,8 @@ export function LandingHero({
             ))}
           </motion.div>
 
-          {/* 열 B — 약간 아래로 시작해서 엇갈림 효과 */}
-          <motion.div style={{ y: yB }} className="flex flex-col gap-3 pt-8 md:gap-4 md:pt-12">
+          {/* 열 B — 약간 아래에서 시작해 엇갈림 효과 */}
+          <motion.div style={{ y: yB }} className="flex flex-col gap-3 pt-10 md:gap-4 md:pt-14">
             {COL_B.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="up" />
             ))}
@@ -159,14 +182,14 @@ export function LandingHero({
 
 function CardItem({ src, index, direction }: { src: string; index: number; direction: 'left' | 'right' | 'up' }) {
   const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, margin: '0px 0px -60px 0px' })
+  const inView = useInView(ref, { once: true, margin: '0px 0px -40px 0px' })
 
   const initial =
     direction === 'left'
-      ? { opacity: 0, x: -40, scale: 0.92 }
+      ? { opacity: 0, x: -36, scale: 0.93 }
       : direction === 'right'
-      ? { opacity: 0, x: 40, scale: 0.92 }
-      : { opacity: 0, y: 40, scale: 0.92 }
+      ? { opacity: 0, x: 36, scale: 0.93 }
+      : { opacity: 0, y: 36, scale: 0.93 }
 
   return (
     <motion.div
@@ -174,8 +197,8 @@ function CardItem({ src, index, direction }: { src: string; index: number; direc
       initial={initial}
       animate={inView ? { opacity: 1, x: 0, y: 0, scale: 1 } : initial}
       transition={{
-        duration: 0.7,
-        delay: index * 0.07,
+        duration: 0.65,
+        delay: index * 0.06,
         ease: [0.16, 1, 0.3, 1],
       }}
       className="overflow-hidden rounded-xl shadow-sm"
