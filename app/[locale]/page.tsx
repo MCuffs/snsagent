@@ -4,6 +4,8 @@ import { getTranslations } from 'next-intl/server'
 import { MarketingFooter } from '../components/MarketingFooter'
 import { MarketingNav } from '../components/MarketingNav'
 import { CapabilityObjects, ConnectedWorkflow, EditorialGallery, ProductShowcase } from '../components/LandingProductShowcase'
+import { LandingHero } from '../components/LandingHero'
+import { FadeUp, SlideIn, ScaleIn } from '../components/ScrollAnimations'
 import { getSessionUser } from '../../lib/auth/user'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -105,40 +107,28 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <main className="min-h-screen bg-[#fbfaf7] text-[#171714] selection:bg-[#ec6238]/15">
+      <main className="text-[#171714] selection:bg-[#ec6238]/15">
       <MarketingNav authenticated={authenticated} locale={locale} />
 
-      <section className="relative overflow-hidden pb-24 pt-16 md:pb-32 md:pt-24">
-        <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[880px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(237,101,57,0.075),transparent_66%)]" />
-        <div className="relative mx-auto max-w-5xl px-5 text-center md:px-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#e8e2d8] bg-white/80 px-4 py-2 text-xs font-medium text-[#716a60]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#ed6238]" />
-            {t('badge')}
-          </div>
-          <h1 className="mt-8 text-[clamp(3.3rem,9.2vw,7.8rem)] font-semibold leading-[0.94] tracking-[-0.075em] text-[#171714] whitespace-pre-line">
-            {t('hero_title')}
-          </h1>
-          <p className="mx-auto mt-7 max-w-2xl text-[16px] leading-8 text-[#746e65] md:text-lg whitespace-pre-line">
-            {t('hero_desc')}
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href={accessHref}
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-[#171714] px-7 text-sm font-medium text-white transition hover:-translate-y-px hover:bg-[#302c26]"
-            >
-              {authenticated ? t('cta_continue') : t('cta_start')} <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href="#product"
-              className="inline-flex h-12 items-center rounded-full border border-[#dfd9ce] bg-white px-7 text-sm font-medium text-[#342f29] transition hover:border-[#bfb7ab]"
-            >
-              {t('cta_view_product')}
-            </a>
-          </div>
-          {!authenticated && (
-            <p className="mt-4 text-xs text-[#a89e94]">{t('cta_free_hint')}</p>
-          )}
-          <div className="mt-6 flex flex-wrap justify-center gap-x-7 gap-y-2 text-xs text-[#857e73]">
+      {/* ── 새 히어로 (블랙 배경 + 카드 갤러리) ── */}
+      <LandingHero
+        authenticated={authenticated}
+        accessHref={accessHref}
+        locale={locale}
+        headline={t('hero_title')}
+        sub={t('hero_desc')}
+        ctaStart={t('cta_start')}
+        ctaContinue={t('cta_continue')}
+        ctaFreeHint={t('cta_free_hint')}
+        badgeText={t('badge')}
+      />
+
+      {/* ── 이하 기존 섹션들 (밝은 배경으로 전환) ── */}
+      <div className="bg-[#fbfaf7]">
+
+        {/* 피처 배지 행 */}
+        <FadeUp className="border-b border-[#ebe8e2]">
+          <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-x-8 gap-y-3 px-5 py-8 text-xs text-[#857e73]">
             {[t('feature_brand'), t('feature_ai'), t('feature_download')].map(item => (
               <span key={item} className="inline-flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-[#ed6238]" />
@@ -146,57 +136,62 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
               </span>
             ))}
           </div>
-        </div>
+        </FadeUp>
 
-        <EditorialGallery />
-      </section>
+        <ProductShowcase authenticated={authenticated} />
+        <CapabilityObjects />
+        <ConnectedWorkflow />
 
-      <ProductShowcase authenticated={authenticated} />
-      <CapabilityObjects />
-      <ConnectedWorkflow />
-
-      <section className="px-5 pb-20 md:px-8 md:pb-28">
-        <div className="mx-auto grid max-w-[1120px] gap-10 border-y border-[#e6dfd5] py-14 md:grid-cols-[0.9fr_1.1fr] md:py-20">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">
-              {isEn ? 'Content operations' : '콘텐츠 운영 자동화'}
-            </p>
-            <h2 className="mt-5 text-[clamp(2rem,4vw,3.6rem)] font-semibold leading-[1.08] tracking-[-0.055em] text-[#171714]">
-              {isEn ? 'Card news automation for repeatable social publishing' : '카드뉴스 자동화부터 인스타그램 자동 게시 준비까지'}
-            </h2>
+        {/* 콘텐츠 자동화 섹션 */}
+        <section className="px-5 pb-20 md:px-8 md:pb-28">
+          <div className="mx-auto grid max-w-[1120px] gap-10 border-y border-[#e6dfd5] py-14 md:grid-cols-[0.9fr_1.1fr] md:py-20">
+            <SlideIn from="left">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">
+                {isEn ? 'Content operations' : '콘텐츠 운영 자동화'}
+              </p>
+              <h2 className="mt-5 text-[clamp(2rem,4vw,3.6rem)] font-semibold leading-[1.08] tracking-[-0.055em] text-[#171714]">
+                {isEn ? 'Card news automation for repeatable social publishing' : '카드뉴스 자동화부터 인스타그램 자동 게시 준비까지'}
+              </h2>
+            </SlideIn>
+            <SlideIn from="right" delay={0.1}>
+              <div className="space-y-5 text-[15px] leading-8 text-[#625c53] md:text-base">
+                <p>
+                  {isEn
+                    ? 'Shuffla turns a brand URL and topic into card news drafts that can be edited, exported, and added to an SNS auto upload workflow without starting from a blank canvas every time.'
+                    : 'Shuffla는 브랜드 URL과 주제를 바탕으로 카드뉴스 자동화 초안을 만들고, 편집과 다운로드까지 이어지도록 돕습니다. 매번 빈 화면에서 시작하지 않아도 SNS 자동 업로드 워크플로우에 넣을 수 있는 결과물을 빠르게 준비할 수 있습니다.'}
+                </p>
+                <p>
+                  {isEn
+                    ? 'Teams preparing Instagram auto publishing can keep one consistent flow for planning, copy, visuals, review, and final 4:5 image export.'
+                    : '인스타그램 자동 게시를 준비하는 팀은 기획, 카피, 비주얼, 검수, 4:5 이미지 내보내기를 하나의 흐름으로 관리할 수 있습니다. 반복 게시가 필요한 브랜드일수록 제작 시간을 줄이고 메시지 검수에 더 집중할 수 있습니다.'}
+                </p>
+              </div>
+            </SlideIn>
           </div>
-          <div className="space-y-5 text-[15px] leading-8 text-[#625c53] md:text-base">
-            <p>
-              {isEn
-                ? 'Shuffla turns a brand URL and topic into card news drafts that can be edited, exported, and added to an SNS auto upload workflow without starting from a blank canvas every time.'
-                : 'Shuffla는 브랜드 URL과 주제를 바탕으로 카드뉴스 자동화 초안을 만들고, 편집과 다운로드까지 이어지도록 돕습니다. 매번 빈 화면에서 시작하지 않아도 SNS 자동 업로드 워크플로우에 넣을 수 있는 결과물을 빠르게 준비할 수 있습니다.'}
-            </p>
-            <p>
-              {isEn
-                ? 'Teams preparing Instagram auto publishing can keep one consistent flow for planning, copy, visuals, review, and final 4:5 image export.'
-                : '인스타그램 자동 게시를 준비하는 팀은 기획, 카피, 비주얼, 검수, 4:5 이미지 내보내기를 하나의 흐름으로 관리할 수 있습니다. 반복 게시가 필요한 브랜드일수록 제작 시간을 줄이고 메시지 검수에 더 집중할 수 있습니다.'}
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="px-5 pb-24 md:px-8 md:pb-32">
-        <div className="mx-auto max-w-[1300px] overflow-hidden rounded-[30px] border border-[#e6dfd5] bg-white px-6 py-16 text-center md:px-10 md:py-24">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">{t('cta_section_eyebrow')}</p>
-          <h2 className="mx-auto mt-6 max-w-3xl text-[clamp(2.35rem,5vw,4.5rem)] font-semibold leading-[1.08] tracking-[-0.065em] whitespace-pre-line">
-            {t('cta_section_title')}
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[#756e63]">
-            {t('cta_section_desc')}
-          </p>
-          <Link
-            href={accessHref}
-            className="mt-9 inline-flex h-12 items-center gap-2 rounded-full bg-[#ed6238] px-8 text-sm font-medium text-white transition hover:-translate-y-px hover:bg-[#db552d]"
-          >
-            {authenticated ? t('cta_continue') : t('cta_google')} <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
+        {/* 하단 CTA 섹션 */}
+        <section className="px-5 pb-24 md:px-8 md:pb-32">
+          <ScaleIn>
+            <div className="mx-auto max-w-[1300px] overflow-hidden rounded-[30px] border border-[#e6dfd5] bg-white px-6 py-16 text-center md:px-10 md:py-24">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#847d73]">{t('cta_section_eyebrow')}</p>
+              <h2 className="mx-auto mt-6 max-w-3xl text-[clamp(2.35rem,5vw,4.5rem)] font-semibold leading-[1.08] tracking-[-0.065em] whitespace-pre-line">
+                {t('cta_section_title')}
+              </h2>
+              <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[#756e63]">
+                {t('cta_section_desc')}
+              </p>
+              <Link
+                href={accessHref}
+                className="mt-9 inline-flex h-12 items-center gap-2 rounded-full bg-[#ed6238] px-8 text-sm font-medium text-white transition hover:-translate-y-px hover:bg-[#db552d]"
+              >
+                {authenticated ? t('cta_continue') : t('cta_google')} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </ScaleIn>
+        </section>
+
+      </div>
 
       <MarketingFooter authenticated={authenticated} locale={locale} />
     </main>
