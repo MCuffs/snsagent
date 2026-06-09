@@ -5,10 +5,18 @@ import { dbService } from '../../../../../lib/db-service'
 import { exchangeGoogleCode, fetchGoogleUserInfo } from '../../../../../lib/google/oauth'
 import { saveErrorLog } from '../../../../../lib/errorLogger'
 import { isLikelyDatabaseConnectionError } from '../../../../../lib/runtime-diagnostics'
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+             request.headers.get('x-real-ip') || '127.0.0.1'
+  const rl = await checkRateLimit(`rate_limit:auth:${ip}`, RATE_LIMIT_PRESETS.auth)
+  if (rl.limited) {
+    return NextResponse.redirect(new URL('/login?error=too_many_requests', request.url))
+  }
+
   const requestUrl = new URL(request.url)
 
   try {

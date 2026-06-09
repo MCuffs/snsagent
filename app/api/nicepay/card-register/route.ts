@@ -14,6 +14,7 @@ import {
 } from '../../../../lib/nicepay'
 import { readNicepayReturnToken } from '../../../../lib/nicepay-return-token'
 import { normalizePlan } from '../../../../lib/limits-types'
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
@@ -25,6 +26,16 @@ const registerSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+             request.headers.get('x-real-ip') || '127.0.0.1'
+  const rl = await checkRateLimit(`rate_limit:payment:${ip}`, RATE_LIMIT_PRESETS.payment)
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } }
+    )
+  }
+
   try {
     const user = await getSessionUser()
     if (!user) {

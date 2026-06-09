@@ -3,7 +3,6 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { routing } from './i18n/routing'
 import { readSessionEmail, SESSION_COOKIE_NAME } from './lib/auth/session'
 import { isAdminEmail } from './lib/auth/admin-emails'
-import { checkRateLimit, RATE_LIMIT_PRESETS } from './lib/rateLimiter'
 
 const intlMiddleware = createMiddleware(routing)
 
@@ -28,37 +27,8 @@ function getRootLocale(request: NextRequest) {
   return routing.defaultLocale
 }
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-
-  // 1. IP-based Rate Limiting for Auth and Payment API paths
-  const isAuthRoute = pathname.startsWith('/api/auth/')
-  const isPaymentRoute =
-    pathname === '/api/nicepay/approve' ||
-    pathname === '/api/nicepay/card-register' ||
-    pathname === '/api/paypal/activate'
-
-  if (isAuthRoute || isPaymentRoute) {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-               request.headers.get('x-real-ip') ||
-               '127.0.0.1'
-    const preset = isAuthRoute ? RATE_LIMIT_PRESETS.auth : RATE_LIMIT_PRESETS.payment
-    const keyPrefix = isAuthRoute ? 'auth' : 'payment'
-
-    const rateLimitResult = await checkRateLimit(`rate_limit:${keyPrefix}:${ip}`, preset)
-    if (rateLimitResult.limited) {
-      return new NextResponse(
-        JSON.stringify({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(Math.ceil(rateLimitResult.resetMs / 1000)),
-          }
-        }
-      )
-    }
-  }
 
   // Pass through API routes, static files, and Next.js internals
   if (

@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { getSubscription, planFromPayPalPlanId } from '../../../../lib/paypal'
 import { dbService } from '../../../../lib/db-service'
 import { formatMissingConfigMessage, getPayPalConfigStatus } from '../../../../lib/runtime-diagnostics'
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
@@ -11,7 +12,17 @@ const activateSchema = z.object({
   subscriptionId: z.string().min(1, 'subscriptionId는 필수입니다.'),
 })
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+             request.headers.get('x-real-ip') || '127.0.0.1'
+  const rl = await checkRateLimit(`rate_limit:payment:${ip}`, RATE_LIMIT_PRESETS.payment)
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } }
+    )
+  }
+
   try {
     const user = await getSessionUser()
     if (!user) {
