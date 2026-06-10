@@ -15,7 +15,7 @@ const koreanTermsSections: TermsSection[] = [
   {
     title: '제1조 목적',
     paragraphs: [
-      '본 약관은 Shuffla(이하 “회사”)가 제공하는 AI 콘텐츠 제작 서비스(이하 “서비스”)의 이용과 관련하여 회사와 이용자 간의 권리, 의무, 책임사항 및 기타 필요한 사항을 정하는 것을 목적으로 합니다.',
+      '본 약관은 파랑버섯 스튜디오(이하 “회사”)가 제공하는 AI 콘텐츠 제작 서비스(이하 “서비스”)의 이용과 관련하여 회사와 이용자 간의 권리, 의무, 책임사항 및 기타 필요한 사항을 정하는 것을 목적으로 합니다.',
     ],
   },
   {
@@ -151,7 +151,7 @@ const koreanTermsSections: TermsSection[] = [
   {
     title: '제12조 미성년자 이용',
     orderedItems: [
-      'Shuffla는 원칙적으로 만 14세 미만 아동의 회원가입 및 서비스 이용을 허용하지 않습니다.',
+      '파랑버섯 스튜디오는 원칙적으로 만 14세 미만 아동의 회원가입 및 서비스 이용을 허용하지 않습니다.',
       '만 19세 미만 미성년자가 유료 서비스를 이용하는 경우 법정대리인의 동의가 필요할 수 있습니다.',
       '법정대리인의 동의 없이 체결된 미성년자의 유료 결제는 관련 법령에 따라 취소될 수 있습니다.',
     ],
@@ -192,8 +192,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const isEn = locale === 'en'
   const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   return {
-    title: isEn ? 'Terms of Service — Shuffla' : '이용약관 — Shuffla',
-    description: isEn ? 'Shuffla card news studio terms of service' : 'Shuffla 카드뉴스 스튜디오 서비스 이용약관',
+    title: isEn ? 'Terms of Service — 파랑버섯 스튜디오' : '이용약관 — 파랑버섯 스튜디오',
+    description: isEn ? '파랑버섯 스튜디오 card news studio terms of service' : '파랑버섯 스튜디오 서비스 이용약관',
     alternates: {
       canonical: `${base}/${locale}/terms`,
       languages: { ko: `${base}/ko/terms`, en: `${base}/en/terms` },
@@ -218,7 +218,7 @@ export default async function TermsPage({ params }: { params: Promise<{ locale: 
           <div className="mt-10 space-y-9 text-sm leading-7 text-[#625c53]">
             <p>시행일: 2026년 6월</p>
             <p>
-              본 이용약관은 Shuffla가 제공하는 AI 기반 카드뉴스 및 SNS 콘텐츠 제작 서비스의 이용 조건과 회사와 이용자 간의 권리, 의무 및 책임사항을 규정합니다.
+              본 이용약관은 파랑버섯 스튜디오가 제공하는 AI 기반 카드뉴스 및 SNS 콘텐츠 제작 서비스의 이용 조건과 회사와 이용자 간의 권리, 의무 및 책임사항을 규정합니다.
             </p>
             {koreanTermsSections.map(section => (
               <section key={section.title} className="space-y-4">

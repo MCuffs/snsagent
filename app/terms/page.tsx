@@ -2,8 +2,8 @@ import { MarketingFooter } from '../components/MarketingFooter'
 import { MarketingNav } from '../components/MarketingNav'
 
 export const metadata = {
-  title: 'Terms — Shuffla',
-  description: 'Shuffla 서비스 이용약관',
+  title: 'Terms — 파랑버섯 스튜디오',
+  description: '파랑버섯 스튜디오 서비스 이용약관',
 }
 
 export default function TermsPage() {
@@ -23,7 +23,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-semibold text-[#171714]">서비스 범위</h2>
             <p className="mt-3">
-              Shuffla는 브랜드 분석, 카드뉴스 생성, 편집, 다운로드를 제공하는 AI 콘텐츠 제작 도구입니다.
+              파랑버섯 스튜디오는 브랜드 분석, 카드뉴스 생성, 편집, 다운로드를 제공하는 AI 콘텐츠 제작 도구입니다.
               생성 결과는 사용자가 검토하고 수정한 뒤 활용해야 합니다.
             </p>
           </section>

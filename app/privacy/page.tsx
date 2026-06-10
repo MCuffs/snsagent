@@ -2,8 +2,8 @@ import { MarketingFooter } from '../components/MarketingFooter'
 import { MarketingNav } from '../components/MarketingNav'
 
 export const metadata = {
-  title: 'Privacy — Shuffla',
-  description: 'Shuffla 개인정보 처리 안내',
+  title: 'Privacy — 파랑버섯 스튜디오',
+  description: '파랑버섯 스튜디오 개인정보 처리 안내',
 }
 
 export default function PrivacyPage() {
@@ -23,7 +23,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-semibold text-[#171714]">수집하는 정보</h2>
             <p className="mt-3">
-              Shuffla는 로그인 계정 정보, 브랜드 설정, 생성 요청, 편집 결과, 결제 상태처럼 서비스 제공에 필요한 정보를 저장합니다.
+              파랑버섯 스튜디오는 로그인 계정 정보, 브랜드 설정, 생성 요청, 편집 결과, 결제 상태처럼 서비스 제공에 필요한 정보를 저장합니다.
             </p>
           </section>
           <section>
