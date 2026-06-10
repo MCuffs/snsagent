@@ -381,6 +381,8 @@ ${contextBlock}
 - Keep message under 650 characters across 2-3 short paragraphs.
 - Never invent performance metrics, medical claims, rankings, discounts, reviews, or unsupported facts.
 - structurePreview must contain exactly slideCount items and each item must describe the slide information role, not finished card copy.
+- draftSlides must contain exactly slideCount items with real headline and body copy. headline: max 40 chars. body: 1-2 sentences, 60-130 chars. Write actual card copy, not planning labels.
+- reasoning: one short English sentence (under 30 chars) explaining the copy intent.
 
 JSON when ready:
 {
@@ -400,6 +402,9 @@ JSON when ready:
     "reasonForStyle": "visual reasoning",
     "structurePreview": [
       { "slideNumber": 1, "role": "Hook", "description": "specific slide role" }
+    ],
+    "draftSlides": [
+      { "slideNumber": 1, "role": "Hook", "headline": "Bold opening hook", "body": "One to two sentences of specific insight for the reader.", "reasoning": "Grabs attention with contrast" }
     ]
   }
 }
@@ -416,6 +421,25 @@ JSON when more detail is needed:
       { "label": "Practical guide", "value": "Create a practical guide for the target reader." },
       { "label": "Checklist", "value": "Create a checklist with concrete decision points." },
       { "label": "Balanced cautions", "value": "Explain benefits and cautions in a balanced way." }
+    ]
+  },
+  "params": {
+    "topic": "specific topic or product name",
+    "visualHint": "minimal-clean",
+    "contentType": "educational guide",
+    "objective": "specific content goal",
+    "slideCount": 5,
+    "productUrl": null,
+    "brandAnalysis": "why this direction fits",
+    "targetEmotion": "reader emotion",
+    "hookDirection": "specific hook angle",
+    "recommendedCta": "specific reader action",
+    "reasonForStyle": "visual reasoning",
+    "structurePreview": [
+      { "slideNumber": 1, "role": "Hook", "description": "specific slide role" }
+    ],
+    "draftSlides": [
+      { "slideNumber": 1, "role": "Hook", "headline": "Bold opening hook", "body": "One to two sentences of specific insight for the reader.", "reasoning": "Grabs attention with contrast" }
     ]
   }
 }`

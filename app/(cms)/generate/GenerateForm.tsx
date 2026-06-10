@@ -236,6 +236,7 @@ export default function GenerateForm({
   const typingTimerRef = useRef<number | null>(null)
   const briefingTimersRef = useRef<number[]>([])
   const generationStartedAtRef = useRef<number | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -381,13 +382,26 @@ export default function GenerateForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyParams])
 
+  const handleCancelAgent = useCallback(() => {
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    setIsWaiting(false)
+    clearTypingTimer()
+    appendAiMessage(locale === 'en' ? 'Request cancelled.' : '요청이 취소되었습니다.')
+  }, [clearTypingTimer, appendAiMessage, locale])
+
   const callAgent = useCallback(async (history: ChatMessage[]) => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setIsWaiting(true)
     try {
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode }),
+        signal: controller.signal,
       })
       const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }
 
@@ -422,9 +436,11 @@ export default function GenerateForm({
         : ''
       const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}` }
       setChatHistory(prev => [...prev, assistantHistory])
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
+      if (abortControllerRef.current === controller) abortControllerRef.current = null
       setIsWaiting(false)
     }
   }, [appendAiMessage, brand.id, generationMode, locale, language])
@@ -1214,6 +1230,16 @@ export default function GenerateForm({
               className="h-12 flex-1 rounded-2xl border border-[#E6DFD5] bg-white px-4 text-sm text-[#2C1E1A] placeholder-[#C2B5AA] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/5 disabled:opacity-50 font-bold transition-all"
               autoFocus
             />
+            {isWaiting && (
+              <button
+                type="button"
+                onClick={handleCancelAgent}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#E6DFD5] bg-white text-[#8C7E7A] transition-all hover:border-red-300 hover:text-red-500 active:scale-95"
+                title={locale === 'en' ? 'Cancel' : '취소'}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="submit"
               disabled={!input.trim() || isWaiting || isRevealingMessage}
