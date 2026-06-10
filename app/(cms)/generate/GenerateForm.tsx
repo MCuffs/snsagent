@@ -1679,85 +1679,103 @@ function PromoPaymentModal({
     if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
     if (!/^\d{6}(\d{4})?$/.test(idNo)) { setFormError('생년월일(6자리) 또는 사업자번호(10자리)를 입력해 주세요.'); return }
     if (!/^\d{2}$/.test(cardPw)) { setFormError('비밀번호 앞 2자리를 입력해 주세요.'); return }
-    
+
     const [mm, yy] = cardExpire.split('/')
     onSubmit(selectedPlan, { cardNo: rawCard, cardExpire: `${yy}${mm}`, idNo, cardPw })
   }
 
+  const planPrice = selectedPlan === 'PRO' ? '20,000원' : '31,200원'
+  const planOriginalPrice = selectedPlan === 'PRO' ? '25,000원' : '39,000원'
+  const planName = selectedPlan === 'PRO' ? 'Creator' : 'Studio'
+  const planDesc = selectedPlan === 'PRO' ? '월 20회 카드뉴스 생성' : '월 30회 카드뉴스 생성'
+
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6"
       onClick={(e) => { if (e.target === overlayRef.current && !processing) onClose() }}
     >
-      <div className="w-full max-w-lg overflow-hidden rounded-[32px] border border-[#EFEAE2] bg-[#FFFDFB] shadow-[0_24px_60px_rgba(44,30,26,0.18)] relative">
-        <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-[#9E7D68]/10 blur-[60px] pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-[#C2A794]/10 blur-[60px] pointer-events-none" />
+      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] shadow-[0_32px_80px_rgba(0,0,0,0.5)] flex flex-col md:flex-row">
 
-        <div className="p-8 relative z-10">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#9E7D68]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#9E7D68] mb-2">
-                🎁 20% 특별 할인 혜택
-              </span>
-              <h2 className="text-xl font-black tracking-[-0.03em] text-[#2C1E1A]">생성 한도 업그레이드</h2>
-            </div>
+        {/* ── 왼쪽: 이미지 배경 + 카드뉴스 감성 오버레이 ── */}
+        <div
+          className="relative md:w-[46%] min-h-[280px] md:min-h-0 flex-shrink-0 flex flex-col justify-between overflow-hidden"
+          style={{ backgroundImage: "url('/promo-bg.png')", backgroundSize: 'cover', backgroundPosition: 'center 30%' }}
+        >
+          {/* 멀티 레이어 오버레이: 카드뉴스 감성 */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/85" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#9E7D68]/60 via-transparent to-transparent mix-blend-multiply" />
+
+          {/* 닫기 버튼 (left panel) */}
+          <div className="relative z-10 flex justify-end p-4">
             <button
               type="button"
               onClick={onClose}
               disabled={processing}
-              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              className="rounded-full p-1.5 bg-white/10 backdrop-blur-sm text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          <p className="text-xs text-[#7C6E6A] font-bold mb-6">
-            무료 한도(2회)를 모두 사용하셨습니다. 지금 업그레이드하시면 첫 달 <strong>20% 특별 할인가</strong>로 무제한 수준의 카드뉴스를 즉시 생성하실 수 있습니다. (결제 완료 시 작성 중이던 내용이 바로 생성됩니다.)
-          </p>
+          {/* 카드뉴스 감성 콘텐츠 */}
+          <div className="relative z-10 p-7 pb-8">
+            {/* 에디토리얼 태그 */}
+            <span className="inline-block rounded-full border border-white/30 bg-white/10 backdrop-blur-sm px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/80 mb-4">
+              SHUFFLA · 한정 혜택
+            </span>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setSelectedPlan('PRO')}
-                disabled={processing}
-                className={`flex flex-col items-start p-5 rounded-2xl border-2 text-left transition-all ${
-                  selectedPlan === 'PRO'
-                    ? 'border-[#9E7D68] bg-[#FFFDF9] shadow-[0_8px_20px_rgba(158,125,104,0.06)]'
-                    : 'border-[#EFEAE2] bg-white hover:border-gray-300'
-                }`}
-              >
-                <span className="text-[10px] font-black text-[#A69282] uppercase tracking-wider">Creator 플랜</span>
-                <span className="text-sm font-black text-[#2C1E1A] mt-1">월 20회 생성</span>
-                <div className="mt-3 flex flex-col">
-                  <span className="text-xs text-gray-400 line-through">월 25,000원</span>
-                  <span className="text-base font-black text-[#9E7D68]">월 20,000원</span>
-                </div>
-              </button>
+            {/* 헤드라인 */}
+            <h2 className="text-[28px] font-black leading-[1.1] tracking-[-0.04em] text-white mb-2">
+              지금<br />시작하면<br /><span className="text-[#FFD580]">20% OFF</span>
+            </h2>
 
-              <button
-                type="button"
-                onClick={() => setSelectedPlan('UNLIMITED')}
-                disabled={processing}
-                className={`flex flex-col items-start p-5 rounded-2xl border-2 text-left transition-all ${
-                  selectedPlan === 'UNLIMITED'
-                    ? 'border-[#9E7D68] bg-[#FFFDF9] shadow-[0_8px_20px_rgba(158,125,104,0.06)]'
-                    : 'border-[#EFEAE2] bg-white hover:border-gray-300'
-                }`}
-              >
-                <span className="text-[10px] font-black text-[#A69282] uppercase tracking-wider">Studio 플랜</span>
-                <span className="text-sm font-black text-[#2C1E1A] mt-1">월 30회 생성</span>
-                <div className="mt-3 flex flex-col">
-                  <span className="text-xs text-gray-400 line-through">월 39,000원</span>
-                  <span className="text-base font-black text-[#9E7D68]">월 31,200원</span>
+            {/* 서브카피 */}
+            <p className="text-xs font-bold text-white/70 leading-relaxed mb-5">
+              무료 한도가 끝났어도<br />괜찮아요. 딱 지금만 20% 할인.
+            </p>
+
+            {/* 플랜 가격 배지 */}
+            <div className="flex items-end gap-2">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-0.5">{planName} 플랜</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xs text-white/40 line-through font-bold">{planOriginalPrice}</span>
+                  <span className="text-2xl font-black text-[#FFD580] tracking-tight">{planPrice}</span>
+                  <span className="text-xs text-white/60 font-bold">/월</span>
                 </div>
-              </button>
+                <p className="text-[10px] text-white/50 font-bold mt-0.5">{planDesc}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 오른쪽: 결제 폼 패널 ── */}
+        <div className="flex-1 bg-[#0F0D0B] flex flex-col overflow-y-auto max-h-[90vh] md:max-h-none">
+          <div className="p-6 flex-1">
+            {/* 플랜 선택 탭 */}
+            <div className="flex gap-2 mb-6">
+              {(['PRO', 'UNLIMITED'] as const).map((plan) => (
+                <button
+                  key={plan}
+                  type="button"
+                  onClick={() => setSelectedPlan(plan)}
+                  disabled={processing}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black tracking-wide transition-all ${
+                    selectedPlan === plan
+                      ? 'bg-[#9E7D68] text-white shadow-[0_4px_16px_rgba(158,125,104,0.35)]'
+                      : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+                  }`}
+                >
+                  {plan === 'PRO' ? 'Creator' : 'Studio'}
+                </button>
+              ))}
             </div>
 
-            <div className="space-y-4 border-t border-[#EFEAE2] pt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* 카드번호 */}
               <div>
-                <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">카드번호</label>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">카드번호</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -1770,13 +1788,13 @@ function PromoPaymentModal({
                   }}
                   disabled={processing}
                   required
-                  className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">유효기간</label>
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">유효기간</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1789,11 +1807,11 @@ function PromoPaymentModal({
                     }}
                     disabled={processing}
                     required
-                    className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">비밀번호 앞 2자리</label>
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">비밀번호 앞 2자리</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -1803,14 +1821,14 @@ function PromoPaymentModal({
                     onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
                     disabled={processing}
                     required
-                    className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">
-                  생년월일 6자리 <span className="font-normal text-gray-400">(법인카드: 사업자번호 10자리)</span>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">
+                  생년월일 <span className="normal-case font-normal text-white/25">(법인: 사업자번호 10자리)</span>
                 </label>
                 <input
                   type="text"
@@ -1821,44 +1839,44 @@ function PromoPaymentModal({
                   onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   disabled={processing}
                   required
-                  className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
                 />
               </div>
-            </div>
 
-            {formError && (
-              <p className="rounded-xl border border-red-200 bg-red-50/50 px-4 py-3 text-xs font-bold text-red-700">{formError}</p>
-            )}
-
-            {error && (
-              <p className="rounded-xl border border-red-200 bg-red-50/50 px-4 py-3 text-xs font-bold text-red-700">{error}</p>
-            )}
-
-            <p className="text-[10px] text-gray-400 text-center leading-relaxed">
-              * 정기 구독의 첫 결제는 20% 특별 할인가로 진행되며, 다음 달 정기 결제일부터는 원래 요금제 가격으로 정상 결제됩니다.<br />
-              * 카드 정보는 암호화되어 전송되며 서버에 안전하게 격리 보관됩니다.
-            </p>
-
-            <button
-              type="submit"
-              disabled={processing}
-              className="w-full rounded-2xl bg-[#2C1E1A] py-4 text-sm font-black text-[#FFFDF8] shadow-[0_14px_34px_rgba(44,30,26,0.18)] transition hover:bg-[#3B302C] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  결제 처리 중...
-                </>
-              ) : (
-                <>
-                  <CreditCard className="h-4 w-4" />
-                  {selectedPlan === 'PRO' ? '20,000원 결제 및 생성 재개' : '31,200원 결제 및 생성 재개'}
-                </>
+              {(formError || error) && (
+                <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-400">
+                  {formError || error}
+                </p>
               )}
-            </button>
-          </form>
+
+              {/* 결제 버튼 */}
+              <button
+                type="submit"
+                disabled={processing}
+                className="w-full rounded-2xl bg-gradient-to-br from-[#9E7D68] to-[#7A5E4E] py-4 text-sm font-black text-white shadow-[0_8px_28px_rgba(158,125,104,0.4)] transition-all hover:shadow-[0_12px_36px_rgba(158,125,104,0.5)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-2"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    결제 처리 중...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-4 w-4" />
+                    {planPrice} 결제 후 즉시 생성
+                  </>
+                )}
+              </button>
+
+              <p className="text-[10px] text-white/20 text-center leading-relaxed pt-1">
+                첫 달만 20% 할인 · 다음 달부터 정상 요금 · 언제든 해지 가능<br />
+                카드 정보는 AES-256 암호화 처리됩니다
+              </p>
+            </form>
+          </div>
         </div>
       </div>
     </div>
   )
 }
+
