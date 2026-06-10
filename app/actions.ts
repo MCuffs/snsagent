@@ -19,7 +19,6 @@ import { planTypography } from '../src/lib/layout/typographyEngine'
 import { applyMediaCardHarness, buildHarnessedVisualPrompt } from '../src/lib/layout/mediaCardHarness'
 import { layerByType, parseEditorialDocument, resolveEditableBackgroundImageUrl, serializeBrandStyleMemory } from '../src/lib/editor/document'
 import { renderEditorialDocument } from '../src/lib/editor/renderer'
-import { deleteUploadedAsset } from '../src/lib/storage/upload'
 import type { EditorialDocument } from '../src/lib/editor/types'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, readSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../lib/auth/session'
 import { hashPassword, verifyPassword } from '../lib/password'
@@ -490,13 +489,6 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
     })
     if (renderOutput) {
       await dbService.updateBrandEditorPreferences(existingSlide.campaign.brandId, serializeBrandStyleMemory(document))
-      // 렌더링 완료 후 임시 업로드 파일 삭제 — carousel/ 결과물은 유지
-      if (backgroundImageUrl) void deleteUploadedAsset(backgroundImageUrl)
-      for (const layer of document.layers) {
-        if (layer.type === 'sticker' && layer.id !== 'sticker' && layer.imageUrl) {
-          void deleteUploadedAsset(layer.imageUrl)
-        }
-      }
     }
     logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'headline_edit', editDelta: { beforeLength: existingSlide.headline.length, afterLength: headline.length }, metadata: { action: 'saveEditorialDocument', rendered: renderOutput } })
     return { success: true as const, slide, document, rendered: renderOutput }
