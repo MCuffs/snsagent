@@ -74,6 +74,13 @@ interface GenerateParams {
   recommendedCta?: string
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
+  draftSlides?: {
+    slideNumber: number
+    role: string
+    headline: string
+    body: string
+    reasoning: string
+  }[]
 }
 
 interface CopyPreviewSlide {
@@ -368,7 +375,7 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
       }
 
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
-      appendAiMessage(msg, data.ready && data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
+      appendAiMessage(msg, data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
       if (data.ready && data.params) {
         analytics.generateBriefReady({
           brandId: brand.id,
@@ -510,6 +517,19 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
   const handleCopyPreview = async () => {
     if (!readyParams) return
+    
+    // 대화 중에 카피 초안(draftSlides)이 이미 합의되었다면 서버 요청 없이 즉시 전환
+    if (readyParams.draftSlides && readyParams.draftSlides.length > 0) {
+      setCopyPreviewSlides(readyParams.draftSlides.map(slide => ({
+        slideNumber: slide.slideNumber,
+        role: slide.role,
+        headline: slide.headline,
+        body: slide.body
+      })))
+      setPhase('preview')
+      return
+    }
+
     setPreviewLoading(true)
     setError(null)
     try {
@@ -609,7 +629,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
           recommendedCta: readyParams.recommendedCta,
           reasonForStyle: readyParams.reasonForStyle,
           structurePreview: readyParams.structurePreview,
-          confirmedSlides: confirmedSlides ?? undefined,
+          confirmedSlides: confirmedSlides ?? readyParams.draftSlides?.map(s => ({
+            slideNumber: s.slideNumber,
+            role: s.role,
+            headline: s.headline,
+            body: s.body
+          })) ?? undefined,
           productImageUrls,
           language,
           generationMode,
@@ -1074,8 +1099,10 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
               )}
             </AnimatePresence>
 
-            {/* 3. Slide Flow Preview */}
-            {briefingStage >= 3 && readyParams.structurePreview && readyParams.structurePreview.length > 0 && (
+            {/* 3. Slide Flow / Draft Copy Preview */}
+            {briefingStage >= 3 && (
+              ((readyParams.draftSlides && readyParams.draftSlides.length > 0) || (readyParams.structurePreview && readyParams.structurePreview.length > 0))
+            ) && (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1083,31 +1110,68 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
                 className="space-y-4 pt-2"
               >
                 <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" /> {t('flow_section')}
+                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" />
+                  {readyParams.draftSlides && readyParams.draftSlides.length > 0 ? (locale === 'en' ? 'Draft Copy & Strategy' : '기획 및 카피 초안') : t('flow_section')}
                 </h4>
-                <div className="relative border-l border-dashed border-[#E5DDD3] pl-5 ml-2.5 space-y-5">
-                  {compactSlidePreview(readyParams.structurePreview).map((slide, idx) => (
-                    <motion.div 
-                      key={slide.slideNumber}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1], delay: idx * 0.08 + 0.3 }}
-                      className="relative"
-                    >
-                      <span className="absolute -left-[30px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FAF8F5] border-2 border-[#9E7D68] text-[10px] font-black text-[#9E7D68] shadow-[0_2px_4px_rgba(158,125,104,0.1)]">
-                        {slide.slideNumber}
-                      </span>
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] font-black tracking-wider uppercase text-[#B88E76]">{slide.role}</span>
-                        <p className="text-xs font-semibold text-[#5C4E4B] leading-5">{slide.description}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-                {readyParams.structurePreview.length > 4 && (
-                  <p className="pl-2 text-[10px] font-bold text-[#A69282]">
-                    {t('flow_note', { count: readyParams.structurePreview.length - 4 })}
-                  </p>
+                
+                {readyParams.draftSlides && readyParams.draftSlides.length > 0 ? (
+                  <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-1.5 custom-scrollbar">
+                    {readyParams.draftSlides.map((slide, idx) => (
+                      <motion.div
+                        key={`draft-${slide.slideNumber}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1], delay: idx * 0.05 }}
+                        className="relative bg-white/90 border border-[#EFEAE2] rounded-2xl p-4.5 shadow-[0_3px_12px_rgba(158,125,104,0.03)] space-y-2.5 hover:border-[#C4A38E] transition-all"
+                      >
+                        <div className="flex items-center justify-between border-b border-[#F5EFE6] pb-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#2C1E1A] text-[10px] font-black text-[#FFFDF8] shadow-sm">
+                            {slide.slideNumber}
+                          </span>
+                          <span className="rounded-full border border-[#E8DCCB] bg-[#F8F4EE] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#9E7D68]">
+                            {slide.role}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-black leading-5 text-[#2C1E1A]">{slide.headline}</p>
+                          <p className="text-[11px] font-medium leading-relaxed text-[#5C4E4B]">{slide.body}</p>
+                        </div>
+                        {slide.reasoning && (
+                          <div className="border-t border-[#F5EFE6] pt-2 mt-1">
+                            <span className="block text-[8px] font-black text-[#B88E76] uppercase tracking-[0.12em]">{locale === 'en' ? 'Reasoning' : '디렉터 기획 의도'}</span>
+                            <p className="text-[10px] text-[#8C7E7A] leading-relaxed mt-0.5 font-semibold">{slide.reasoning}</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative border-l border-dashed border-[#E5DDD3] pl-5 ml-2.5 space-y-5">
+                      {compactSlidePreview(readyParams.structurePreview!).map((slide, idx) => (
+                        <motion.div 
+                          key={slide.slideNumber}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1], delay: idx * 0.08 + 0.3 }}
+                          className="relative"
+                        >
+                          <span className="absolute -left-[30px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FAF8F5] border-2 border-[#9E7D68] text-[10px] font-black text-[#9E7D68] shadow-[0_2px_4px_rgba(158,125,104,0.1)]">
+                            {slide.slideNumber}
+                          </span>
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] font-black tracking-wider uppercase text-[#B88E76]">{slide.role}</span>
+                            <p className="text-xs font-semibold text-[#5C4E4B] leading-5">{slide.description}</p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                    {readyParams.structurePreview!.length > 4 && (
+                      <p className="pl-2 text-[10px] font-bold text-[#A69282]">
+                        {t('flow_note', { count: readyParams.structurePreview!.length - 4 })}
+                      </p>
+                    )}
+                  </>
                 )}
               </motion.div>
             )}
