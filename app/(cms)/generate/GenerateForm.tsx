@@ -15,6 +15,8 @@ import {
   Layers,
   Sparkle,
   ChevronLeft,
+  Check,
+  Loader2,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -707,6 +709,20 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
   // ── Generating overlay ──────────────────────────────────────────
   if (phase === 'generating') {
+    const LOADING_STEP_TITLES = language === 'en' ? [
+      "1. Brand Analysis",
+      "2. Copy Writing",
+      "3. Visual & Style Design",
+      "4. Layout Calculation",
+      "5. Quality Assurance"
+    ] : [
+      "1단계. 브랜드 분석 및 콘셉트 도출",
+      "2단계. 카피 조율 및 마케팅 톤 설정",
+      "3단계. 비주얼 방향 및 프롬프트 설계",
+      "4단계. 레이아웃 & 타이포그래피 계산",
+      "5단계. 모바일 가독성 및 최종 검수"
+    ]
+
     return (
       <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#FFFDF9] via-[#FAF7F2] to-[#FAF8F5] px-6 py-16 text-[#2C1E1A] relative overflow-hidden">
         {/* Glow ambient background bubbles */}
@@ -714,30 +730,88 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[#C2A794]/15 blur-[100px] pointer-events-none" />
 
         <motion.div
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={smoothTransition}
-          className="w-full max-w-md bg-white/75 backdrop-blur-md border border-[#EFEAE2] rounded-3xl p-8 shadow-[0_12px_40px_rgba(158,125,104,0.06),_0_2px_4px_rgba(158,125,104,0.02)] text-center relative z-10"
+          className="w-full max-w-lg bg-white/80 backdrop-blur-md border border-[#EFEAE2] rounded-[32px] p-8 shadow-[0_24px_60px_rgba(158,125,104,0.08),_0_4px_12px_rgba(158,125,104,0.02)] relative z-10"
         >
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="mb-6 flex justify-center"
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#9E7D68]/10 to-[#C4A38E]/20 border border-[#9E7D68]/20 shadow-[0_8px_24px_rgba(158,125,104,0.06)]">
-              <Sparkles className="h-6 w-6 text-[#9E7D68]" />
-            </div>
-          </motion.div>
-          <h2 className="text-xl font-black tracking-[-0.03em] text-[#2C1E1A]">{t('building_title')}</h2>
-          <p className="mt-3 text-sm text-[#8C7E7A] font-semibold leading-6 min-h-[48px] px-2">{LOADING_STEPS[loadingStep]}</p>
-          <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-[#F2EAE1]">
-            <motion.div
-              className="h-full bg-gradient-to-r from-[#C29B84] to-[#9E7D68]"
-              animate={{ width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%` }}
-              transition={{ duration: 3.5, ease: 'easeInOut' }}
-            />
+          <div className="text-center mb-8">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              className="mb-4 inline-flex"
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#9E7D68]/10 to-[#C4A38E]/20 border border-[#9E7D68]/20 shadow-[0_8px_24px_rgba(158,125,104,0.06)]">
+                <Sparkles className="h-5 w-5 text-[#9E7D68]" />
+              </div>
+            </motion.div>
+            <h2 className="text-2xl font-black tracking-[-0.03em] text-[#2C1E1A]">{t('building_title')}</h2>
+            <p className="mt-2 text-xs text-[#C2B5AA] font-bold">{t('wait_msg')}</p>
           </div>
-          <p className="mt-4 text-xs text-[#C2B5AA] font-bold">{t('wait_msg')}</p>
+
+          {/* Timeline Blocks */}
+          <div className="space-y-4 relative">
+            {LOADING_STEPS.map((stepDesc, idx) => {
+              const isCompleted = idx < loadingStep
+              const isCurrent = idx === loadingStep
+
+              return (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.1, duration: 0.4 }}
+                  className={`relative flex gap-4 p-4 rounded-2xl border transition-all duration-300 ${
+                    isCompleted
+                      ? 'bg-emerald-50/40 border-emerald-100/70 text-emerald-800'
+                      : isCurrent
+                      ? 'bg-white border-2 border-[#9E7D68] shadow-[0_12px_24px_rgba(158,125,104,0.06)] text-[#2C1E1A]'
+                      : 'bg-[#FCFBF9]/30 border-[#EFEAE2]/60 text-gray-400 opacity-55'
+                  }`}
+                >
+                  {/* Timeline Connector Line */}
+                  {idx < LOADING_STEPS.length - 1 && (
+                    <div 
+                      className={`absolute left-7 top-14 w-[2px] h-[34px] -translate-x-1/2 z-0 transition-colors duration-500 ${
+                        isCompleted ? 'bg-emerald-400' : 'bg-[#EFEAE2]'
+                      }`} 
+                    />
+                  )}
+
+                  {/* Step Status Icon */}
+                  <div className="relative z-10 shrink-0">
+                    {isCompleted ? (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_2px_8px_rgba(16,185,129,0.2)]">
+                        <Check className="h-3.5 w-3.5 stroke-[3]" />
+                      </div>
+                    ) : isCurrent ? (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#9E7D68] text-white shadow-[0_2px_8px_rgba(158,125,104,0.2)]">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 border border-gray-200 text-gray-400 text-xs font-bold">
+                        {idx + 1}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step Description */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`text-sm font-black tracking-[-0.02em] ${
+                      isCompleted ? 'text-emerald-900' : isCurrent ? 'text-[#2C1E1A]' : 'text-gray-400'
+                    }`}>
+                      {LOADING_STEP_TITLES[idx]}
+                    </h4>
+                    <p className={`mt-1.5 text-xs leading-5 font-semibold ${
+                      isCompleted ? 'text-emerald-700/80' : isCurrent ? 'text-[#8C7E7A]' : 'text-gray-400/70'
+                    }`}>
+                      {stepDesc}
+                    </p>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
         </motion.div>
       </div>
     )
