@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../lib/auth/user'
-import { normalizePlan } from '../../../lib/limits-types'
-import { list } from '@vercel/blob'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
@@ -9,11 +7,6 @@ import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
-
-// Storage quota definitions
-// Uploads are ephemeral — deleted after rendering. Quota is a safety cap, not a storage limit.
-const QUOTA_FREE = 200 * 1024 * 1024  // 200MB safety cap (actual usage stays low after render cleanup)
-const QUOTA_PAID = 500 * 1024 * 1024  // 500MB safety cap
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days local retention
 const IMAGE_EXTENSIONS: Record<string, string> = {
@@ -105,61 +98,7 @@ export async function POST(request: Request) {
       totalIncomingSize += file.size
     }
 
-    // 3. Calculate current storage quota usage
-    const userPlan = normalizePlan(user.plan)
-    const quotaLimit = userPlan === 'FREE' ? QUOTA_FREE : QUOTA_PAID
-    let currentUsage = 0
-
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      // Vercel Blob Storage quota calculation
-      try {
-        const prefix = `uploads/${user.id}/`
-        const { blobs } = await list({ prefix, token: process.env.BLOB_READ_WRITE_TOKEN })
-        currentUsage = blobs.reduce((sum, b) => sum + b.size, 0)
-      } catch (listError) {
-        console.error('[Upload Quota] Failed to list Vercel blobs:', listError)
-        return NextResponse.json(
-          { error: 'Unable to verify storage quota. Upload was not processed.' },
-          { status: 503 }
-        )
-      }
-    } else {
-      // Local FS storage quota calculation
-      const dir = path.join(process.cwd(), 'public', 'uploads', user.id)
-      if (fs.existsSync(dir)) {
-        try {
-          const localFiles = fs.readdirSync(dir)
-          const nowMs = Date.now()
-          for (const localFile of localFiles) {
-            const filePath = path.join(dir, localFile)
-            const stat = fs.statSync(filePath)
-            if (stat.isFile()) {
-              // Auto-cleanup files older than 30 days
-              if (nowMs - stat.mtimeMs > RETENTION_MS) {
-                fs.unlinkSync(filePath)
-              } else {
-                currentUsage += stat.size
-              }
-            }
-          }
-        } catch (fsError) {
-          console.error('[Upload Quota] Local directory read failed:', fsError)
-        }
-      }
-    }
-
-    // 4. Enforce quota limits
-    if (currentUsage + totalIncomingSize > quotaLimit) {
-      const limitMb = Math.round(quotaLimit / (1024 * 1024))
-      const currentMb = (currentUsage / (1024 * 1024)).toFixed(2)
-      console.error('[Upload] 400: 용량 초과', { currentUsage, totalIncomingSize, quotaLimit })
-      return NextResponse.json(
-        { error: `저장 용량이 부족합니다. (한도: ${limitMb}MB, 사용 중: ${currentMb}MB)` },
-        { status: 400 }
-      )
-    }
-
-    // 5. Upload files
+    // 3. Upload files
     const urls: string[] = []
 
     for (const file of files) {
