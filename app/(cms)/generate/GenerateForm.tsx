@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1686,10 +1687,10 @@ function PromoPaymentModal({
   const planPrice = selectedPlan === 'PRO' ? '20,000원' : '31,200원'
   const planOriginalPrice = selectedPlan === 'PRO' ? '25,000원' : '39,000원'
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4"
       onClick={(e) => { if (e.target === overlayRef.current && !processing) onClose() }}
     >
       {/* 9:16 카드 컨테이너 */}
@@ -1858,7 +1859,8 @@ function PromoPaymentModal({
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
