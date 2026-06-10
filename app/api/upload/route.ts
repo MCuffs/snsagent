@@ -11,8 +11,9 @@ export const runtime = 'nodejs'
 
 
 // Storage quota definitions
-const QUOTA_FREE = 20 * 1024 * 1024 // 20MB
-const QUOTA_PAID = 100 * 1024 * 1024 // 100MB
+// Uploads are ephemeral — deleted after rendering. Quota is a safety cap, not a storage limit.
+const QUOTA_FREE = 200 * 1024 * 1024  // 200MB safety cap (actual usage stays low after render cleanup)
+const QUOTA_PAID = 500 * 1024 * 1024  // 500MB safety cap
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days local retention
 const IMAGE_EXTENSIONS: Record<string, string> = {
