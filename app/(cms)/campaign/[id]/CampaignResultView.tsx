@@ -535,8 +535,26 @@ export default function CampaignResultView({
     }
   }
 
+  // ✅ 텍스트 편집 중 다운로드 뺄리 방지: export 전 contentEditable blur() 실행
+  // onInput으로 이미 실시간 store 동기화되지만, React가 다음 렌더링 전에 상태를
+  // 읽는 틀사이를 대비해 blur()로 flush한 후 소액의 React 스케줄링 대기
+  const flushActiveTextEdit = (): Promise<void> => {
+    return new Promise(resolve => {
+      const el = globalThis.document?.activeElement as HTMLElement | null
+      if (el?.isContentEditable) {
+        el.blur() // onBlur 핸들러가 실행되면서 store를 flush
+        // blur 후 React가 state를 flush할 수 있도록 다음 탁에 양보
+        setTimeout(resolve, 30)
+      } else {
+        resolve()
+      }
+    })
+  }
+
   const downloadActiveSlide = async () => {
     if (!activeSlide?.imageUrl) return
+    // 편집 중인 텍스트를 먼저 store에 flush
+    await flushActiveTextEdit()
     setExporting(true)
     setMessage(null)
     analytics.campaignDownload(campaign.id, 'png', 1, {
@@ -589,6 +607,8 @@ export default function CampaignResultView({
 
   const exportActive = async (format: 'png' | 'jpg', scale: 1 | 2) => {
     if (!activeSlide || !activeDocument) return
+    // 편집 중인 텍스트를 먼저 store에 flush
+    await flushActiveTextEdit()
     setExporting(true)
     setMessage(null)
     analytics.campaignDownload(campaign.id, format, 1, {
@@ -639,6 +659,8 @@ export default function CampaignResultView({
   const exportZip = async () => {
     setDownloadingAll(true)
     setMessage(null)
+    // 편집 중인 텍스트를 먼저 store에 flush (현재 활성 슬라이드가 열린 싄 보호)
+    await flushActiveTextEdit()
     analytics.campaignDownload(campaign.id, 'zip', slides.length, {
       export_scale: 1,
       download_scope: 'all_slides',

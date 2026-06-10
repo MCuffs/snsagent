@@ -531,7 +531,14 @@ function LayerContent({
       onFocus={() => {
         onEditingStart()
       }}
+      // ✅ 핵심 수정: 키 입력마다 실시간으로 store에 텍스트 동기화
+      // onBlur만 쓰던 구조에서는 blur 전에 다운로드하면 구버전 텍스트가 export되는 버그 발생
+      onInput={e => {
+        const text = (e.currentTarget as HTMLDivElement).innerText.replace(/\n$/, '')
+        onText(text)
+      }}
       onBlur={e => {
+        // onInput이 이미 처리하지만 blur 시점에도 최종 한 번 더 flush
         const text = e.currentTarget.innerText.replace(/\n$/, '')
         onText(text)
         onEditingEnd()
