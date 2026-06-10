@@ -1679,201 +1679,183 @@ function PromoPaymentModal({
     if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
     if (!/^\d{6}(\d{4})?$/.test(idNo)) { setFormError('생년월일(6자리) 또는 사업자번호(10자리)를 입력해 주세요.'); return }
     if (!/^\d{2}$/.test(cardPw)) { setFormError('비밀번호 앞 2자리를 입력해 주세요.'); return }
-
     const [mm, yy] = cardExpire.split('/')
     onSubmit(selectedPlan, { cardNo: rawCard, cardExpire: `${yy}${mm}`, idNo, cardPw })
   }
 
   const planPrice = selectedPlan === 'PRO' ? '20,000원' : '31,200원'
   const planOriginalPrice = selectedPlan === 'PRO' ? '25,000원' : '39,000원'
-  const planName = selectedPlan === 'PRO' ? 'Creator' : 'Studio'
-  const planDesc = selectedPlan === 'PRO' ? '월 20회 카드뉴스 생성' : '월 30회 카드뉴스 생성'
 
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4"
       onClick={(e) => { if (e.target === overlayRef.current && !processing) onClose() }}
     >
-      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] shadow-[0_32px_80px_rgba(0,0,0,0.5)] flex flex-col md:flex-row">
-
-        {/* ── 왼쪽: 이미지 배경 + 카드뉴스 감성 오버레이 ── */}
+      {/* 9:16 카드 컨테이너 */}
+      <div
+        className="relative overflow-hidden rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.6)]"
+        style={{ width: 'min(380px, 90vw)', height: 'min(675px, 90vh)', aspectRatio: '9/16' }}
+      >
+        {/* ── 전체 배경: 이미지 */}
         <div
-          className="relative md:w-[46%] min-h-[280px] md:min-h-0 flex-shrink-0 flex flex-col justify-between overflow-hidden"
-          style={{ backgroundImage: "url('/promo-bg.png')", backgroundSize: 'cover', backgroundPosition: 'center 30%' }}
-        >
-          {/* 멀티 레이어 오버레이: 카드뉴스 감성 */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/85" />
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#9E7D68]/60 via-transparent to-transparent mix-blend-multiply" />
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url('/promo-card-bg.jpg')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 20%',
+          }}
+        />
 
-          {/* 닫기 버튼 (left panel) */}
-          <div className="relative z-10 flex justify-end p-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={processing}
-              className="rounded-full p-1.5 bg-white/10 backdrop-blur-sm text-white/70 transition hover:bg-white/20 hover:text-white disabled:opacity-40"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+        {/* ── 하단부 블러 마스크: 이미지가 점점 흐려지며 사라지는 효과 */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(to bottom, transparent 0%, transparent 30%, rgba(10,8,6,0.6) 55%, rgba(10,8,6,0.92) 70%, #0A0806 82%)',
+          }}
+        />
 
-          {/* 카드뉴스 감성 콘텐츠 */}
-          <div className="relative z-10 p-7 pb-8">
-            {/* 에디토리얼 태그 */}
-            <span className="inline-block rounded-full border border-white/30 bg-white/10 backdrop-blur-sm px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white/80 mb-4">
-              SHUFFLA · 한정 혜택
-            </span>
-
-            {/* 헤드라인 */}
-            <h2 className="text-[28px] font-black leading-[1.1] tracking-[-0.04em] text-white mb-2">
-              지금<br />시작하면<br /><span className="text-[#FFD580]">20% OFF</span>
-            </h2>
-
-            {/* 서브카피 */}
-            <p className="text-xs font-bold text-white/70 leading-relaxed mb-5">
-              무료 한도가 끝났어도<br />괜찮아요. 딱 지금만 20% 할인.
-            </p>
-
-            {/* 플랜 가격 배지 */}
-            <div className="flex items-end gap-2">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-0.5">{planName} 플랜</p>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-xs text-white/40 line-through font-bold">{planOriginalPrice}</span>
-                  <span className="text-2xl font-black text-[#FFD580] tracking-tight">{planPrice}</span>
-                  <span className="text-xs text-white/60 font-bold">/월</span>
-                </div>
-                <p className="text-[10px] text-white/50 font-bold mt-0.5">{planDesc}</p>
-              </div>
-            </div>
-          </div>
+        {/* ── 닫기 버튼 */}
+        <div className="absolute top-4 right-4 z-20">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={processing}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm text-white/60 transition hover:bg-black/50 hover:text-white disabled:opacity-40"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* ── 오른쪽: 결제 폼 패널 ── */}
-        <div className="flex-1 bg-[#0F0D0B] flex flex-col overflow-y-auto max-h-[90vh] md:max-h-none">
-          <div className="p-6 flex-1">
-            {/* 플랜 선택 탭 */}
-            <div className="flex gap-2 mb-6">
-              {(['PRO', 'UNLIMITED'] as const).map((plan) => (
-                <button
-                  key={plan}
-                  type="button"
-                  onClick={() => setSelectedPlan(plan)}
-                  disabled={processing}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-black tracking-wide transition-all ${
-                    selectedPlan === plan
-                      ? 'bg-[#9E7D68] text-white shadow-[0_4px_16px_rgba(158,125,104,0.35)]'
-                      : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
-                  }`}
-                >
-                  {plan === 'PRO' ? 'Creator' : 'Studio'}
-                </button>
-              ))}
+        {/* ── 텍스트 영역: 이미지 위 하단 fade 구간 */}
+        <div className="absolute z-10 px-7" style={{ top: '38%' }}>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3">Shuffla · 특별 혜택</p>
+          <h2
+            className="font-black text-white leading-[1.18] tracking-[-0.03em] mb-3"
+            style={{ fontSize: 'clamp(22px, 5.5vw, 26px)' }}
+          >
+            무료 체험 기간이<br />끝났어도<br />괜찮습니다
+          </h2>
+          <p className="text-sm text-white/55 font-medium leading-relaxed">
+            20%의 특별 혜택을 제공합니다,<br />천천히 고민해보세요
+          </p>
+        </div>
+
+        {/* ── 하단 결제 영역 */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 px-6 pb-6" style={{ top: '65%' }}>
+          {/* 플랜 탭 */}
+          <div className="flex gap-2 mb-4">
+            {(['PRO', 'UNLIMITED'] as const).map((plan) => (
+              <button
+                key={plan}
+                type="button"
+                onClick={() => setSelectedPlan(plan)}
+                disabled={processing}
+                className={`flex-1 py-2 rounded-xl text-[11px] font-black tracking-wide transition-all ${
+                  selectedPlan === plan
+                    ? 'bg-white text-[#1a1410]'
+                    : 'bg-white/10 text-white/40 hover:bg-white/15 hover:text-white/60'
+                }`}
+              >
+                <span>{plan === 'PRO' ? 'Creator' : 'Studio'}</span>
+                <span className={`ml-1 text-[10px] font-bold ${selectedPlan === plan ? 'text-[#9E7D68]' : 'text-white/25'}`}>
+                  {plan === 'PRO' ? '20,000원' : '31,200원'}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-2.5">
+            {/* 카드번호 */}
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="카드번호  0000 - 0000 - 0000 - 0000"
+              maxLength={19}
+              value={cardNo}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 16)
+                setCardNo(v.replace(/(.{4})/g, '$1-').replace(/-$/, ''))
+              }}
+              disabled={processing}
+              required
+              className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-xs tracking-widest text-white placeholder-white/25 outline-none focus:border-white/30 focus:bg-white/12 disabled:opacity-40 transition"
+              style={{ background: 'rgba(255,255,255,0.07)' }}
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="유효기간  MM/YY"
+                maxLength={5}
+                value={cardExpire}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 4)
+                  setCardExpire(v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v)
+                }}
+                disabled={processing}
+                required
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
+                style={{ background: 'rgba(255,255,255,0.07)' }}
+              />
+              <input
+                type="password"
+                inputMode="numeric"
+                placeholder="비밀번호 앞 2자리"
+                maxLength={2}
+                value={cardPw}
+                onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                disabled={processing}
+                required
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
+                style={{ background: 'rgba(255,255,255,0.07)' }}
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 카드번호 */}
-              <div>
-                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">카드번호</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0000 - 0000 - 0000 - 0000"
-                  maxLength={19}
-                  value={cardNo}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, '').slice(0, 16)
-                    setCardNo(v.replace(/(.{4})/g, '$1-').replace(/-$/, ''))
-                  }}
-                  disabled={processing}
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
-                />
-              </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="생년월일 6자리  (법인: 사업자번호 10자리)"
+              maxLength={10}
+              value={idNo}
+              onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              disabled={processing}
+              required
+              className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
+              style={{ background: 'rgba(255,255,255,0.07)' }}
+            />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">유효기간</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="MM / YY"
-                    maxLength={5}
-                    value={cardExpire}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 4)
-                      setCardExpire(v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v)
-                    }}
-                    disabled={processing}
-                    required
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">비밀번호 앞 2자리</label>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    placeholder="••"
-                    maxLength={2}
-                    value={cardPw}
-                    onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                    disabled={processing}
-                    required
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40">
-                  생년월일 <span className="normal-case font-normal text-white/25">(법인: 사업자번호 10자리)</span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="YYMMDD"
-                  maxLength={10}
-                  value={idNo}
-                  onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  disabled={processing}
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm tracking-widest text-white placeholder-white/20 outline-none focus:border-[#9E7D68]/60 focus:ring-1 focus:ring-[#9E7D68]/40 disabled:opacity-40"
-                />
-              </div>
-
-              {(formError || error) && (
-                <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-400">
-                  {formError || error}
-                </p>
-              )}
-
-              {/* 결제 버튼 */}
-              <button
-                type="submit"
-                disabled={processing}
-                className="w-full rounded-2xl bg-gradient-to-br from-[#9E7D68] to-[#7A5E4E] py-4 text-sm font-black text-white shadow-[0_8px_28px_rgba(158,125,104,0.4)] transition-all hover:shadow-[0_12px_36px_rgba(158,125,104,0.5)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-2"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    결제 처리 중...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="h-4 w-4" />
-                    {planPrice} 결제 후 즉시 생성
-                  </>
-                )}
-              </button>
-
-              <p className="text-[10px] text-white/20 text-center leading-relaxed pt-1">
-                첫 달만 20% 할인 · 다음 달부터 정상 요금 · 언제든 해지 가능<br />
-                카드 정보는 AES-256 암호화 처리됩니다
+            {(formError || error) && (
+              <p className="rounded-xl bg-red-500/15 px-4 py-2.5 text-[11px] font-bold text-red-400 border border-red-500/20">
+                {formError || error}
               </p>
-            </form>
-          </div>
+            )}
+
+            {/* 결제 버튼 */}
+            <button
+              type="submit"
+              disabled={processing}
+              className="w-full rounded-2xl bg-white py-3.5 text-sm font-black text-[#1a1410] shadow-[0_8px_24px_rgba(255,255,255,0.12)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-1"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  결제 처리 중...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4" />
+                  <span>{planPrice}로 시작하기</span>
+                  <span className="ml-0.5 text-xs font-bold text-gray-400 line-through">{planOriginalPrice}</span>
+                </>
+              )}
+            </button>
+
+            <p className="text-[9px] text-white/20 text-center pt-0.5">
+              첫 달 20% 할인 · 언제든 해지 가능 · 카드 정보 AES-256 암호화
+            </p>
+          </form>
         </div>
       </div>
     </div>
