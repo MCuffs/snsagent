@@ -43,7 +43,7 @@ export default function TermsPage() {
           </section>
           <section>
             <h2 className="text-base font-semibold text-[#171714]">문의</h2>
-            <p className="mt-3">서비스 이용과 약관 관련 문의는 support@shuffla.ai로 보내주세요.</p>
+            <p className="mt-3">서비스 이용과 약관 관련 문의는 admin@shuffla.io로 보내주세요.</p>
           </section>
         </div>
       </section>

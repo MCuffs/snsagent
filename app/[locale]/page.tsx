@@ -77,7 +77,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           '@type': 'Organization',
           name: 'Shuffla',
           url: base,
-          contactPoint: { '@type': 'ContactPoint', email: 'alstnwjd0424@gmail.com', contactType: 'customer support' },
+          contactPoint: { '@type': 'ContactPoint', email: 'admin@shuffla.io', contactType: 'customer support' },
           sameAs: ['https://www.instagram.com/shuffla.io/'],
         },
         featureList: isEn

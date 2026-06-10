@@ -200,7 +200,7 @@ export default async function PricingPage() {
                                 </div>
                             </div>
                             <a
-                                href="mailto:support@shuffla.ai"
+                                href="mailto:admin@shuffla.io"
                                 className="inline-flex h-11 items-center gap-1.5 rounded-full bg-[#0a0a0a] px-6 text-[14px] font-bold text-white hover:bg-[#1a1a1a] transition-colors whitespace-nowrap"
                             >
                                 도입 문의하기 <ArrowRight className="h-4 w-4" />
@@ -272,7 +272,7 @@ export default async function PricingPage() {
                         <div className="mt-14 text-center">
                             <p className="text-[14px] text-[#525252]">더 궁금한 점이 있나요?</p>
                             <a
-                                href="mailto:support@shuffla.ai"
+                                href="mailto:admin@shuffla.io"
                                 className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0a0a0a] hover:gap-2.5 transition-all"
                             >
                                 문의하기 <ArrowRight className="h-4 w-4" />

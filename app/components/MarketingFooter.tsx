@@ -47,7 +47,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
             items={[
               [label('블로그', 'blog'), `${prefix}/blog`],
               [label('워크플로우', 'workflow'), `${prefix}/#workflow`],
-              [label('문의하기', 'contact'), 'mailto:support@shuffla.ai'],
+              [label('문의하기', 'contact'), 'mailto:admin@shuffla.io'],
             ]}
           />
           <div>
@@ -76,7 +76,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
               <BusinessInfoItem label="사업자등록번호" value="354-14-0333" />
               <BusinessInfoItem label="주소" value="서울특별시 영등포구 양평로 22나길 7-1" />
               <BusinessInfoItem label="전화번호" value="010-8777-0605" />
-              <BusinessInfoItem label="이메일" value="alstnwjd0424@naver.com" />
+              <BusinessInfoItem label="이메일" value="admin@shuffla.io" />
               <BusinessInfoItem label="통신판매업 신고번호" value="2026-서울영등포-1320호" />
             </dl>
           </div>

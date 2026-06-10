@@ -274,8 +274,8 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
                   <div className="space-y-2">
                     <p>
                       이메일:{' '}
-                      <a href="mailto:alstnwjd0424@gmail.com" className="font-medium text-[#171714] hover:underline">
-                        alstnwjd0424@gmail.com
+                      <a href="mailto:admin@shuffla.io" className="font-medium text-[#171714] hover:underline">
+                        admin@shuffla.io
                       </a>
                     </p>
                     <p>
@@ -288,8 +288,8 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
                     <p>성명: 운영자 또는 책임자명 입력</p>
                     <p>
                       이메일:{' '}
-                      <a href="mailto:alstnwjd0424@gmail.com" className="font-medium text-[#171714] hover:underline">
-                        alstnwjd0424@gmail.com
+                      <a href="mailto:admin@shuffla.io" className="font-medium text-[#171714] hover:underline">
+                        admin@shuffla.io
                       </a>
                     </p>
                   </div>
@@ -325,7 +325,7 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
               <h2 className="text-base font-semibold text-[#171714]">{t('s6_title')}</h2>
               <p className="mt-3">{t('s6_body')}</p>
               <div className="mt-4 flex gap-4">
-                <a href="mailto:alstnwjd0424@gmail.com" className="font-medium text-[#171714] hover:underline">alstnwjd0424@gmail.com</a>
+                <a href="mailto:admin@shuffla.io" className="font-medium text-[#171714] hover:underline">admin@shuffla.io</a>
                 <a href="https://www.instagram.com/shuffla.io/" target="_blank" rel="noopener noreferrer" className="font-medium text-[#171714] hover:underline">@shuffla.io</a>
               </div>
             </section>
