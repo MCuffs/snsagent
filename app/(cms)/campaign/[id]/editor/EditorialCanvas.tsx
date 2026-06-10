@@ -165,6 +165,8 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
             style={{
               opacity: background.opacity / 100,
               filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
+              transform: `translate(${(background.x ?? 0) * SCALE}px, ${(background.y ?? 0) * SCALE}px) scale(${background.scale ?? 1})`,
+              transformOrigin: '0 0',
             }}
           />
         )}

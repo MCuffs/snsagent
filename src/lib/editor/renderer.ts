@@ -74,7 +74,14 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
   if (layer.type === 'background') {
     const source = backgroundData || layer.imageUrl || ''
     if (!source) return ''
-    return `<image href="${escapeXml(source)}" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" opacity="${opacity}" filter="${document.overlay.blur ? 'url(#editor-bg)' : ''}"/>`
+    const scale = layer.scale ?? 1
+    const tx = layer.x ?? 0
+    const ty = layer.y ?? 0
+    // SVG transform: translate then scale from origin (0,0) — matches CSS transform-origin:0 0
+    const transform = (scale !== 1 || tx !== 0 || ty !== 0)
+      ? ` transform="translate(${tx},${ty}) scale(${scale})"`
+      : ''
+    return `<image href="${escapeXml(source)}" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" opacity="${opacity}"${transform} filter="${document.overlay.blur ? 'url(#editor-bg)' : ''}"/>`
   }
   if (layer.type === 'overlay') {
     return `<rect width="1080" height="1350" fill="url(#editor-darkness)" opacity="${opacity}"/><rect width="1080" height="1350" fill="url(#editor-vignette)" opacity="${opacity}"/><rect width="1080" height="1350" filter="url(#editor-grain)" opacity="${document.overlay.grain / 180}"/>`
