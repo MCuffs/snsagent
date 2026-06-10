@@ -79,7 +79,7 @@ export function getSessionSigningSecret() {
 }
 
 export function getNicepayReturnTokenSecret() {
-  const secret = readEnv('NICEPAY_RETURN_TOKEN_SECRET') || readEnv('AUTH_SECRET')
+  const secret = readEnv('NICEPAY_RETURN_TOKEN_SECRET') || readEnv('SESSION_SECRET') || readEnv('AUTH_SECRET')
 
   if (secret && secret !== 'replace-with-a-long-random-secret' && secret.length >= 32) {
     return secret
