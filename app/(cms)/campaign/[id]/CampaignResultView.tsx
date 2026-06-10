@@ -253,17 +253,21 @@ export default function CampaignResultView({
   useEffect(() => {
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
     const timeout = window.setTimeout(async () => {
-      const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), false)
-      analytics.editorDocumentSave({
-        campaignId: campaign.id,
-        slideId: activeSlide.id,
-        slideNumber: activeSlide.slideNumber,
-        saveType: 'autosave',
-        renderOutput: false,
-        success: result.success,
-        reason: result.success ? undefined : result.error,
-      })
-      if (result.success) markSaved(activeSlide.id)
+      try {
+        const result = await saveEditorialDocumentAction(activeSlide.id, JSON.stringify(activeDocument), false)
+        analytics.editorDocumentSave({
+          campaignId: campaign.id,
+          slideId: activeSlide.id,
+          slideNumber: activeSlide.slideNumber,
+          saveType: 'autosave',
+          renderOutput: false,
+          success: result.success,
+          reason: result.success ? undefined : result.error,
+        })
+        if (result.success) markSaved(activeSlide.id)
+      } catch (err) {
+        console.error('[autosave] Server Action failed:', err)
+      }
     }, 900)
     return () => window.clearTimeout(timeout)
   }, [activeDocument, activeSlide, campaign.id, dirtySlides, editorBusy, markSaved])

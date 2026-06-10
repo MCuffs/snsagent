@@ -88,7 +88,9 @@ export async function POST(request: Request) {
     let totalIncomingSize = 0
 
     for (const file of files) {
-      if (!allowedTypes.includes(file.type)) {
+      // Normalize image/jpg → image/jpeg (some browsers/OS report the wrong subtype)
+      const normalizedType = file.type === 'image/jpg' ? 'image/jpeg' : file.type
+      if (!allowedTypes.includes(normalizedType)) {
         return NextResponse.json({ error: `지원하지 않는 파일 형식: ${file.type}` }, { status: 400 })
       }
       if (file.size > MAX_FILE_SIZE) {
@@ -157,7 +159,7 @@ export async function POST(request: Request) {
       const bytes = await file.arrayBuffer()
       const buffer = Buffer.from(bytes)
       const detectedType = detectImageMime(buffer)
-      if (!detectedType || detectedType !== file.type) {
+      if (!detectedType) {
         return NextResponse.json({ error: 'File type verification failed.' }, { status: 400 })
       }
 

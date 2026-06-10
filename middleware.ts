@@ -30,12 +30,13 @@ function getRootLocale(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Pass through API routes, static files, and Next.js internals
+  // Pass through API routes, static files, Next.js internals, and Server Actions
   if (
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/_vercel') ||
-    pathname.match(/\.[a-zA-Z0-9]+$/)
+    pathname.match(/\.[a-zA-Z0-9]+$/) ||
+    request.headers.get('next-action') !== null
   ) {
     return NextResponse.next()
   }
