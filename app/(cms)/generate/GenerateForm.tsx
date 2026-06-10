@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   Check,
   Loader2,
+  CreditCard,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
 
@@ -35,6 +36,11 @@ interface Brand {
 
 interface GenerateFormProps {
   brand: Brand
+  userId?: string
+  userEmail?: string | null
+  userName?: string | null
+  nicepayClientKey?: string
+  nicepayReturnTokens?: Record<string, string>
 }
 
 interface ChatMessage {
@@ -177,7 +183,14 @@ const formItemVariants = {
   }
 }
 
-export default function GenerateForm({ brand }: GenerateFormProps) {
+export default function GenerateForm({
+  brand,
+  userId,
+  userEmail,
+  userName,
+  nicepayClientKey,
+  nicepayReturnTokens,
+}: GenerateFormProps) {
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('generate')
@@ -205,6 +218,12 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
   const [copyPreviewSlides, setCopyPreviewSlides] = useState<CopyPreviewSlide[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
+
+  // Promo payment modal states
+  const [showPromoModal, setShowPromoModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<'PRO' | 'UNLIMITED'>('PRO')
+  const [processingPayment, setProcessingPayment] = useState(false)
+  const [promoError, setPromoError] = useState<string | null>(null)
 
   const generating = phase === 'generating'
 
@@ -645,6 +664,17 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
 
       const data = await res.json() as { campaignId?: string; error?: string }
       if (!res.ok || data.error) {
+        if (res.status === 429 && (data.error?.includes('무료 플랜') || data.error?.includes('최초 2회'))) {
+          analytics.generateFailed(brand.id, data.error || 'quota_exceeded', {
+            generation_mode: generationMode,
+            http_status: res.status,
+            slide_count: readyParams.slideCount,
+          })
+          setPhase('preview')
+          setShowPromoModal(true)
+          return
+        }
+
         analytics.generateFailed(brand.id, data.error || 'api_error', {
           generation_mode: generationMode,
           http_status: res.status,
@@ -691,19 +721,132 @@ export default function GenerateForm({ brand }: GenerateFormProps) {
     }
   }
 
+  const handlePromoPayment = async (
+    planKey: 'PRO' | 'UNLIMITED',
+    cardData: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }
+  ) => {
+    if (!nicepayReturnTokens || !nicepayClientKey) {
+      setPromoError('결제 환경 설정이 누락되었습니다.')
+      return
+    }
+    const returnToken = nicepayReturnTokens[planKey]
+    if (!returnToken) {
+      setPromoError('결제 토큰을 생성할 수 없습니다.')
+      return
+    }
+
+    setPromoError(null)
+    setProcessingPayment(true)
+
+    const PLAN_AMOUNTS: Record<string, number> = { PRO: 25000, UNLIMITED: 39000 }
+    const originalAmount = PLAN_AMOUNTS[planKey] ?? 0
+    const amount = Math.round(originalAmount * 0.8)
+    const orderId = `shuffla_regist_promo_${Date.now()}_${planKey}`
+
+    analytics.planSelectClick(planKey, 'FREE', {
+      payment_provider: 'nicepay',
+      amount,
+      currency: 'KRW',
+      is_promo: true,
+    })
+    analytics.paymentStart(planKey, 'nicepay', {
+      amount,
+      currency: 'KRW',
+      order_id: orderId,
+      is_promo: true,
+    })
+
+    try {
+      const [encodedPayload] = returnToken.split('.')
+      if (!encodedPayload) {
+        throw new Error('Invalid payment token format')
+      }
+
+      const decodeBase64Url = (str: string) => {
+        let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+        while (base64.length % 4) {
+          base64 += '='
+        }
+        return atob(base64)
+      }
+
+      const payloadObj = JSON.parse(decodeBase64Url(encodedPayload))
+      const encryptionKey = payloadObj.encryptionKey
+      if (!encryptionKey) {
+        throw new Error('Encryption key missing from payment token')
+      }
+
+      const plaintext = `cardNo=${cardData.cardNo}&cardExpire=${cardData.cardExpire}&idNo=${cardData.idNo}&cardPw=${cardData.cardPw}`
+      const { ciphertext, iv } = await encryptCardDataClient(plaintext, encryptionKey)
+
+      const res = await fetch('/api/nicepay/card-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: returnToken,
+          ciphertext,
+          iv,
+          plan: planKey,
+          isPromo: true,
+        }),
+      })
+
+      const responseData = await res.json() as { error?: string }
+
+      if (!res.ok) {
+        analytics.paymentFailed(planKey, 'nicepay', responseData.error || 'api_error', {
+          amount,
+          currency: 'KRW',
+          order_id: orderId,
+        })
+        setPromoError(responseData.error || '결제 승인에 실패했습니다.')
+        setProcessingPayment(false)
+      } else {
+        analytics.paymentSuccess(planKey, 'nicepay', {
+          amount,
+          currency: 'KRW',
+          order_id: orderId,
+          is_promo: true,
+        })
+        setShowPromoModal(false)
+        setProcessingPayment(false)
+        router.refresh()
+        
+        // Wait 1.5s for session to update plan, then resume campaign generation automatically
+        setTimeout(() => {
+          void handleGenerate(copyPreviewSlides)
+        }, 1500)
+      }
+    } catch (err) {
+      console.error('Promo payment registration error:', err)
+      setPromoError('결제 처리 중 네트워크 오류가 발생했습니다.')
+      setProcessingPayment(false)
+    }
+  }
+
   // ── Copy Preview screen ─────────────────────────────────────────
   if (phase === 'preview') {
     return (
-      <CopyPreviewPanel
-        slides={copyPreviewSlides}
-        referenceFiles={referenceFiles}
-        setReferenceFiles={setReferenceFiles}
-        error={error}
-        onBack={() => { setPhase('chat'); setError(null) }}
-        onConfirm={(slides) => handleGenerate(slides)}
-        t={t}
-        locale={locale}
-      />
+      <>
+        <CopyPreviewPanel
+          slides={copyPreviewSlides}
+          referenceFiles={referenceFiles}
+          setReferenceFiles={setReferenceFiles}
+          error={error}
+          onBack={() => { setPhase('chat'); setError(null) }}
+          onConfirm={(slides) => handleGenerate(slides)}
+          t={t}
+          locale={locale}
+        />
+        {showPromoModal && (
+          <PromoPaymentModal
+            processing={processingPayment}
+            error={promoError}
+            onSubmit={handlePromoPayment}
+            onClose={() => setShowPromoModal(false)}
+          />
+        )}
+      </>
     )
   }
 
@@ -1462,6 +1605,258 @@ function CopyPreviewPanel({
             {t('copy_preview_confirm')}
             <ArrowRight className="h-4 w-4" />
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+async function encryptCardDataClient(plainText: string, keyBase64: string): Promise<{ ciphertext: string; iv: string }> {
+  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0))
+
+  const cryptoKey = await window.crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  )
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12))
+
+  const encoder = new TextEncoder()
+  const encodedText = encoder.encode(plainText)
+
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv,
+    },
+    cryptoKey,
+    encodedText
+  )
+
+  return {
+    ciphertext: toBase64(new Uint8Array(ciphertextBuffer)),
+    iv: toBase64(iv),
+  }
+}
+
+interface PromoPaymentModalProps {
+  processing: boolean
+  error: string | null
+  onSubmit: (plan: 'PRO' | 'UNLIMITED', data: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }) => void
+  onClose: () => void
+}
+
+function PromoPaymentModal({
+  processing,
+  error,
+  onSubmit,
+  onClose,
+}: PromoPaymentModalProps) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [selectedPlan, setSelectedPlan] = useState<'PRO' | 'UNLIMITED'>('PRO')
+  const [cardNo, setCardNo] = useState('')
+  const [cardExpire, setCardExpire] = useState('')
+  const [idNo, setIdNo] = useState('')
+  const [cardPw, setCardPw] = useState('')
+  const [formError, setFormError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    const rawCard = cardNo.replace(/-/g, '')
+    if (!/^\d{14,16}$/.test(rawCard)) { setFormError('카드번호를 올바르게 입력해 주세요.'); return }
+    if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
+    if (!/^\d{6}(\d{4})?$/.test(idNo)) { setFormError('생년월일(6자리) 또는 사업자번호(10자리)를 입력해 주세요.'); return }
+    if (!/^\d{2}$/.test(cardPw)) { setFormError('비밀번호 앞 2자리를 입력해 주세요.'); return }
+    
+    const [mm, yy] = cardExpire.split('/')
+    onSubmit(selectedPlan, { cardNo: rawCard, cardExpire: `${yy}${mm}`, idNo, cardPw })
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md px-4"
+      onClick={(e) => { if (e.target === overlayRef.current && !processing) onClose() }}
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-[32px] border border-[#EFEAE2] bg-[#FFFDFB] shadow-[0_24px_60px_rgba(44,30,26,0.18)] relative">
+        <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-[#9E7D68]/10 blur-[60px] pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-[#C2A794]/10 blur-[60px] pointer-events-none" />
+
+        <div className="p-8 relative z-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#9E7D68]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#9E7D68] mb-2">
+                🎁 20% 특별 할인 혜택
+              </span>
+              <h2 className="text-xl font-black tracking-[-0.03em] text-[#2C1E1A]">생성 한도 업그레이드</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={processing}
+              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-[#7C6E6A] font-bold mb-6">
+            무료 한도(2회)를 모두 사용하셨습니다. 지금 업그레이드하시면 첫 달 <strong>20% 특별 할인가</strong>로 무제한 수준의 카드뉴스를 즉시 생성하실 수 있습니다. (결제 완료 시 작성 중이던 내용이 바로 생성됩니다.)
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setSelectedPlan('PRO')}
+                disabled={processing}
+                className={`flex flex-col items-start p-5 rounded-2xl border-2 text-left transition-all ${
+                  selectedPlan === 'PRO'
+                    ? 'border-[#9E7D68] bg-[#FFFDF9] shadow-[0_8px_20px_rgba(158,125,104,0.06)]'
+                    : 'border-[#EFEAE2] bg-white hover:border-gray-300'
+                }`}
+              >
+                <span className="text-[10px] font-black text-[#A69282] uppercase tracking-wider">Creator 플랜</span>
+                <span className="text-sm font-black text-[#2C1E1A] mt-1">월 20회 생성</span>
+                <div className="mt-3 flex flex-col">
+                  <span className="text-xs text-gray-400 line-through">월 25,000원</span>
+                  <span className="text-base font-black text-[#9E7D68]">월 20,000원</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPlan('UNLIMITED')}
+                disabled={processing}
+                className={`flex flex-col items-start p-5 rounded-2xl border-2 text-left transition-all ${
+                  selectedPlan === 'UNLIMITED'
+                    ? 'border-[#9E7D68] bg-[#FFFDF9] shadow-[0_8px_20px_rgba(158,125,104,0.06)]'
+                    : 'border-[#EFEAE2] bg-white hover:border-gray-300'
+                }`}
+              >
+                <span className="text-[10px] font-black text-[#A69282] uppercase tracking-wider">Studio 플랜</span>
+                <span className="text-sm font-black text-[#2C1E1A] mt-1">월 30회 생성</span>
+                <div className="mt-3 flex flex-col">
+                  <span className="text-xs text-gray-400 line-through">월 39,000원</span>
+                  <span className="text-base font-black text-[#9E7D68]">월 31,200원</span>
+                </div>
+              </button>
+            </div>
+
+            <div className="space-y-4 border-t border-[#EFEAE2] pt-6">
+              <div>
+                <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">카드번호</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0000 - 0000 - 0000 - 0000"
+                  maxLength={19}
+                  value={cardNo}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '').slice(0, 16)
+                    setCardNo(v.replace(/(.{4})/g, '$1-').replace(/-$/, ''))
+                  }}
+                  disabled={processing}
+                  required
+                  className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">유효기간</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="MM / YY"
+                    maxLength={5}
+                    value={cardExpire}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 4)
+                      setCardExpire(v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v)
+                    }}
+                    disabled={processing}
+                    required
+                    className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">비밀번호 앞 2자리</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="••"
+                    maxLength={2}
+                    value={cardPw}
+                    onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                    disabled={processing}
+                    required
+                    className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-black text-[#5C4E4B]">
+                  생년월일 6자리 <span className="font-normal text-gray-400">(법인카드: 사업자번호 10자리)</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="YYMMDD"
+                  maxLength={10}
+                  value={idNo}
+                  onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  disabled={processing}
+                  required
+                  className="w-full rounded-xl border border-[#E6DFD5] bg-white px-4 py-3 text-sm tracking-widest outline-none focus:border-[#9E7D68] focus:ring-1 focus:ring-[#9E7D68] disabled:bg-gray-50"
+                />
+              </div>
+            </div>
+
+            {formError && (
+              <p className="rounded-xl border border-red-200 bg-red-50/50 px-4 py-3 text-xs font-bold text-red-700">{formError}</p>
+            )}
+
+            {error && (
+              <p className="rounded-xl border border-red-200 bg-red-50/50 px-4 py-3 text-xs font-bold text-red-700">{error}</p>
+            )}
+
+            <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+              * 정기 구독의 첫 결제는 20% 특별 할인가로 진행되며, 다음 달 정기 결제일부터는 원래 요금제 가격으로 정상 결제됩니다.<br />
+              * 카드 정보는 암호화되어 전송되며 서버에 안전하게 격리 보관됩니다.
+            </p>
+
+            <button
+              type="submit"
+              disabled={processing}
+              className="w-full rounded-2xl bg-[#2C1E1A] py-4 text-sm font-black text-[#FFFDF8] shadow-[0_14px_34px_rgba(44,30,26,0.18)] transition hover:bg-[#3B302C] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  결제 처리 중...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4" />
+                  {selectedPlan === 'PRO' ? '20,000원 결제 및 생성 재개' : '31,200원 결제 및 생성 재개'}
+                </>
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>

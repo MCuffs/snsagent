@@ -23,6 +23,7 @@ const registerSchema = z.object({
   ciphertext: z.string().min(1, '암호화된 데이터가 누락되었습니다.'),
   iv: z.string().min(1, '암호화 IV가 누락되었습니다.'),
   plan: z.string().min(1, '구독 플랜이 누락되었습니다.'),
+  isPromo: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || '잘못된 요청 형식입니다.' }, { status: 400 })
     }
 
-    const { token, ciphertext, iv, plan } = parsed.data
+    const { token, ciphertext, iv, plan, isPromo } = parsed.data
 
     if (!isPaidPlan(plan)) {
       return NextResponse.json({ error: '유효하지 않은 플랜입니다.' }, { status: 400 })
@@ -114,6 +115,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '이미 사용 가능한 1회권이 있습니다.' }, { status: 409 })
     }
 
+    // Calculate billing amount (20% discount if isPromo is requested or if user is on FREE plan and has exceeded 2 limit)
+    const userPlan = normalizePlan(user.plan)
+    const campaigns = await dbService.getCampaigns(user.id)
+    const isFreePlanExceeded = userPlan === 'FREE' && campaigns.length >= 2
+    const finalIsPromo = Boolean(isPromo) || isFreePlanExceeded
+
+    const PLAN_AMOUNTS: Record<PaidPlan, number> = {
+      LITE: 3000,
+      PRO: 25000,
+      UNLIMITED: 39000,
+    }
+    const originalAmount = PLAN_AMOUNTS[validPlan] ?? 0
+    const amount = finalIsPromo ? Math.round(originalAmount * 0.8) : originalAmount
+
     const registOrderId = createNicepayOrderId('regist', `${user.id}:${validPlan}:${Date.now()}`)
     const billing = await issueDirectBillingKey({
       orderId: registOrderId,
@@ -130,6 +145,7 @@ export async function POST(request: NextRequest) {
       plan: validPlan,
       buyerName: user.name ?? undefined,
       buyerEmail: user.email ?? undefined,
+      amount,
     })
 
     const paidAt = new Date()

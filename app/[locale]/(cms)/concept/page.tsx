@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation'
 import { getSessionUser, getCachedBrands } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
 import { getHistoryRetentionStatus } from '../../../../lib/history-retention'
-import { normalizePlan, PRICING_PLANS } from '../../../../lib/limits-types'
+import { normalizePlan, PRICING_PLANS, PAID_SUBSCRIPTION_PLANS } from '../../../../lib/limits-types'
+import { isPaidPlan } from '../../../../lib/nicepay'
+import { createNicepayReturnToken } from '../../../../lib/nicepay-return-token'
 import DashboardContainer from '../../../(cms)/concept/DashboardContainer'
 import { Loader2 } from 'lucide-react'
 
@@ -86,6 +88,10 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
     }
   })
 
+  const nicepayReturnTokens = Object.fromEntries(
+    PAID_SUBSCRIPTION_PLANS.filter(isPaidPlan).map((p) => [p, createNicepayReturnToken(user.id, p)]),
+  )
+
   return (
     <DashboardContainer
       existingBrand={serializedBrand}
@@ -95,6 +101,10 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
       retentionDays={PRICING_PLANS[plan].historyRetentionDays}
       canUpgradeRetention={plan !== 'UNLIMITED'}
       userEmail={user.email}
+      userId={user.id}
+      userName={user.name}
+      nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}
+      nicepayReturnTokens={nicepayReturnTokens}
     />
   )
 }

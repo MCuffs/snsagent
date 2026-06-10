@@ -46,6 +46,10 @@ interface DashboardContainerProps {
   retentionDays: number
   canUpgradeRetention: boolean
   userEmail?: string | null
+  userId?: string
+  userName?: string | null
+  nicepayClientKey?: string
+  nicepayReturnTokens?: Record<string, string>
 }
 
 export default function DashboardContainer({
@@ -56,6 +60,10 @@ export default function DashboardContainer({
   retentionDays,
   canUpgradeRetention,
   userEmail,
+  userId,
+  userName,
+  nicepayClientKey,
+  nicepayReturnTokens,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const t = useTranslations('concept')
@@ -184,6 +192,11 @@ export default function DashboardContainer({
               brandDna: brandToPass.brandDna || null,
               websiteUrl: brandToPass.websiteUrl || null,
             }}
+            userId={userId}
+            userEmail={userEmail}
+            userName={userName}
+            nicepayClientKey={nicepayClientKey}
+            nicepayReturnTokens={nicepayReturnTokens}
           />
         </motion.div>
       )}

@@ -118,13 +118,15 @@ export async function approveBillingPayment(input: {
   plan: PaidPlan
   buyerName?: string | null
   buyerEmail?: string
+  amount?: number
 }): Promise<NicepayPayment> {
   const order = nicepayPlanOrder(input.plan)
+  const finalAmount = input.amount !== undefined ? input.amount : order.amount
   return callNicepay<NicepayPayment>(`/v1/subscribe/${encodeURIComponent(input.bid)}`, {
     method: 'POST',
     body: JSON.stringify({
       orderId: input.orderId,
-      amount: order.amount,
+      amount: finalAmount,
       goodsName: order.goodsName,
       buyerName: input.buyerName || undefined,
       buyerEmail: input.buyerEmail || undefined,
