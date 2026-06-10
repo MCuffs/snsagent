@@ -87,6 +87,31 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
+// HEIC/HEIF, BMP 등 서버가 처리할 수 없는 포맷을 Canvas로 JPEG 변환
+async function normalizeImageFile(file: File): Promise<File> {
+  const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+  if (supported.includes(file.type)) return file
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('canvas 미지원')); return }
+      ctx.drawImage(img, 0, 0)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('이미지 변환 실패')); return }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+      }, 'image/jpeg', 0.92)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지 로드 실패')) }
+    img.src = url
+  })
+}
+
 function fileNameFor(campaignTitle: string, slideNumber: number, extension = 'png') {
   const safeTitle = campaignTitle
     .replace(/[\\/:*?"<>|]+/g, '-')
@@ -172,8 +197,9 @@ export default function CampaignResultView({
     setEditorBusy(true)
     setMessage(null)
     try {
+      const normalizedFile = await normalizeImageFile(file)
       const formData = new FormData()
-      formData.append('files', file)
+      formData.append('files', normalizedFile)
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
       const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
       const imageUrl = uploadData.urls?.[0]
@@ -297,11 +323,13 @@ export default function CampaignResultView({
     setUploadToast({ status: 'uploading', text: '이미지 업로드 중', progress: 0 })
 
     try {
+      const normalizedFile = await normalizeImageFile(file)
+
       // XHR로 업로드 — progress 이벤트 활용
       const backgroundUrl = await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         const formData = new FormData()
-        formData.append('files', file)
+        formData.append('files', normalizedFile)
 
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
