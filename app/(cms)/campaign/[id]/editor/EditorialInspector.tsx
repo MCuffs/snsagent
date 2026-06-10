@@ -41,7 +41,6 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
   const undo = useEditorialStore(state => state.undo)
   const redo = useEditorialStore(state => state.redo)
   const [tab, setTab] = useState<EditorTab>('text')
-  const [copyTarget, setCopyTarget] = useState<'title' | 'subtitle'>('title')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [showTemplateInput, setShowTemplateInput] = useState(false)
@@ -64,8 +63,19 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
     if (nextTab === 'templates') void fetchTemplates()
   }
 
+  const selectedLayerId = useEditorialStore(state => state.selectedLayerId)
   if (!document) return null
-  const copyLayer = document.layers.find(item => item.type === copyTarget)!
+
+  const selectedLayer = selectedLayerId
+    ? document.layers.find(l => l.id === selectedLayerId)
+    : null
+  const isTextLayer = selectedLayer && (selectedLayer.type === 'text' || selectedLayer.type === 'title' || selectedLayer.type === 'subtitle')
+
+  const activeTextLayer = isTextLayer
+    ? selectedLayer
+    : (document.layers.find(l => l.type === 'title') ||
+       document.layers.find(l => l.type === 'subtitle') ||
+       document.layers.find(l => l.type === 'text'))
 
   async function handleSaveTemplate() {
     if (!templateName.trim() || !document) return
@@ -138,10 +148,8 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
       <div className="p-4">
         {tab === 'text' && (
           <TextPanel
-            layer={copyLayer}
-            target={copyTarget}
-            onTarget={value => { setCopyTarget(value); selectLayer(value) }}
-            onChange={update => updateLayer(slideId, copyLayer.id, update)}
+            layer={activeTextLayer}
+            onChange={update => activeTextLayer && updateLayer(slideId, activeTextLayer.id, update)}
             onAddTextLayer={() => {
               const newLayer: EditorialLayer = {
                 id: `text-${Date.now()}`,
@@ -269,18 +277,32 @@ function DragNumberInput({
 
 function TextPanel({
   layer,
-  target,
-  onTarget,
   onChange,
   onAddTextLayer,
 }: {
-  layer: EditorialLayer
-  target: 'title' | 'subtitle'
-  onTarget: (target: 'title' | 'subtitle') => void
+  layer: EditorialLayer | undefined
   onChange: (update: Partial<EditorialLayer>) => void
   onAddTextLayer: () => void
 }) {
   const t = useTranslations('campaign')
+
+  if (!layer) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={onAddTextLayer}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[#c8bfb5] py-2 text-xs font-bold text-[#746a62] hover:border-[#0066ff] hover:text-[#0066ff] transition-colors"
+        >
+          <Type className="h-3.5 w-3.5" /> 텍스트 추가
+        </button>
+        <p className="py-8 text-center text-xs text-[#9a8d82] bg-[#fdfcfa] rounded-lg border border-[#f0e8de] border-dashed">
+          편집할 글자를 캔버스에서 선택해 주세요.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <button
@@ -290,17 +312,7 @@ function TextPanel({
       >
         <Type className="h-3.5 w-3.5" /> 텍스트 추가
       </button>
-      <div className="flex rounded-lg bg-[#f7f4ef] p-1">
-        <Segment active={target === 'title'} onClick={() => onTarget('title')}>{t('target_title')}</Segment>
-        <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>{t('target_body')}</Segment>
-      </div>
-      <textarea
-        value={layer.text || ''}
-        onChange={event => onChange({ text: event.target.value })}
-        rows={target === 'title' ? 2 : 3}
-        className="field w-full resize-none p-3 text-sm leading-6"
-        placeholder={target === 'title' ? t('placeholder_headline') : t('placeholder_body')}
-      />
+
       <div className="grid grid-cols-[1fr_70px_36px] gap-2">
         <select value={layer.fontPreset} onChange={event => onChange({ fontPreset: event.target.value as FontPreset })} className="field h-10 px-3 text-xs font-bold">
           <option value="pretendard">Pretendard</option>
@@ -320,27 +332,42 @@ function TextPanel({
         <input type="color" aria-label={t('text_color')} value={layer.color || '#ffffff'} onChange={event => onChange({ color: event.target.value })} className="field h-10 w-9 cursor-pointer p-1" />
       </div>
       <div className="flex gap-2">
-        <ToggleButton
-          active={(layer.fontWeight ?? 400) >= 700}
+        <button
+          type="button"
           onClick={() => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })}
-          label={t('bold')}
+          title={t('bold')}
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
+            (layer.fontWeight ?? 400) >= 700
+              ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
+              : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
+          }`}
         >
           <Bold className="h-3.5 w-3.5" />
-        </ToggleButton>
-        <ToggleButton
-          active={!!layer.italic}
+        </button>
+        <button
+          type="button"
           onClick={() => onChange({ italic: !layer.italic })}
-          label={t('italic')}
+          title={t('italic')}
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
+            layer.italic
+              ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
+              : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
+          }`}
         >
           <Italic className="h-3.5 w-3.5" />
-        </ToggleButton>
-        <ToggleButton
-          active={!!layer.underline}
+        </button>
+        <button
+          type="button"
           onClick={() => onChange({ underline: !layer.underline })}
-          label={t('underline')}
+          title={t('underline')}
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
+            layer.underline
+              ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
+              : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
+          }`}
         >
           <Underline className="h-3.5 w-3.5" />
-        </ToggleButton>
+        </button>
       </div>
       <RangeControl label={t('font_weight')} value={layer.fontWeight || 400} min={100} max={900} onChange={value => onChange({ fontWeight: value })} />
     </div>
