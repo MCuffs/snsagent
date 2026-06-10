@@ -1712,7 +1712,7 @@ function PromoPaymentModal({
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to bottom, transparent 0%, transparent 30%, rgba(10,8,6,0.6) 55%, rgba(10,8,6,0.92) 70%, #0A0806 82%)',
+            background: 'linear-gradient(to bottom, transparent 0%, transparent 20%, rgba(30,28,26,0.55) 42%, rgba(38,35,32,0.88) 58%, rgba(44,41,38,0.97) 70%, #2a2724 80%)',
           }}
         />
 
@@ -1729,23 +1729,23 @@ function PromoPaymentModal({
         </div>
 
         {/* ── 텍스트 영역: 이미지 위 하단 fade 구간 */}
-        <div className="absolute z-10 px-7" style={{ top: '38%' }}>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-3">Shuffla · 특별 혜택</p>
+        <div className="absolute z-10 px-7" style={{ top: '28%' }}>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mb-2">Shuffla · 특별 혜택</p>
           <h2
-            className="font-black text-white leading-[1.18] tracking-[-0.03em] mb-3"
-            style={{ fontSize: 'clamp(22px, 5.5vw, 26px)' }}
+            className="font-black text-white leading-[1.18] tracking-[-0.03em] mb-2"
+            style={{ fontSize: 'clamp(20px, 5vw, 24px)' }}
           >
             무료 체험 기간이<br />끝났어도<br />괜찮습니다
           </h2>
-          <p className="text-sm text-white/55 font-medium leading-relaxed">
+          <p className="text-xs text-white/55 font-medium leading-relaxed">
             20%의 특별 혜택을 제공합니다,<br />천천히 고민해보세요
           </p>
         </div>
 
         {/* ── 하단 결제 영역 */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 px-6 pb-6" style={{ top: '65%' }}>
+        <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-5" style={{ top: '56%', background: 'linear-gradient(to bottom, transparent 0%, rgba(44,41,38,0.97) 12%, #2a2724 22%)' }}>
           {/* 플랜 탭 */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-3">
             {(['PRO', 'UNLIMITED'] as const).map((plan) => (
               <button
                 key={plan}
@@ -1766,7 +1766,7 @@ function PromoPaymentModal({
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-2.5">
+          <form onSubmit={handleSubmit} className="space-y-2">
             {/* 카드번호 */}
             <input
               type="text"
@@ -1780,8 +1780,8 @@ function PromoPaymentModal({
               }}
               disabled={processing}
               required
-              className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-xs tracking-widest text-white placeholder-white/25 outline-none focus:border-white/30 focus:bg-white/12 disabled:opacity-40 transition"
-              style={{ background: 'rgba(255,255,255,0.07)' }}
+              className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs tracking-widest text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
+              style={{ background: 'rgba(200,192,185,0.13)' }}
             />
 
             <div className="grid grid-cols-2 gap-2">
@@ -1797,8 +1797,8 @@ function PromoPaymentModal({
                 }}
                 disabled={processing}
                 required
-                className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
-                style={{ background: 'rgba(255,255,255,0.07)' }}
+                className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
+                style={{ background: 'rgba(200,192,185,0.13)' }}
               />
               <input
                 type="password"
@@ -1809,8 +1809,8 @@ function PromoPaymentModal({
                 onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
                 disabled={processing}
                 required
-                className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
-                style={{ background: 'rgba(255,255,255,0.07)' }}
+                className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
+                style={{ background: 'rgba(200,192,185,0.13)' }}
               />
             </div>
 
@@ -1823,12 +1823,12 @@ function PromoPaymentModal({
               onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
               disabled={processing}
               required
-              className="w-full rounded-xl border border-white/10 px-4 py-3 text-xs text-white placeholder-white/25 outline-none focus:border-white/30 disabled:opacity-40 transition"
-              style={{ background: 'rgba(255,255,255,0.07)' }}
+              className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
+              style={{ background: 'rgba(200,192,185,0.13)' }}
             />
 
             {(formError || error) && (
-              <p className="rounded-xl bg-red-500/15 px-4 py-2.5 text-[11px] font-bold text-red-400 border border-red-500/20">
+              <p className="rounded-xl bg-red-500/15 px-4 py-2 text-[11px] font-bold text-red-400 border border-red-500/20">
                 {formError || error}
               </p>
             )}
@@ -1837,7 +1837,7 @@ function PromoPaymentModal({
             <button
               type="submit"
               disabled={processing}
-              className="w-full rounded-2xl bg-white py-3.5 text-sm font-black text-[#1a1410] shadow-[0_8px_24px_rgba(255,255,255,0.12)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-1"
+              className="w-full rounded-2xl bg-white py-3 text-sm font-black text-[#1a1410] shadow-[0_8px_24px_rgba(255,255,255,0.12)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-1"
             >
               {processing ? (
                 <>
