@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../../../lib/auth/user'
-import { dbService } from '../../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../../lib/limits-types'
 import { isPaidPlan } from '../../../../lib/nicepay'
 import { getPublicPayPalClientId, PAYPAL_PLAN_IDS } from '../../../../lib/paypal'
@@ -21,9 +20,6 @@ export default async function PricingPage({
   const { locale } = await params
   const user = await getSessionUser()
   if (!user) redirect(`/${locale}/login`)
-
-  const brands = await dbService.getBrands(user.id)
-  if (brands.length === 0) redirect(`/${locale}/concept`)
 
   const t = await getTranslations('billing')
   const sp = searchParams ? await searchParams : {}

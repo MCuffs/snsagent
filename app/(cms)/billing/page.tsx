@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { getSessionUser } from '../../../lib/auth/user'
-import { dbService } from '../../../lib/db-service'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../lib/limits-types'
 import { isPaidPlan } from '../../../lib/nicepay'
 import { getPublicPayPalClientId, PAYPAL_PLAN_IDS } from '../../../lib/paypal'
@@ -18,9 +17,6 @@ export default async function PricingPage({
 }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-
-  const brands = await dbService.getBrands(user.id)
-  if (brands.length === 0) redirect('/concept')
 
   const params = searchParams ? await searchParams : {}
   const plansList = PAID_SUBSCRIPTION_PLANS
