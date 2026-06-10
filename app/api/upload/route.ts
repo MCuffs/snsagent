@@ -76,10 +76,12 @@ export async function POST(request: Request) {
     const files = formData.getAll('files') as File[]
 
     if (!files || files.length === 0) {
+      console.error('[Upload] 400: 파일 없음')
       return NextResponse.json({ error: '파일이 없습니다.' }, { status: 400 })
     }
 
     if (files.length > 4) {
+      console.error('[Upload] 400: 파일 수 초과', files.length)
       return NextResponse.json({ error: '이미지는 한 번에 최대 4개까지 업로드할 수 있습니다.' }, { status: 400 })
     }
 
@@ -90,10 +92,13 @@ export async function POST(request: Request) {
     for (const file of files) {
       // Normalize image/jpg → image/jpeg (some browsers/OS report the wrong subtype)
       const normalizedType = file.type === 'image/jpg' ? 'image/jpeg' : file.type
+      console.log('[Upload] file.type:', file.type, '→ normalized:', normalizedType, 'size:', file.size)
       if (!allowedTypes.includes(normalizedType)) {
+        console.error('[Upload] 400: 지원하지 않는 파일 형식:', file.type)
         return NextResponse.json({ error: `지원하지 않는 파일 형식: ${file.type}` }, { status: 400 })
       }
       if (file.size > MAX_FILE_SIZE) {
+        console.error('[Upload] 400: 파일 크기 초과', file.size)
         return NextResponse.json({ error: '파일 크기는 10MB 이하여야 합니다.' }, { status: 400 })
       }
       totalIncomingSize += file.size
@@ -146,6 +151,7 @@ export async function POST(request: Request) {
     if (currentUsage + totalIncomingSize > quotaLimit) {
       const limitMb = Math.round(quotaLimit / (1024 * 1024))
       const currentMb = (currentUsage / (1024 * 1024)).toFixed(2)
+      console.error('[Upload] 400: 용량 초과', { currentUsage, totalIncomingSize, quotaLimit })
       return NextResponse.json(
         { error: `저장 용량이 부족합니다. (한도: ${limitMb}MB, 사용 중: ${currentMb}MB)` },
         { status: 400 }
@@ -160,6 +166,7 @@ export async function POST(request: Request) {
       const buffer = Buffer.from(bytes)
       const detectedType = detectImageMime(buffer)
       if (!detectedType) {
+        console.error('[Upload] 400: magic bytes 불일치, file.type:', file.type, 'buffer head:', buffer.slice(0, 4).toString('hex'))
         return NextResponse.json({ error: 'File type verification failed.' }, { status: 400 })
       }
 
