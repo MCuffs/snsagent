@@ -199,6 +199,11 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
     .filter(isUserImageLayer)
     .map(candidate => normalizeUserImageLayer(candidate))
 
+  // Preserve user-added free text layers: type 'text'
+  const userTextLayers = input.layers
+    .filter(isUserTextLayer)
+    .map(candidate => normalizeUserTextLayer(candidate))
+
   return {
     ...fallback,
     ...input,
@@ -218,13 +223,49 @@ export function normalizeDocument(input: EditorialDocument): EditorialDocument {
       bloom: number(input.overlay?.bloom, 0, 100, fallback.overlay.bloom),
       colorFilter: validColor(input.overlay?.colorFilter, fallback.overlay.colorFilter),
     },
-    layers: [...sanitized, ...userImageLayers].sort((a, b) => a.zIndex - b.zIndex),
+    layers: [...sanitized, ...userImageLayers, ...userTextLayers].sort((a, b) => a.zIndex - b.zIndex),
     updatedAt: new Date().toISOString(),
   }
 }
 
 function isUserImageLayer(candidate: EditorialLayer) {
   return candidate.type === 'sticker' && candidate.id !== 'sticker' && typeof candidate.imageUrl === 'string'
+}
+
+function isUserTextLayer(candidate: EditorialLayer) {
+  return candidate.type === 'text' && typeof candidate.text === 'string'
+}
+
+function normalizeUserTextLayer(candidate: EditorialLayer): EditorialLayer {
+  return {
+    id: typeof candidate.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(candidate.id) ? candidate.id : `text-${Date.now()}`,
+    type: 'text',
+    name: typeof candidate.name === 'string' ? candidate.name.slice(0, 40) : '텍스트',
+    visible: candidate.visible !== false,
+    locked: false,
+    opacity: number(candidate.opacity, 0, 100, 100),
+    zIndex: number(candidate.zIndex, 0, 1000, 65),
+    x: number(candidate.x, 0, 1080, 200),
+    y: number(candidate.y, 0, 1350, 600),
+    width: number(candidate.width, 40, 1080, 680),
+    height: number(candidate.height, 20, 1350, 100),
+    scale: number(candidate.scale, 0.25, 4, 1),
+    rotation: number(candidate.rotation, -180, 180, 0),
+    blur: number(candidate.blur, 0, 40, 0),
+    shadow: number(candidate.shadow, 0, 60, 0),
+    text: typeof candidate.text === 'string' ? candidate.text.slice(0, 500) : '텍스트를 입력하세요',
+    fontPreset: toFontPreset(candidate.fontPreset),
+    fontSize: number(candidate.fontSize, 10, 180, 28),
+    fontWeight: number(candidate.fontWeight, 100, 900, 400),
+    lineHeight: number(candidate.lineHeight, 0.8, 2.4, 1.4),
+    tracking: number(candidate.tracking, -8, 30, 0),
+    color: validColor(candidate.color, '#ffffff'),
+    textAlign: candidate.textAlign ?? 'left',
+    italic: candidate.italic === true,
+    underline: candidate.underline === true,
+    stroke: number(candidate.stroke, 0, 12, 0),
+    strokeColor: validColor(candidate.strokeColor, '#000000'),
+  }
 }
 
 function normalizeUserImageLayer(candidate: EditorialLayer): EditorialLayer {

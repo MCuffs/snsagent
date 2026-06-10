@@ -6,6 +6,7 @@ export type EditorialLayerType =
   | 'sticker'
   | 'cta'
   | 'watermark'
+  | 'text'
 
 export type FontPreset = 'pretendard' | 'suit' | 'noto-sans' | 'serif' | 'magazine'
 export type TypographyPreset =

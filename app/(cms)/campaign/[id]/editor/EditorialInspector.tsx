@@ -36,6 +36,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
   const updateLayer = useEditorialStore(state => state.updateLayer)
   const updateDocument = useEditorialStore(state => state.updateDocument)
   const selectLayer = useEditorialStore(state => state.selectLayer)
+  const addLayer = useEditorialStore(state => state.addLayer)
   const applyOverlayToAll = useEditorialStore(state => state.applyOverlayToAll)
   const undo = useEditorialStore(state => state.undo)
   const redo = useEditorialStore(state => state.redo)
@@ -141,6 +142,35 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
             target={copyTarget}
             onTarget={value => { setCopyTarget(value); selectLayer(value) }}
             onChange={update => updateLayer(slideId, copyLayer.id, update)}
+            onAddTextLayer={() => {
+              const newLayer: EditorialLayer = {
+                id: `text-${Date.now()}`,
+                type: 'text',
+                name: '텍스트',
+                visible: true,
+                locked: false,
+                opacity: 100,
+                zIndex: 65,
+                x: 200,
+                y: 600,
+                width: 680,
+                height: 100,
+                scale: 1,
+                rotation: 0,
+                blur: 0,
+                shadow: 0,
+                text: '텍스트를 입력하세요',
+                fontPreset: 'pretendard',
+                fontSize: 28,
+                fontWeight: 400,
+                lineHeight: 1.4,
+                tracking: 0,
+                color: '#ffffff',
+                textAlign: 'left',
+              }
+              addLayer(slideId, newLayer)
+              selectLayer(newLayer.id)
+            }}
           />
         )}
         {tab === 'background' && (
@@ -242,15 +272,24 @@ function TextPanel({
   target,
   onTarget,
   onChange,
+  onAddTextLayer,
 }: {
   layer: EditorialLayer
   target: 'title' | 'subtitle'
   onTarget: (target: 'title' | 'subtitle') => void
   onChange: (update: Partial<EditorialLayer>) => void
+  onAddTextLayer: () => void
 }) {
   const t = useTranslations('campaign')
   return (
     <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onAddTextLayer}
+        className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[#c8bfb5] py-2 text-xs font-bold text-[#746a62] hover:border-[#0066ff] hover:text-[#0066ff] transition-colors"
+      >
+        <Type className="h-3.5 w-3.5" /> 텍스트 추가
+      </button>
       <div className="flex rounded-lg bg-[#f7f4ef] p-1">
         <Segment active={target === 'title'} onClick={() => onTarget('title')}>{t('target_title')}</Segment>
         <Segment active={target === 'subtitle'} onClick={() => onTarget('subtitle')}>{t('target_body')}</Segment>
