@@ -268,14 +268,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
     return () => globalThis.document?.removeEventListener('pointerdown', close)
   }, [contextMenu])
 
-  // Auto-enter editing mode when a new user text layer is selected
-  useEffect(() => {
-    if (!selectedLayerId || !document) return
-    const layer = document.layers.find(l => l.id === selectedLayerId)
-    if (layer?.type === 'text' && layer.text === '텍스트를 입력하세요') {
-      setEditingLayerId(selectedLayerId)
-    }
-  }, [selectedLayerId, document])
+
 
   const handleDragEnd = useCallback((layer: EditorialLayer, x: number, y: number) => {
     if (!document) return
@@ -428,10 +421,11 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
               }}
             >
               <LayerContent
-                key={isEditing ? layer.id + '-edit' : layer.id}
+                key={layer.id}
                 layer={layer}
                 editing={isEditing}
                 onText={text => updateLayer(slideId, layer.id, { text })}
+                onEditingStart={() => setEditingLayerId(layer.id)}
                 onEditingEnd={() => setEditingLayerId(null)}
               />
               {showHandles && (
@@ -472,11 +466,12 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
 // ─── Layer content renderer ───────────────────────────────────────────────────
 function LayerContent({
-  layer, editing, onText, onEditingEnd,
+  layer, editing, onText, onEditingStart, onEditingEnd,
 }: {
   layer: EditorialLayer
   editing: boolean
   onText: (text: string) => void
+  onEditingStart: () => void
   onEditingEnd: () => void
 }) {
   const textRef = useRef<HTMLDivElement>(null)
@@ -485,6 +480,7 @@ function LayerContent({
   useEffect(() => {
     if (!editing || !textRef.current) return
     const el = textRef.current
+    if (globalThis.document?.activeElement === el) return
     el.focus()
     const range = globalThis.document?.createRange()
     const sel = window.getSelection()
@@ -530,11 +526,12 @@ function LayerContent({
   return (
     <div
       ref={textRef}
-      contentEditable={editing && !layer.locked}
+      contentEditable={!layer.locked}
       suppressContentEditableWarning
+      onFocus={() => {
+        onEditingStart()
+      }}
       onBlur={e => {
-        if (!editing) return
-        // Strip trailing newline that contentEditable appends
         const text = e.currentTarget.innerText.replace(/\n$/, '')
         onText(text)
         onEditingEnd()
@@ -544,8 +541,12 @@ function LayerContent({
           e.preventDefault()
           const text = (e.target as HTMLDivElement).innerText.replace(/\n$/, '')
           onText(text)
+          e.currentTarget.blur()
           onEditingEnd()
         }
+      }}
+      onPointerDown={e => {
+        e.stopPropagation()
       }}
       className="h-full whitespace-pre-wrap break-words outline-none"
       style={{
@@ -561,8 +562,8 @@ function LayerContent({
         background: layer.textBackground,
         fontStyle: layer.italic ? 'italic' : undefined,
         textDecoration: layer.underline ? 'underline' : undefined,
-        userSelect: editing ? 'text' : 'none',
-        pointerEvents: editing ? 'auto' : 'none',
+        userSelect: 'text',
+        pointerEvents: 'auto',
       }}
     >
       {layer.text}

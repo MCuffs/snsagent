@@ -275,6 +275,16 @@ function DragNumberInput({
   )
 }
 
+const applyInlineStyle = (command: 'bold' | 'italic' | 'underline', fallbackToggle: () => void) => {
+  if (typeof window === 'undefined') return
+  const sel = window.getSelection()
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+    document.execCommand(command)
+  } else {
+    fallbackToggle()
+  }
+}
+
 function TextPanel({
   layer,
   onChange,
@@ -334,7 +344,10 @@ function TextPanel({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })}
+          onMouseDown={e => {
+            e.preventDefault()
+            applyInlineStyle('bold', () => onChange({ fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 }))
+          }}
           title={t('bold')}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
             (layer.fontWeight ?? 400) >= 700
@@ -346,7 +359,10 @@ function TextPanel({
         </button>
         <button
           type="button"
-          onClick={() => onChange({ italic: !layer.italic })}
+          onMouseDown={e => {
+            e.preventDefault()
+            applyInlineStyle('italic', () => onChange({ italic: !layer.italic }))
+          }}
           title={t('italic')}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
             layer.italic
@@ -358,7 +374,10 @@ function TextPanel({
         </button>
         <button
           type="button"
-          onClick={() => onChange({ underline: !layer.underline })}
+          onMouseDown={e => {
+            e.preventDefault()
+            applyInlineStyle('underline', () => onChange({ underline: !layer.underline }))
+          }}
           title={t('underline')}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
             layer.underline
