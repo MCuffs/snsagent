@@ -1,10 +1,10 @@
 {
   "nav": {
     "product": "Product",
-    "workflow": "Workflow",
     "gallery": "Gallery",
     "pricing": "Pricing",
     "resources": "Resources",
+    "mcp": "MCP",
     "login": "Log in",
     "back_to_cms": "Back to Studio",
     "continue": "Continue working",

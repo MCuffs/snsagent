@@ -1,10 +1,10 @@
 {
   "nav": {
     "product": "제품",
-    "workflow": "워크플로우",
     "gallery": "갤러리",
     "pricing": "요금제",
     "resources": "리소스",
+    "mcp": "MCP",
     "login": "로그인",
     "back_to_cms": "CMS로 돌아가기",
     "continue": "작업 계속하기",
