@@ -59,6 +59,7 @@ interface ClarificationPrompt {
   options: ClarificationOption[]
   allowCustom?: boolean
   skipLabel?: string
+  variant?: 'question' | 'refinement'
 }
 
 interface DisplayMessage {
@@ -90,6 +91,7 @@ interface GenerateParams {
     body: string
     reasoning: string
   }[]
+  refinementOptions?: ClarificationOption[]
 }
 
 interface CopyPreviewSlide {
@@ -97,6 +99,61 @@ interface CopyPreviewSlide {
   role: string
   headline: string
   body: string
+}
+
+const NEW_TOPIC_OPTION_VALUE = '__SHUFFLA_NEW_TOPIC__'
+
+function truncateOptionLabel(label: string, locale: string) {
+  const max = locale === 'en' ? 30 : 18
+  const clean = label.replace(/\s+/g, ' ').trim()
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
+}
+
+function buildAgentMemoryContext(params?: GenerateParams) {
+  if (!params?.draftSlides?.length) return ''
+
+  const lines = [
+    '',
+    '[Existing draft slides]',
+    `Topic: ${params.topic}`,
+    `Slide count: ${params.slideCount}`,
+    ...params.draftSlides.slice(0, 10).map(slide => (
+      `${slide.slideNumber}. [${slide.role}] ${slide.headline} / ${slide.body}`
+    )),
+  ]
+
+  return lines.join('\n')
+}
+
+function stripAgentMemoryContext(content: string) {
+  return content.replace(/\n?\[Existing draft slides\][\s\S]*$/u, '')
+}
+
+function buildDraftRefinementPrompt(locale: string, options?: ClarificationOption[]): ClarificationPrompt {
+  const isEn = locale === 'en'
+  const dynamicOptions = Array.isArray(options)
+    ? options
+      .filter(option => option.label?.trim() && option.value?.trim())
+      .map(option => ({ ...option, label: truncateOptionLabel(option.label, locale) }))
+      .slice(0, 3)
+    : []
+
+  return {
+    variant: 'refinement',
+    question: isEn ? 'How should we tune this draft?' : '이 초안을 어떤 방향으로 조정할까요?',
+    allowCustom: true,
+    options: [
+      ...(dynamicOptions.length >= 2 ? dynamicOptions : (isEn ? [
+      { label: 'Make it easier', value: 'Revise the draft to explain the topic more simply and clearly. Do not run new research.' },
+      { label: 'More trend-led', value: 'Revise the draft around trend signals and why people are reacting now. Do not run new research.' },
+      { label: 'Stronger hook', value: 'Make the opening hook and slide headlines sharper while keeping the same facts. Do not run new research.' },
+    ] : [
+      { label: '더 쉽게 설명', value: '새 조사는 하지 말고, 현재 근거와 초안을 바탕으로 더 쉽고 명확한 정보형 흐름으로 다듬어 주세요.' },
+      { label: '더 트렌디하게', value: '새 조사는 하지 말고, 현재 근거와 초안을 바탕으로 사람들이 왜 반응하는지 중심의 트렌드형 흐름으로 다듬어 주세요.' },
+      { label: '훅 더 강하게', value: '새 조사는 하지 말고, 현재 근거와 초안을 바탕으로 첫 장 훅과 제목을 더 강하게 다듬어 주세요.' },
+    ])),
+    ],
+  }
 }
 
 let msgCounter = 0
@@ -186,9 +243,6 @@ const formItemVariants = {
 
 export default function GenerateForm({
   brand,
-  userId,
-  userEmail,
-  userName,
   nicepayClientKey,
   nicepayReturnTokens,
 }: GenerateFormProps) {
@@ -219,10 +273,10 @@ export default function GenerateForm({
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
   const [copyPreviewSlides, setCopyPreviewSlides] = useState<CopyPreviewSlide[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [pendingNewTopic, setPendingNewTopic] = useState(false)
 
   // Promo payment modal states
   const [showPromoModal, setShowPromoModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<'PRO' | 'UNLIMITED'>('PRO')
   const [processingPayment, setProcessingPayment] = useState(false)
   const [promoError, setPromoError] = useState<string | null>(null)
 
@@ -329,6 +383,12 @@ export default function GenerateForm({
     typingTimerRef.current = window.setTimeout(revealNext, 100)
   }, [clearTypingTimer, revealBriefing])
 
+  const dismissClarification = useCallback((messageId: string) => {
+    setDisplayMessages(prev => prev.map(message => (
+      message.id === messageId ? { ...message, clarification: undefined } : message
+    )))
+  }, [])
+
   useEffect(() => () => {
     clearTypingTimer()
     clearBriefingTimers()
@@ -411,7 +471,10 @@ export default function GenerateForm({
       }
 
       const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
-      appendAiMessage(msg, data.params ? data.params : undefined, !data.ready ? data.clarification : undefined)
+      const refinementPrompt = data.ready && data.params?.draftSlides?.length
+        ? buildDraftRefinementPrompt(locale, data.params.refinementOptions)
+        : undefined
+      appendAiMessage(msg, data.params ? data.params : undefined, refinementPrompt || (!data.ready ? data.clarification : undefined))
       if (data.ready && data.params) {
         analytics.generateBriefReady({
           brandId: brand.id,
@@ -434,7 +497,8 @@ export default function GenerateForm({
             ...data.clarification.options.map(option => `- ${option.label}: ${option.value}`),
           ].join('\n')
         : ''
-      const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}` }
+      const draftContext = buildAgentMemoryContext(data.params)
+      const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}${draftContext}` }
       setChatHistory(prev => [...prev, assistantHistory])
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
@@ -504,8 +568,20 @@ export default function GenerateForm({
     const text = input.trim()
     if (!text || isWaiting || isRevealingMessage) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
-    const newHistory = [...chatHistory, userMsg]
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: pendingNewTopic
+        ? (locale === 'en' ? `New topic: ${text}` : `새 주제로 전환: ${text}`)
+        : text,
+    }
+    const baseHistory = pendingNewTopic
+      ? chatHistory.map(message => (
+        message.role === 'assistant'
+          ? { ...message, content: stripAgentMemoryContext(message.content) }
+          : message
+      ))
+      : chatHistory
+    const newHistory = [...baseHistory, userMsg]
 
     setDisplayMessages(prev => [...prev, userDisplay(text)])
     setChatHistory(newHistory)
@@ -517,6 +593,7 @@ export default function GenerateForm({
       locale,
     })
     setInput('')
+    setPendingNewTopic(false)
     setReadyParams(null)
     setBriefingStage(0)
     clearBriefingTimers()
@@ -526,6 +603,31 @@ export default function GenerateForm({
 
   const handleClarificationSelect = async (option: ClarificationOption | null) => {
     if (isWaiting || isRevealingMessage) return
+
+    if (option?.value === NEW_TOPIC_OPTION_VALUE) {
+      const userLabel = option.label
+      const prompt = locale === 'en'
+        ? 'Okay. Type the new topic below and I will research it from scratch.'
+        : '좋아요. 아래 입력창에 새 주제를 입력하면 이전 초안과 분리해서 다시 조사할게요.'
+
+      setDisplayMessages(prev => [
+        ...prev.map(message => (
+          message.clarification?.variant === 'refinement'
+            ? { ...message, clarification: undefined }
+            : message
+        )),
+        userDisplay(userLabel),
+      ])
+      appendAiMessage(prompt)
+      setChatHistory([{ role: 'assistant', content: prompt }])
+      setReadyParams(null)
+      setBriefingStage(0)
+      setPendingNewTopic(true)
+      setInput('')
+      clearBriefingTimers()
+      window.setTimeout(() => inputRef.current?.focus(), 50)
+      return
+    }
 
     const text = option
       ? option.value
@@ -1076,10 +1178,14 @@ export default function GenerateForm({
                         <p className="text-sm font-black leading-6 text-[#2C1E1A]">{msg.clarification.question}</p>
                         <button
                           type="button"
-                          onClick={() => handleClarificationSelect(null)}
+                          onClick={() => (
+                            msg.clarification?.variant === 'refinement'
+                              ? dismissClarification(msg.id)
+                              : handleClarificationSelect(null)
+                          )}
                           disabled={isWaiting || isRevealingMessage}
                           className="shrink-0 rounded-full p-1 text-[#8C7E7A] transition-colors hover:bg-[#F2EAE1] disabled:opacity-40"
-                          aria-label={locale === 'en' ? 'Skip question' : '질문 건너뛰기'}
+                          aria-label={locale === 'en' ? 'Close options' : '선택지 닫기'}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1096,7 +1202,7 @@ export default function GenerateForm({
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#8C7E7A] shadow-sm group-hover:text-[#9E7D68]">
                               {index + 1}
                             </span>
-                            <span className="min-w-0 flex-1 text-sm font-bold leading-5 text-[#3B302C]">{option.label}</span>
+                            <span title={option.label} className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-[#3B302C]">{option.label}</span>
                             <ArrowRight className="h-4 w-4 shrink-0 text-[#A69282] opacity-0 transition-opacity group-hover:opacity-100" />
                           </button>
                         ))}
@@ -1105,6 +1211,34 @@ export default function GenerateForm({
                         <p className="mt-3 text-[11px] font-semibold text-[#9A8C80]">
                           {locale === 'en' ? 'Or type your own answer in the input below.' : '또는 아래 입력창에 직접 답변해도 됩니다.'}
                         </p>
+                      )}
+                      {msg.clarification.variant === 'refinement' && (
+                        <div className="mt-3 flex flex-col gap-2 border-t border-[#EFEAE2] pt-3 sm:flex-row">
+                          <button
+                            type="button"
+                            onClick={handleCopyPreview}
+                            disabled={isWaiting || isRevealingMessage || previewLoading}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#2C1E1A] px-3 py-2.5 text-xs font-black text-[#FFFDF8] transition hover:bg-[#3A2A24] disabled:opacity-40"
+                          >
+                            {previewLoading ? (
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                            {locale === 'en' ? 'Use this draft' : '이 초안으로 진행'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleClarificationSelect({
+                              label: locale === 'en' ? 'Try another topic' : '다른 주제로 만들기',
+                              value: NEW_TOPIC_OPTION_VALUE,
+                            })}
+                            disabled={isWaiting || isRevealingMessage}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#D8CEC1] bg-white px-3 py-2.5 text-xs font-black text-[#5C4E4B] transition hover:border-[#9E7D68] hover:bg-[#FFF8F1] disabled:opacity-40"
+                          >
+                            {locale === 'en' ? 'Try another topic' : '다른 주제로 만들기'}
+                          </button>
+                        </div>
                       )}
                       {msg.clarification.skipLabel && (
                         <button
@@ -1225,7 +1359,11 @@ export default function GenerateForm({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={readyParams ? t('feedback_placeholder') : t('input_placeholder')}
+              placeholder={
+                pendingNewTopic
+                  ? (locale === 'en' ? 'Enter the new topic to research from scratch' : '새로 만들 주제를 입력하세요')
+                  : readyParams ? t('feedback_placeholder') : t('input_placeholder')
+              }
               disabled={isWaiting || isRevealingMessage}
               className="h-12 flex-1 rounded-2xl border border-[#E6DFD5] bg-white px-4 text-sm text-[#2C1E1A] placeholder-[#C2B5AA] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/5 disabled:opacity-50 font-bold transition-all"
               autoFocus
@@ -1889,4 +2027,3 @@ function PromoPaymentModal({
     document.body
   )
 }
-

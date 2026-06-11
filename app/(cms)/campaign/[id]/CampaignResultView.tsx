@@ -24,10 +24,11 @@ import type { PexelsBackgroundCandidate } from '../../../../src/lib/ai/providers
 import type { AgentReport, AgentReportItem } from '../../../../src/lib/carousel/agents'
 import { applyBrandStyleMemory, parseEditorialDocument } from '../../../../src/lib/editor/document'
 import type { EditorialLayer } from '../../../../src/lib/editor/types'
-import { EditorialCanvas } from './editor/EditorialCanvas'
+import { EditorialCanvas, richTextHtmlForEditor } from './editor/EditorialCanvas'
 import { EditorialInspector } from './editor/EditorialInspector'
 import { useEditorialStore } from './editor/useEditorialStore'
 import { analytics } from '../../../../lib/analytics/thinkingdata'
+import type { EditorialDocument } from '../../../../src/lib/editor/types'
 
 interface Slide {
   id: string
@@ -118,6 +119,113 @@ function fileNameFor(campaignTitle: string, slideNumber: number, extension = 'pn
     .replace(/\s+/g, '-')
     .slice(0, 48) || 'card-news'
   return `${safeTitle}-${String(slideNumber).padStart(2, '0')}.${extension}`
+}
+
+function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?: EditorialDocument; fallbackImageUrl: string | null; alt: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.1)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const update = () => setScale(element.clientWidth / 1080)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  if (!document) {
+    return fallbackImageUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={fallbackImageUrl} alt={alt} className="h-full w-full object-cover" />
+    ) : null
+  }
+
+  const background = document.layers.find(layer => layer.type === 'background')
+  const overlayLayer = document.layers.find(layer => layer.type === 'overlay')
+  const overlay = document.overlay
+  const layers = document.layers
+    .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
+    .sort((a, b) => a.zIndex - b.zIndex)
+
+  return (
+    <div ref={ref} className="relative h-full w-full overflow-hidden bg-[#090a0d]" aria-label={alt}>
+      {background?.visible && background.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={background.imageUrl}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          style={{
+            opacity: background.opacity / 100,
+            filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
+            transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
+            transformOrigin: '0 0',
+          }}
+        />
+      )}
+      {(!background?.imageUrl && fallbackImageUrl) && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+      )}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: (overlayLayer?.opacity ?? 100) / 100,
+          background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
+          mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
+        }}
+      />
+      {layers.map(layer => (
+        <div
+          key={layer.id}
+          className="absolute overflow-hidden whitespace-pre-wrap break-words"
+          style={{
+            left: layer.x * scale,
+            top: layer.y * scale,
+            width: layer.width * scale,
+            minHeight: layer.height * scale,
+            zIndex: layer.zIndex,
+            opacity: layer.opacity / 100,
+            transform: `scale(${layer.scale}) rotate(${layer.rotation}deg)`,
+            transformOrigin: 'top left',
+            color: layer.color,
+            fontFamily: fontFamily(layer.fontPreset),
+            fontSize: (layer.fontSize || 24) * scale,
+            fontWeight: layer.fontWeight,
+            lineHeight: layer.lineHeight,
+            letterSpacing: (layer.tracking || 0) * scale,
+            textAlign: layer.textAlign,
+            textShadow: layer.shadow ? `0 ${4 * scale}px ${layer.shadow * scale}px rgba(0,0,0,.58)` : undefined,
+            WebkitTextStroke: layer.stroke ? `${layer.stroke * scale}px ${layer.strokeColor}` : undefined,
+            background: layer.textBackground,
+            fontStyle: layer.italic ? 'italic' : undefined,
+            textDecoration: layer.underline ? 'underline' : undefined,
+          }}
+        >
+          {layer.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={layer.imageUrl} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span dangerouslySetInnerHTML={{ __html: richTextHtmlForEditor(layer, scale) }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function fontFamily(preset?: string | null) {
+  if (preset === 'serif' || preset === 'magazine') return 'Georgia, "Noto Serif KR", serif'
+  if (preset === 'suit') return 'SUIT, Pretendard, sans-serif'
+  if (preset === 'noto-sans') return '"Noto Sans KR", Pretendard, sans-serif'
+  return 'Pretendard, "Apple SD Gothic Neo", sans-serif'
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const n = Number.parseInt(hex.slice(1), 16)
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${alpha})`
 }
 
 async function downloadImage(url: string, fileName: string) {
@@ -827,10 +935,11 @@ export default function CampaignResultView({
                 }`}
               >
                 <div className="aspect-[4/5] overflow-hidden rounded-[5px] bg-[#f8f3e9]">
-                  {slide.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={slide.imageUrl} alt={t('thumbnail_alt', { number: slide.slideNumber })} className="h-full w-full object-cover" />
-                  )}
+                  <SlideDocumentThumbnail
+                    document={documents[slide.id]}
+                    fallbackImageUrl={slide.imageUrl}
+                    alt={t('thumbnail_alt', { number: slide.slideNumber })}
+                  />
                 </div>
                 <p className="mt-2 truncate px-1 pb-1 text-left text-[11px] font-black text-[#4a4039]">
                   {slide.slideNumber}. {slide.headline}

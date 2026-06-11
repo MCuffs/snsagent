@@ -97,53 +97,165 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
     const maskAttr = (layer.edgeFade ?? 0) > 0 ? ` mask="url(#fade-${layer.id})"` : ''
     return `<image href="${escapeXml(imageData)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}" transform="${transform}"${blurAttr}${maskAttr}/>`
   }
-  if (!layer.text) return ''
+  if (!layer.text && !layer.textHtml) return ''
   const fontFamily = fontFamilyForPreset(layer.fontPreset)
-  const anchor = layer.textAlign === 'center' ? 'middle' : layer.textAlign === 'right' ? 'end' : 'start'
-  const x = layer.textAlign === 'center' ? layer.x + layer.width / 2 : layer.textAlign === 'right' ? layer.x + layer.width : layer.x
+  const anchorX = layer.textAlign === 'center' ? layer.x + layer.width / 2 : layer.textAlign === 'right' ? layer.x + layer.width : layer.x
   const fontSize = layer.fontSize || 24
-  const lineHeight = fontSize * (layer.lineHeight || 1.25)
-  const text = wrapTextForLayer(layer, fontSize).slice(0, 12).map((line, index) =>
-    `<tspan x="${x}" y="${layer.y + fontSize + index * lineHeight}">${escapeXml(line)}</tspan>`
-  ).join('')
+  const text = renderRichText(layer, anchorX, fontFamily)
   const background = layer.textBackground
     ? `<rect x="${layer.x - 12}" y="${layer.y - 8}" width="${layer.width + 24}" height="${layer.height + 16}" rx="10" fill="${escapeXml(layer.textBackground)}" opacity="${opacity}"/>`
     : ''
-  return `${background}<text text-anchor="${anchor}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="${layer.fontWeight || 400}" letter-spacing="${layer.tracking || 0}" fill="${escapeXml(layer.color || '#ffffff')}" opacity="${opacity}" stroke="${escapeXml(layer.strokeColor || 'none')}" stroke-width="${layer.stroke || 0}" paint-order="stroke" filter="${layer.shadow ? 'url(#editor-text-shadow)' : ''}" transform="rotate(${layer.rotation} ${x} ${layer.y}) scale(${layer.scale})">${text}</text>`
+  return `${background}<text font-family="${fontFamily}" font-size="${fontSize}" font-weight="${layer.fontWeight || 400}" letter-spacing="${layer.tracking || 0}" fill="${escapeXml(layer.color || '#ffffff')}" opacity="${opacity}" stroke="${escapeXml(layer.strokeColor || 'none')}" stroke-width="${layer.stroke || 0}" paint-order="stroke" filter="${layer.shadow ? 'url(#editor-text-shadow)' : ''}" transform="rotate(${layer.rotation} ${anchorX} ${layer.y}) scale(${layer.scale})">${text}</text>`
 }
 
-function wrapTextForLayer(layer: EditorialLayer, fontSize: number) {
-  const maxWidth = Math.max(layer.width, fontSize)
+interface TextRun {
+  text: string
+  fontSize?: number
+  fontWeight?: number
+  italic?: boolean
+  underline?: boolean
+  breakBefore?: boolean
+}
+
+interface LineRun extends TextRun {
+  x: number
+}
+
+function renderRichText(layer: EditorialLayer, anchorX: number, fontFamily: string) {
+  const lines = wrapRichTextForLayer(layer).slice(0, 12)
+  let cursorY = layer.y
+  return lines.map(line => {
+    const lineHeight = Math.max(...line.runs.map(run => run.fontSize || layer.fontSize || 24), [layer.fontSize || 24][0]) * (layer.lineHeight || 1.25)
+    cursorY += lineHeight
+    const startX = layer.textAlign === 'center'
+      ? anchorX - line.width / 2
+      : layer.textAlign === 'right'
+        ? anchorX - line.width
+        : anchorX
+    let cursorX = startX
+    return line.runs.map(run => {
+      const output = `<tspan x="${cursorX}" y="${cursorY}" font-family="${fontFamily}" font-size="${run.fontSize || layer.fontSize || 24}" font-weight="${run.fontWeight || layer.fontWeight || 400}"${run.italic ? ' font-style="italic"' : ''}${run.underline ? ' text-decoration="underline"' : ''}>${escapeXml(run.text)}</tspan>`
+      cursorX += estimateTextWidth(run.text, run.fontSize || layer.fontSize || 24, layer.tracking || 0)
+      return output
+    }).join('')
+  }).join('')
+}
+
+function wrapRichTextForLayer(layer: EditorialLayer) {
+  const baseFontSize = layer.fontSize || 24
+  const maxWidth = Math.max(layer.width, baseFontSize)
   const tracking = layer.tracking || 0
-  return String(layer.text || '')
-    .split(/\r?\n/)
-    .flatMap(paragraph => wrapParagraph(paragraph, maxWidth, fontSize, tracking))
+  const sourceRuns = layer.textHtml ? parseRichTextHtml(layer.textHtml, layer) : plainTextRuns(layer.text || '', layer)
+  const lines: { runs: LineRun[]; width: number }[] = []
+  let currentRuns: LineRun[] = []
+  let currentWidth = 0
+
+  const pushLine = () => {
+    lines.push({ runs: currentRuns, width: currentWidth })
+    currentRuns = []
+    currentWidth = 0
+  }
+
+  for (const run of sourceRuns) {
+    if (run.breakBefore && (currentRuns.length > 0 || currentWidth > 0)) pushLine()
+    for (const char of run.text) {
+      if (char === '\n') {
+        pushLine()
+        continue
+      }
+      const runFontSize = run.fontSize || baseFontSize
+      const width = estimateTextWidth(char, runFontSize, tracking)
+      if (currentRuns.length > 0 && currentWidth + width > maxWidth) pushLine()
+      const previous = currentRuns.at(-1)
+      if (previous && sameRunStyle(previous, run)) {
+        previous.text += char
+      } else {
+        currentRuns.push({ ...run, text: char, x: currentWidth })
+      }
+      currentWidth += width
+    }
+  }
+  if (currentRuns.length > 0 || lines.length === 0) pushLine()
+  return lines
 }
 
-function wrapParagraph(text: string, maxWidth: number, fontSize: number, tracking: number) {
-  if (!text) return ['']
+function sameRunStyle(a: TextRun, b: TextRun) {
+  return a.fontSize === b.fontSize &&
+    a.fontWeight === b.fontWeight &&
+    a.italic === b.italic &&
+    a.underline === b.underline
+}
 
-  const lines: string[] = []
-  let line = ''
+function plainTextRuns(text: string, layer?: EditorialLayer): TextRun[] {
+  return [{
+    text,
+    fontWeight: layer?.fontWeight,
+    italic: layer?.italic,
+    underline: layer?.underline,
+  }]
+}
 
-  for (const char of text) {
-    const candidate = `${line}${char}`
-    if (line && estimateTextWidth(candidate, fontSize, tracking) > maxWidth) {
-      const breakAt = line.lastIndexOf(' ')
-      if (breakAt > 0) {
-        lines.push(line.slice(0, breakAt).trimEnd())
-        line = `${line.slice(breakAt + 1)}${char}`.trimStart()
-      } else {
-        lines.push(line)
-        line = char
-      }
-    } else {
-      line = candidate
+function parseRichTextHtml(html: string, layer: EditorialLayer): TextRun[] {
+  const tokens = html.split(/(<[^>]+>)/g).filter(Boolean)
+  const runs: TextRun[] = []
+  const stack: Omit<TextRun, 'text'>[] = [{}]
+
+  const current = () => ({ ...stack[stack.length - 1] })
+
+  for (const token of tokens) {
+    if (!token.startsWith('<')) {
+      const decoded = decodeHtml(token)
+      if (decoded) runs.push({ ...current(), text: decoded })
+      continue
+    }
+
+    const tag = token.toLowerCase()
+    if (/^<br\s*\/?>/.test(tag) || /^<\/div/.test(tag) || /^<\/p/.test(tag)) {
+      runs.push({ ...current(), text: '\n' })
+      continue
+    }
+    if (/^<div/.test(tag) || /^<p/.test(tag)) {
+      if (runs.length > 0) runs.push({ ...current(), text: '\n' })
+      continue
+    }
+    if (/^<\/(span|b|strong|i|em|u)>/.test(tag)) {
+      if (stack.length > 1) stack.pop()
+      continue
+    }
+    if (/^<(b|strong)\b/.test(tag)) {
+      stack.push({ ...current(), fontWeight: 800 })
+      continue
+    }
+    if (/^<(i|em)\b/.test(tag)) {
+      stack.push({ ...current(), italic: true })
+      continue
+    }
+    if (/^<u\b/.test(tag)) {
+      stack.push({ ...current(), underline: true })
+      continue
+    }
+    if (/^<span\b/.test(tag)) {
+      const style = current()
+      const fontSizeMatch = token.match(/data-font-size=["']?(\d+(?:\.\d+)?)/i)
+      const fontSize = fontSizeMatch ? Number(fontSizeMatch[1]) : undefined
+      stack.push({
+        ...style,
+        fontSize: Number.isFinite(fontSize) ? Math.min(180, Math.max(10, fontSize!)) : style.fontSize || layer.fontSize,
+      })
     }
   }
 
-  if (line) lines.push(line)
-  return lines
+  return runs.length > 0 ? runs : [{ text: layer.text || '' }]
+}
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
 }
 
 function estimateTextWidth(text: string, fontSize: number, tracking: number) {

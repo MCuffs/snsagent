@@ -254,6 +254,7 @@ function normalizeUserTextLayer(candidate: EditorialLayer): EditorialLayer {
     blur: number(candidate.blur, 0, 40, 0),
     shadow: number(candidate.shadow, 0, 60, 0),
     text: typeof candidate.text === 'string' ? candidate.text.slice(0, 500) : '텍스트를 입력하세요',
+    textHtml: typeof candidate.textHtml === 'string' ? candidate.textHtml.slice(0, 5000) : undefined,
     fontPreset: toFontPreset(candidate.fontPreset),
     fontSize: number(candidate.fontSize, 10, 180, 28),
     fontWeight: number(candidate.fontWeight, 100, 900, 400),
@@ -364,6 +365,7 @@ function normalizeLayer(candidate: EditorialLayer, fallback: EditorialLayer, ind
     type: fallback.type,
     name: typeof candidate.name === 'string' ? candidate.name.slice(0, 40) : fallback.name,
     text: typeof candidate.text === 'string' ? candidate.text.slice(0, 500) : fallback.text,
+    textHtml: typeof candidate.textHtml === 'string' ? candidate.textHtml.slice(0, 5000) : fallback.textHtml,
     imageUrl: typeof candidate.imageUrl === 'string' ? candidate.imageUrl.slice(0, 4096) : fallback.imageUrl,
     visible: candidate.visible !== false,
     locked: candidate.locked === true,
@@ -383,8 +385,16 @@ function normalizeLayer(candidate: EditorialLayer, fallback: EditorialLayer, ind
     lineHeight: number(candidate.lineHeight, 0.8, 2.4, fallback.lineHeight || 1.2),
     tracking: number(candidate.tracking, -8, 30, fallback.tracking || 0),
     color: validColor(candidate.color, fallback.color || '#ffffff'),
+    textAlign: candidate.textAlign === 'center' || candidate.textAlign === 'right' || candidate.textAlign === 'left'
+      ? candidate.textAlign
+      : fallback.textAlign,
+    italic: candidate.italic === true,
+    underline: candidate.underline === true,
     stroke: number(candidate.stroke, 0, 12, fallback.stroke || 0),
     strokeColor: validColor(candidate.strokeColor, fallback.strokeColor || '#000000'),
+    textBackground: typeof candidate.textBackground === 'string'
+      ? validColor(candidate.textBackground, fallback.textBackground || '#000000')
+      : fallback.textBackground,
   }
 }
 
