@@ -1,13 +1,42 @@
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
+import { getSessionUser } from '../../../actions'
+import prisma from '../../../../lib/db'
 
 export async function GET() {
-  return NextResponse.json({ key: null, unavailable: true })
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { mcpApiKey: true },
+  })
+
+  return NextResponse.json({ key: row?.mcpApiKey ?? null })
 }
 
 export async function POST() {
-  return NextResponse.json({ error: 'API key feature coming soon' }, { status: 503 })
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const key = `shfl_${randomBytes(24).toString('hex')}`
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { mcpApiKey: key },
+  })
+
+  return NextResponse.json({ key })
 }
 
 export async function DELETE() {
-  return NextResponse.json({ error: 'API key feature coming soon' }, { status: 503 })
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { mcpApiKey: null },
+  })
+
+  return NextResponse.json({ ok: true })
 }

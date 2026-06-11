@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
-import { CreditCard, LogOut } from 'lucide-react'
+import { CreditCard } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { getSessionUser, getCachedBrands } from '../../lib/auth/user'
 import { TabProvider } from './TabContext'
 import SidebarNav from './SidebarNav'
 import ThinkingDataProvider from '../components/ThinkingDataProvider'
 import MobileHeader from './MobileHeader'
+import { UserProfileDrawer } from './UserProfileDrawer'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser()
@@ -16,7 +17,6 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
   const brands = await getCachedBrands(user.id)
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
   const t = await getTranslations('cms_layout')
-  const tCms = await getTranslations('cms')
 
   return (
     <TabProvider>
@@ -53,25 +53,12 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
             <span className="text-[#0066ff] font-semibold">{t('plan_link')}</span>
           </Link>
 
-          <div className="flex items-center justify-between rounded-md px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-[#111111]">{user.name || user.email}</p>
-              <p className="truncate text-[11px] text-[#71717a]">{user.email}</p>
-            </div>
-            <form
-              action={async () => {
-                'use server'
-                const { logoutAction } = await import('../actions')
-                await logoutAction()
-                const { redirect: serverRedirect } = await import('next/navigation')
-                serverRedirect('/login')
-              }}
-            >
-              <button type="submit" className="ml-2 rounded p-1 text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors" title={tCms('logout')}>
-                <LogOut className="h-3.5 w-3.5" />
-              </button>
-            </form>
-          </div>
+          <UserProfileDrawer
+            userName={user.name ?? null}
+            userEmail={user.email}
+            userPlan={user.plan}
+            createdAt={user.createdAt.toISOString()}
+          />
           <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
         </div>
       </aside>
@@ -95,25 +82,12 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
                 <span className="text-[#0066ff] font-semibold">{t('plan_link')}</span>
               </Link>
 
-              <div className="flex items-center justify-between rounded-md px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-[#111111]">{user.name || user.email}</p>
-                  <p className="truncate text-[11px] text-[#71717a]">{user.email}</p>
-                </div>
-                <form
-                  action={async () => {
-                    'use server'
-                    const { logoutAction } = await import('../actions')
-                    await logoutAction()
-                    const { redirect: serverRedirect } = await import('next/navigation')
-                    serverRedirect('/login')
-                  }}
-                >
-                  <button type="submit" className="ml-2 rounded p-1 text-[#71717a] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors" title={tCms('logout')}>
-                    <LogOut className="h-3.5 w-3.5" />
-                  </button>
-                </form>
-              </div>
+              <UserProfileDrawer
+                userName={user.name ?? null}
+                userEmail={user.email}
+                userPlan={user.plan}
+                createdAt={user.createdAt.toISOString()}
+              />
               <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
             </div>
           </div>
