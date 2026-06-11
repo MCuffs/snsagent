@@ -148,9 +148,16 @@ function SelectionToolbar({ slideId, editingLayerId }: { slideId: string; editin
 
   return (
     <div
+      data-selection-toolbar
       style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)', zIndex: 9999 }}
       className="flex items-center gap-0.5 rounded-lg border border-[#333] bg-[#1a1a1a] px-1.5 py-1 shadow-2xl"
-      onMouseDown={e => e.preventDefault()}
+      onMouseDown={e => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onPointerDown={e => {
+        e.stopPropagation()
+      }}
     >
       <button type="button" onClick={() => applyStyle('bold')} title={t('bold')}
         className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${isBold ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}>
@@ -353,6 +360,10 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   useEffect(() => {
     if (!editingLayerId) return
     const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest('[data-selection-toolbar]')) {
+        return
+      }
       if (stageRef.current && !stageRef.current.contains(e.target as Node)) {
         setEditingLayerId(null)
       }
