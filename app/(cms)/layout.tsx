@@ -16,6 +16,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
 
   const brands = await getCachedBrands(user.id)
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
+  const hasSubscription = Boolean(user.paypalSubscriptionId || user.nicepayBid)
+  const paymentProvider: 'paypal' | 'nicepay' | null = user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
   const t = await getTranslations('cms_layout')
 
   return (
@@ -58,6 +60,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
             userEmail={user.email}
             userPlan={user.plan}
             createdAt={user.createdAt.toISOString()}
+            hasSubscription={hasSubscription}
+            paymentProvider={paymentProvider}
           />
           <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
         </div>
@@ -87,6 +91,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
                 userEmail={user.email}
                 userPlan={user.plan}
                 createdAt={user.createdAt.toISOString()}
+                hasSubscription={hasSubscription}
+                paymentProvider={paymentProvider}
               />
               <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
             </div>

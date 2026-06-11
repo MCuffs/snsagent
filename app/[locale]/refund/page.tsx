@@ -27,7 +27,7 @@ const KO_SECTIONS = [
     title: '제2조 구독 플랜 취소 및 환불',
     items: [
       '유료 구독(Creator, Studio 플랜)은 월 단위로 자동 갱신됩니다.',
-      '구독 취소는 서비스 내 [요금제] 메뉴 또는 고객 지원 이메일(admin@shuffla.io)을 통해 언제든지 신청할 수 있습니다.',
+      '구독 취소는 서비스 내 좌측 하단 이름 클릭 → 내 계정 패널의 [구독 취소하기] 버튼 또는 고객 지원 이메일(admin@shuffla.io)을 통해 언제든지 신청할 수 있습니다.',
       '구독을 취소하면 즉시 유료 기능 이용이 중단됩니다. 이미 결제된 기간에 대한 부분 환불은 제공되지 않습니다.',
       '갱신일 이전에 취소하면 다음 결제 주기부터 청구되지 않습니다.',
       '단, 최초 결제일로부터 7일 이내에 서비스를 전혀 이용하지 않은 경우(카드뉴스 생성 0회) 전액 환불을 요청할 수 있습니다.',
@@ -75,7 +75,7 @@ const EN_SECTIONS = [
     title: 'Article 2 — Subscription Plan Cancellation & Refund',
     items: [
       'Paid subscriptions (Creator and Studio plans) renew automatically on a monthly basis.',
-      'You may cancel your subscription at any time via the [Pricing] menu in the app or by emailing admin@shuffla.io.',
+      'You may cancel your subscription at any time via the [Cancel subscription] button in the account panel (click your name in the bottom-left of the app) or by emailing admin@shuffla.io.',
       'Upon cancellation, access to paid features stops immediately. No partial refunds are issued for the remaining period of an active billing cycle.',
       'Canceling before your renewal date prevents the next charge from occurring.',
       'Exception: if you cancel within 7 days of your first payment and have not used the service (0 card news generated), you may request a full refund.',

@@ -25,6 +25,8 @@ export default async function CmsLayout({
   const t = await getTranslations('cms')
   const brands = await getCachedBrands(user.id)
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
+  const hasSubscription = Boolean(user.paypalSubscriptionId || user.nicepayBid)
+  const paymentProvider: 'paypal' | 'nicepay' | null = user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
 
   return (
     <TabProvider>
@@ -67,6 +69,8 @@ export default async function CmsLayout({
               userEmail={user.email}
               userPlan={user.plan}
               createdAt={user.createdAt.toISOString()}
+              hasSubscription={hasSubscription}
+              paymentProvider={paymentProvider}
             />
 
             <div className="px-3 pb-1 flex items-center justify-between">
@@ -100,6 +104,8 @@ export default async function CmsLayout({
                   userEmail={user.email}
                   userPlan={user.plan}
                   createdAt={user.createdAt.toISOString()}
+                  hasSubscription={hasSubscription}
+                  paymentProvider={paymentProvider}
                 />
 
                 <div className="px-3 pb-1 flex items-center justify-between">

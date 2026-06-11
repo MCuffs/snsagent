@@ -1,32 +1,40 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Key, Copy, Check, RefreshCw, Trash2, X, User, Mail, CreditCard, ExternalLink, LogOut } from 'lucide-react'
+import { Key, Copy, Check, RefreshCw, Trash2, X, User, Mail, CreditCard, ExternalLink, LogOut, AlertCircle } from 'lucide-react'
 
 interface Props {
   userName: string | null
   userEmail: string
   userPlan: string
   createdAt: string
+  hasSubscription: boolean
+  paymentProvider: 'paypal' | 'nicepay' | null
 }
 
 const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   FREE:      { label: 'Free',      color: 'text-[#71717a] bg-[#f4f4f5]' },
   LITE:      { label: 'Lite',      color: 'text-[#0066ff] bg-[#eff6ff]' },
-  PRO:       { label: 'Pro',       color: 'text-[#7c3aed] bg-[#f5f3ff]' },
-  UNLIMITED: { label: 'Unlimited', color: 'text-[#059669] bg-[#ecfdf5]' },
+  PRO:       { label: 'Creator',   color: 'text-[#7c3aed] bg-[#f5f3ff]' },
+  UNLIMITED: { label: 'Studio',    color: 'text-[#059669] bg-[#ecfdf5]' },
 }
 
-export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: Props) {
+const DEMO_EMAIL = 'alstnwjd0424@gmail.com'
+
+export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, hasSubscription, paymentProvider }: Props) {
   const [open, setOpen] = useState(false)
   const [key, setKey] = useState<string | null>(null)
   const [keyLoaded, setKeyLoaded] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [revealed, setRevealed] = useState(false)
+  const [canceling, setCanceling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  // 드로어 열릴 때 키 fetch
+  // 구독 취소 버튼 노출 조건: 구독 중이거나 데모 계정
+  const showCancelBtn = hasSubscription || userEmail === DEMO_EMAIL
+
   useEffect(() => {
     if (!open || keyLoaded) return
     fetch('/api/mcp/key')
@@ -35,19 +43,15 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: 
       .finally(() => setKeyLoaded(true))
   }, [open, keyLoaded])
 
-  // 외부 클릭 닫기
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // ESC 닫기
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('keydown', handler)
@@ -77,6 +81,28 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: 
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const cancelSubscription = async () => {
+    if (!confirm('구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 계속하시겠습니까?')) return
+    setCanceling(true)
+    setCancelError('')
+    try {
+      const endpoint = paymentProvider === 'nicepay'
+        ? '/api/payments/nicepay/cancel'
+        : '/api/paypal/cancel'
+      const res = await fetch(endpoint, { method: 'POST' })
+      const data = await res.json() as { error?: string }
+      if (!res.ok) {
+        setCancelError(data.error || '구독 취소에 실패했습니다.')
+      } else {
+        window.location.reload()
+      }
+    } catch {
+      setCancelError('네트워크 오류가 발생했습니다.')
+    } finally {
+      setCanceling(false)
+    }
+  }
+
   const plan = PLAN_LABELS[userPlan] ?? PLAN_LABELS.FREE
   const displayName = userName || userEmail
   const initials = (userName || userEmail).slice(0, 2).toUpperCase()
@@ -84,7 +110,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: 
 
   return (
     <>
-      {/* 트리거 — 사용자 이름 영역 */}
+      {/* 트리거 */}
       <button
         onClick={() => setOpen(true)}
         className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-[#f0f0f0]"
@@ -98,10 +124,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: 
         </div>
       </button>
 
-      {/* 오버레이 */}
-      {open && (
-        <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" />
-      )}
+      {open && <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" />}
 
       {/* 드로어 */}
       <div
@@ -146,6 +169,34 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt }: 
               <a href="/billing" className="text-[#0066ff] hover:underline">플랜 변경 →</a>
             </div>
           </div>
+
+          {/* 구독 취소 */}
+          {showCancelBtn && (
+            <div className="mt-4">
+              {cancelError && (
+                <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-[11px] text-red-600">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  {cancelError}
+                </div>
+              )}
+              <button
+                onClick={cancelSubscription}
+                disabled={canceling || !hasSubscription}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 py-2 text-[12px] font-medium text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+              >
+                {canceling ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <X className="h-3.5 w-3.5" />
+                )}
+                {canceling ? '처리 중…' : '구독 취소하기'}
+              </button>
+              <p className="mt-1.5 text-[10px] leading-relaxed text-[#a1a1aa]">
+                취소 즉시 유료 기능 이용이 중단됩니다.{' '}
+                <a href="/ko/refund" target="_blank" className="underline hover:text-[#71717a]">환불 정책 보기</a>
+              </p>
+            </div>
+          )}
         </div>
 
         {/* MCP API 키 */}
