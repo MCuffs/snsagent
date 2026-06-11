@@ -66,6 +66,9 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
             <Link href={`${prefix}/privacy`} className="hover:text-[#171714]">
               {showKoreanBusinessInfo ? '개인정보처리방침' : 'Privacy'}
             </Link>
+            <Link href={`${prefix}/refund`} className="hover:text-[#171714]">
+              {showKoreanBusinessInfo ? '환불 정책' : 'Refund Policy'}
+            </Link>
           </div>
         </div>
         {showKoreanBusinessInfo && (
