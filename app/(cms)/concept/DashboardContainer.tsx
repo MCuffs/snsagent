@@ -8,13 +8,9 @@ import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
 import PainterDashboard from '../painter/PainterDashboard'
-import InstagramDashboard from '../instagram/InstagramDashboard'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { CheckCircle2, Globe, TrendingUp } from 'lucide-react'
-
-// Instagram 기능 테스트용 허용 이메일
-const INSTAGRAM_ALLOWED_EMAILS = ['alstnwjd0424@gmail.com']
 
 interface BrandProfileData {
   id: string
@@ -69,7 +65,6 @@ export default function DashboardContainer({
   const t = useTranslations('concept')
   const searchParams = useSearchParams()
   const urlBrandId = searchParams?.get('brandId') || null
-  const hasInstagramAccess = userEmail ? INSTAGRAM_ALLOWED_EMAILS.includes(userEmail) : false
   const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
 
@@ -225,17 +220,6 @@ export default function DashboardContainer({
           className="h-full"
         >
           <PainterDashboard brand={brandToPass} />
-        </motion.div>
-      )}
-
-      {activeTab === 'instagram' && hasInstagramAccess && brandToPass && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
-          <InstagramDashboard brandId={brandToPass.id} userEmail={userEmail || ''} />
         </motion.div>
       )}
     </div>

@@ -43,7 +43,7 @@ const CONFIG_SNIPPET = `{
 const TOOLS = [
   { name: 'generate_card_news', descKo: '주제와 브랜드 톤을 입력하면 카드뉴스 슬라이드를 자동 생성합니다.', descEn: 'Generate card news slides from a topic and brand tone.' },
   { name: 'list_card_news', descKo: '내 계정에 저장된 카드뉴스 목록을 가져옵니다.', descEn: 'List all card news saved in your account.' },
-  { name: 'publish_to_instagram', descKo: '완성된 카드뉴스를 Instagram에 자동으로 업로드합니다.', descEn: 'Publish a finished card news directly to Instagram.' },
+  { name: 'download_card_news', descKo: '완성된 카드뉴스를 ZIP 파일로 다운로드합니다.', descEn: 'Download a finished card news as a ZIP file.' },
 ]
 
 export default async function McpPage({ params }: { params: Promise<{ locale: string }> }) {

@@ -38,7 +38,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Nav */}
-          <SidebarNav hasCompleteBrand={hasCompleteBrand} userEmail={user.email} />
+          <SidebarNav hasCompleteBrand={hasCompleteBrand} />
 
         {/* User + Plan */}
         <div className="border-t border-[#e4e4e7] p-3 space-y-1.5">
@@ -68,7 +68,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         {/* Mobile Header Drawer */}
         <MobileHeader>
           <div className="flex flex-col h-full justify-between pb-4">
-            <SidebarNav hasCompleteBrand={hasCompleteBrand} userEmail={user.email} />
+            <SidebarNav hasCompleteBrand={hasCompleteBrand} />
             
             <div className="border-t border-[#e4e4e7] p-3 space-y-1.5 mt-auto">
               <Link

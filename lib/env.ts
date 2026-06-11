@@ -11,30 +11,6 @@ export function isTruthyEnv(name: string) {
   return value === 'true' || value === '1' || value === 'yes'
 }
 
-export function isInstagramMockMode() {
-  return isTruthyEnv('INSTAGRAM_MOCK_MODE')
-}
-
-export function getInstagramAccountId() {
-  return readEnv('INSTAGRAM_ACCOUNT_ID') || 'mock_account_id'
-}
-
-export function getInstagramAccessToken() {
-  return readEnv('INSTAGRAM_ACCESS_TOKEN') || 'mock_access_token'
-}
-
-export function getMetaAppId() {
-  return readEnv('META_APP_ID')
-}
-
-export function getMetaAppSecret() {
-  return readEnv('META_APP_SECRET')
-}
-
-export function getMetaApiVersion() {
-  return readEnv('META_API_VERSION') || 'v19.0'
-}
-
 export function getGoogleClientId() {
   return readEnv('GOOGLE_CLIENT_ID')
 }

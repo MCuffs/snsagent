@@ -45,11 +45,11 @@ const DEMOS_KO: ChatDemo[] = [
   {
     client: 'claude',
     messages: [
-      { role: 'user', content: '오늘 서울 카페 추천 콘텐츠 카드뉴스 만들고, 완성되면 인스타그램에 바로 올려줘.' },
+      { role: 'user', content: '오늘 서울 카페 추천 콘텐츠 카드뉴스 만들어줘.' },
       {
         role: 'assistant',
-        toolCall: 'shuffla › generate_card_news → publish_to_instagram',
-        content: '카드뉴스 생성 후 Instagram 게시까지 완료했어요! 방금 업로드된 게시물은 인스타그램 앱에서 바로 확인하실 수 있습니다.',
+        toolCall: 'shuffla › generate_card_news',
+        content: '카드뉴스 생성 완료했어요! 다운로드하거나 직접 편집할 수 있습니다.',
         images: [{ src: '/mcp-demo/food-cafe.png', alt: '서울 카페 추천 카드뉴스' }],
       },
     ],
@@ -102,11 +102,11 @@ const DEMOS_EN: ChatDemo[] = [
   {
     client: 'claude',
     messages: [
-      { role: 'user', content: 'Create a Seoul cafe recommendation card news, then publish it directly to Instagram when done.' },
+      { role: 'user', content: 'Create a Seoul cafe recommendation card news.' },
       {
         role: 'assistant',
-        toolCall: 'shuffla › generate_card_news → publish_to_instagram',
-        content: 'All done — card news generated and published to Instagram! You can check the live post in your Instagram app right now.',
+        toolCall: 'shuffla › generate_card_news',
+        content: 'Generated! The Seoul cafe recommendation card news is ready to download or edit.',
         images: [{ src: '/mcp-demo/food-cafe.png', alt: 'Seoul cafe card news' }],
       },
     ],
