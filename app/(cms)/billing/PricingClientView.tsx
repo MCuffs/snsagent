@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Check, CreditCard, Loader2, X } from 'lucide-react'
 import { FUNDING, PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js'
@@ -97,8 +98,7 @@ function PricingGrid({
   const [cardModalPlan, setCardModalPlan] = useState<string | null>(null)
 
   // Locale-based payment method determination
-  // NicePay 일시 중단 — 준비중
-  const showNicePay = false
+  const showNicePay = locale === 'ko' && Boolean(nicepayClientKey)
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
 
   // Google Ads conversion tracking
@@ -351,8 +351,13 @@ function PricingGrid({
                       </span>
                     )}
                   </div>
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold tracking-tight text-slate-900">{planPrice}</span>
+                  <div className="mt-6">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold tracking-tight text-slate-900">{planPrice}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isEnglish ? 'VAT included' : '부가세 포함'}
+                    </p>
                   </div>
                 </div>
 
@@ -426,6 +431,7 @@ function PricingGrid({
           processing={processingPayment !== null}
           onSubmit={handleCardDirectPayment}
           onClose={() => setCardModalPlan(null)}
+          locale={locale}
         />
       )}
     </div>
@@ -439,6 +445,7 @@ function PayPalSubscribeButton({
   currentPlan,
   onSuccess,
   onError,
+  locale = 'ko',
 }: {
   planKey: string
   planId: string
@@ -446,9 +453,11 @@ function PayPalSubscribeButton({
   currentPlan: string
   onSuccess: () => void
   onError: (message: string) => void
+  locale?: string
 }) {
   const [{ isPending }] = usePayPalScriptReducer()
   const t = useTranslations('billing')
+  const [agreed, setAgreed] = useState(false)
 
   const createSubscription = useCallback(
     (_data: Record<string, unknown>, actions: { subscription: { create: (options: object) => Promise<string> } }) => {
@@ -495,19 +504,67 @@ function PayPalSubscribeButton({
   }
 
   return (
-    <div>
-      <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">{t('paypal_label')}</p>
-      <PayPalButtons
-        fundingSource={FUNDING.PAYPAL}
-        forceReRender={[planId, userId]}
-        style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
-        createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
-        onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
-        onError={() => {
-          analytics.paymentFailed(planKey, 'paypal', 'paypal_sdk_error', { subscription_id: planId })
-          onError(t('paypal_error'))
-        }}
-      />
+    <div className="space-y-3">
+      {/* Checkbox for PayPal */}
+      <div className="flex items-start gap-2 px-1 text-left">
+        <input
+          type="checkbox"
+          id={`paypal-agree-${planKey}`}
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className="mt-1 h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+        />
+        <label htmlFor={`paypal-agree-${planKey}`} className="text-xs leading-normal text-slate-500">
+          {locale === 'en' ? (
+            <>
+              I agree to the{' '}
+              <Link href={`/${locale}/terms`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                Terms
+              </Link>
+              ,{' '}
+              <Link href={`/${locale}/privacy`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                Privacy
+              </Link>
+              , and{' '}
+              <Link href={`/${locale}/refund`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                Refund Policy
+              </Link>
+              . (Required)
+            </>
+          ) : (
+            <>
+              정기 결제 진행을 위해{' '}
+              <Link href={`/${locale}/terms`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                이용약관
+              </Link>
+              ,{' '}
+              <Link href={`/${locale}/privacy`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                개인정보처리방침
+              </Link>
+              ,{' '}
+              <Link href={`/${locale}/refund`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                환불 정책
+              </Link>
+              을 모두 확인하였으며 이에 동의합니다. (필수)
+            </>
+          )}
+        </label>
+      </div>
+
+      <div className={agreed ? '' : 'pointer-events-none opacity-40'}>
+        <p className="mb-2 text-center text-xs font-bold text-[#6f6a61]">{t('paypal_label')}</p>
+        <PayPalButtons
+          fundingSource={FUNDING.PAYPAL}
+          forceReRender={[planId, userId, agreed]}
+          style={{ layout: 'vertical', color: 'gold', shape: 'rect', height: 40, label: 'subscribe' }}
+          createSubscription={createSubscription as Parameters<typeof PayPalButtons>[0]['createSubscription']}
+          onApprove={onApprove as Parameters<typeof PayPalButtons>[0]['onApprove']}
+          onError={() => {
+            analytics.paymentFailed(planKey, 'paypal', 'paypal_sdk_error', { subscription_id: planId })
+            onError(t('paypal_error'))
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -565,11 +622,13 @@ function CardInfoModal({
   processing,
   onSubmit,
   onClose,
+  locale = 'ko',
 }: {
   planKey: string
   processing: boolean
   onSubmit: (data: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }) => void
   onClose: () => void
+  locale?: string
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const [cardNo, setCardNo] = useState('')
@@ -577,10 +636,15 @@ function CardInfoModal({
   const [idNo, setIdNo] = useState('')
   const [cardPw, setCardPw] = useState('')
   const [formError, setFormError] = useState('')
+  const [agreed, setAgreed] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
+    if (!agreed) {
+      setFormError(locale === 'en' ? 'Please agree to the terms.' : '이용약관 및 환불정책 동의에 체크해주세요.')
+      return
+    }
     const rawCard = cardNo.replace(/-/g, '')
     if (!/^\d{14,16}$/.test(rawCard)) { setFormError('카드번호를 올바르게 입력해 주세요.'); return }
     if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
@@ -680,13 +744,60 @@ function CardInfoModal({
             <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</p>
           )}
 
+          {/* Agreement Checkbox */}
+          <div className="flex items-start gap-2.5 py-1">
+            <input
+              type="checkbox"
+              id="payment-agree-modal"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              required
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+            />
+            <label htmlFor="payment-agree-modal" className="text-xs leading-normal text-slate-500">
+              {locale === 'en' ? (
+                <>
+                  I agree to the{' '}
+                  <Link href={`/${locale}/terms`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    Terms
+                  </Link>
+                  ,{' '}
+                  <Link href={`/${locale}/privacy`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    Privacy
+                  </Link>
+                  , and{' '}
+                  <Link href={`/${locale}/refund`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    Refund Policy
+                  </Link>
+                  . (Required)
+                </>
+              ) : (
+                <>
+                  정기 결제 진행을 위해{' '}
+                  <Link href={`/${locale}/terms`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    이용약관
+                  </Link>
+                  ,{' '}
+                  <Link href={`/${locale}/privacy`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    개인정보처리방침
+                  </Link>
+                  ,{' '}
+                  <Link href={`/${locale}/refund`} target="_blank" className="font-semibold text-slate-700 underline underline-offset-2 hover:text-[#ff6b35]">
+                    환불 정책
+                  </Link>
+                  을 모두 확인하였으며 이에 동의합니다. (필수)
+                </>
+              )}
+            </label>
+          </div>
+
           <p className="text-xs text-slate-400">
             카드 정보는 나이스페이 보안 서버로 직접 전송되며 Shuffla 서버에 저장되지 않습니다.
           </p>
 
           <button
             type="submit"
-            disabled={processing}
+            disabled={processing || !agreed}
             className="w-full rounded-xl bg-slate-900 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
           >
             {processing ? (

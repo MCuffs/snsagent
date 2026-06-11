@@ -162,12 +162,19 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
                   {/* Price */}
                   <div className="mt-4">
-                    <span className={`text-[38px] font-black tracking-[-0.045em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
-                      {plan.price}
-                    </span>
-                    <span className={`ml-2 text-[13px] ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
-                      {plan.priceNote}
-                    </span>
+                    <div className="flex items-baseline">
+                      <span className={`text-[38px] font-black tracking-[-0.045em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                        {plan.price}
+                      </span>
+                      <span className={`ml-2 text-[13px] ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
+                        {plan.priceNote}
+                      </span>
+                    </div>
+                    {plan.key !== 'free' && plan.key !== 'enterprise' && (
+                      <p className={`mt-1 text-[11px] ${plan.highlight ? 'text-white/60' : 'text-[#71717a]'}`}>
+                        {isEn ? 'VAT included' : '부가세 포함'}
+                      </p>
+                    )}
                   </div>
 
                   {/* Divider */}
