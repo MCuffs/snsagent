@@ -12,7 +12,7 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
   useEffect(() => {
     fetch('/api/mcp/key')
       .then((r) => r.json())
-      .then((d) => setKey(d.key))
+      .then((d) => { if (!d.unavailable) setKey(d.key) })
       .finally(() => setLoading(false))
   }, [])
 
