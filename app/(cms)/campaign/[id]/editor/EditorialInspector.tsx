@@ -240,26 +240,6 @@ function DragNumberInput({
   label?: string
   className?: string
 }) {
-  const startRef = useRef<{ y: number; value: number } | null>(null)
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    startRef.current = { y: e.clientY, value }
-    const onMove = (me: MouseEvent) => {
-      if (!startRef.current) return
-      const delta = Math.round((startRef.current.y - me.clientY) / 2)
-      const next = Math.min(max, Math.max(min, startRef.current.value + delta))
-      onChange(next)
-    }
-    const onUp = () => {
-      startRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
-
   return (
     <input
       type="number"
@@ -268,9 +248,7 @@ function DragNumberInput({
       min={min}
       max={max}
       onChange={e => onChange(Math.min(max, Math.max(min, Number(e.target.value))))}
-      onMouseDown={handleMouseDown}
-      title="위아래로 드래그해서 크기 조절"
-      className={`cursor-ns-resize select-none ${className ?? ''}`}
+      className={className ?? ''}
     />
   )
 }
@@ -791,7 +769,7 @@ function mergeTemplateIntoDocument(current: EditorialDocument, template: Editori
   const merged = template.layers.map(tLayer => {
     const existing = currentById.get(tLayer.id)
     if (!existing) return tLayer
-    return { ...tLayer, text: existing.text, imageUrl: existing.imageUrl }
+    return { ...tLayer, text: existing.text, textHtml: existing.textHtml, imageUrl: existing.imageUrl }
   })
   const templateIds = new Set(template.layers.map(l => l.id))
   const extra = current.layers.filter(l => !templateIds.has(l.id))
@@ -800,10 +778,6 @@ function mergeTemplateIntoDocument(current: EditorialDocument, template: Editori
 
 function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[11px] font-bold ${active ? 'bg-[#0066ff]/8 text-[#0066ff]' : 'text-[#746a62] hover:bg-[#faf8f4]'}`}>{icon}{label}</button>
-}
-
-function Segment({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`flex-1 rounded-md py-2 text-xs font-bold ${active ? 'bg-white text-[#111318] shadow-sm' : 'text-[#746a62]'}`}>{children}</button>
 }
 
 function OptionGroup({ title, children }: { title: string; children: React.ReactNode }) {
@@ -816,23 +790,6 @@ function Choice({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function RangeControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
   return <label className="block text-xs font-bold text-[#514a44]"><span className="mb-2 flex justify-between"><span>{label}</span><span className="text-[#746a62]">{value}</span></span><input type="range" value={value} min={min} max={max} onChange={event => onChange(Number(event.target.value))} className="w-full accent-[#0066ff]" /></label>
-}
-
-function ToggleButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold transition-colors ${
-        active
-          ? 'border-[#0066ff] bg-[#0066ff]/8 text-[#0066ff]'
-          : 'border-[#e8dfd4] text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff]'
-      }`}
-    >
-      {children}
-    </button>
-  )
 }
 
 function NumberControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {

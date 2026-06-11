@@ -9,6 +9,92 @@ import type { EditorialLayer, FontPreset } from '../../../../../src/lib/editor/t
 
 const SCALE = 0.5
 
+function closestEditableFromSelection(layerId?: string | null) {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null
+  const range = sel.getRangeAt(0)
+  const container = range.commonAncestorContainer
+  const start = container instanceof Element ? container : container.parentElement
+  const editable = start?.closest('[contenteditable="true"]') as HTMLDivElement | null
+  if (!editable) return null
+  if (layerId && editable.dataset.editorialLayerId !== layerId) return null
+  return editable
+}
+
+function serializeEditableContent(editable: HTMLDivElement) {
+  const clone = editable.cloneNode(true) as HTMLDivElement
+  clone.querySelectorAll('[style]').forEach(node => {
+    const element = node as HTMLElement
+    const fontSize = element.dataset.fontSize || element.style.fontSize.replace('px', '')
+    element.removeAttribute('style')
+    if (fontSize && Number.isFinite(Number(fontSize))) {
+      element.dataset.fontSize = String(Math.round(Number(fontSize) / (Number(fontSize) > 80 ? SCALE : 1)))
+    }
+  })
+  clone.querySelectorAll('script,style').forEach(node => node.remove())
+  clone.querySelectorAll('*').forEach(node => {
+    const element = node as HTMLElement
+    Array.from(element.attributes).forEach(attribute => {
+      const keep =
+        attribute.name === 'data-font-size' ||
+        (element.tagName === 'A' && attribute.name === 'href')
+      if (!keep) element.removeAttribute(attribute.name)
+    })
+  })
+  const text = editable.innerText.replace(/\n$/, '')
+  const textHtml = clone.innerHTML
+  return { text, textHtml: textHtml && textHtml !== text ? textHtml : undefined }
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+    .replace(/\n/g, '<br>')
+}
+
+export function richTextHtmlForEditor(layer: EditorialLayer, scale = SCALE) {
+  const source = layer.textHtml || escapeHtml(layer.text || '')
+  if (typeof window === 'undefined') return source
+  const template = document.createElement('template')
+  template.innerHTML = source
+  template.content.querySelectorAll('script,style').forEach(node => node.remove())
+  template.content.querySelectorAll('*').forEach(node => {
+    const element = node as HTMLElement
+    Array.from(element.attributes).forEach(attribute => {
+      if (attribute.name !== 'data-font-size') element.removeAttribute(attribute.name)
+    })
+    const fontSize = Number(element.dataset.fontSize)
+    if (Number.isFinite(fontSize) && fontSize >= 10 && fontSize <= 180) {
+      element.style.fontSize = `${fontSize * scale}px`
+    }
+  })
+  return template.innerHTML
+}
+
+function applyFontSizeToSelection(fontSize: number, layerId: string | null, onCommit: (text: string, textHtml?: string) => void) {
+  const editable = closestEditableFromSelection(layerId)
+  const sel = window.getSelection()
+  if (!editable || !sel || sel.rangeCount === 0) return false
+
+  const range = sel.getRangeAt(0)
+  const wrapper = document.createElement('span')
+  wrapper.dataset.fontSize = String(fontSize)
+  wrapper.style.fontSize = `${fontSize * SCALE}px`
+  wrapper.append(range.extractContents())
+  range.insertNode(wrapper)
+  range.selectNodeContents(wrapper)
+  sel.removeAllRanges()
+  sel.addRange(range)
+
+  const serialized = serializeEditableContent(editable)
+  onCommit(serialized.text, serialized.textHtml)
+  return true
+}
+
 // ─── Floating bold/italic/underline toolbar (editing mode only) ───────────────
 function SelectionToolbar({ slideId, editingLayerId }: { slideId: string; editingLayerId: string | null }) {
   const t = useTranslations('campaign')
@@ -18,7 +104,7 @@ function SelectionToolbar({ slideId, editingLayerId }: { slideId: string; editin
   const updateLayer = useEditorialStore(state => state.updateLayer)
 
   useEffect(() => {
-    if (!editingLayerId) { setPos(null); return }
+    if (!editingLayerId) return
     const update = () => {
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); return }
@@ -38,16 +124,22 @@ function SelectionToolbar({ slideId, editingLayerId }: { slideId: string; editin
 
   const layer = selectedLayerId ? documents[slideId]?.layers.find(l => l.id === selectedLayerId) : null
 
+  const commitEditable = () => {
+    const editable = closestEditableFromSelection(editingLayerId)
+    if (!editable || !editingLayerId) return
+    const serialized = serializeEditableContent(editable)
+    updateLayer(slideId, editingLayerId, serialized)
+  }
+
   const applyStyle = (command: 'bold' | 'italic' | 'underline') => {
     document.execCommand(command)
-    if (!layer || !selectedLayerId) return
-    if (command === 'bold') {
-      updateLayer(slideId, selectedLayerId, { fontWeight: (layer.fontWeight ?? 400) >= 700 ? 400 : 700 })
-    } else if (command === 'italic') {
-      updateLayer(slideId, selectedLayerId, { italic: !layer.italic })
-    } else if (command === 'underline') {
-      updateLayer(slideId, selectedLayerId, { underline: !layer.underline })
-    }
+    commitEditable()
+  }
+
+  const adjustSelectionFontSize = (delta: number) => {
+    if (!layer || !editingLayerId) return
+    const next = Math.min(180, Math.max(10, Math.round((layer.fontSize || 24) + delta)))
+    applyFontSizeToSelection(next, editingLayerId, (text, textHtml) => updateLayer(slideId, editingLayerId, { text, textHtml }))
   }
 
   const isBold = (layer?.fontWeight ?? 400) >= 700
@@ -71,6 +163,15 @@ function SelectionToolbar({ slideId, editingLayerId }: { slideId: string; editin
       <button type="button" onClick={() => applyStyle('underline')} title={t('underline')}
         className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${isUnderline ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}>
         <Underline className="h-3.5 w-3.5" />
+      </button>
+      <span className="mx-1 h-5 w-px bg-white/15" />
+      <button type="button" onClick={() => adjustSelectionFontSize(-4)} title="선택 글자 작게"
+        className="flex h-7 w-7 items-center justify-center rounded text-[11px] font-black text-white/80 transition-colors hover:bg-white/15 hover:text-white">
+        A-
+      </button>
+      <button type="button" onClick={() => adjustSelectionFontSize(4)} title="선택 글자 크게"
+        className="flex h-7 w-7 items-center justify-center rounded text-[11px] font-black text-white/80 transition-colors hover:bg-white/15 hover:text-white">
+        A+
       </button>
     </div>
   )
@@ -236,7 +337,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
   const [failedBackgroundUrl, setFailedBackgroundUrl] = useState<string | null>(null)
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null)
-  const isResizing = useRef(false)
+  const [isResizing, setIsResizing] = useState(false)
   const stageRef = useRef<HTMLDivElement>(null)
 
   // Escape → exit editing mode
@@ -351,7 +452,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
         {elements.map(layer => {
           const isEditing = editingLayerId === layer.id
           const isSelected = selectedLayerId === layer.id
-          const canDrag = !layer.locked && !isEditing && !isResizing.current
+          const canDrag = !layer.locked && !isEditing && !isResizing
           const showHandles = isSelected && !isEditing && !['background', 'overlay'].includes(layer.type)
 
           return (
@@ -424,7 +525,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                 key={layer.id}
                 layer={layer}
                 editing={isEditing}
-                onText={text => updateLayer(slideId, layer.id, { text })}
+                onText={(text, textHtml) => updateLayer(slideId, layer.id, { text, textHtml })}
                 onEditingStart={() => setEditingLayerId(layer.id)}
                 onEditingEnd={() => setEditingLayerId(null)}
               />
@@ -432,8 +533,8 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                 <ResizeHandles
                   layer={layer}
                   onResize={(w, h, x, y) => updateLayer(slideId, layer.id, { width: w, height: h, x, y })}
-                  onResizeStart={() => { isResizing.current = true }}
-                  onResizeEnd={() => { isResizing.current = false }}
+                  onResizeStart={() => setIsResizing(true)}
+                  onResizeEnd={() => setIsResizing(false)}
                 />
               )}
             </motion.div>
@@ -470,7 +571,7 @@ function LayerContent({
 }: {
   layer: EditorialLayer
   editing: boolean
-  onText: (text: string) => void
+  onText: (text: string, textHtml?: string) => void
   onEditingStart: () => void
   onEditingEnd: () => void
 }) {
@@ -534,20 +635,20 @@ function LayerContent({
       // ✅ 핵심 수정: 키 입력마다 실시간으로 store에 텍스트 동기화
       // onBlur만 쓰던 구조에서는 blur 전에 다운로드하면 구버전 텍스트가 export되는 버그 발생
       onInput={e => {
-        const text = (e.currentTarget as HTMLDivElement).innerText.replace(/\n$/, '')
-        onText(text)
+        const serialized = serializeEditableContent(e.currentTarget as HTMLDivElement)
+        onText(serialized.text, serialized.textHtml)
       }}
       onBlur={e => {
         // onInput이 이미 처리하지만 blur 시점에도 최종 한 번 더 flush
-        const text = e.currentTarget.innerText.replace(/\n$/, '')
-        onText(text)
+        const serialized = serializeEditableContent(e.currentTarget)
+        onText(serialized.text, serialized.textHtml)
         onEditingEnd()
       }}
       onKeyDown={e => {
         if (e.key === 'Escape') {
           e.preventDefault()
-          const text = (e.target as HTMLDivElement).innerText.replace(/\n$/, '')
-          onText(text)
+          const serialized = serializeEditableContent(e.currentTarget)
+          onText(serialized.text, serialized.textHtml)
           e.currentTarget.blur()
           onEditingEnd()
         }
@@ -572,9 +673,8 @@ function LayerContent({
         userSelect: 'text',
         pointerEvents: 'auto',
       }}
-    >
-      {layer.text}
-    </div>
+      dangerouslySetInnerHTML={{ __html: richTextHtmlForEditor(layer) }}
+    />
   )
 }
 

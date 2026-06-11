@@ -44,6 +44,7 @@ export interface EditorialLayer {
   borderRadius?: number   // 0–50 (%) for image layers
   edgeFade?: number       // 0–100 — radial mask fade from edge inward
   text?: string
+  textHtml?: string
   imageUrl?: string | null
   fontPreset?: FontPreset
   fontSize?: number

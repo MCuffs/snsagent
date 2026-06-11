@@ -6,6 +6,8 @@ import { formatBrandDnaForPrompt } from '../../../../lib/brand-dna'
 import { collectBrandUrlContext } from '../../../../lib/brand-url-collector'
 import { analyzePurchasePersuasionWithOpenAI, formatPurchasePersuasionForPrompt } from '../../../../lib/purchase-persuasion'
 import { extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
+import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
+import { repairRenderableCopy } from '../../../../src/lib/copywriting/renderableCopy'
 import { getCopywritingModel } from '../../../../src/lib/ai/llmClient'
 import {
   getOpenAIBaseURLHost,
@@ -51,6 +53,7 @@ interface GenerateParams {
   reasonForStyle?: string
   structurePreview?: { slideNumber: number; role: string; description: string }[]
   draftSlides?: DraftSlide[]
+  refinementOptions?: ClarificationOption[]
 }
 
 interface ClarificationOption {
@@ -74,6 +77,116 @@ interface AgentResponse {
 
 const VISUAL_HINT_OPTIONS = ['dark-editorial', 'trend-feed', 'community-style', 'minimal-clean', 'breaking-news']
 
+function getAgentDraftCopyConstraints(language: 'ko' | 'en' = 'ko') {
+  return language === 'en'
+    ? {
+      maxHeadlineChars: 40,
+      maxBodyChars: 130,
+      maxBodyLines: 3,
+      lineLength: 34,
+    }
+    : {
+      maxHeadlineChars: 22,
+      maxBodyChars: 85,
+      maxBodyLines: 3,
+      lineLength: 20,
+    }
+}
+
+function buildAgentResearchTopic(lastUserText: string, allUserText: string) {
+  const clean = (text: string) => text
+    .replace(/https?:\/\/[^\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const last = clean(lastUserText)
+  if (last.length >= 8 && !/^(ㅇ+|네|예|응|좋아|ㄱㄱ|고고)$/u.test(last)) {
+    return last.slice(0, 220)
+  }
+
+  return clean(allUserText).slice(-220)
+}
+
+function hasPriorDraftContext(messages: ChatMessage[]) {
+  return messages.some(message => (
+    message.role === 'assistant' &&
+    (
+      message.content.includes('[Existing draft slides]') ||
+      message.content.includes('[기존 카피 초안]')
+    )
+  ))
+}
+
+function stripAgentMemoryContext(content: string) {
+  return content
+    .replace(/\n?\[Existing draft slides\][\s\S]*$/u, '')
+    .replace(/\n?\[기존 카피 초안\][\s\S]*$/u, '')
+}
+
+function isNewTopicRequest(text: string) {
+  const trimmed = text.replace(/\s+/g, ' ').trim()
+  const compact = trimmed.replace(/\s+/g, '').toLowerCase()
+  if (!compact) return false
+  if (/https?:\/\//i.test(text)) return true
+  if (/새주제|다른주제|주제변경|처음부터|완전히새로|이거말고|이것말고|아니이거말고|newtopic|differenttopic|startover/.test(compact)) {
+    return true
+  }
+
+  const styleOnly = /(톤|문구|제목|본문|헤드라인|바디|슬라이드|페이지|장|길이|말투|표현|분위기|색감|스타일|headline|body|tone|style|slide|page)/.test(compact)
+  if (styleOnly) return false
+
+  return /[가-힣A-Za-z0-9]{2,}(?:이슈|뉴스|트렌드|논란|정보|사건|제품|브랜드)?(?:으로|로)(?:바꿔|변경|해줘|가자|진행)/.test(compact)
+}
+
+function isLightweightRevisionRequest(text: string) {
+  const normalized = text.replace(/\s+/g, '').toLowerCase()
+  if (!normalized) return true
+  if (/^(ㅇ+|ㄱㄱ|고고|좋아|좋음|네|예|응|오케이|ok|okay|yes|go)$/.test(normalized)) return true
+
+  return /수정|바꿔|변경|줄여|늘려|짧게|길게|톤|문구|제목|본문|슬라이드|페이지|장|더|다시|edit|revise|change|shorter|longer|tone|headline|body/.test(normalized)
+}
+
+function normalizeGeneralProfileCategory(value?: string | null) {
+  if (value === 'current-affairs' || value === 'information' || value === 'trends') return value
+  return 'information'
+}
+
+function buildKoreanGeneralModeInstruction(category: string) {
+  switch (normalizeGeneralProfileCategory(category)) {
+    case 'current-affairs':
+      return [
+        '이 콘텐츠는 시사 프로필 기반 카드뉴스입니다.',
+        '목표는 사건, 정책, 사회 이슈의 사실관계와 배경, 핵심 쟁점, 영향을 독자가 균형 있게 이해하고 저장하게 만드는 것입니다.',
+        '정치적 단정이나 과장 없이 확인된 근거와 아직 봐야 할 대목을 분리해 설명하세요.',
+      ].join('\n')
+    case 'trends':
+      return [
+        '이 콘텐츠는 트렌드 프로필 기반 카드뉴스입니다.',
+        '목표는 사람들이 요즘 왜 반응하는지, 어떤 문화/소비/콘텐츠 흐름이 생겼는지, 독자가 어떻게 활용하거나 관찰하면 좋은지 보여주는 것입니다.',
+        '뉴스 해설처럼 쟁점만 정리하지 말고, 변화의 신호, 반응 포인트, 실전 적용 관점 중심으로 흐름을 설계하세요.',
+      ].join('\n')
+    case 'information':
+    default:
+      return [
+        '이 콘텐츠는 정보/테크 프로필 기반 카드뉴스입니다.',
+        '목표는 독자가 개념, 변화, 사용법, 체크포인트를 빠르게 이해하고 실제 판단이나 행동에 활용하게 만드는 것입니다.',
+        '딱딱한 백과사전식 설명보다 문제, 원리, 비교 기준, 실용 포인트 중심으로 흐름을 설계하세요.',
+      ].join('\n')
+  }
+}
+
+function buildEnglishGeneralModeInstruction(category: string) {
+  switch (normalizeGeneralProfileCategory(category)) {
+    case 'current-affairs':
+      return 'This is a current-affairs carousel. Help readers understand verified facts, background, key tensions, and impact without partisan certainty or unsupported claims.'
+    case 'trends':
+      return 'This is a trend carousel. Explain why people are reacting now, what cultural/consumer/content signals are emerging, and how readers can interpret or apply the trend. Do not make it feel like a hard-news explainer.'
+    case 'information':
+    default:
+      return 'This is an information or tech carousel. Help readers understand the concept, change, use case, checklist, or decision criteria in a practical, easy-to-apply way.'
+  }
+}
+
 function buildSystemPrompt(
   brand: {
     name: string
@@ -91,14 +204,9 @@ function buildSystemPrompt(
 ) {
   const isGeneral = generationMode === 'general'
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
-  const turnsLeft = Math.max(0, 3 - (userTurnCount ?? 0))
-  const roundGuidance = turnsLeft > 0
-    ? (language === 'en'
-      ? `\n## Briefing Round Control\nThe user has answered ${userTurnCount ?? 0} briefing rounds. If the accumulated briefing is still missing audience, angle, evidence, or desired action, ask one concrete follow-up with 3-4 options. Do not repeat a question focus already asked in the conversation. If the briefing is specific enough, return ready:true.\n`
-      : `\n## 브리핑 라운드 제어\n사용자가 브리핑 ${userTurnCount ?? 0}라운드에 답했습니다. 누적 브리핑에 독자·관점·근거·행동 유도 중 부족한 축이 남아 있을 때만 추가 질문을 하세요. 이미 물어본 질문 축을 반복하지 말고, 충분히 구체적이면 ready:true를 반환하세요.\n`)
-    : (language === 'en'
-      ? `\n## Briefing Round Control\nThe user has completed all 3 required briefing rounds. You may now set ready:true and return the full params.\n`
-      : `\n## 브리핑 라운드 제어\n사용자가 필수 브리핑 3라운드를 모두 완료했습니다. 이제 ready:true와 함께 전체 params를 반환할 수 있습니다.\n`)
+  const briefingGuidance = language === 'en'
+    ? `The user has sent ${userTurnCount ?? 0} request turn(s). Prefer one-pass planning: if the request has a usable topic, return ready:true with a complete strategy and draftSlides. Ask one clarification only when the topic is too vague to produce useful copy.`
+    : `사용자가 요청을 ${userTurnCount ?? 0}번 보냈습니다. 기본은 원패스 기획입니다. 주제가 카드뉴스로 만들 수 있을 정도면 ready:true로 기획안과 draftSlides를 한 번에 반환하세요. 너무 막연해서 좋은 카피를 만들 수 없을 때만 질문하세요.`
 
   if (language === 'en') {
     return buildEnglishSystemPrompt({
@@ -107,228 +215,83 @@ function buildSystemPrompt(
       scrapedContext,
       generationMode,
       rssContext,
-      roundGuidance,
+      briefingGuidance,
     })
   }
 
-  if (isGeneral) {
-    return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 정보/시사/트렌드 콘텐츠 전략가입니다.
-사용자가 뉴스 기사, 정보글, 또는 트렌드 글을 입력하면, 이를 깊이 분석하여 일반 정보 전달용 카드뉴스 전략 기획서와 각 슬라이드별 실제 카피 초안(Headline/Body)을 제안해 주어야 합니다.
-${roundGuidance}
-## 이번 카드뉴스 유형 (중요)
-- 본 콘텐츠는 브랜드 홍보용이 아닌, 일반 정보/시사/트렌드 요약 전달용 카드뉴스입니다.
-- 브랜드 고유의 이름, 브랜드 DNA, 또는 특정 브랜드의 업종을 카피나 레이아웃 기획에 강제로 대입하지 마십시오.
-- 타겟 고객 및 제공된 정보글(원문/RSS)의 객관적 팩트에 전적으로 초점을 맞추어 텍스트를 구성해야 합니다.
-- 톤앤매너는 대중이 이해하기 쉬우며 신뢰감 있고 명확한 에디토리얼 어조(예: 뉴닉, 대학내일 정보성 피드 스타일)를 기본으로 취하십시오.
+  const modeInstruction = isGeneral
+    ? [
+      buildKoreanGeneralModeInstruction(brand.industry),
+      '브랜드 홍보, 구매 유도, 제품 CTA처럼 쓰지 말고, 입력과 제공 근거 안에서 가장 자연스러운 카드뉴스 흐름을 직접 설계하세요.',
+    ].join('\n')
+    : [
+      '이 콘텐츠는 URL 프로필 기반의 브랜드/상품/서비스 카드뉴스입니다.',
+      '목표는 브랜드/상품/서비스 맥락을 독자가 저장하고 이해하게 만드는 것입니다.',
+      '광고문처럼 쓰지 말고, 독자의 문제, 선택 기준, 활용 맥락 중심으로 가장 자연스러운 카드뉴스 흐름을 직접 설계하세요.',
+    ].join('\n')
 
-## 사용자의 과거 디자인 선호 스타일 (비주얼/레이아웃 테마용)
-${preferencesText}
+  const contextBlock = [
+    isGeneral
+      ? `프로필 분야: ${brand.industry || '시사/정보/트렌드'}\n주요 독자: ${brand.targetAudience || '일반 독자'}\n톤앤매너: ${brand.toneOfVoice || '명확하고 읽기 쉬운 에디토리얼 톤'}`
+      : `브랜드명: ${brand.name}\n업종: ${brand.industry}\n타겟: ${brand.targetAudience}\n톤앤매너: ${brand.toneOfVoice}\n브랜드 DNA: ${dnaText || '없음'}`,
+    `사용자 선호 스타일: ${preferencesText || '없음'}`,
+    rssContext ? `실시간 관련 뉴스:\n${rssContext}` : '',
+    scrapedContext ? `수집된 URL/자료 컨텍스트:\n${scrapedContext}` : '',
+  ].filter(Boolean).join('\n\n')
 
-${rssContext ? `## 실시간 수집된 관련 뉴스 (훅 및 슬라이드 기획의 핵심 근거로 활용)\n${rssContext}\n\n위 뉴스 기사들의 실제 이슈, 트렌드 키워드, 구체적 사실을 훅 방향과 슬라이드 흐름에 반드시 반영하세요.\n` : ''}
-${scrapedContext ? `## 이번에 수집된 기사/정보 본문 분석 정보\n${scrapedContext}\n` : ''}
+  return `당신은 Shuffla의 한국 인스타그램 카드뉴스 크리에이티브 디렉터입니다.
+${briefingGuidance}
 
-## 대화 규칙 및 역할
-- 기계적 답변을 지양하고, 정보 콘텐츠 기획 전문가로서 주도적으로 레이아웃과 흐름을 설계해 주십시오.
-- 어떠한 마크다운 강조 기호도 사용하지 말고, 일반 텍스트와 자연스러운 단락 구분만 사용하십시오.
-- 사용자가 카드뉴스 주제나 글을 주면, 레이아웃 추천뿐만 아니라 **실제 각 슬라이드에 들어갈 카피 초안(headline, body)과 그렇게 작성한 의도(reasoning, 공백 포함 30자 이내로 극히 짧게 한글로 작성)**를 "draftSlides" 배열에 담아 함께 돌려주십시오.
-- 대화 과정에서 사용자가 카피에 대한 피드백(예: '3페이지 본문 내용을 더 간결하게 수정해줘', '톤을 더 밝게 해줘')을 준다면, 사용자의 의도를 반영하여 해당 슬라이드들의 "headline"과 "body"를 수정하고, 변경 기획 사유를 "reasoning"에 공백 포함 30자 이내의 아주 짧은 한글 1문장으로 작성하여 "draftSlides"를 실시간 갱신해 반환하세요. 생성 속도를 높이기 위해 기획 사유를 상세하게 설명하지 마십시오.
-- 사용자의 입력에 주제·대상·관점이 부족해 실제 카드뉴스 품질이 낮아질 경우에는 ready를 false로 두고 clarification을 반환하세요. 단, 이 때도 지금까지 정해진 정보나 임시 기획에 근거한 "params"와 "draftSlides"는 함께 채워서 내려주어야 유저가 중간 흐름을 파악할 수 있습니다.
-- clarification은 사용자가 바로 고를 수 있는 3~4개의 구체 선택지를 포함해야 합니다.
-- message는 세 문단, 총 220자 이내로 작성하십시오.
-- 성과 지표나 도달률 등 근거 없는 예측 수치는 작성하지 마십시오.
+## 제작 모드
+${modeInstruction}
 
-## 추천안 설정 가이드
-1. visualHint: 'breaking-news', 'minimal-clean', 'trend-feed', 'community-style', 'dark-editorial' 중 하나
-2. contentType: '교육 정보형', '저장형 카드뉴스', '계정 유입형' 중 하나
-3. objective: 정보 전달과 유저 소장 욕구를 고려한 단문
-4. slideCount: 5, 7, 10 중 하나
+## 참고 정보
+${contextBlock || '추가 참고 정보 없음'}
 
-## 응답 형식 (반드시 JSON)
-추천안이 제안되고 생성할 준비가 끝났을 때 (ready: true):
+## 작성 규칙
+- 유효한 JSON만 반환하세요. 마크다운 강조 기호는 쓰지 마세요.
+- 충분한 주제가 있으면 ready:true로 기획안과 실제 카피 초안을 한 번에 반환하세요.
+- 질문은 입력이 너무 넓거나 모호해서 좋은 카드뉴스가 불가능할 때만 1개 하세요.
+- 슬라이드 흐름, 도메인, 톤, 헤드라인 방향은 입력을 보고 직접 판단하세요.
+- 확인되지 않은 수치, 순위, 후기, 성과 예측, 의료/금융 단정 표현은 만들지 마세요.
+- message는 3문단 이내, 220자 이하로 쓰고 카피 확인 후 생성을 자연스럽게 제안하세요.
+- visualHint는 dark-editorial, trend-feed, community-style, minimal-clean, breaking-news 중 하나입니다.
+- slideCount는 5, 7, 10 중 하나입니다. 기본은 5 또는 7입니다.
+- structurePreview와 draftSlides는 slideCount와 같은 개수여야 합니다.
+- draftSlides는 실제 카드에 들어갈 문구입니다. headline은 22자 이하, body는 85자 이하의 1~2문장으로 쓰세요.
+- reasoning은 공백 포함 30자 이내의 짧은 한글 문장입니다.
+- refinementOptions는 이 초안을 더 좋게 바꾸는 관점 선택지 3개입니다. 새 조사 없이 기존 근거/초안만 재구성하는 방향이어야 합니다.
+
+## JSON 형식
 {
-  "message": "수집된 정보의 특성을 살려, 명확한 팩트가 강조되는 카드뉴스 초안을 준비했습니다.\\n\\n각 슬라이드별 제목과 내용을 확인하시고, 수정하고 싶은 부분이 있다면 말씀해 주세요.\\n\\n이 방향으로 카드뉴스를 완성할까요?",
+  "message": "짧은 기획 요약과 카피 확인 안내",
   "ready": true,
   "params": {
-    "topic": "정보/이슈 요약 제목",
-    "visualHint": "breaking-news",
-    "contentType": "교육 정보형",
-    "objective": "정보 전달을 통해 타겟 독자의 소장 및 계정 유입 극대화",
+    "topic": "구체 주제",
+    "visualHint": "trend-feed",
+    "contentType": "저장형 카드뉴스",
+    "objective": "구체 목표",
     "slideCount": 5,
     "productUrl": null,
-    "brandAnalysis": "최신 트렌드/시사 뉴스의 전달력을 높이기 위한 기획",
-    "targetEmotion": "새로운 정보를 빠르게 습득했다는 만족감",
-    "hookDirection": "놓치기 쉬운 트렌드 변화를 한 번에 요약",
-    "recommendedCta": "게시물 저장 및 관련 소식 팔로우 유도",
-    "reasonForStyle": "정보성 뉴스의 전달과 신뢰감을 높이기 위한 스타일",
+    "brandAnalysis": "방향이 맞는 이유",
+    "targetEmotion": "독자 감정",
+    "hookDirection": "훅 방향",
+    "recommendedCta": "저장/확인/방문 등 자연스러운 행동",
+    "reasonForStyle": "스타일 이유",
     "structurePreview": [
-      { "slideNumber": 1, "role": "Hook", "description": "핵심 헤드라인" }
+      { "slideNumber": 1, "role": "Hook", "description": "슬라이드 역할" }
     ],
     "draftSlides": [
-      {
-        "slideNumber": 1,
-        "role": "Hook",
-        "headline": "요즘 대세라는 AI 트렌드, 아직도 모른다면?",
-        "body": "빠르게 변화하는 AI 기술의 실상과 대중의 인식을 한눈에 요약해 드립니다.",
-        "reasoning": "최근 AI 트렌드에 대한 독자의 호기심과 긴장감을 유발하기 위해 자극적인 질문형 헤드라인을 구성함."
-      }
+      { "slideNumber": 1, "role": "Hook", "headline": "실제 제목", "body": "실제 본문입니다.", "reasoning": "의도 요약" }
+    ],
+    "refinementOptions": [
+      { "label": "관점 선택지", "value": "새 조사는 하지 말고, 현재 근거와 초안을 바탕으로 구체 관점으로 다시 다듬어 주세요." }
     ]
   }
 }
 
-정보가 부족하거나 사용자와 피드백을 주고받는 중일 때 (ready: false):
-{
-  "message": "입력하신 주제에 맞춰 1차 카드뉴스 기획과 카피 초안을 작성했습니다.\\n\\n오른쪽 패널에서 카피를 확인하시고, 수정하고 싶은 포인트가 있거나 아래 방향을 원하시면 말씀해 주세요.",
-  "ready": false,
-  "clarification": {
-    "question": "이번 카드뉴스에서 어떤 관점을 가장 강조할까요?",
-    "allowCustom": true,
-    "skipLabel": "현재 정보로 진행",
-    "options": [
-      { "label": "효능/장점 정리", "value": "주제의 효능과 장점을 구체적으로 정리한 카드뉴스" },
-      { "label": "체크리스트", "value": "실생활에서 확인할 체크리스트형 카드뉴스" },
-      { "label": "요즘 이슈 연결", "value": "최근 트렌드와 연결한 정보성 카드뉴스" }
-    ]
-  },
-  "params": {
-    "topic": "정보/이슈 요약 제목",
-    "visualHint": "breaking-news",
-    "contentType": "교육 정보형",
-    "objective": "정보 전달을 통해 타겟 독자의 소장 및 계정 유입 극대화",
-    "slideCount": 5,
-    "productUrl": null,
-    "brandAnalysis": "최신 트렌드/시사 뉴스의 전달력을 높이기 위한 기획",
-    "targetEmotion": "새로운 정보를 빠르게 습득했다는 만족감",
-    "hookDirection": "놓치기 쉬운 트렌드 변화를 한 번에 요약",
-    "recommendedCta": "게시물 저장 및 관련 소식 팔로우 유도",
-    "reasonForStyle": "정보성 뉴스의 전달과 신뢰감을 높이기 위한 스타일",
-    "structurePreview": [
-      { "slideNumber": 1, "role": "Hook", "description": "핵심 헤드라인" }
-    ],
-    "draftSlides": [
-      {
-        "slideNumber": 1,
-        "role": "Hook",
-        "headline": "요즘 대세라는 AI 트렌드, 아직도 모른다면?",
-        "body": "빠르게 변화하는 AI 기술의 실상과 대중의 인식을 한눈에 요약해 드립니다.",
-        "reasoning": "호기심을 유발하는 질문형 헤드라인 구성"
-      }
-    ]
-  }
-}`
-  }
-
-  return `당신은 한국 SNS 카드뉴스 전문 크리에이티브 디렉터이자 브랜드 콘텐츠 전략가입니다.
-사용자가 상품명, 캠페인 주제, 또는 상품 URL을 입력하면, 브랜드 프로필과 감성 선호도를 깊이 분석하여 카드뉴스 전략 기획서와 각 슬라이드별 실제 카피 초안(Headline/Body)을 제안해 주어야 합니다.
-${roundGuidance}
-## 브랜드 정보
-브랜드명: ${brand.name}
-업종: ${brand.industry}
-타겟 고객: ${brand.targetAudience}
-톤앤매너: ${brand.toneOfVoice}
-
-## 브랜드 DNA
-${dnaText}
-
-## 사용자의 과거 디자인 선호 스타일 (중요)
-${preferencesText}
-
-${scrapedContext ? `## 이번에 스크래핑된 상품 페이지 분석 정보\n${scrapedContext}\n` : ''}
-
-## 대화 규칙 및 역할
-- **인간 크리에이티브 디렉터의 목소리**: 기계적이거나 정형화된 챗봇 문투는 피하고, 전문 에이전시의 든든한 파트너로서 예의를 갖추되 정답을 주도적으로 제시하는 전문가 톤을 취하십시오. "질문을 수집하여 분석했다"는 형태가 아니라, "브랜드의 매력을 이렇게 해석했다"는 관점에서 제안하십시오.
-- **마크다운 서식 절대 사용 금지**: 별표("**" 또는 "*"), 샵("#")을 이용한 타이틀 구성 등 마크다운 스타일은 사용자가 읽기에 불필요한 AI 기계음 느낌을 줍니다. **어떠한 강조 기호도 사용하지 말고**, 오직 일반 텍텍스트, 평이한 문장, 그리고 자연스러운 단락 구분(줄바꿈)만을 활용하십시오. 필요 시 대시("-") 또는 일반 번호를 사용한 목록 형태로만 깔끔하게 나열하십시오.
-- 사용자가 상품이나 주제를 말하면, 단순히 레이아웃 추천뿐만 아니라 **실제 각 슬라이드에 들어갈 카피 초안(headline, body)과 그렇게 작성한 의도(reasoning, 공백 포함 30자 이내로 극히 짧게 한글로 작성)**를 "draftSlides" 배열에 담아 함께 돌려주십시오.
-- 대화 과정에서 사용자가 카피에 대한 피드백(예: '2장 본문 내용을 더 간결하게 수정해줘', '톤을 더 밝게 해줘')을 준다면, 사용자의 의도를 반영하여 해당 슬라이드들의 "headline"과 "body"를 수정하고, 변경 기획 사유를 "reasoning"에 공백 포함 30자 이내의 아주 짧은 한글 1문장으로 작성하여 "draftSlides"를 실시간 갱신해 반환하세요. 생성 속도를 높이기 위해 기획 사유를 상세하게 설명하지 마십시오.
-- 단, 사용자의 입력에 상품·캠페인·고객 문제·핵심 관점이 거의 없어 실제 카드뉴스 품질이 낮아질 경우에는 무리하게 생성하지 말고 ready를 false로 두고 clarification을 반환하세요. 단, 이 때도 지금까지 정해진 정보나 임시 기획에 근거한 "params"와 "draftSlides"는 함께 채워서 내려주어야 유저가 중간 흐름을 파악할 수 있습니다.
-- 이미 제안된 기획안에 대해 사용자가 피드백(예: "더 밝게 해줘", "5장으로 수정해줘")을 준다면, 그 피드백을 수용하여 비주얼 스타일, 슬라이드 수 등을 수정하고 기획안을 즉시 업데이트해 주어야 합니다.
-- message는 채팅창에서 편하게 읽히도록 세 문단, 총 220자 이내로 작성하십시오. 콘셉트 해석, 슬라이드 흐름 요약, 생성 여부 확인 질문만 담으십시오.
-- 성과 증가율, 저장 확률 등 확인할 근거가 없는 수치나 예측 지표는 message와 params 어디에도 작성하지 마십시오.
-
-## 추천안 설정 가이드
-1. visualHint (비주얼 스타일): 다음 중 하나만 제안
-   - 'dark-editorial': 차분하고 진중한 감성 에디토리얼, 럭셔리/패션 브랜드 및 소장용 정보 카드에 추천.
-   - 'trend-feed': 캐주얼하고 선명한 이미지 중심, 트렌디 피드, 구매 유도 및 즉각적인 CTR 극대화에 추천.
-   - 'community-style': 커뮤니티 정보 공유 느낌, 친근한 대화 및 유저 반응 유도에 추천.
-   - 'minimal-clean': 깔끔한 배경과 여백 위주, 미니멀하고 심플한 브랜드, 교육 및 제품 특징 요약에 추천.
-   - 'breaking-news': 보도자료 또는 강렬한 강조, 이슈 중심의 대담한 폰트와 프로모션에 추천.
-2. contentType (콘텐츠 목적): 다음 중 하나만 제안
-   - '저장형 카드뉴스', '구매 전환형', '계정 유입형', '교육 정보형', '브랜드 인지도형'
-3. objective: 캠페인 목표 (사용자 입력과 브랜드 DNA를 조화시켜 자연스럽고 설득력 있는 단문으로 작성)
-4. slideCount (슬라이드 수): 5, 7, 10 중 하나 추천 (기본적으로 5장 또는 7장 추천)
-
-## 응답 형식 (반드시 JSON)
-추천안이 제안되고 생성할 준비가 끝났을 때 (ready: true):
-{
-  "message": "PYEARCHIVE의 정돈된 감성을 살려, 여백과 제품 실루엣이 돋보이는 에디토리얼 카드뉴스 초안을 제안합니다.\\n\\n슬라이드별 카피와 기획 의도를 확인하시고 수정하고 싶으신 점이 있다면 말씀해 주세요.\\n\\n이대로 카드뉴스를 생성할까요?",
-  "ready": true,
-  "params": {
-    "topic": "상품/주제 이름 (예: PYE Essential Bag 001)",
-    "visualHint": "dark-editorial",
-    "contentType": "저장형 카드뉴스",
-    "objective": "타겟 유저의 소장(저장) 가치를 극대화하여 계정 팔로우 유도",
-    "slideCount": 5,
-    "productUrl": "http... (사용자가 입력한 URL이 있다면 기입, 없으면 null)",
-    "brandAnalysis": "브랜드가 가진 미니멀하고 정돈된 감성을 적극적으로 반영",
-    "targetEmotion": "나만 알고 싶은 브랜드에 대한 특별함 및 소유 욕구",
-    "hookDirection": "일상의 무질서 속에서 균형을 잡는 에센셜 라이프 제안",
-    "recommendedCta": "상세 스토어 이동 및 컬렉션 라인업 탐색 유도",
-    "reasonForStyle": "해당 브랜드의 시그니처 정돈감을 극대화하기 위해 여백이 돋보이는 dark-editorial 스타일을 기획했습니다.",
-    "structurePreview": [
-      { "slideNumber": 1, "role": "Hook", "description": "일상의 질서를 완성하는 파이 에센셜 백 소개" }
-    ],
-    "draftSlides": [
-      {
-        "slideNumber": 1,
-        "role": "Hook",
-        "headline": "일상의 무질서 속에서, 내 삶의 질서를 찾는 법",
-        "body": "불필요한 짐은 덜어내고 매 순간 나에게 꼭 필요한 균형을 채워보세요.",
-        "reasoning": "브랜드의 미니멀 아이덴티티를 살려 독자가 일상의 질서를 재발견하도록 공감형 문구를 구성함."
-      }
-    ]
-  }
+질문이 꼭 필요할 때만 ready:false와 clarification을 함께 반환하고, 가능한 범위의 params와 draftSlides도 포함하세요.`
 }
-
-정보가 부족하거나 사용자와 피드백을 주고받는 중일 때 (ready: false):
-{
-  "message": "좋은 카드뉴스를 만들기에는 정보가 아직 조금 넓습니다.\n\n아래 방향 중 하나를 고르거나 직접 의견을 말씀해 주세요. 카피 초안과 기획을 더 정확하게 수정하겠습니다.",
-  "ready": false,
-  "clarification": {
-    "question": "이번 카드뉴스에서 무엇을 가장 강조할까요?",
-    "allowCustom": true,
-    "skipLabel": "현재 정보로 진행",
-    "options": [
-      { "label": "신상품 소개", "value": "신상품 또는 대표 상품을 소개하는 카드뉴스" },
-      { "label": "고객 고민 해결", "value": "고객의 고민을 해결하는 정보형 카드뉴스" },
-      { "label": "브랜드 스토리", "value": "브랜드 차별점과 스토리를 보여주는 카드뉴스" }
-    ]
-  },
-  "params": {
-    "topic": "상품/주제 이름 (예: PYE Essential Bag 001)",
-    "visualHint": "dark-editorial",
-    "contentType": "저장형 카드뉴스",
-    "objective": "타겟 유저의 소장(저장) 가치를 극대화하여 계정 팔로우 유도",
-    "slideCount": 5,
-    "productUrl": null,
-    "brandAnalysis": "브랜드가 가진 미니멀하고 정돈된 감성을 적극적으로 반영",
-    "targetEmotion": "나만 알고 싶은 브랜드에 대한 특별함 및 소유 욕구",
-    "hookDirection": "일상의 무질서 속에서 균형을 잡는 에센셜 라이프 제안",
-    "recommendedCta": "상세 스토어 이동 및 컬렉션 라인업 탐색 유도",
-    "reasonForStyle": "해당 브랜드의 시그니처 정돈감을 극대화하기 위해 여백이 돋보이는 dark-editorial 스타일을 기획했습니다.",
-    "structurePreview": [
-      { "slideNumber": 1, "role": "Hook", "description": "일상의 질서를 완성하는 파이 에센셜 백 소개" }
-    ],
-    "draftSlides": [
-      {
-        "slideNumber": 1,
-        "role": "Hook",
-        "headline": "일상의 무질서 속에서, 내 삶의 질서를 찾는 법",
-        "body": "불필요한 짐은 덜어내고 매 순간 나에게 꼭 필요한 균형을 채워보세요.",
-        "reasoning": "브랜드 아이덴티티에 기반한 첫 장 훅 문구 제안"
-      }
-    ]
-  }
-}`
-  }
 
 
 
@@ -344,7 +307,7 @@ function buildEnglishSystemPrompt(params: {
   scrapedContext: string
   generationMode?: 'brand' | 'general'
   rssContext?: string
-  roundGuidance: string
+  briefingGuidance: string
 }) {
   const isGeneral = params.generationMode === 'general'
   const brandDna = formatBrandDnaForPrompt(params.brand.brandDna)
@@ -352,20 +315,30 @@ function buildEnglishSystemPrompt(params: {
     params.rssContext ? `## Real-time relevant context\n${params.rssContext}` : '',
     params.scrapedContext ? `## Collected source or product context\n${params.scrapedContext}` : '',
   ].filter(Boolean).join('\n\n')
+  const profileContext = isGeneral
+    ? [
+      '## Editorial Profile Context',
+      `- Profile category: ${params.brand.industry || 'information/news/trends'}`,
+      `- Target readers: ${params.brand.targetAudience || 'general readers'}`,
+      `- Tone of voice: ${params.brand.toneOfVoice || 'clear editorial voice'}`,
+    ].join('\n')
+    : [
+      '## Brand/Profile Context',
+      `- Brand: ${params.brand.name}`,
+      `- Industry: ${params.brand.industry}`,
+      `- Target audience: ${params.brand.targetAudience}`,
+      `- Tone of voice: ${params.brand.toneOfVoice}`,
+      `- Brand DNA: ${brandDna || 'Not specified'}`,
+    ].join('\n')
 
   return `You are Shuffla's senior Instagram carousel creative director.
-${params.roundGuidance}
+${params.briefingGuidance}
 ## Mode
 ${isGeneral
-    ? 'This is an information, news, or trend carousel. Do not force brand promotion. Ground the plan in the user topic and verified context.'
-    : `This is a brand carousel for ${params.brand.name}. Reflect the brand profile without inventing product claims.`}
+    ? `${buildEnglishGeneralModeInstruction(params.brand.industry)} Do not force brand promotion, purchase CTAs, or product framing.`
+    : `This is a URL/profile-based brand, product, or service carousel for ${params.brand.name}. Help readers understand and save the brand/product context without sounding like an ad.`}
 
-## Brand/Profile Context
-- Brand: ${params.brand.name}
-- Industry: ${params.brand.industry}
-- Target audience: ${params.brand.targetAudience}
-- Tone of voice: ${params.brand.toneOfVoice}
-- Brand DNA: ${brandDna || 'Not specified'}
+${profileContext}
 
 ## User style memory
 ${params.preferencesText || 'No prior style memory.'}
@@ -376,13 +349,15 @@ ${contextBlock}
 - Return valid JSON only.
 - Write every JSON string value in English.
 - Do not use markdown emphasis symbols.
-- If the user topic lacks enough audience, angle, evidence, or action detail, return ready:false with a concrete clarification question and 3-4 useful options.
-- If enough detail exists, return ready:true with params.
+- Prefer one-pass planning. If the user gives a usable topic, return ready:true with params and draftSlides.
+- Ask a clarification only when the topic is too vague to produce useful copy.
 - Keep message under 650 characters across 2-3 short paragraphs.
 - Never invent performance metrics, medical claims, rankings, discounts, reviews, or unsupported facts.
-- structurePreview must contain exactly slideCount items and each item must describe the slide information role, not finished card copy.
-- draftSlides must contain exactly slideCount items with real headline and body copy. headline: max 40 chars. body: 1-2 sentences, 60-130 chars. Write actual card copy, not planning labels.
-- reasoning: one short English sentence (under 30 chars) explaining the copy intent.
+- Decide the domain, flow, tone, and headline angle from the input.
+- structurePreview and draftSlides must each contain exactly slideCount items.
+- draftSlides must be real card copy. headline: max 40 chars. body: 1-2 sentences, max 130 chars.
+- reasoning: one short English sentence under 30 chars.
+- refinementOptions must contain exactly 3 topic-specific ways to improve this draft without new research.
 
 JSON when ready:
 {
@@ -405,6 +380,9 @@ JSON when ready:
     ],
     "draftSlides": [
       { "slideNumber": 1, "role": "Hook", "headline": "Bold opening hook", "body": "One to two sentences of specific insight for the reader.", "reasoning": "Grabs attention with contrast" }
+    ],
+    "refinementOptions": [
+      { "label": "Specific angle", "value": "Revise the draft around this specific angle using the existing evidence only. Do not run new research." }
     ]
   }
 }
@@ -440,6 +418,9 @@ JSON when more detail is needed:
     ],
     "draftSlides": [
       { "slideNumber": 1, "role": "Hook", "headline": "Bold opening hook", "body": "One to two sentences of specific insight for the reader.", "reasoning": "Grabs attention with contrast" }
+    ],
+    "refinementOptions": [
+      { "label": "Specific angle", "value": "Revise the draft around this specific angle using the existing evidence only. Do not run new research." }
     ]
   }
 }`
@@ -454,6 +435,40 @@ function validateParams(params: unknown): params is GenerateParams {
   if (!p.objective || typeof p.objective !== 'string') return false
   if (!p.slideCount || ![5, 7, 10].includes(Number(p.slideCount))) return false
   return true
+}
+
+function validateDraftSlides(params: GenerateParams) {
+  if (!Array.isArray(params.draftSlides)) return false
+  if (params.draftSlides.length !== Number(params.slideCount)) return false
+
+  return params.draftSlides.every((slide, index) => (
+    Number(slide.slideNumber) === index + 1 &&
+    typeof slide.role === 'string' &&
+    slide.role.trim().length > 0 &&
+    typeof slide.headline === 'string' &&
+    slide.headline.trim().length > 0 &&
+    typeof slide.body === 'string' &&
+    slide.body.trim().length > 0
+  ))
+}
+
+function normalizeDraftSlides(params: GenerateParams, language: 'ko' | 'en' = 'ko') {
+  if (!Array.isArray(params.draftSlides)) return
+  const constraints = getAgentDraftCopyConstraints(language)
+
+  params.draftSlides = params.draftSlides.map(slide => {
+    const repaired = repairRenderableCopy({
+      headline: slide.headline,
+      body: slide.body,
+      constraints,
+    })
+
+    return {
+      ...slide,
+      headline: repaired.headline,
+      body: repaired.body,
+    }
+  })
 }
 
 function validateClarification(clarification: unknown): clarification is ClarificationPrompt {
@@ -533,20 +548,29 @@ export async function POST(request: Request) {
 
     // 3 & 4. URL scrape + RSS fetch in parallel
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
-    const _allUserText = messages
+    const allUserText = messages
       .filter(m => m.role === 'user')
       .map(m => m.content)
       .join('\n')
-    const _previousAssistantText = messages
-      .filter(m => m.role === 'assistant')
-      .map(m => m.content)
-      .join('\n')
+    const userTurnCount = messages.filter(m => m.role === 'user').length
 
     const urlMatch = lastUserMessage?.content.match(/https?:\/\/[^\s]+/)
     const userTextClean = lastUserMessage?.content.replace(/https?:\/\/[^\s]+/g, '').trim() || ''
-    const keywords = extractGenerationKeywords(userTextClean)
+    const researchTopic = buildAgentResearchTopic(userTextClean, allUserText)
+    const keywords = extractGenerationKeywords(researchTopic || userTextClean)
+    const hasDraftContext = hasPriorDraftContext(messages)
+    const requestsNewTopic = isNewTopicRequest(userTextClean)
+    const isFollowUpRevision = userTurnCount > 1 && !requestsNewTopic && isLightweightRevisionRequest(userTextClean)
+    const shouldUseExternalResearch = generationMode === 'general' &&
+      researchTopic.length >= 2 &&
+      (!hasDraftContext || requestsNewTopic) &&
+      !isFollowUpRevision
+    const shouldUseRssFallback = generationMode === 'general' &&
+      Boolean(lastUserMessage) &&
+      (!hasDraftContext || requestsNewTopic) &&
+      !isFollowUpRevision
 
-    const [scrapeResult, rssResult] = await Promise.all([
+    const [scrapeResult, researchBrief, rssResult] = await Promise.all([
       // URL scrape (only if URL present)
       urlMatch ? (async () => {
         try {
@@ -572,14 +596,37 @@ export async function POST(request: Request) {
         }
       })() : Promise.resolve({ scraped: '', persuasion: '' }),
 
+      // OpenAI Web Search research (only for general/editorial mode)
+      shouldUseExternalResearch ? (async () => {
+        try {
+          return await buildCarouselResearchBrief({
+            topic: researchTopic,
+            category: brand.industry || 'information',
+            keyContent: [
+              `프로필 분야: ${brand.industry || 'information'}`,
+              `주요 독자: ${brand.targetAudience || '일반 독자'}`,
+              `톤앤매너: ${brand.toneOfVoice || '명확하고 읽기 쉬운 톤'}`,
+            ].join('\n'),
+            contentType: normalizeGeneralProfileCategory(brand.industry),
+            slideCount: 7,
+            language: language || 'ko',
+            mode: 'fast',
+          })
+        } catch (err) {
+          console.warn('[GenerateAgent] OpenAI web research failed:', err)
+          return null
+        }
+      })() : Promise.resolve(null),
+
       // RSS fetch (only for general mode)
-      (lastUserMessage && generationMode === 'general') ? (async () => {
+      shouldUseRssFallback ? (async () => {
         try {
           return await fetchRssForGeneration({
-            category: inferRssCategory(userTextClean, brand.industry || 'information'),
+            category: inferRssCategory(researchTopic || userTextClean, brand.industry || 'information'),
             keywords,
-            topic: userTextClean.slice(0, 80),
+            topic: (researchTopic || userTextClean).slice(0, 80),
             limit: 5,
+            language: language || 'ko',
           })
         } catch (err) {
           console.warn('[GenerateAgent] RSS fetch failed:', err)
@@ -590,8 +637,9 @@ export async function POST(request: Request) {
 
     const scrapedContext = scrapeResult.scraped
     const purchasePersuasionContext = scrapeResult.persuasion
+    const researchContext = formatResearchBriefForPrompt(researchBrief, language || 'ko')
     let rssContext = ''
-    if (rssResult && rssResult.matched && rssResult.articles.length > 0) {
+    if (!researchContext && rssResult && rssResult.matched && rssResult.articles.length > 0) {
       const lines = [
         `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
         `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,
@@ -646,22 +694,28 @@ export async function POST(request: Request) {
       brandId: brand.id,
       metadata: { language, generationMode },
     }
-    const userTurnCount = messages.filter(m => m.role === 'user').length
     const systemPrompt = buildSystemPrompt(
       brand,
       preferencesText,
-      [scrapedContext, purchasePersuasionContext].filter(Boolean).join('\n\n'),
+      [scrapedContext, purchasePersuasionContext, researchContext].filter(Boolean).join('\n\n'),
       language,
       generationMode,
       rssContext,
       userTurnCount
     )
+    const modelMessages = requestsNewTopic
+      ? messages.map(message => (
+        message.role === 'assistant'
+          ? { ...message, content: stripAgentMemoryContext(message.content) }
+          : message
+      ))
+      : messages
     logAiDiagnostic({ status: 'start', ...diagnosticContext })
     const response = await openai.chat.completions.create({
       model,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages,
+        ...modelMessages,
       ],
       response_format: { type: 'json_object' },
       max_completion_tokens: 4000,
@@ -699,6 +753,13 @@ export async function POST(request: Request) {
         })
       }
       parsed.params.slideCount = Number(parsed.params.slideCount)
+      normalizeDraftSlides(parsed.params, language || 'ko')
+      if (!validateDraftSlides(parsed.params)) {
+        parsed.ready = false
+        parsed.message = language === 'en'
+          ? 'I prepared the strategy, but the slide draft was incomplete. Please send the same request once more or add one preferred angle so I can return the full draft.'
+          : '기획 방향은 잡혔지만 슬라이드 카피 초안이 완성되지 않았습니다. 같은 요청을 한 번만 다시 보내주시거나 원하는 관점을 한 줄만 덧붙여 주세요.'
+      }
     }
 
     // Trust LLM's own ready/clarification judgment — no heuristic override
