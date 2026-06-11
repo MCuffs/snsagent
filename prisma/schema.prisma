@@ -32,6 +32,7 @@ model User {
   nicepayLastPaidAt        DateTime?
   nicepayCanceledAt        DateTime?
   nicepayLastOrderId       String?                @unique
+  mcpApiKey                String?                @unique
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   brands                   Brand[]
