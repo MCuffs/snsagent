@@ -124,10 +124,10 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
       />
 
       {/* ── 이하 기존 섹션들 (밝은 배경으로 전환) ── */}
-      <div className="bg-[#fbfaf7]">
+      <div className="bg-white">
 
         {/* 피처 배지 행 */}
-        <FadeUp className="border-b border-[#ebe8e2]">
+        <FadeUp className="border-b border-slate-100">
           <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-x-8 gap-y-3 px-5 py-8 text-xs text-[#857e73]">
             {[t('feature_brand'), t('feature_ai'), t('feature_download')].map(item => (
               <span key={item} className="inline-flex items-center gap-1.5">
