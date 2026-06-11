@@ -11,10 +11,10 @@ interface MarketingNavProps {
 
 type NavKey =
   | 'product'
-  | 'workflow'
   | 'gallery'
   | 'pricing'
   | 'resources'
+  | 'mcp'
   | 'login'
   | 'back_to_cms'
   | 'continue'
@@ -44,10 +44,10 @@ export async function MarketingNav({ authenticated = false, locale }: MarketingN
         </Link>
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 text-sm md:flex">
           <Link href={`${prefix}/#product`} className="transition-colors hover:opacity-70">{label('제품', 'product')}</Link>
-          <Link href={`${prefix}/#workflow`} className="transition-colors hover:opacity-70">{label('워크플로우', 'workflow')}</Link>
-          <Link href={`${prefix}/#gallery`} className="transition-colors hover:opacity-70">{label('갤러리', 'gallery')}</Link>
+          <Link href={`${prefix}/mcp`} className="transition-colors hover:opacity-70">{label('MCP', 'mcp')}</Link>
           <Link href={`${prefix}/pricing`} className="transition-colors hover:opacity-70">{label('요금제', 'pricing')}</Link>
           <Link href={`${prefix}/blog`} className="transition-colors hover:opacity-70">{label('리소스', 'resources')}</Link>
+          <Link href={`${prefix}/#gallery`} className="transition-colors hover:opacity-70">{label('갤러리', 'gallery')}</Link>
         </nav>
         <div className="flex items-center gap-2.5">
           {locale && <LocaleSwitcher />}

@@ -22,7 +22,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
   const showKoreanBusinessInfo = locale === 'ko'
 
   return (
-    <footer className="border-t border-[#e9e4db] bg-[#f6f4ef] pb-10 pt-16 text-[#171714]">
+    <footer className="border-t border-slate-200 bg-[#f8fafc] pb-10 pt-16 text-[#171714]">
       <div className="mx-auto max-w-[1300px] px-5 md:px-8">
         <div className="grid gap-12 md:grid-cols-[1.5fr_0.7fr_0.7fr_0.9fr]">
           <div>
@@ -57,7 +57,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
             </Link>
           </div>
         </div>
-        <div className="mt-16 flex flex-col justify-between gap-3 border-t border-[#e0dbd2] pt-7 text-xs text-[#847d73] sm:flex-row">
+        <div className="mt-16 flex flex-col justify-between gap-3 border-t border-slate-200 pt-7 text-xs text-[#847d73] sm:flex-row">
           <p>&copy; 2026 Shuffla. All rights reserved.</p>
           <div className="flex gap-6">
             <Link href={`${prefix}/terms`} className="hover:text-[#171714]">
@@ -66,10 +66,13 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
             <Link href={`${prefix}/privacy`} className="hover:text-[#171714]">
               {showKoreanBusinessInfo ? '개인정보처리방침' : 'Privacy'}
             </Link>
+            <Link href={`${prefix}/refund`} className="hover:text-[#171714]">
+              {showKoreanBusinessInfo ? '환불 정책' : 'Refund Policy'}
+            </Link>
           </div>
         </div>
         {showKoreanBusinessInfo && (
-          <div className="mt-6 border-t border-[#e0dbd2] pt-6 text-xs leading-6 text-[#847d73]">
+          <div className="mt-6 border-t border-slate-200 pt-6 text-xs leading-6 text-[#847d73]">
             <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
               <BusinessInfoItem label="상호" value="파랑버섯 스튜디오" />
               <BusinessInfoItem label="대표자명" value="정민수" />

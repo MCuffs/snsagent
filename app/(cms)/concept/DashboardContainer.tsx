@@ -8,13 +8,9 @@ import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
 import PainterDashboard from '../painter/PainterDashboard'
-import InstagramDashboard from '../instagram/InstagramDashboard'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { CheckCircle2, Globe, TrendingUp } from 'lucide-react'
-
-// Instagram 기능 테스트용 허용 이메일
-const INSTAGRAM_ALLOWED_EMAILS = ['alstnwjd0424@gmail.com']
 
 interface BrandProfileData {
   id: string
@@ -69,7 +65,6 @@ export default function DashboardContainer({
   const t = useTranslations('concept')
   const searchParams = useSearchParams()
   const urlBrandId = searchParams?.get('brandId') || null
-  const hasInstagramAccess = userEmail ? INSTAGRAM_ALLOWED_EMAILS.includes(userEmail) : false
   const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
 
@@ -117,7 +112,7 @@ export default function DashboardContainer({
 
   return (
     <div className="h-full">
-      {activeTab === 'concept' && (
+      <div className={activeTab === 'concept' ? 'h-full' : 'hidden'}>
         <div className="flex h-full flex-col">
           {subProfile !== null && (
             <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0">
@@ -169,15 +164,10 @@ export default function DashboardContainer({
             )}
           </div>
         </div>
-      )}
+      </div>
 
-      {activeTab === 'generate' && brandToPass && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
+      {brandToPass && (
+        <div className={activeTab === 'generate' ? 'h-full' : 'hidden'}>
           <GenerateForm
             key={brandToPass.id}
             brand={{
@@ -198,45 +188,22 @@ export default function DashboardContainer({
             nicepayClientKey={nicepayClientKey}
             nicepayReturnTokens={nicepayReturnTokens}
           />
-        </motion.div>
+        </div>
       )}
 
-      {activeTab === 'works' && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
-          <WorksGrid
-            campaigns={campaigns}
-            planName={planName}
-            retentionDays={retentionDays}
-            canUpgradeRetention={canUpgradeRetention}
-          />
-        </motion.div>
-      )}
+      <div className={activeTab === 'works' ? 'h-full' : 'hidden'}>
+        <WorksGrid
+          campaigns={campaigns}
+          planName={planName}
+          retentionDays={retentionDays}
+          canUpgradeRetention={canUpgradeRetention}
+        />
+      </div>
 
-      {activeTab === 'painter' && brandToPass && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
+      {brandToPass && (
+        <div className={activeTab === 'painter' ? 'h-full' : 'hidden'}>
           <PainterDashboard brand={brandToPass} />
-        </motion.div>
-      )}
-
-      {activeTab === 'instagram' && hasInstagramAccess && brandToPass && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full"
-        >
-          <InstagramDashboard brandId={brandToPass.id} userEmail={userEmail || ''} />
-        </motion.div>
+        </div>
       )}
     </div>
   )

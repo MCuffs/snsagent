@@ -2,13 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, Palette, Camera, LucideIcon } from 'lucide-react'
+import { BookOpen, Zap, Grid3X3, Palette, LucideIcon } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
 
-// Instagram 기능 테스트용 허용 이메일
-const INSTAGRAM_ALLOWED_EMAILS = ['alstnwjd0424@gmail.com']
+// Instagram 기능 테스트용 허용 이메일 — 제거됨
 
 interface NavItem {
   key: string
@@ -17,7 +16,6 @@ interface NavItem {
   descKey: string
   href: string
   highlight?: boolean
-  requiresInstagramAccess?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -25,22 +23,19 @@ const navItems: NavItem[] = [
   { key: 'generate', label: 'Generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
   { key: 'works', label: 'Works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
   { key: 'painter', label: 'My Painter', icon: Palette, descKey: 'nav_painter_desc', href: '/concept?tab=painter', highlight: true },
-  { key: 'instagram', label: 'Instagram', icon: Camera, descKey: 'nav_instagram_desc', href: '/concept?tab=instagram', requiresInstagramAccess: true },
 ]
 
 interface SidebarNavProps {
   hasCompleteBrand: boolean
-  userEmail?: string | null
   locale?: string
 }
 
-export default function SidebarNav({ hasCompleteBrand, userEmail, locale }: SidebarNavProps) {
+export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
   const t = useTranslations('cms')
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
-  const hasInstagramAccess = userEmail ? INSTAGRAM_ALLOWED_EMAILS.includes(userEmail) : false
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     analytics.sidebarClick(item.key, {
@@ -62,11 +57,6 @@ export default function SidebarNav({ hasCompleteBrand, userEmail, locale }: Side
   return (
     <nav className="flex-1 space-y-0.5 px-2 py-3">
       {navItems.map((item) => {
-        // Instagram 메뉴는 허용된 유저만 표시
-        if (item.requiresInstagramAccess && !hasInstagramAccess) {
-          return null
-        }
-
         const Icon = item.icon
         const disabled = !hasCompleteBrand && item.key !== 'concept'
         const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`

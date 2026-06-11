@@ -17,7 +17,7 @@ export function ProductShowcase({ authenticated = false }: { authenticated?: boo
   const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
 
   return (
-    <section id="product" className="border-t border-[#ebe8e2] bg-[#fbfaf7] py-24 md:py-32">
+    <section id="product" className="border-t border-slate-100 bg-white py-24 md:py-32">
       <div className="mx-auto max-w-[1380px] px-5 md:px-8">
         <div className="mx-auto mb-16 max-w-3xl text-center md:mb-20">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#847d73]">Product workflow</p>
@@ -70,7 +70,7 @@ function ShowcaseRow({
   children: React.ReactNode
 }) {
   return (
-    <article className="overflow-hidden rounded-[26px] border border-[#ebe8e2] bg-[#f5f3ee] p-5 md:p-8 lg:p-10">
+    <article className="overflow-hidden rounded-[26px] border border-slate-200/60 bg-slate-50 p-5 md:p-8 lg:p-10">
       <div className={`grid items-center gap-9 lg:grid-cols-[0.35fr_0.65fr] lg:gap-12 ${reverse ? 'lg:grid-cols-[0.65fr_0.35fr]' : ''}`}>
         <div className={reverse ? 'lg:order-2' : ''}>
           <p className="font-mono text-xs tracking-[0.24em] text-[#999183]">{number} / SHUFFLA</p>
@@ -90,15 +90,15 @@ function ShowcaseRow({
 
 function BrowserShell({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-[18px] border border-[#ddd9d1] bg-white shadow-[0_22px_65px_rgba(35,31,26,0.1)]">
-      <div className="flex h-11 items-center border-b border-[#ede9e2] bg-[#fcfbf8] px-4">
+    <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_22px_65px_rgba(35,31,26,0.1)]">
+      <div className="flex h-11 items-center border-b border-slate-100 bg-slate-50 px-4">
         <div className="flex gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-[#dbd7d0]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#dbd7d0]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#dbd7d0]" />
         </div>
         <p className="mx-auto text-[11px] font-medium text-[#8c8479]">{title}</p>
-        <span className="rounded-full border border-[#e9e4db] px-2 py-1 text-[10px] text-[#989185]">Live</span>
+        <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] text-[#989185]">Live</span>
       </div>
       {children}
     </div>
@@ -148,18 +148,18 @@ function DirectorMockup() {
   return (
     <BrowserShell title="Shuffla / Generate">
       <div className="grid min-h-[440px] md:grid-cols-[0.42fr_0.58fr]">
-        <div className="border-b border-[#eee9e1] bg-[#faf8f3] p-5 md:border-b-0 md:border-r">
+        <div className="border-b border-slate-100 bg-slate-50 p-5 md:border-b-0 md:border-r">
           <div className="flex items-center gap-2 text-xs font-semibold text-[#362f29]">
             <MessageSquareText className="h-4 w-4 text-[#e95b30]" />
             {t('director_label')}
           </div>
-          <div className="mt-6 rounded-xl bg-white p-3 text-[11px] leading-5 text-[#686156] shadow-sm ring-1 ring-[#ebe6dc]">
+          <div className="mt-6 rounded-xl bg-white p-3 text-[11px] leading-5 text-[#686156] shadow-sm ring-1 ring-slate-100">
             {t('director_user_msg')}
           </div>
           <div className="mt-3 rounded-xl bg-[#302c27] p-3 text-[11px] leading-5 text-white/82">
             {directorMsg}
           </div>
-          <div className="mt-5 flex items-center justify-between rounded-xl border border-[#e6e0d6] bg-white px-3 py-2.5 text-[10px] text-[#827a6f]">
+          <div className="mt-5 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[10px] text-[#827a6f]">
             {t('msg_input')}
             <button type="button" onClick={generate} className="rounded-lg bg-[#171714] px-2.5 py-1 text-white transition active:scale-95">Send</button>
           </div>
@@ -176,7 +176,7 @@ function DirectorMockup() {
           </div>
           <div className="mt-6 grid grid-cols-3 gap-2">
             {['dark-editorial', '5 slides', '4:5 feed'].map(item => (
-              <div key={item} className="rounded-lg border border-[#ece6dc] bg-[#fcfbf9] px-2 py-3 text-center text-[10px] text-[#716a60]">
+              <div key={item} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-3 text-center text-[10px] text-[#716a60]">
                 {item}
               </div>
             ))}
@@ -186,7 +186,7 @@ function DirectorMockup() {
               <div
                 key={number}
                 className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all duration-500 ${
-                  phase === 'generating' && index < 3 ? 'border-[#f0c6b7] bg-[#fff8f4]' : 'border-[#eee9e1]'
+                  phase === 'generating' && index < 3 ? 'border-[#f0c6b7] bg-[#fff8f4]' : 'border-slate-200'
                 } ${phase === 'done' ? 'translate-x-0 opacity-100' : ''}`}
               >
                 <span className="font-mono text-[10px] text-[#aaa294]">{number}</span>
@@ -233,8 +233,8 @@ function EditorMockup() {
 
   return (
     <BrowserShell title="Shuffla / Editorial Studio">
-      <div className="grid min-h-[445px] grid-cols-[0.66fr_0.34fr] bg-[#fbfaf7]">
-        <div className="flex gap-3 border-r border-[#ede8df] p-4 md:p-5">
+      <div className="grid min-h-[445px] grid-cols-[0.66fr_0.34fr] bg-white">
+        <div className="flex gap-3 border-r border-slate-200 p-4 md:p-5">
           <div className="hidden w-14 space-y-2 md:block">
             {editorialCards.slice(0, 3).map((image, index) => (
               <button type="button" key={image} onClick={() => setSelectedCard(index)} className={`relative block aspect-[4/5] w-full overflow-hidden rounded-md transition ${selectedCard === index ? 'ring-2 ring-[#e95b30]' : 'opacity-70 hover:opacity-100'}`}>
@@ -250,7 +250,7 @@ function EditorMockup() {
         </div>
         <div className="p-3 md:p-4">
           <p className="text-xs font-semibold text-[#27231f]">{t('editor_title')}</p>
-          <div className="mt-4 flex gap-1 rounded-lg bg-[#f1ede6] p-1 text-[9px] text-[#82796e]">
+          <div className="mt-4 flex gap-1 rounded-lg bg-slate-100 p-1 text-[9px] text-[#82796e]">
             {tabLabels.map(label => (
               <button type="button" key={label} onClick={() => setTab(label)} className={`flex-1 rounded-md py-1.5 text-center transition ${tab === label ? 'bg-white font-semibold text-[#27231f]' : ''}`}>{label}</button>
             ))}
@@ -258,10 +258,10 @@ function EditorMockup() {
           {tab === tabLabels[0] ? (
             <>
               <p className="mt-5 text-[10px] text-[#91887b]">Title</p>
-              <div className="mt-2 rounded-md border border-[#e6dfd4] bg-white p-2 text-[10px] text-[#3c372f]">Why Shuffla?</div>
+              <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-[10px] text-[#3c372f]">Why Shuffla?</div>
             </>
           ) : (
-            <div className="mt-5 rounded-md border border-[#e6dfd4] bg-white p-3 text-[10px] leading-5 text-[#6d665c]">
+            <div className="mt-5 rounded-md border border-slate-200 bg-white p-3 text-[10px] leading-5 text-[#6d665c]">
               {tab === tabLabels[1] ? t('bg_hint') : t('effect_hint')}
             </div>
           )}
@@ -308,12 +308,12 @@ export function CapabilityObjects() {
   ]
 
   return (
-    <section className="border-y border-[#ebe8e2] bg-white py-24 md:py-28">
+    <section className="border-y border-slate-100 bg-white py-24 md:py-28">
       <div className="mx-auto max-w-[1300px] px-5 md:px-8">
-        <div className="grid divide-y divide-[#ebe8e2] md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="grid divide-y divide-slate-100 md:grid-cols-3 md:divide-x md:divide-y-0">
           {capabilities.map((item, index) => (
             <article key={item.title} className="px-0 py-10 first:pt-0 last:pb-0 md:px-10 md:py-0 md:first:pl-0 md:last:pr-0">
-              <p className="font-mono text-[11px] tracking-[0.22em] text-[#aaa294]">FIG 0.{index + 1}</p>
+              <p className="font-mono text-[11px] tracking-[0.22em] text-slate-400">FIG 0.{index + 1}</p>
               <div className={`landing-capability-figure landing-capability-${index + 1} my-10 flex h-44 items-center justify-center text-[#9b9488]`}>{item.figure}</div>
               <h3 className="text-lg font-medium tracking-[-0.03em] text-[#211e1a]">{item.title}</h3>
               <p className="mt-3 max-w-xs text-sm leading-7 text-[#777064]">{item.body}</p>
@@ -395,45 +395,45 @@ export function ConnectedWorkflow() {
   ]
 
   return (
-    <section id="workflow" className="bg-[#fbfaf7] py-24 md:py-32">
+    <section id="workflow" className="bg-white py-24 md:py-32">
       <div className="mx-auto grid max-w-[1300px] gap-14 px-5 md:px-8 lg:grid-cols-[0.37fr_0.63fr]">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#847d73]">One connected system</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">One connected system</p>
           <h2 className="mt-5 text-[clamp(2.2rem,4vw,3.5rem)] font-semibold leading-[1.12] tracking-[-0.06em] whitespace-pre-line">
             {t('workflow_title')}
           </h2>
-          <p className="mt-6 max-w-sm text-sm leading-7 text-[#777064]">
+          <p className="mt-6 max-w-sm text-sm leading-7 text-slate-500">
             {t('workflow_desc')}
           </p>
         </div>
-        <div className="landing-operations-panel overflow-hidden rounded-[24px] border border-[#e5dfd5] bg-white">
-          <div className="flex items-center justify-between border-b border-[#eee8df] px-5 py-4">
+        <div className="landing-operations-panel overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <div className="flex items-center gap-2 text-xs font-medium text-[#332f29]">
               <span className="landing-live-dot h-2 w-2 rounded-full bg-[#ed6238]" />
               Content operation / live
             </div>
-            <span className="font-mono text-[10px] text-[#968d80]">05 assets synced</span>
+            <span className="font-mono text-[10px] text-slate-400">05 assets synced</span>
           </div>
           <div className="grid md:grid-cols-[0.58fr_0.42fr]">
-            <div className="border-b border-[#eee8df] p-5 md:border-b-0 md:border-r">
+            <div className="border-b border-slate-200 p-5 md:border-b-0 md:border-r">
               <div className="relative flex justify-between pb-8">
-                <span className="landing-pipeline-track absolute left-8 right-8 top-[17px] h-px bg-[#e5dfd6]" />
+                <span className="landing-pipeline-track absolute left-8 right-8 top-[17px] h-px bg-slate-200" />
                 {stages.map((stage, index) => (
                   <button key={stage.title} type="button" onClick={() => setActive(index)} className="relative z-10 flex flex-col items-center gap-3">
-                    <span className={`flex h-9 w-9 items-center justify-center rounded-full border text-xs transition ${active === index ? 'border-[#ed6238] bg-[#fff2ed] text-[#ed6238]' : 'border-[#ddd7cc] bg-white text-[#a29a8d]'}`}>
+                    <span className={`flex h-9 w-9 items-center justify-center rounded-full border text-xs transition ${active === index ? 'border-[#ed6238] bg-[#fff2ed] text-[#ed6238]' : 'border-slate-200 bg-white text-[#a29a8d]'}`}>
                       0{index + 1}
                     </span>
                     <span className={`text-[11px] transition ${active === index ? 'font-medium text-[#302c26]' : 'text-[#81796d]'}`}>{stage.title}</span>
                   </button>
                 ))}
               </div>
-              <div className="rounded-xl border border-[#eee7dd] bg-[#fcfbf8] p-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-[#29251f]">{stages[active].metric}</p>
                   <p className="font-mono text-[11px] text-[#e95b30]">{stages[active].progress}</p>
                 </div>
-                <p className="mt-2 text-xs text-[#7a7267]">{stages[active].detail}</p>
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#ece6dc]">
+                <p className="mt-2 text-xs text-slate-500">{stages[active].detail}</p>
+                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
                   <div className="landing-operation-progress h-full rounded-full bg-[#ed6238]" style={{ width: stages[active].progress }} />
                 </div>
               </div>
@@ -443,12 +443,12 @@ export function ConnectedWorkflow() {
               </div>
             </div>
             <div className="p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-[#968d80]">Activity stream</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Activity stream</p>
               <div className="mt-5 space-y-4">
                 {activityItems.map(([message, time], index) => (
                   <div key={message} className="landing-activity-item flex gap-3" style={{ animationDelay: `${index * 0.55}s` }}>
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ed6238]" />
-                    <div className="flex-1 border-b border-[#f0ebe3] pb-3">
+                    <div className="flex-1 border-b border-slate-100 pb-3">
                       <p className="text-[11px] text-[#514b43]">{message}</p>
                       <p className="mt-1 font-mono text-[9px] text-[#a39b90]">{time}</p>
                     </div>

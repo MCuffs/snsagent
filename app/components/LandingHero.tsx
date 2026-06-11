@@ -33,7 +33,7 @@ const COL_C = [
 ]
 
 // 페이지 배경색 — 갤러리 상하단 페이드와 통일
-const BG = '#fbfaf7'
+const BG = '#ffffff'
 
 interface Props {
   authenticated: boolean
@@ -72,11 +72,16 @@ export function LandingHero({
   return (
     <section
       ref={containerRef}
-      className="relative"
+      className="relative overflow-hidden"
       style={{ background: BG }}
     >
-      {/* 은은한 중앙 글로우 */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_30%,rgba(237,98,56,0.05),transparent)]" />
+      {/* 은은하게 퍼지고 움직이는 그라데이션 백그라운드 효과 */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Glow 1: Sky Blue */}
+        <div className="bg-glow-1 absolute -top-[15%] left-[5%] h-[550px] w-[550px] rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.07)_0%,transparent_70%)] blur-3xl" />
+        {/* Glow 2: Light Blue */}
+        <div className="bg-glow-2 absolute top-[10%] -right-[10%] h-[650px] w-[650px] rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.07)_0%,transparent_70%)] blur-3xl" />
+      </div>
 
       {/* ── 히어로 텍스트 ─────────────────────────────── */}
       <div className="relative z-10 mx-auto max-w-5xl px-5 pt-28 text-center md:pt-36">
