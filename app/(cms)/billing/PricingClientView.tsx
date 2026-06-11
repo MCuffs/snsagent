@@ -97,8 +97,7 @@ function PricingGrid({
   const [cardModalPlan, setCardModalPlan] = useState<string | null>(null)
 
   // Locale-based payment method determination
-  // NicePay 일시 중단 — 준비중
-  const showNicePay = false
+  const showNicePay = locale === 'ko' && !!nicepayClientKey
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
 
   // Google Ads conversion tracking
