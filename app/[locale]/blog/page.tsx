@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title: isEn ? 'Blog | Shuffla Card News Studio' : '블로그 | Shuffla 카드뉴스 스튜디오',
     description: isEn
-      ? 'Guides, updates, tips, and FAQs for AI card news automation, Instagram publishing, and social content operations.'
-      : '카드뉴스 자동화, SNS 자동 업로드, 인스타그램 자동 게시를 위한 Shuffla 활용 가이드와 FAQ를 확인하세요.',
+      ? 'Guides, updates, tips, and FAQs for AI card news creation with Shuffla.'
+      : 'AI 카드뉴스 제작과 Shuffla 활용 가이드, FAQ를 확인하세요.',
     alternates: {
       canonical: `${base}/${locale}/blog`,
       languages: { ko: `${base}/ko/blog`, en: `${base}/en/blog` },
@@ -22,8 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     openGraph: {
       title: isEn ? 'Blog | Shuffla Card News Studio' : '블로그 | Shuffla 카드뉴스 스튜디오',
       description: isEn
-        ? 'Practical guides for AI card news automation and social publishing.'
-        : 'AI 카드뉴스 자동화와 SNS 게시 운영을 위한 실전 가이드.',
+        ? 'Practical guides for AI card news creation and content strategy.'
+        : 'AI 카드뉴스 제작과 콘텐츠 전략을 위한 실전 가이드.',
       url: `${base}/${locale}/blog`,
       type: 'website',
       siteName: 'Shuffla',
@@ -33,14 +33,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       card: 'summary_large_image',
       title: isEn ? 'Blog | Shuffla Card News Studio' : '블로그 | Shuffla 카드뉴스 스튜디오',
       description: isEn
-        ? 'Guides for card news automation, social uploads, and Instagram publishing.'
-        : '카드뉴스 자동화, SNS 자동 업로드, 인스타그램 자동 게시 가이드.',
+        ? 'Guides for AI card news creation and content workflow.'
+        : 'AI 카드뉴스 제작 가이드.',
       images: [`${base}/og-image.png`],
       site: '@shuffla_io',
     },
     keywords: isEn
-      ? ['card news automation', 'AI content tips', 'Instagram publishing guide', 'social media content automation']
-      : ['카드뉴스 자동화', 'SNS 자동 업로드', '인스타그램 자동 게시', 'AI 카드뉴스 제작', '카드뉴스 가이드'],
+      ? ['card news creator', 'AI content tips', 'card news guide', 'social media content']
+      : ['카드뉴스 제작', 'AI 카드뉴스', '카드뉴스 가이드', '콘텐츠 제작'],
   }
 }
 
@@ -112,8 +112,8 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
             </h1>
             <p className="mt-6 max-w-xl text-[16px] leading-7 text-slate-500 font-medium">
               {isEn
-                ? 'Practical articles for AI card news automation, social uploads, and Instagram publishing.'
-                : '카드뉴스 자동화, SNS 자동 업로드, 인스타그램 자동 게시를 더 효율적으로 운영하는 방법을 정리했습니다.'}
+                ? 'Practical articles on how to create better card news with AI — tips, workflows, and updates.'
+                : 'AI 카드뉴스를 더 잘 만드는 방법을 정리했습니다. 활용 팁, 워크플로우, 업데이트를 확인하세요.'}
             </p>
           </div>
         </section>
