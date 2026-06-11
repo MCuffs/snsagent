@@ -34,15 +34,7 @@ const KO_SECTIONS = [
     ],
   },
   {
-    title: '제3조 1회 이용권(AI 배경 재생성 패스) 환불',
-    items: [
-      '3,000원 1회 이용권은 결제 완료 후 서비스에 즉시 적용됩니다.',
-      '이용권을 사용하기 전이라면 결제일로부터 7일 이내에 환불을 요청할 수 있습니다.',
-      '이용권을 이미 사용한 경우에는 환불이 불가합니다.',
-    ],
-  },
-  {
-    title: '제4조 환불이 불가한 경우',
+    title: '제3조 환불이 불가한 경우',
     items: [
       '서비스를 이미 사용한 경우(카드뉴스 생성, 다운로드, 편집 등 기능 이용 이력이 있는 경우)',
       '결제일로부터 7일이 경과한 경우',
@@ -51,11 +43,11 @@ const KO_SECTIONS = [
     ],
   },
   {
-    title: '제5조 회사 귀책 사유에 의한 환불',
+    title: '제4조 회사 귀책 사유에 의한 환불',
     body: '회사의 중대한 서비스 오류, 결제 시스템 오작동 등 회사 귀책 사유로 인해 서비스를 정상적으로 이용하지 못한 경우, 회사는 이용자에게 적절한 방법(전액 환불 또는 크레딧 지급)으로 보상합니다.',
   },
   {
-    title: '제6조 환불 절차',
+    title: '제5조 환불 절차',
     items: [
       '환불을 요청하려면 admin@shuffla.io로 이메일을 보내주세요.',
       '이메일에 가입 계정 이메일 주소, 결제 일자, 환불 사유를 포함해 주세요.',
@@ -64,11 +56,11 @@ const KO_SECTIONS = [
     ],
   },
   {
-    title: '제7조 정책 변경',
+    title: '제6조 정책 변경',
     body: '회사는 관련 법령 또는 서비스 운영 정책에 따라 본 환불 정책을 변경할 수 있습니다. 변경 시 서비스 내 공지 또는 이메일을 통해 사전 안내합니다.',
   },
   {
-    title: '제8조 문의',
+    title: '제7조 문의',
     body: '환불 관련 문의는 admin@shuffla.io로 연락해 주세요. 운영시간: 평일 10:00 ~ 18:00 (KST)',
     isContact: true,
   },
@@ -90,28 +82,20 @@ const EN_SECTIONS = [
     ],
   },
   {
-    title: 'Article 3 — One-Time Pass (AI Background Regeneration) Refund',
-    items: [
-      'The ₩3,000 one-time pass is applied to your account immediately upon purchase.',
-      'If the pass has not been used, you may request a refund within 7 days of purchase.',
-      'Once the pass has been used, it is non-refundable.',
-    ],
-  },
-  {
-    title: 'Article 4 — Non-Refundable Cases',
+    title: 'Article 3 — Non-Refundable Cases',
     items: [
       'The service has been used (card news generated, downloaded, or edited)',
       'More than 7 days have passed since the payment date',
       'Access was restricted due to a violation of our Terms of Service',
-      'Free credits or passes provided through promotions, discount codes, or events',
+      'Free credits provided through promotions, discount codes, or events',
     ],
   },
   {
-    title: 'Article 5 — Refund Due to Company Error',
+    title: 'Article 4 — Refund Due to Company Error',
     body: 'If you are unable to use the service due to a material error or payment system failure on our part, the Company will provide appropriate compensation — either a full refund or equivalent service credit.',
   },
   {
-    title: 'Article 6 — Refund Process',
+    title: 'Article 5 — Refund Process',
     items: [
       'To request a refund, email us at admin@shuffla.io.',
       'Please include your account email address, payment date, and reason for the refund request.',
@@ -120,11 +104,11 @@ const EN_SECTIONS = [
     ],
   },
   {
-    title: 'Article 7 — Policy Updates',
+    title: 'Article 6 — Policy Updates',
     body: 'We may update this Refund Policy in accordance with applicable law or changes to our service. We will notify users in advance via in-app notice or email.',
   },
   {
-    title: 'Article 8 — Contact',
+    title: 'Article 7 — Contact',
     body: 'For refund inquiries, contact us at admin@shuffla.io. Support hours: Mon–Fri, 10:00–18:00 KST.',
     isContact: true,
   },
