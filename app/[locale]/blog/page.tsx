@@ -68,27 +68,49 @@ const guidesEn = [
   { title: 'Build card news in 9 minutes', duration: '9:22', accent: 'from-[#1c7ed6] to-[#339af0]' },
 ]
 
+const postImages: Record<string, string> = {
+  // Korean slugs
+  '카드뉴스-자동화-가이드': '/front/card-10.png',
+  '카드뉴스-주제-선정법': '/front/card-13.png',
+  '제품-이미지-카드뉴스-품질': '/front/card-11.png',
+  '셔플라-공식-런칭': '/front/card-04.png',
+  '요금제-결제-faq': '/front/card-01.png',
+  'ai-저작권-faq': '/front/card-15.png',
+  // English slugs
+  'card-news-automation-guide': '/front/card-10.png',
+  'best-topics-for-card-news': '/front/card-13.png',
+  'product-images-card-news-quality': '/front/card-11.png',
+  'shuffla-official-launch': '/front/card-04.png',
+  'billing-subscription-faq': '/front/card-01.png',
+  'ai-copyright-faq': '/front/card-15.png',
+}
+
 export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const authenticated = Boolean(await getSessionUser())
   const isEn = locale === 'en'
   const posts = getBlogPosts(locale)
-  const featured = posts[3]
+  const featured = posts[3] // Shuffla launch post
+  const featuredImage = postImages[featured.slug] || '/front/card-04.png'
   const categories = isEn ? categoriesEn : categoriesKo
-  const guides = isEn ? guidesEn : guidesKo
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col relative overflow-hidden selection:bg-sky-500/20">
+      {/* Background glow and grid pattern */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-gradient-to-b from-sky-100/20 via-sky-50/5 to-transparent rounded-full blur-3xl opacity-70 z-0" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-[0.15] z-0" />
+
       <MarketingNav authenticated={authenticated} locale={locale} />
 
-      <main className="flex-1">
-        <section className="relative overflow-hidden pt-20 pb-12 lg:pt-28 lg:pb-16">
-          <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
-            <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#ff6b35]">Blog</p>
-            <h1 className="mt-5 max-w-3xl text-[44px] font-black leading-[1.05] tracking-[-0.045em] text-[#0a0a0a] md:text-[60px]">
+      <main className="flex-1 relative z-10">
+        {/* Header Section */}
+        <section className="relative pt-20 pb-12 lg:pt-28 lg:pb-16">
+          <div className="mx-auto max-w-7xl px-6 lg:px-8">
+            <p className="text-[12px] font-black uppercase tracking-[0.16em] text-brand-blue">Blog</p>
+            <h1 className="mt-5 max-w-3xl text-[40px] font-black leading-[1.1] tracking-[-0.04em] text-slate-900 md:text-[54px] whitespace-pre-line">
               {isEn ? 'Guides, updates,\nand everything Shuffla' : '카드뉴스 자동화 가이드부터\n최신 업데이트까지'}
             </h1>
-            <p className="mt-7 max-w-xl text-[17px] leading-8 text-[#525252]">
+            <p className="mt-6 max-w-xl text-[16px] leading-7 text-slate-500 font-medium">
               {isEn
                 ? 'Practical articles for AI card news automation, social uploads, and Instagram publishing.'
                 : '카드뉴스 자동화, SNS 자동 업로드, 인스타그램 자동 게시를 더 효율적으로 운영하는 방법을 정리했습니다.'}
@@ -96,89 +118,112 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
           </div>
         </section>
 
+        {/* Featured Post Split-Layout Section */}
         <section className="pb-16">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Link
-                href={`/${locale}/blog/${featured.slug}`}
-                className="group relative flex min-h-[400px] flex-col justify-end overflow-hidden rounded-[22px] bg-gradient-to-br from-[#fff4e6] via-[#ffe8cc] to-[#ffd6a5] p-10 md:p-12 lg:col-span-2"
-              >
-                <div className="relative">
-                  <div className="mb-6 flex items-center gap-3">
-                    <span className={`inline-block rounded-full px-3 py-1.5 text-[12px] font-black ${featured.tagClass}`}>{featured.category}</span>
-                    <span className="text-[13px] font-bold text-[#0a0a0a]/60">{featured.date}</span>
-                    <span className="text-[13px] text-[#0a0a0a]/60">·</span>
-                    <span className="text-[13px] font-bold text-[#0a0a0a]/60">{featured.readTime}</span>
-                  </div>
-                  <h2 className="text-[32px] font-black leading-[1.1] tracking-[-0.04em] text-[#0a0a0a] md:text-[40px]">{featured.title}</h2>
-                  <p className="mt-5 max-w-xl text-[16px] leading-[1.65] text-[#0a0a0a]/75">{featured.desc}</p>
-                  <div className="mt-8 inline-flex items-center gap-2 text-[14px] font-black text-[#0a0a0a] transition-all group-hover:gap-3">
-                    {isEn ? 'Read more' : '자세히 읽기'} <ArrowRight className="h-4 w-4" />
-                  </div>
+            <Link
+              href={`/${locale}/blog/${featured.slug}`}
+              className="group block rounded-[28px] border border-slate-200/80 bg-white/60 backdrop-blur-md p-6 md:p-8 shadow-[0_12px_40px_-20px_rgba(14,165,233,0.08)] hover:border-sky-200 hover:shadow-[0_20px_50px_-15px_rgba(14,165,233,0.12)] transition-all duration-300"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                {/* Left: Rounded Image Container */}
+                <div className="aspect-[4/3] w-full relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                  <img
+                    src={featuredImage}
+                    alt={featured.title}
+                    className="object-cover w-full h-full transform transition-transform duration-500 group-hover:scale-102"
+                  />
                 </div>
-              </Link>
 
-              <div className="flex flex-col justify-between rounded-[22px] bg-[#0a0a0a] p-10 text-white">
-                <div>
-                  <Sparkles className="h-7 w-7 text-[#ff6b35]" strokeWidth={2.2} />
-                  <h3 className="mt-6 text-[24px] font-black leading-[1.2] tracking-[-0.025em]">
-                    {isEn ? 'Watch quick guides' : '영상으로 빠르게 보기'}
-                  </h3>
-                  <p className="mt-4 text-[14px] leading-[1.6] text-white/60">
-                    {isEn ? 'Learn Shuffla core features with short video guides.' : '짧은 영상으로 Shuffla 핵심 기능을 빠르게 익혀보세요.'}
+                {/* Right: Info and Text Details */}
+                <div className="flex flex-col justify-center">
+                  <div className="mb-4 flex items-center gap-3 text-xs">
+                    <span className={`inline-block rounded-full px-3 py-1.5 text-[11px] font-bold ${featured.tagClass}`}>{featured.category}</span>
+                    <span className="text-slate-400 font-semibold">{featured.date}</span>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-400 font-semibold">{featured.readTime}</span>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold leading-[1.2] tracking-[-0.03em] text-slate-900 group-hover:text-brand-blue transition-colors duration-300">
+                    {featured.title}
+                  </h2>
+                  <p className="mt-5 text-[15px] leading-relaxed text-slate-500 font-medium">
+                    {featured.desc}
                   </p>
-                </div>
-                <div className="mt-8 space-y-3">
-                  {guides.map((guide) => (
-                    <Link key={guide.title} href={`/${locale}/blog/${posts[0].slug}`} className="group flex items-center gap-3">
-                      <div className={`flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-[11px] font-black text-white ${guide.accent}`}>
-                        {guide.duration}
-                      </div>
-                      <span className="text-[13px] font-bold text-white/85 group-hover:text-white">{guide.title}</span>
-                    </Link>
-                  ))}
+                  <div className="mt-8 inline-flex items-center gap-1.5 text-sm font-bold text-brand-blue group-hover:text-brand-blue-hover transition-colors">
+                    {isEn ? 'Read full article' : '전체 읽기'} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
           </div>
         </section>
 
-        <section className="pb-8">
+        {/* Categories Bar */}
+        <section className="pb-10">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="flex flex-wrap items-center gap-2">
-              {categories.map((category) => (
-                <button key={category.name} className={`rounded-full px-4 py-2 text-[13px] font-bold transition-all hover:-translate-y-[1px] ${category.color}`}>
-                  {category.name}
-                </button>
-              ))}
-              <span className="ml-auto text-[13px] font-medium text-[#8a8a8a]">
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-6">
+              {categories.map((category) => {
+                const isAll = category.name === '전체' || category.name === 'All';
+                return (
+                  <button
+                    key={category.name}
+                    className={`rounded-full px-4.5 py-2 text-[13px] font-bold transition-all ${
+                      isAll
+                        ? 'bg-slate-900 text-white hover:bg-slate-800'
+                        : 'bg-white border border-slate-200/60 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                );
+              })}
+              <span className="ml-auto text-[13px] font-bold text-slate-400">
                 {posts.length} {isEn ? 'posts' : '개'}
               </span>
             </div>
           </div>
         </section>
 
+        {/* Recent Posts Grid */}
         <section className="pb-28">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {posts.map((post) => (
-                <Link
-                  key={post.slug}
-                  href={`/${locale}/blog/${post.slug}`}
-                  className="group relative flex flex-col rounded-[22px] border border-black/[0.06] bg-white p-7 transition-all hover:border-black/[0.12] hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.08)]"
-                >
-                  <div className="mb-5 flex items-center gap-2">
-                    <span className={`inline-block rounded-md px-2.5 py-1 text-[11px] font-black ${post.tagClass}`}>{post.category}</span>
-                    <span className="text-[12px] font-medium text-[#8a8a8a]">{post.date}</span>
-                  </div>
-                  <h3 className="mb-3 text-[18px] font-black leading-[1.3] tracking-[-0.02em] text-[#0a0a0a] transition-colors group-hover:text-[#ff6b35]">{post.title}</h3>
-                  <p className="mb-6 flex-1 text-[14px] leading-[1.6] text-[#525252] line-clamp-3">{post.desc}</p>
-                  <div className="flex items-center justify-between border-t border-black/[0.06] pt-4">
-                    <span className="text-[12px] font-bold text-[#8a8a8a]">{post.readTime}</span>
-                    <ArrowUpRight className="h-4 w-4 text-[#525252] transition-all group-hover:-translate-y-[1px] group-hover:translate-x-[1px] group-hover:text-[#ff6b35]" />
-                  </div>
-                </Link>
-              ))}
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {posts.map((post) => {
+                const postImage = postImages[post.slug] || '/front/card-01.png'
+                return (
+                  <Link
+                    key={post.slug}
+                    href={`/${locale}/blog/${post.slug}`}
+                    className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)] transition-all duration-300 hover:border-sky-200 hover:shadow-[0_20px_40px_-15px_rgba(14,165,233,0.08)] hover:-translate-y-1"
+                  >
+                    <div className="aspect-[4/3] w-full overflow-hidden border-b border-slate-100 bg-slate-50 relative">
+                      <img
+                        src={postImage}
+                        alt={post.title}
+                        className="object-cover w-full h-full transform transition-transform duration-500 group-hover:scale-102"
+                      />
+                    </div>
+                    <div className="p-6 flex flex-col flex-1">
+                      <div className="mb-4 flex items-center gap-3 text-xs">
+                        <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold ${post.tagClass}`}>{post.category}</span>
+                        <span className="text-slate-400 font-semibold">{post.date}</span>
+                      </div>
+                      <h3 className="mb-3 text-[18px] font-bold leading-[1.4] text-slate-900 group-hover:text-brand-blue transition-colors duration-300 line-clamp-2">
+                        {post.title}
+                      </h3>
+                      <p className="mb-6 flex-1 text-[14px] leading-relaxed text-slate-500 font-medium line-clamp-3">
+                        {post.desc}
+                      </p>
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                        <span className="text-[12px] font-bold text-slate-400">{post.readTime}</span>
+                        <div className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 group-hover:text-brand-blue transition-colors">
+                          {isEn ? 'Read article' : '읽기'} <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </section>
