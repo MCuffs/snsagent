@@ -672,9 +672,24 @@ function CardInfoModal({
           </button>
         </div>
 
-        <p className="mb-6 text-sm text-slate-500">
-          <span className="font-semibold text-slate-700">Shuffla {planKey}</span> 정기 구독 등록을 위해 카드 정보를 입력해 주세요.
+        <p className="mb-4 text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">Shuffla {planKey === 'PRO' ? 'Creator' : planKey === 'UNLIMITED' ? 'Studio' : planKey}</span> 정기 구독 등록을 위해 카드 정보를 입력해 주세요.
         </p>
+
+        {/* W-1/7: 결제 금액·자동갱신 주기 명시 */}
+        <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-600">결제 금액</span>
+            <span className="font-bold text-slate-900">
+              {planKey === 'PRO' ? '월 25,000원 (부가세 포함)' : planKey === 'UNLIMITED' ? '월 39,000원 (부가세 포함)' : planKey === 'LITE' ? '3,000원 (부가세 포함, 1회)' : ''}
+            </span>
+          </div>
+          {planKey !== 'LITE' && (
+            <p className="mt-1.5 text-xs text-slate-400">
+              매월 자동 청구됩니다. 언제든지 취소할 수 있으며, 취소 후 즉시 이용이 중단됩니다.
+            </p>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -31,6 +31,12 @@ export async function POST(request: Request) {
     )
   }
 
+  // 나이스페이 웹훅 인증:
+  // 나이스페이는 표준 HMAC 서명 헤더를 지원하지 않아 커스텀 Secret 방식 사용.
+  // Authorization: Bearer {NICEPAY_WEBHOOK_SECRET} 헤더로 검증 (기본).
+  // 나이스페이 콘솔에서 웹훅 URL에 ?secret= 쿼리파라미터 방식을 써야 하는 경우
+  // 환경변수 WEBHOOK_ALLOW_QUERY_SECRET=true 를 설정하면 쿼리 방식도 허용됨
+  // (기본값 false — URL 노출 방지).
   if (!verifyRequestSecret(request, webhookSecret)) {
     return unauthorizedJson('Unauthorized NicePay webhook request.')
   }

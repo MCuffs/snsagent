@@ -70,6 +70,14 @@ export default async function PricingPage({
         customerEmail={user.email}
         showRegenerationOffer={params.offer === 'regeneration'}
       />
+
+      {/* W-6: 결제 페이지 내 사업자 정보 고지 (전자상거래법 제10조) */}
+      <div className="mt-12 border-t border-[#e4e4e7] pt-6 text-[11px] leading-6 text-[#a1a1aa] space-y-0.5">
+        <p className="font-semibold text-[#71717a]">파랑버섯 스튜디오</p>
+        <p>대표자: 정민수 · 사업자등록번호: 354-14-0333 · 통신판매업 신고번호: 2026-서울영등포-1320호</p>
+        <p>주소: 서울특별시 영등포구 · 고객센터: admin@shuffla.io</p>
+        <p>부가세 포함 가격 · 구독 취소 시 잔여 기간 부분 환불 미제공</p>
+      </div>
     </div>
   )
 }

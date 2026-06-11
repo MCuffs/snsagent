@@ -55,6 +55,14 @@ export async function approveNicepayPaymentForUser(
     return { ok: false, status: 409, error: '이미 사용 가능한 1회권이 있습니다.', offer: 'regeneration' }
   }
 
+  // W-5: orderId 중복 체크 — 동일 orderId로 이미 처리된 결제인지 DB에서 사전 확인
+  // nicepayLastOrderId는 DB에 unique 제약이 있어 최후 방어가 되나,
+  // 중복 API 호출 자체를 방지하기 위해 진입 시점에 선제 차단
+  if (orderId && user.nicepayLastOrderId === orderId) {
+    console.warn(`[NicePay Approve] Duplicate orderId detected: ${orderId} for user=${user.id}`)
+    return { ok: false, status: 409, error: '이미 처리된 결제입니다.' }
+  }
+
   const expectedAmount = PLAN_AMOUNTS[validPlan]
   console.log(`[NicePay Approve] user=${user.id} plan=${validPlan} amount=${expectedAmount} tid=${tid}`)
 

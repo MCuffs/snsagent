@@ -285,7 +285,7 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
                       </a>
                     </p>
                     <p>개인정보보호 책임자</p>
-                    <p>성명: 운영자 또는 책임자명 입력</p>
+                    <p>성명: 정민수</p>
                     <p>
                       이메일:{' '}
                       <a href="mailto:admin@shuffla.io" className="font-medium text-[#171714] hover:underline">
