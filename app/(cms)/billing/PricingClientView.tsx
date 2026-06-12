@@ -441,19 +441,19 @@ function PricingGrid({
                       <button
                         type="button"
                         onClick={() => handleFastSpringCheckout(planKey)}
-                        className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                        className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 py-3.5 text-sm font-semibold text-slate-100 border border-indigo-900/30 shadow-sm transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                         <span className="relative flex items-center justify-center gap-2">
                           {!fscLoaded ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                               Loading...
                             </>
                           ) : (
                             <>
-                              <CreditCard className="h-4 w-4" />
-                              {locale === 'en' ? 'Subscribe with FastSpring' : 'FastSpring 결제'}
+                              <CreditCard className="h-4 w-4 text-indigo-400" />
+                              {locale === 'en' ? 'FastSpring (Pending)' : 'FastSpring (임시대기중)'}
                             </>
                           )}
                         </span>
