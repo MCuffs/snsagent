@@ -101,17 +101,16 @@ function PricingGrid({
   const showNicePay = locale === 'ko' && Boolean(nicepayClientKey)
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
   const isFastSpringTester = _customerEmail?.trim().toLowerCase() === 'alstnwjd0424@gmail.com'
-
   const getFastSpringUrl = (plan: string) => {
-    const storefront = process.env.NEXT_PUBLIC_FASTSPRING_STOREFRONT || 'shuffla'
+    const storefront = process.env.NEXT_PUBLIC_FASTSPRING_STOREFRONT || 'shuffla.test.onfastspring.com'
     const productPath = plan === 'PRO'
       ? (process.env.NEXT_PUBLIC_FASTSPRING_CREATOR_PRODUCT || 'shuffla-creator-plan')
       : (process.env.NEXT_PUBLIC_FASTSPRING_STUDIO_PRODUCT || 'shuffla-studio-plan')
     const emailParam = _customerEmail ? `?email=${encodeURIComponent(_customerEmail)}` : ''
-    if (storefront.includes('.') || storefront.includes('/')) {
+    if (storefront.includes('.')) {
       return `https://${storefront}/${productPath}${emailParam}`
     }
-    return `https://${storefront}.fastspring.com/product/${productPath}${emailParam}`
+    return `https://${storefront}.onfastspring.com/${productPath}${emailParam}`
   }
 
   // Google Ads conversion tracking
