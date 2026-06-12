@@ -153,10 +153,10 @@ function PricingGrid({
         fsc.builder.checkout()
       } catch (err) {
         console.error('FastSpring Popup checkout error:', err)
-        setError('FastSpring 결제창을 여는 데 실패했습니다.')
+        setError(locale === 'en' ? 'Failed to open FastSpring checkout modal.' : 'FastSpring 결제창을 여는 데 실패했습니다.')
       }
     } else {
-      setError('FastSpring 결제 라이브러리가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.')
+      setError(locale === 'en' ? 'FastSpring checkout library is not loaded yet. Please try again in a moment.' : 'FastSpring 결제 라이브러리가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.')
     }
   }
 
