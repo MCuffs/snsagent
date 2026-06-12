@@ -100,6 +100,19 @@ function PricingGrid({
   // Locale-based payment method determination
   const showNicePay = locale === 'ko' && Boolean(nicepayClientKey)
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
+  const isFastSpringTester = _customerEmail?.trim().toLowerCase() === 'alstnwjd0424@gmail.com'
+
+  const getFastSpringUrl = (plan: string) => {
+    const storefront = process.env.NEXT_PUBLIC_FASTSPRING_STOREFRONT || 'shuffla'
+    const productPath = plan === 'PRO'
+      ? (process.env.NEXT_PUBLIC_FASTSPRING_CREATOR_PRODUCT || 'shuffla-creator-plan')
+      : (process.env.NEXT_PUBLIC_FASTSPRING_STUDIO_PRODUCT || 'shuffla-studio-plan')
+    const emailParam = _customerEmail ? `?email=${encodeURIComponent(_customerEmail)}` : ''
+    if (storefront.includes('.') || storefront.includes('/')) {
+      return `https://${storefront}/${productPath}${emailParam}`
+    }
+    return `https://${storefront}.fastspring.com/product/${productPath}${emailParam}`
+  }
 
   // Google Ads conversion tracking
   useEffect(() => {
@@ -378,6 +391,20 @@ function PricingGrid({
                   </button>
                 ) : (
                   <div className="space-y-3">
+                    {isFastSpringTester && (
+                      <a
+                        href={getFastSpringUrl(planKey)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <span className="relative flex items-center justify-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          {locale === 'en' ? 'Subscribe with FastSpring' : 'FastSpring 결제'}
+                        </span>
+                      </a>
+                    )}
                     {showNicePay && (
                       <button
                         type="button"
@@ -411,10 +438,10 @@ function PricingGrid({
                         onError={setError}
                       />
                     )}
-                    {showPayPal && !paypalPlanId && (
+                    {showPayPal && !paypalPlanId && !isFastSpringTester && (
                       <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
-                    {!showNicePay && !showPayPal && (
+                    {!showNicePay && !showPayPal && !isFastSpringTester && (
                       <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
                   </div>
