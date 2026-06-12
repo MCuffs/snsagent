@@ -490,6 +490,7 @@ function PricingGrid({
                         currentPlan={currentPlan}
                         onSuccess={() => router.refresh()}
                         onError={setError}
+                        locale={locale}
                       />
                     )}
                     {showPayPal && !paypalPlanId && !isFastSpringTester && (
