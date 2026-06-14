@@ -29,20 +29,20 @@ export function getCardHarnessContract(role: string | undefined, language: 'ko' 
   const maxHeadline = language === 'en'
     ? (isClosing ? 42 : 40)
     : (isClosing ? 26 : 24)
-  // EN body: 1–2 punchy sentences ≈ 120 chars max; KO: 130–160 chars
+  // KO body: 넉넉하게 허용해 자연스러운 문장이 잘리지 않도록
   const maxBody = language === 'en'
-    ? (isClosing ? 110 : 130)
-    : (isClosing ? 130 : 160)
+    ? (isClosing ? 130 : 160)
+    : (isClosing ? 180 : 220)
   const lineLen = language === 'en'
     ? (isClosing ? 42 : 44)
-    : (isClosing ? 28 : 30)
+    : (isClosing ? 30 : 32)
   return {
     role: normalizedRole,
     maxHeadlineChars: maxHeadline,
     maxBodyChars: maxBody,
-    maxBodyLines: isClosing ? 4 : 5,
+    maxBodyLines: isClosing ? 5 : 6,
     lineLength: lineLen,
-    maxTotalChars: isClosing ? 170 : 210,
+    maxTotalChars: isClosing ? 220 : 260,
     requiresAction: ['save-cta', 'cta'].includes(normalizedRole),
   }
 }

@@ -799,7 +799,7 @@ ${slideDescriptions}
 규칙:
 - 총 ${slides.length}개 슬라이드를 작성하세요.
 - headline은 24자 이하. 숫자 번호, "콘텐츠 방향", "기획 목표", "슬라이드별 기획 흐름", "Hook", "Summary" 같은 기획 라벨 금지.
-- body는 1~2개의 완성 문장, 70~140자 권장.
+- body는 2~3개의 완성 문장, 100~200자 권장. 구체적인 정보와 이유를 담아 충분히 서술하세요.
 - 참고 근거를 그대로 복사하지 말고 독자가 읽을 카드뉴스 문장으로 바꾸세요.
 - 각 슬라이드는 앞 슬라이드와 다른 정보를 말해야 합니다.
 - 확인되지 않은 수치, 순위, 효과는 만들지 마세요.${rssInstruction}${researchInstruction}
@@ -926,7 +926,7 @@ Rewrite rules:
 - Each slide must add a concrete fact, reason, use case, caution, or action — one sharp insight per slide.
 - Never include unrelated news, stock, politics, or trend information unless the user topic explicitly asks for it.
 - Keep headline under 40 characters. Never start with a number like "1.", "2.", etc. No summary labels.
-- Body should normally be 60-120 characters (1-2 complete sentences). Avoid vague filler phrases.
+- Body should normally be 100-180 characters (2-3 complete sentences). Include specific details, reasons, or concrete facts. Avoid vague filler phrases.
 - Vary sentence endings — don't repeat the same grammatical pattern across slides.
 - Do not use planning tokens or internal terms in card copy.
 - Write all output in English. No Korean characters anywhere.
@@ -962,7 +962,7 @@ body: ${slide.body}
 - 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체도 피하세요. 에디토리얼 톤을 유지하세요.
 - 사용자의 주제와 무관한 시사/경제/뉴스 정보는 절대 넣지 마세요.
 - headline은 필요할 때만 다듬고 25자 이하로 유지하세요. "1.", "2." 같은 숫자 번호로 시작하지 마세요.
-- body는 일반 슬라이드 80~150자, 마무리 슬라이드 70~120자를 권장합니다. 모바일 카드에서 3~5줄 안에 읽히는 완성 문장으로 작성하세요.
+- body는 일반 슬라이드 120~200자, 마무리 슬라이드 100~160자를 권장합니다. 구체적인 정보, 이유, 사례를 2~3문장으로 충분히 서술하세요.
 - 각 body에는 주제의 구체 기준, 이유, 실제 행동 중 최소 2개를 자연스럽게 연결하세요.
 - 영어 기획 토큰이나 내부 계획 용어를 본문에 쓰지 마세요.
 
