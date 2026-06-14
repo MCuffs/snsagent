@@ -96,10 +96,69 @@ function PricingGrid({
   const [canceling, setCanceling] = useState(false)
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
   const [cardModalPlan, setCardModalPlan] = useState<string | null>(null)
+  const [fscLoaded, setFscLoaded] = useState(false)
 
   // Locale-based payment method determination
   const showNicePay = locale === 'ko' && Boolean(nicepayClientKey)
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
+  const isFastSpringTester = _customerEmail?.trim().toLowerCase() === 'alstnwjd0424@gmail.com'
+
+  // Dynamic FastSpring SDK script loader
+  useEffect(() => {
+    if (!isFastSpringTester) return
+
+    // If script already exists, check if global fastspring is loaded
+    const existingScript = document.getElementById('fsc-api')
+    if (existingScript) {
+      if ((window as any).fastspring) {
+        setFscLoaded(true)
+      }
+      return
+    }
+
+    const storefront = process.env.NEXT_PUBLIC_FASTSPRING_STOREFRONT || 'shuffla.test.onfastspring.com/popup-shuffla'
+    const script = document.createElement('script')
+    script.id = 'fsc-api'
+    script.src = 'https://sbl.onfastspring.com/sbl/1.0.5/fastspring-builder.min.js'
+    script.type = 'text/javascript'
+    script.setAttribute('data-storefront', storefront)
+    script.async = true
+    script.onload = () => {
+      setFscLoaded(true)
+    }
+    script.onerror = () => {
+      console.error('Failed to load FastSpring SBL SDK')
+    }
+    document.body.appendChild(script)
+  }, [isFastSpringTester])
+
+  const handleFastSpringCheckout = (plan: string) => {
+    const productPath = plan === 'PRO'
+      ? (process.env.NEXT_PUBLIC_FASTSPRING_CREATOR_PRODUCT || 'shuffla-creator-plan')
+      : (process.env.NEXT_PUBLIC_FASTSPRING_STUDIO_PRODUCT || 'shuffla-studio-plan')
+
+    const fsc = (window as any).fastspring
+    if (fsc && fsc.builder) {
+      try {
+        setError('')
+        fsc.builder.clean()
+        fsc.builder.add(productPath)
+        if (_customerEmail) {
+          fsc.builder.push({
+            contact: {
+              email: _customerEmail
+            }
+          })
+        }
+        fsc.builder.checkout()
+      } catch (err) {
+        console.error('FastSpring Popup checkout error:', err)
+        setError(locale === 'en' ? 'Failed to open FastSpring checkout modal.' : 'FastSpring 결제창을 여는 데 실패했습니다.')
+      }
+    } else {
+      setError(locale === 'en' ? 'FastSpring checkout library is not loaded yet. Please try again in a moment.' : 'FastSpring 결제 라이브러리가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.')
+    }
+  }
 
   // Google Ads conversion tracking
   useEffect(() => {
@@ -378,6 +437,28 @@ function PricingGrid({
                   </button>
                 ) : (
                   <div className="space-y-3">
+                    {isFastSpringTester && (
+                      <button
+                        type="button"
+                        onClick={() => handleFastSpringCheckout(planKey)}
+                        className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 py-3.5 text-sm font-semibold text-slate-100 border border-indigo-900/30 shadow-sm transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <span className="relative flex items-center justify-center gap-2">
+                          {!fscLoaded ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="h-4 w-4 text-indigo-400" />
+                              {locale === 'en' ? 'FastSpring (Pending)' : 'FastSpring (임시대기중)'}
+                            </>
+                          )}
+                        </span>
+                      </button>
+                    )}
                     {showNicePay && (
                       <button
                         type="button"
@@ -409,12 +490,13 @@ function PricingGrid({
                         currentPlan={currentPlan}
                         onSuccess={() => router.refresh()}
                         onError={setError}
+                        locale={locale}
                       />
                     )}
-                    {showPayPal && !paypalPlanId && (
+                    {showPayPal && !paypalPlanId && !isFastSpringTester && (
                       <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
-                    {!showNicePay && !showPayPal && (
+                    {!showNicePay && !showPayPal && !isFastSpringTester && (
                       <p className="text-center text-xs font-medium text-slate-500">{t('payment_setup')}</p>
                     )}
                   </div>
