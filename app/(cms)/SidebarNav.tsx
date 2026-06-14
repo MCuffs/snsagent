@@ -2,12 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, Palette, LucideIcon } from 'lucide-react'
+import { BookOpen, Zap, Grid3X3, LucideIcon } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
-
-// Instagram 기능 테스트용 허용 이메일 — 제거됨
 
 interface NavItem {
   key: string
@@ -15,14 +13,12 @@ interface NavItem {
   icon: LucideIcon
   descKey: string
   href: string
-  highlight?: boolean
 }
 
 const navItems: NavItem[] = [
   { key: 'concept', label: 'Concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
   { key: 'generate', label: 'Generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
   { key: 'works', label: 'Works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
-  { key: 'painter', label: 'My Painter', icon: Palette, descKey: 'nav_painter_desc', href: '/concept?tab=painter', highlight: true },
 ]
 
 interface SidebarNavProps {
@@ -85,21 +81,12 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150 ${
               isActive
                 ? 'bg-[#111111] text-white font-medium'
-                : item.highlight && !isActive
-                ? 'text-[#52525b] hover:bg-[#f0f0f0] hover:text-[#111111] relative'
                 : 'text-[#52525b] hover:bg-[#f0f0f0] hover:text-[#111111]'
             }`}
           >
-            <Icon className={`h-4 w-4 shrink-0 ${item.highlight && !isActive ? 'text-[#8b5cf6]' : ''}`} />
+            <Icon className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-medium leading-none">{item.label}</p>
-                {item.highlight && !isActive && (
-                  <span className="inline-flex items-center rounded-full bg-[#8b5cf6]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#8b5cf6] border border-[#8b5cf6]/20">
-                    AI 학습
-                  </span>
-                )}
-              </div>
+              <p className="font-medium leading-none">{item.label}</p>
               <p className={`mt-0.5 text-[11px] ${isActive ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
                 {t(item.descKey as Parameters<typeof t>[0])}
               </p>

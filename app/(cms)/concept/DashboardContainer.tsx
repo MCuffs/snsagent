@@ -7,10 +7,9 @@ import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
-import PainterDashboard from '../painter/PainterDashboard'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { CheckCircle2, Globe, TrendingUp } from 'lucide-react'
+import { CheckCircle2, Globe, TrendingUp, Sparkles } from 'lucide-react'
 
 interface BrandProfileData {
   id: string
@@ -23,6 +22,14 @@ interface BrandProfileData {
   ctaStyle: string
   brandDna?: string | null
   websiteUrl?: string | null
+}
+
+interface SummarizedPreferenceData {
+  summary: string | null
+  preferredHookPatterns: string | null
+  preferredLayouts: string | null
+  avoidPatterns: string | null
+  preferredCopyTone: string | null
 }
 
 interface DashboardContainerProps {
@@ -46,6 +53,7 @@ interface DashboardContainerProps {
   userName?: string | null
   nicepayClientKey?: string
   nicepayReturnTokens?: Record<string, string>
+  summarizedPreference?: SummarizedPreferenceData | null
 }
 
 export default function DashboardContainer({
@@ -60,6 +68,7 @@ export default function DashboardContainer({
   userName,
   nicepayClientKey,
   nicepayReturnTokens,
+  summarizedPreference,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const t = useTranslations('concept')
@@ -132,6 +141,7 @@ export default function DashboardContainer({
                 hasUrlProfile={existingBrand && Boolean(existingBrand.websiteUrl) ? true : false}
                 hasGeneralProfile={Boolean(generalProfile)}
                 onSelect={setSubProfile}
+                summarizedPreference={summarizedPreference}
               />
             )}
 
@@ -199,12 +209,6 @@ export default function DashboardContainer({
           canUpgradeRetention={canUpgradeRetention}
         />
       </div>
-
-      {brandToPass && (
-        <div className={activeTab === 'painter' ? 'h-full' : 'hidden'}>
-          <PainterDashboard brand={brandToPass} />
-        </div>
-      )}
     </div>
   )
 }
@@ -213,10 +217,12 @@ function ProfileSelectScreen({
   hasUrlProfile,
   hasGeneralProfile,
   onSelect,
+  summarizedPreference,
 }: {
   hasUrlProfile: boolean
   hasGeneralProfile: boolean
   onSelect: (type: 'brand' | 'general') => void
+  summarizedPreference?: SummarizedPreferenceData | null
 }) {
   const t = useTranslations('concept')
 
@@ -236,6 +242,8 @@ function ProfileSelectScreen({
       complete: hasGeneralProfile,
     },
   ]
+
+  const hasPreference = summarizedPreference?.summary && summarizedPreference.summary.trim().length > 0
 
   return (
     <motion.div
@@ -272,6 +280,18 @@ function ProfileSelectScreen({
               </div>
             </button>
           ))}
+        </div>
+
+        <div className="mt-8 rounded-xl border border-[#e4e4e7] bg-[#fafafa] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="h-4 w-4 text-[#8b5cf6]" />
+            <p className="text-sm font-semibold text-[#111111]">AI가 학습한 콘텐츠 방향</p>
+          </div>
+          {hasPreference ? (
+            <p className="text-sm leading-6 text-[#52525b]">{summarizedPreference!.summary}</p>
+          ) : (
+            <p className="text-sm text-[#71717a]">아직 학습된 콘텐츠 방향이 없습니다</p>
+          )}
         </div>
       </div>
     </motion.div>

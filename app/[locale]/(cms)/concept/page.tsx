@@ -44,6 +44,10 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
   const brandProfile = brands.find((b) => b.websiteUrl !== 'general_profile') || null
   const generalProfile = brands.find((b) => b.websiteUrl === 'general_profile') || null
 
+  const summarizedPreference = brandProfile
+    ? await dbService.getSummarizedPreference(brandProfile.id)
+    : null
+
   const serializedBrand = brandProfile
     ? {
         id: brandProfile.id,
@@ -105,6 +109,7 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
       userName={user.name}
       nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}
       nicepayReturnTokens={nicepayReturnTokens}
+      summarizedPreference={summarizedPreference}
     />
   )
 }
