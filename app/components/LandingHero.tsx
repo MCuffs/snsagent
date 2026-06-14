@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
-// 전체 카드 풀 — 랜딩마다 셔플해서 3열에 배분
+// 전체 카드 풀 — 중복 자산은 제외하고 안정적으로 3열에 배분
 const ALL_CARDS = [
   '/front/card-01.png',
   '/front/card-02.png',
@@ -30,15 +30,6 @@ const ALL_CARDS = [
   '/front/card-hu100-03.png',
   '/front/card-hu100-04.png',
 ]
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
 
 // 페이지 배경색 — 갤러리 상하단 페이드와 통일
 const BG = '#ffffff'
@@ -71,15 +62,13 @@ export function LandingHero({
     offset: ['start start', 'end end'],
   })
 
-  // 랜딩마다 셔플 후 3열로 균등 배분
+  // 렌더 중 랜덤 셔플을 피해서 SSR/CSR 결과를 안정적으로 유지
   const [colA, colB, colC] = useMemo(() => {
-    const shuffled = shuffleArray(ALL_CARDS)
-    const perCol = Math.ceil(shuffled.length / 3)
-    return [
-      shuffled.slice(0, perCol),
-      shuffled.slice(perCol, perCol * 2),
-      shuffled.slice(perCol * 2),
-    ]
+    const columns: [string[], string[], string[]] = [[], [], []]
+    ALL_CARDS.forEach((src, index) => {
+      columns[index % columns.length].push(src)
+    })
+    return columns
   }, [])
 
   // 패럴렉스 폭을 줄여 상단 이탈 방지 (-6% / +5% / -8%)
@@ -180,21 +169,21 @@ export function LandingHero({
           {/* 열 A */}
           <motion.div style={{ y: yA }} className="flex flex-col gap-3 md:gap-4">
             {colA.map((src, i) => (
-              <CardItem key={src} src={src} index={i} direction="left" />
+              <CardItem key={src} src={src} index={i} direction="left" priority={i === 0} />
             ))}
           </motion.div>
 
           {/* 열 B — 약간 아래에서 시작해 엇갈림 효과 */}
           <motion.div style={{ y: yB }} className="flex flex-col gap-3 pt-10 md:gap-4 md:pt-14">
             {colB.map((src, i) => (
-              <CardItem key={src} src={src} index={i} direction="up" />
+              <CardItem key={src} src={src} index={i} direction="up" priority={i === 0} />
             ))}
           </motion.div>
 
           {/* 열 C */}
           <motion.div style={{ y: yC }} className="flex flex-col gap-3 md:gap-4">
             {colC.map((src, i) => (
-              <CardItem key={src} src={src} index={i} direction="right" />
+              <CardItem key={src} src={src} index={i} direction="right" priority={i === 0} />
             ))}
           </motion.div>
         </div>
@@ -203,7 +192,7 @@ export function LandingHero({
   )
 }
 
-function CardItem({ src, index, direction }: { src: string; index: number; direction: 'left' | 'right' | 'up' }) {
+function CardItem({ src, index, direction, priority }: { src: string; index: number; direction: 'left' | 'right' | 'up'; priority?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { once: true, margin: '0px 0px -40px 0px' })
 
@@ -233,7 +222,7 @@ function CardItem({ src, index, direction }: { src: string; index: number; direc
         height={525}
         className="w-full object-cover"
         sizes="(max-width: 768px) 33vw, 420px"
-        priority={index < 2}
+        priority={priority}
       />
     </motion.div>
   )

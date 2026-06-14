@@ -3,12 +3,14 @@ import { getSessionUser } from '../../../lib/auth/user'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
+import sharp from 'sharp'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
-const RETENTION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days local retention
+const MAX_TOTAL_UPLOAD_SIZE = 24 * 1024 * 1024 // 24MB per request
+const MAX_IMAGE_DIMENSION = 2400
 const IMAGE_EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -50,6 +52,33 @@ function detectImageMime(buffer: Buffer) {
   return null
 }
 
+async function normalizeImageBuffer(buffer: Buffer, mimeType: string) {
+  if (mimeType === 'image/gif') {
+    return { buffer, mimeType }
+  }
+
+  const pipeline = sharp(buffer, { failOn: 'error' })
+    .rotate()
+    .resize({
+      width: MAX_IMAGE_DIMENSION,
+      height: MAX_IMAGE_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+
+  if (mimeType === 'image/jpeg') {
+    return { buffer: await pipeline.jpeg({ quality: 88, mozjpeg: true }).toBuffer(), mimeType }
+  }
+  if (mimeType === 'image/png') {
+    return { buffer: await pipeline.png({ compressionLevel: 9 }).toBuffer(), mimeType }
+  }
+  if (mimeType === 'image/webp') {
+    return { buffer: await pipeline.webp({ quality: 86 }).toBuffer(), mimeType }
+  }
+
+  return { buffer, mimeType }
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) {
@@ -86,7 +115,6 @@ export async function POST(request: Request) {
     for (const file of files) {
       // Normalize image/jpg → image/jpeg (some browsers/OS report the wrong subtype)
       const normalizedType = file.type === 'image/jpg' ? 'image/jpeg' : file.type
-      console.log('[Upload] file.type:', file.type, '→ normalized:', normalizedType, 'size:', file.size)
       if (!allowedTypes.includes(normalizedType)) {
         console.error('[Upload] 400: 지원하지 않는 파일 형식:', file.type)
         return NextResponse.json({ error: `지원하지 않는 파일 형식: ${file.type}` }, { status: 400 })
@@ -96,6 +124,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: '파일 크기는 10MB 이하여야 합니다.' }, { status: 400 })
       }
       totalIncomingSize += file.size
+    }
+
+    if (totalIncomingSize > MAX_TOTAL_UPLOAD_SIZE) {
+      return NextResponse.json({ error: 'Total upload size must be 24MB or less.' }, { status: 400 })
     }
 
     // 3. Upload files
@@ -110,15 +142,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'File type verification failed.' }, { status: 400 })
       }
 
-      const ext = IMAGE_EXTENSIONS[detectedType] || 'jpg'
+      const normalized = await normalizeImageBuffer(buffer, detectedType)
+      const ext = IMAGE_EXTENSIONS[normalized.mimeType] || 'jpg'
       const fileName = `ref-${randomUUID()}.${ext}`
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
         const { put } = await import('@vercel/blob')
         // Prefix by uploads/${user.id}/ for prefix isolated search/limit scans
-        const blob = await put(`uploads/${user.id}/${fileName}`, buffer, {
+        const blob = await put(`uploads/${user.id}/${fileName}`, normalized.buffer, {
           access: 'public',
-          contentType: detectedType,
+          contentType: normalized.mimeType,
           token: process.env.BLOB_READ_WRITE_TOKEN,
         })
         urls.push(blob.url)
@@ -126,7 +159,7 @@ export async function POST(request: Request) {
         // Local development fallback
         const dir = path.join(process.cwd(), 'public', 'uploads', user.id)
         fs.mkdirSync(dir, { recursive: true })
-        fs.writeFileSync(path.join(dir, fileName), buffer)
+        fs.writeFileSync(path.join(dir, fileName), normalized.buffer)
         urls.push(new URL(`/uploads/${user.id}/${fileName}`, request.url).toString())
       }
     }

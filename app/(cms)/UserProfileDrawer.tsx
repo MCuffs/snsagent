@@ -25,6 +25,7 @@ const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
 export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, hasSubscription, paymentProvider }: Props) {
   const [open, setOpen] = useState(false)
   const [key, setKey] = useState<string | null>(null)
+  const [hasKey, setHasKey] = useState(false)
   const [keyLoaded, setKeyLoaded] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -40,7 +41,10 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
     if (!open || keyLoaded) return
     fetch('/api/mcp/key')
       .then(r => r.json())
-      .then(d => setKey(d.key))
+      .then(d => {
+        setKey(d.key ?? null)
+        setHasKey(Boolean(d.hasKey || d.key))
+      })
       .finally(() => setKeyLoaded(true))
   }, [open, keyLoaded])
 
@@ -64,6 +68,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
     const r = await fetch('/api/mcp/key', { method: 'POST' })
     const d = await r.json()
     setKey(d.key)
+    setHasKey(Boolean(d.hasKey || d.key))
     setRevealed(true)
     setGenerating(false)
   }
@@ -72,6 +77,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
     if (!confirm('API 키를 삭제할까요? 연결된 MCP 클라이언트가 즉시 작동을 멈춥니다.')) return
     await fetch('/api/mcp/key', { method: 'DELETE' })
     setKey(null)
+    setHasKey(false)
     setRevealed(false)
   }
 
@@ -107,7 +113,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
   const plan = PLAN_LABELS[userPlan] ?? PLAN_LABELS.FREE
   const displayName = userName || userEmail
   const initials = (userName || userEmail).slice(0, 2).toUpperCase()
-  const maskedKey = key ? `${key.slice(0, 12)}${'•'.repeat(20)}` : ''
+  const maskedKey = key ? `${key.slice(0, 12)}${'•'.repeat(20)}` : `shfl_${'•'.repeat(20)}`
 
   return (
     <>
@@ -209,22 +215,29 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
 
           {!keyLoaded ? (
             <div className="h-8 animate-pulse rounded-lg bg-[#f4f4f5]" />
-          ) : key ? (
+          ) : hasKey ? (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 rounded-lg border border-[#e4e4e7] bg-[#fafafa] px-3 py-2">
                 <code className="flex-1 truncate font-mono text-[11px] text-[#52525b]">
                   {revealed ? key : maskedKey}
                 </code>
-                <button
-                  onClick={() => setRevealed(v => !v)}
-                  className="shrink-0 text-[10px] font-medium text-[#71717a] hover:text-[#111111]"
-                >
-                  {revealed ? '숨기기' : '보기'}
-                </button>
-                <button onClick={copy} className="shrink-0 rounded p-0.5 text-[#71717a] hover:text-[#111111]">
-                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+                {key && (
+                  <>
+                    <button
+                      onClick={() => setRevealed(v => !v)}
+                      className="shrink-0 text-[10px] font-medium text-[#71717a] hover:text-[#111111]"
+                    >
+                      {revealed ? '숨기기' : '보기'}
+                    </button>
+                    <button onClick={copy} className="shrink-0 rounded p-0.5 text-[#71717a] hover:text-[#111111]">
+                      {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </>
+                )}
               </div>
+              <p className="text-[10px] leading-relaxed text-[#71717a]">
+                {key ? '지금 복사해 주세요. 이 키는 다시 표시되지 않습니다.' : '활성 키가 있습니다. 새 키가 필요하면 재발급해 주세요.'}
+              </p>
               <div className="flex gap-1.5">
                 <button
                   onClick={generate}
