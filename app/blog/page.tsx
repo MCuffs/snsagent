@@ -85,17 +85,17 @@ const guides = [
 ]
 
 const postImages = [
-  '/front/card-10.png',
-  '/front/card-13.png',
-  '/front/card-11.png',
-  '/front/card-04.png',
-  '/front/card-01.png',
-  '/front/card-15.png',
+  '/front/card-10.webp',
+  '/front/card-13.webp',
+  '/front/card-11.webp',
+  '/front/card-04.webp',
+  '/front/card-01.webp',
+  '/front/card-15.webp',
 ]
 
 export default async function BlogPage() {
   const authenticated = Boolean(await getSessionUser())
-  const featuredImage = '/front/card-04.png'
+  const featuredImage = '/front/card-04.webp'
 
   return (
     <div className="min-h-screen bg-white text-slate-900 flex flex-col relative overflow-hidden selection:bg-sky-500/20">
@@ -190,7 +190,7 @@ export default async function BlogPage() {
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {posts.map((post, idx) => {
-                const postImage = postImages[idx] || '/front/card-01.png'
+                const postImage = postImages[idx] || '/front/card-01.webp'
                 return (
                   <Link
                     key={idx}

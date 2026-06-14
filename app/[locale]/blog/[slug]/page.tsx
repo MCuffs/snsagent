@@ -54,19 +54,19 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
 const postImages: Record<string, string> = {
   // Korean slugs
-  '카드뉴스-자동화-가이드': '/front/card-10.png',
-  '카드뉴스-주제-선정법': '/front/card-13.png',
-  '제품-이미지-카드뉴스-품질': '/front/card-11.png',
-  '셔플라-공식-런칭': '/front/card-04.png',
-  '요금제-결제-faq': '/front/card-01.png',
-  'ai-저작권-faq': '/front/card-15.png',
+  '카드뉴스-자동화-가이드': '/front/card-10.webp',
+  '카드뉴스-주제-선정법': '/front/card-13.webp',
+  '제품-이미지-카드뉴스-품질': '/front/card-11.webp',
+  '셔플라-공식-런칭': '/front/card-04.webp',
+  '요금제-결제-faq': '/front/card-01.webp',
+  'ai-저작권-faq': '/front/card-15.webp',
   // English slugs
-  'card-news-automation-guide': '/front/card-10.png',
-  'best-topics-for-card-news': '/front/card-13.png',
-  'product-images-card-news-quality': '/front/card-11.png',
-  'shuffla-official-launch': '/front/card-04.png',
-  'billing-subscription-faq': '/front/card-01.png',
-  'ai-copyright-faq': '/front/card-15.png',
+  'card-news-automation-guide': '/front/card-10.webp',
+  'best-topics-for-card-news': '/front/card-13.webp',
+  'product-images-card-news-quality': '/front/card-11.webp',
+  'shuffla-official-launch': '/front/card-04.webp',
+  'billing-subscription-faq': '/front/card-01.webp',
+  'ai-copyright-faq': '/front/card-15.webp',
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
@@ -79,7 +79,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound()
   }
 
-  const postImage = postImages[post.slug] || '/front/card-01.png'
+  const postImage = postImages[post.slug] || '/front/card-01.webp'
   const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
   const jsonLd = {
     '@context': 'https://schema.org',
