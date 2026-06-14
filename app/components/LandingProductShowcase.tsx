@@ -1,16 +1,46 @@
 'use client'
 
 import Image from 'next/image'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, Download, MessageSquareText, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-const editorialCards = [
+const ALL_EDITORIAL_CARDS = [
   '/front/shuffla-editorial-02.webp',
   '/front/shuffla-editorial-03.webp',
   '/front/shuffla-editorial-04.webp',
   '/front/shuffla-editorial-05.webp',
+  '/front/card-kakao-01.png',
+  '/front/card-kakao-02.png',
+  '/front/card-kakao-03.png',
+  '/front/card-kakao-04.png',
+  '/front/card-kakao-05.png',
+  '/front/card-kakao-06.png',
+  '/front/card-kakao-07.png',
+  '/front/card-kakao-08.png',
+  '/front/card-kakao-09.png',
+  '/front/card-kakao-10.png',
+  '/front/card-kakao-11.png',
+  '/front/card-kakao-12.png',
+  '/front/card-hodu-01.png',
+  '/front/card-hodu-02.png',
+  '/front/card-hodu-03.png',
+  '/front/card-hodu-04.png',
+  '/front/card-hodu-05.png',
+  '/front/card-hu100-01.png',
+  '/front/card-hu100-02.png',
+  '/front/card-hu100-03.png',
+  '/front/card-hu100-04.png',
 ]
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 export function ProductShowcase({ authenticated = false }: { authenticated?: boolean }) {
   const t = useTranslations('landing')
@@ -214,7 +244,9 @@ function EditorMockup() {
   const t = useTranslations('landing')
   const tabLabels = [t('tab_text'), t('tab_bg'), t('tab_effect')] as const
   type TabLabel = typeof tabLabels[number]
-  const [selectedCard, setSelectedCard] = useState(2)
+  // 랜딩마다 카드 순서 셔플 (useMemo — 컴포넌트 마운트 시 1회)
+  const editorialCards = useMemo(() => shuffleArray(ALL_EDITORIAL_CARDS), [])
+  const [selectedCard, setSelectedCard] = useState(0)
   const [tab, setTab] = useState<TabLabel>(tabLabels[0])
   const sliderKeys = [t('slider_text'), t('slider_darkness'), t('slider_contrast')]
   const [settings, setSettings] = useState<Record<string, number>>({
