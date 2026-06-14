@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { Key, Copy, Check, RefreshCw, Trash2, X, User, Mail, CreditCard, ExternalLink, LogOut, AlertCircle } from 'lucide-react'
 
@@ -19,7 +20,7 @@ const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   UNLIMITED: { label: 'Studio',    color: 'text-[#059669] bg-[#ecfdf5]' },
 }
 
-const DEMO_EMAIL = 'alstnwjd0424@gmail.com'
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
 
 export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, hasSubscription, paymentProvider }: Props) {
   const [open, setOpen] = useState(false)
@@ -166,7 +167,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
             </div>
             <div className="flex items-center gap-2 text-[12px] text-[#71717a]">
               <CreditCard className="h-3.5 w-3.5 shrink-0" />
-              <a href="/billing" className="text-[#0066ff] hover:underline">플랜 변경 →</a>
+              <Link href="/billing" className="text-[#0066ff] hover:underline">플랜 변경 →</Link>
             </div>
           </div>
 

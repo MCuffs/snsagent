@@ -106,7 +106,7 @@ export async function checkRateLimit(
     const data = await response.json() as { result?: [number, number] }
     if (data.result && Array.isArray(data.result)) {
       const [count, ttlMs] = data.result
-      const limited = count > config.maxRequests
+      const limited = count >= config.maxRequests
       return {
         limited,
         remaining: limited ? 0 : Math.max(0, config.maxRequests - count),

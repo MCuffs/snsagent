@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { uploadGeneratedAsset } from '../storage/upload'
 import { renderSvgToPng } from '../render/svgToPng'
+import { isTrustedRenderableImageUrl } from '../security/imageUrl'
 import type { LayoutDefinition } from './layoutTypes'
 import type { OverlayPlan } from './overlayEngine'
 import type { TypographyPlan, TypographyToken } from './typographyEngine'
@@ -325,10 +326,11 @@ function escapeXml(value: string) {
 
 async function toImageDataUri(imageUrl: string) {
   if (!imageUrl || imageUrl.startsWith('data:')) return imageUrl
+  if (!isTrustedRenderableImageUrl(imageUrl)) return ''
 
   if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
     try {
-      const cleanPath = imageUrl.startsWith('file://') ? imageUrl.replace('file://', '') : imageUrl
+      const cleanPath = imageUrl
       const filePath = path.join(process.cwd(), 'public', cleanPath)
       if (fs.existsSync(filePath)) {
         const fileBuffer = fs.readFileSync(filePath)

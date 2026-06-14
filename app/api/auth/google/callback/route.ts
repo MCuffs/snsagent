@@ -40,7 +40,10 @@ export async function GET(request: Request) {
     const token = await exchangeGoogleCode(request, code)
     const profile = await fetchGoogleUserInfo(token.access_token)
     const email = normalizeSessionEmail(profile.email)
-    await dbService.getOrCreateUser(email, profile.name || email.split('@')[0])
+    const user = await dbService.getOrCreateUser(email, profile.name || email.split('@')[0])
+    if (user.accountStatus && user.accountStatus !== 'active') {
+      return NextResponse.redirect(new URL('/login?error=account_blocked', request.url))
+    }
 
     const response = NextResponse.redirect(new URL('/concept', request.url))
     response.cookies.delete(GOOGLE_OAUTH_STATE_COOKIE_NAME)

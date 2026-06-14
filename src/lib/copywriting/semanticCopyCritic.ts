@@ -92,6 +92,14 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
+    if (language === 'ko' && hasLikelyMojibakeKoreanCopy(combined)) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: 'Korean copy appears to be encoding-corrupted and must be regenerated before rendering.',
+      })
+    }
+
     if (!isClosing && !hasDomainAnchor(combined, domainProfile.requiredCopyAnchors)) {
       issues.push({
         slideNumber: slide.slideNumber,
@@ -265,22 +273,31 @@ function hasIncompleteEnglishEnding(value: string) {
   return /\b(and|or|but|because|with|for|to|from|than|that|which|when|where|while|by)\W*$/i.test(normalized)
 }
 
+function hasLikelyMojibakeKoreanCopy(value: string) {
+  const hangulCount = (value.match(/[\uac00-\ud7a3]/gu) || []).length
+  const cjkCount = (value.match(/[\u3400-\u9fff\uf900-\ufaff]/gu) || []).length
+  const markerCount = (value.match(/[?�]/gu) || []).length
+
+  if (hangulCount >= 4) return false
+  return (cjkCount >= 8 && markerCount >= 2) || (cjkCount >= 12 && markerCount >= 1) || markerCount >= 6
+}
+
 function hasBrokenKoreanParticle(value: string) {
-  return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)\b/u.test(value) ||
+  return /[가-힣]{2,}의\s*(?:의|은|는|이|가|을|를|과|와)(?=\s|$|[.!?。！？])/u.test(value) ||
     /[가-힣]{2,}의의/u.test(value) ||
-    /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)\b/u.test(value) ||
+    /[가-힣]{2,}(?:은|는|이|가|을|를)(?:은|는|이|가|을|를)(?=\s|$|[.!?。！？])/u.test(value) ||
     /[가-힣]{2,}(?:이나|거나|부터|까지|보다|처럼)[.!?。！？]$/u.test(value.trim())
 }
 
 function hasDanglingKoreanParticle(value: string) {
   const normalized = value.trim()
-  return /(?:그런데|하지만|그리고|또한|그래서|반면|다만|SNS에서|온라인에서)\s+\d*\.?\s*(?:은|는|이|가|을|를|도|만)\b/u.test(normalized) ||
-    /\b\d+\.\s*(?:은|는|이|가|을|를|도|만)\b/u.test(normalized) ||
+  return /(?:그런데|하지만|그리고|또한|그래서|반면|다만|SNS에서|온라인에서)\s+\d*\.?\s*(?:은|는|이|가|을|를|도|만)(?=\s|$|[.!?。！？])/u.test(normalized) ||
+    /\b\d+\.\s*(?:은|는|이|가|을|를|도|만)(?=\s|$|[.!?。！？])/u.test(normalized) ||
     /(?:^|[.!?。！？]\s*)(?:은|는|이|가|을|를|도|만)\s+\S+/u.test(normalized)
 }
 
 function startsWithDanglingKoreanParticle(value: string) {
-  return /^(?:에서|에게서|으로|로|을|를|은|는|이|가|와|과|도|만|부터|까지|보다|처럼|의|에|에게|께|한테)\b/u.test(value.trim())
+  return /^(?:에서|에게서|으로|로|을|를|은|는|이|가|와|과|도|만|부터|까지|보다|처럼|의|에|에게|께|한테)(?=\s|$|[.!?。！？])/u.test(value.trim())
 }
 
 function hasOffTopicSensationalAngle(value: string, topic: string) {

@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { MarketingFooter } from '../components/MarketingFooter'
 import { MarketingNav } from '../components/MarketingNav'
 
