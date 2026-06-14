@@ -1,36 +1,61 @@
 'use client'
 
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
-// 17장 이미지를 시각적으로 섞어서 배치 (비슷한 톤끼리 인접하지 않도록)
-// 패션계열: 01~09, 뷰티/정보계열: 10~17
-const COL_A = [
-  '/front/card-01.png',  // 비버 스트리트 (다크)
-  '/front/card-10.png',  // 스킨케어 (라이트)
-  '/front/card-04.png',  // 비버 블루 (쿨)
-  '/front/card-13.png',  // 호두 (뉴트럴)
-  '/front/card-07.png',  // 럭셔리 미러 (다크)
-  '/front/card-16.png',  // 강아지 (라이트)
+// 전체 카드 풀 — 랜딩마다 셔플해서 3열에 배분
+const ALL_CARDS = [
+  '/front/card-01.png',
+  '/front/card-02.png',
+  '/front/card-03.png',
+  '/front/card-04.png',
+  '/front/card-05.png',
+  '/front/card-06.png',
+  '/front/card-07.png',
+  '/front/card-08.png',
+  '/front/card-09.png',
+  '/front/card-10.png',
+  '/front/card-11.png',
+  '/front/card-12.png',
+  '/front/card-13.png',
+  '/front/card-14.png',
+  '/front/card-15.png',
+  '/front/card-16.png',
+  '/front/card-17.png',
+  '/front/card-kakao-01.png',
+  '/front/card-kakao-02.png',
+  '/front/card-kakao-03.png',
+  '/front/card-kakao-04.png',
+  '/front/card-kakao-05.png',
+  '/front/card-kakao-06.png',
+  '/front/card-kakao-07.png',
+  '/front/card-kakao-08.png',
+  '/front/card-kakao-09.png',
+  '/front/card-kakao-10.png',
+  '/front/card-kakao-11.png',
+  '/front/card-kakao-12.png',
+  '/front/card-hodu-01.png',
+  '/front/card-hodu-02.png',
+  '/front/card-hodu-03.png',
+  '/front/card-hodu-04.png',
+  '/front/card-hodu-05.png',
+  '/front/card-hu100-01.png',
+  '/front/card-hu100-02.png',
+  '/front/card-hu100-03.png',
+  '/front/card-hu100-04.png',
 ]
-const COL_B = [
-  '/front/card-03.png',  // 오버핏 후드 (그레이)
-  '/front/card-11.png',  // 스킨케어2 (핑크)
-  '/front/card-06.png',  // MATTY BOY 포트레이트 (버건디)
-  '/front/card-14.png',  // 호두2 (브라운)
-  '/front/card-02.png',  // 비버 사이즈 비율 (다크)
-  '/front/card-17.png',  // GRAPH JUICE (퍼플)
-]
-const COL_C = [
-  '/front/card-05.png',  // 비버 핑크 후드 (라이트)
-  '/front/card-12.png',  // 스킨케어3
-  '/front/card-08.png',  // MATTY BOY 아웃핏 (다크)
-  '/front/card-15.png',  // 남자 스타일링 (모노)
-  '/front/card-09.png',  // MATTY BOY 730 (컬러풀)
-]
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 // 페이지 배경색 — 갤러리 상하단 페이드와 통일
 const BG = '#ffffff'
@@ -58,11 +83,21 @@ export function LandingHero({
   badgeText,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // 갤러리 영역만 스크롤 추적 — section 전체가 아니라 갤러리 wrapper를 기준으로
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ['start start', 'end end'],
   })
+
+  // 랜딩마다 셔플 후 3열로 균등 배분
+  const [colA, colB, colC] = useMemo(() => {
+    const shuffled = shuffleArray(ALL_CARDS)
+    const perCol = Math.ceil(shuffled.length / 3)
+    return [
+      shuffled.slice(0, perCol),
+      shuffled.slice(perCol, perCol * 2),
+      shuffled.slice(perCol * 2),
+    ]
+  }, [])
 
   // 패럴렉스 폭을 줄여 상단 이탈 방지 (-6% / +5% / -8%)
   const yA = useTransform(scrollYProgress, [0, 1], ['0%', '-6%'])
@@ -161,21 +196,21 @@ export function LandingHero({
         <div className="mx-auto grid max-w-[1300px] grid-cols-3 gap-3 md:gap-4">
           {/* 열 A */}
           <motion.div style={{ y: yA }} className="flex flex-col gap-3 md:gap-4">
-            {COL_A.map((src, i) => (
+            {colA.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="left" />
             ))}
           </motion.div>
 
           {/* 열 B — 약간 아래에서 시작해 엇갈림 효과 */}
           <motion.div style={{ y: yB }} className="flex flex-col gap-3 pt-10 md:gap-4 md:pt-14">
-            {COL_B.map((src, i) => (
+            {colB.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="up" />
             ))}
           </motion.div>
 
           {/* 열 C */}
           <motion.div style={{ y: yC }} className="flex flex-col gap-3 md:gap-4">
-            {COL_C.map((src, i) => (
+            {colC.map((src, i) => (
               <CardItem key={src} src={src} index={i} direction="right" />
             ))}
           </motion.div>
