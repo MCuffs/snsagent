@@ -5,6 +5,7 @@ import { Copy, Check, RefreshCw, Trash2, Key } from 'lucide-react'
 
 export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
   const [key, setKey] = useState<string | null>(null)
+  const [hasKey, setHasKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -12,7 +13,12 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
   useEffect(() => {
     fetch('/api/mcp/key')
       .then((r) => r.json())
-      .then((d) => { if (!d.unavailable) setKey(d.key) })
+      .then((d) => {
+        if (!d.unavailable) {
+          setKey(d.key ?? null)
+          setHasKey(Boolean(d.hasKey || d.key))
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -21,6 +27,7 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
     const r = await fetch('/api/mcp/key', { method: 'POST' })
     const d = await r.json()
     setKey(d.key)
+    setHasKey(Boolean(d.hasKey || d.key))
     setGenerating(false)
   }
 
@@ -28,6 +35,7 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
     if (!confirm(isEn ? 'Revoke this API key?' : 'API 키를 삭제할까요?')) return
     await fetch('/api/mcp/key', { method: 'DELETE' })
     setKey(null)
+    setHasKey(false)
   }
 
   const copy = () => {
@@ -37,7 +45,7 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const masked = key ? `${key.slice(0, 10)}${'•'.repeat(24)}` : ''
+  const masked = key ? `${key.slice(0, 10)}${'•'.repeat(24)}` : `shfl_${'•'.repeat(24)}`
 
   return (
     <div className="rounded-2xl border border-black/[0.08] bg-white p-6 shadow-sm">
@@ -52,16 +60,20 @@ export function McpApiKeyPanel({ isEn }: { isEn: boolean }) {
 
       {loading ? (
         <div className="h-10 animate-pulse rounded-lg bg-black/[0.04]" />
-      ) : key ? (
+      ) : hasKey ? (
         <>
           <div className="flex items-center gap-2 rounded-xl border border-black/[0.07] bg-[#fafaf7] px-4 py-2.5">
             <code className="flex-1 font-mono text-[13px] text-[#525252]">{masked}</code>
-            <button onClick={copy} className="shrink-0 rounded-md p-1.5 text-[#525252] transition hover:bg-black/5">
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
+            {key && (
+              <button onClick={copy} className="shrink-0 rounded-md p-1.5 text-[#525252] transition hover:bg-black/5">
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            )}
           </div>
           <p className="mt-2 text-[12px] text-[#8a8a8a]">
-            {isEn ? 'Keep this key secret. It grants full access to your Shuffla account.' : '이 키는 외부에 노출되지 않도록 주의하세요.'}
+            {key
+              ? (isEn ? 'Copy this key now. It will not be shown again.' : '지금 복사해 주세요. 이 키는 다시 표시되지 않습니다.')
+              : (isEn ? 'A key is active. Regenerate it if you need to copy a new key.' : '활성 키가 있습니다. 새 키가 필요하면 재발급해 주세요.')}
           </p>
           <div className="mt-4 flex gap-2">
             <button

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { randomBytes } from 'crypto'
 import { getSessionUser } from '../../../actions'
 import prisma from '../../../../lib/db'
+import { createMcpApiKey, hashMcpApiKey } from '../../../../lib/auth/mcp-api-key'
 
 export async function GET() {
   const user = await getSessionUser()
@@ -9,24 +9,27 @@ export async function GET() {
 
   const row = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { mcpApiKey: true },
+    select: { mcpApiKey: true, mcpApiKeyHash: true },
   })
 
-  return NextResponse.json({ key: row?.mcpApiKey ?? null })
+  return NextResponse.json({ key: null, hasKey: Boolean(row?.mcpApiKeyHash || row?.mcpApiKey) })
 }
 
 export async function POST() {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const key = `shfl_${randomBytes(24).toString('hex')}`
+  const key = createMcpApiKey()
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { mcpApiKey: key },
+    data: {
+      mcpApiKey: null,
+      mcpApiKeyHash: hashMcpApiKey(key),
+    },
   })
 
-  return NextResponse.json({ key })
+  return NextResponse.json({ key, hasKey: true })
 }
 
 export async function DELETE() {
@@ -35,7 +38,7 @@ export async function DELETE() {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { mcpApiKey: null },
+    data: { mcpApiKey: null, mcpApiKeyHash: null },
   })
 
   return NextResponse.json({ ok: true })
