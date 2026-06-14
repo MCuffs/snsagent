@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import { renderSvgToPng } from '../render/svgToPng'
+import { isTrustedRenderableImageUrl } from '../security/imageUrl'
 import { uploadGeneratedAsset } from '../storage/upload'
 import { layerByType, normalizeDocument } from './document'
 import type { EditorialDocument, EditorialLayer, FontPreset } from './types'
@@ -296,8 +297,9 @@ function escapeXml(value: string) {
 
 async function toImageDataUri(imageUrl: string) {
   if (!imageUrl || imageUrl.startsWith('data:')) return imageUrl
+  if (!isTrustedRenderableImageUrl(imageUrl)) return ''
   if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
-    const cleanPath = imageUrl.startsWith('file://') ? imageUrl.replace('file://', '') : imageUrl
+    const cleanPath = imageUrl
     const filePath = path.join(process.cwd(), 'public', cleanPath)
     if (fs.existsSync(filePath)) {
       const fileBuffer = fs.readFileSync(filePath)

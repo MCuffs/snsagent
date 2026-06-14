@@ -1,4 +1,4 @@
-export const ADMIN_EMAILS = (process.env.SUPER_USER_EMAILS || 'alstnwjd0424@gmail.com,imhs1248@gmail.com,kanghiee616@gmail.com')
+export const ADMIN_EMAILS = (process.env.SUPER_USER_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(Boolean)

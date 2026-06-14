@@ -4,14 +4,29 @@ import prisma from '../../../../lib/db'
 
 export const runtime = 'nodejs'
 
-function extractEmail(data: any): string | null {
-  if (!data) return null
+type FastSpringValue = Record<string, unknown>
+
+function asRecord(value: unknown): FastSpringValue | null {
+  return typeof value === 'object' && value !== null ? value as FastSpringValue : null
+}
+
+function getString(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function extractEmail(data: unknown): string | null {
+  const record = asRecord(data)
+  if (!record) return null
+  const account = asRecord(record.account)
+  const accountContact = asRecord(account?.contact)
+  const customer = asRecord(record.customer)
+  const recipient = asRecord(record.recipient)
   const email =
-    data.account?.contact?.email ||
-    data.account?.email ||
-    data.customer?.email ||
-    data.recipient?.email ||
-    data.email
+    getString(accountContact?.email) ||
+    getString(account?.email) ||
+    getString(customer?.email) ||
+    getString(recipient?.email) ||
+    getString(record.email)
 
   if (typeof email === 'string' && email.includes('@')) {
     return email.trim().toLowerCase()
@@ -19,29 +34,33 @@ function extractEmail(data: any): string | null {
   return null
 }
 
-function extractProductPaths(eventType: string, data: any): string[] {
-  if (!data) return []
+function extractProductPaths(eventType: string, data: unknown): string[] {
+  const record = asRecord(data)
+  if (!record) return []
   const paths: string[] = []
 
   if (eventType === 'order.completed') {
-    if (Array.isArray(data.items)) {
-      for (const item of data.items) {
-        if (item.product) {
-          if (typeof item.product === 'string') {
-            paths.push(item.product)
-          } else if (typeof item.product === 'object' && item.product !== null) {
-            const path = item.product.product || item.product.name || ''
+    if (Array.isArray(record.items)) {
+      for (const item of record.items) {
+        const product = asRecord(item)?.product
+        if (product) {
+          if (typeof product === 'string') {
+            paths.push(product)
+          } else if (typeof product === 'object' && product !== null) {
+            const productRecord = asRecord(product)
+            const path = getString(productRecord?.product) || getString(productRecord?.name)
             if (path) paths.push(path)
           }
         }
       }
     }
   } else {
-    if (data.product) {
-      if (typeof data.product === 'string') {
-        paths.push(data.product)
-      } else if (typeof data.product === 'object' && data.product !== null) {
-        const path = data.product.product || data.product.name || ''
+    if (record.product) {
+      if (typeof record.product === 'string') {
+        paths.push(record.product)
+      } else if (typeof record.product === 'object' && record.product !== null) {
+        const productRecord = asRecord(record.product)
+        const path = getString(productRecord?.product) || getString(productRecord?.name)
         if (path) paths.push(path)
       }
     }
@@ -134,7 +153,7 @@ export async function POST(request: Request) {
   }
 
   // 4. Parse events
-  let payload: any
+  let payload: unknown
   try {
     payload = JSON.parse(rawBody)
   } catch (err) {
@@ -142,7 +161,7 @@ export async function POST(request: Request) {
     return Response.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const events = payload.events
+  const events = asRecord(payload)?.events
   if (!events || !Array.isArray(events)) {
     console.warn('[FastSpring Webhook] Missing events array in payload')
     return Response.json({ success: true, message: 'No events processed' }, { status: 200 })

@@ -101,7 +101,18 @@ function PricingGrid({
   // Locale-based payment method determination
   const showNicePay = locale === 'ko' && Boolean(nicepayClientKey)
   const showPayPal = locale !== 'ko' && Object.keys(paypalPlanIds).length > 0
-  const isFastSpringTester = _customerEmail?.trim().toLowerCase() === 'alstnwjd0424@gmail.com'
+  const fastSpringTesterEmail = process.env.NEXT_PUBLIC_FASTSPRING_TESTER_EMAIL?.trim().toLowerCase()
+  const isFastSpringTester = Boolean(fastSpringTesterEmail && _customerEmail?.trim().toLowerCase() === fastSpringTesterEmail)
+  const getFastSpring = () => (window as Window & {
+    fastspring?: {
+      builder?: {
+        clean: () => void
+        add: (productPath: string) => void
+        push: (payload: { contact: { email: string } }) => void
+        checkout: () => void
+      }
+    }
+  }).fastspring
 
   // Dynamic FastSpring SDK script loader
   useEffect(() => {
@@ -110,9 +121,7 @@ function PricingGrid({
     // If script already exists, check if global fastspring is loaded
     const existingScript = document.getElementById('fsc-api')
     if (existingScript) {
-      if ((window as any).fastspring) {
-        setFscLoaded(true)
-      }
+      if (getFastSpring()) window.setTimeout(() => setFscLoaded(true), 0)
       return
     }
 
@@ -137,7 +146,7 @@ function PricingGrid({
       ? (process.env.NEXT_PUBLIC_FASTSPRING_CREATOR_PRODUCT || 'shuffla-creator-plan')
       : (process.env.NEXT_PUBLIC_FASTSPRING_STUDIO_PRODUCT || 'shuffla-studio-plan')
 
-    const fsc = (window as any).fastspring
+    const fsc = getFastSpring()
     if (fsc && fsc.builder) {
       try {
         setError('')

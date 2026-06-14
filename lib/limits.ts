@@ -1,7 +1,8 @@
 import { dbService } from './db-service'
-import { SubscriptionPlan, PlanFeature, PRICING_PLANS, normalizePlan } from './limits-types'
+import { PRICING_PLANS, normalizePlan } from './limits-types'
+import type { SubscriptionPlan, PlanFeature } from './limits-types'
 import { getCampaignUsagePeriodStart } from './usage-period'
-import { isAdminEmail } from './admin'
+import { isAdminEmail } from './auth/admin-emails'
 
 export type { SubscriptionPlan, PlanFeature }
 export { PRICING_PLANS }

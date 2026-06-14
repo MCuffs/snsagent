@@ -15,6 +15,12 @@ const eslintConfig = defineConfig([
       'no-unused-vars': 'off',
     },
   },
+  {
+    files: ["scripts/**/*.{js,mjs,ts}", "tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
   globalIgnores([
     ".next/**",
     ".vercel/**",
