@@ -282,15 +282,29 @@ function ProfileSelectScreen({
           ))}
         </div>
 
-        <div className="mt-8 rounded-xl border border-[#e4e4e7] bg-[#fafafa] p-5">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="mt-8 rounded-xl border border-[#e4e4e7] bg-gradient-to-br from-[#faf8ff] to-[#f5f3ff] p-5">
+          <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-[#8b5cf6]" />
-            <p className="text-sm font-semibold text-[#111111]">AI가 학습한 콘텐츠 방향</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#8b5cf6]">AI 학습 리포트</p>
           </div>
           {hasPreference ? (
-            <p className="text-sm leading-6 text-[#52525b]">{summarizedPreference!.summary}</p>
+            <>
+              <p className="mt-1 text-sm font-semibold text-[#111111]">
+                AI가 학습한 사용자님의 콘텐츠 흐름입니다
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#52525b]">{summarizedPreference!.summary}</p>
+              <p className="mt-3 text-[11px] text-[#a1a1aa]">카드뉴스를 더 생성할수록 취향이 정교하게 반영됩니다.</p>
+            </>
           ) : (
-            <p className="text-sm text-[#71717a]">아직 학습된 콘텐츠 방향이 없습니다</p>
+            <>
+              <p className="mt-1 text-sm font-semibold text-[#111111]">
+                아직 학습된 내용이 없어요
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#71717a]">
+                카드뉴스를 생성하고 편집할수록 AI가 사용자님의 콘텐츠 스타일과 취향을 파악해
+                다음 생성에 자동으로 반영합니다.
+              </p>
+            </>
           )}
         </div>
       </div>
