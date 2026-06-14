@@ -484,6 +484,12 @@ function validateClarification(clarification: unknown): clarification is Clarifi
   })
 }
 
+// SSE helper — encode a named event + JSON payload
+function sseEvent(event: string, data: unknown): Uint8Array {
+  const line = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+  return new TextEncoder().encode(line)
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
@@ -515,7 +521,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    // 1. If history is empty, immediately return greeting message (minimizes OpenAI API load)
+    // 1. Greeting (no history) — no SSE needed, return JSON immediately
     if (!messages || messages.length === 0) {
       const greeting: AgentResponse = language === 'en' ? {
         message: `Hello! I'm the Creative Content Director for ${brand.name}.\n\nPlease share a product URL or campaign topic you'd like to feature (e.g. "new leather bag launch"). I'll design the most effective card news strategy based on your brand's unique identity and target audience.`,
@@ -531,256 +537,213 @@ export async function POST(request: Request) {
       return NextResponse.json(greeting)
     }
 
-    // 2. Parse past styles memory
-    let preferencesText = '과거 선호 스타일 기록 없음 (브랜드 정보 기준 기본 기획)'
-    if (brand.editorPreferences) {
-      try {
-        const pref = JSON.parse(brand.editorPreferences)
-        preferencesText = `
-        - 과거 사용자가 선호한 타이포그래피 프리셋: ${pref.typographyPreset || '기본'}
-        - 과거 사용자가 선호한 오버레이 프리셋: ${pref.overlay?.preset || '기본'}
-        - 과거 선호한 텍스트 폰트/크기: ${pref.titleStyle?.fontPreset || '기본'} (크기: ${pref.titleStyle?.fontSize || '기본'})
-        `
-      } catch {
-        // ignore JSON parsing errors
-      }
-    }
+    // 2. SSE stream for all subsequent turns
+    const stream = new ReadableStream({
+      async start(controller) {
+        const emit = (event: string, data: unknown) => {
+          try { controller.enqueue(sseEvent(event, data)) } catch { /* closed */ }
+        }
 
-    // 3 & 4. URL scrape + RSS fetch in parallel
-    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
-    const allUserText = messages
-      .filter(m => m.role === 'user')
-      .map(m => m.content)
-      .join('\n')
-    const userTurnCount = messages.filter(m => m.role === 'user').length
-
-    const urlMatch = lastUserMessage?.content.match(/https?:\/\/[^\s]+/)
-    const userTextClean = lastUserMessage?.content.replace(/https?:\/\/[^\s]+/g, '').trim() || ''
-    const researchTopic = buildAgentResearchTopic(userTextClean, allUserText)
-    const keywords = extractGenerationKeywords(researchTopic || userTextClean)
-    const hasDraftContext = hasPriorDraftContext(messages)
-    const requestsNewTopic = isNewTopicRequest(userTextClean)
-    const isFollowUpRevision = userTurnCount > 1 && !requestsNewTopic && isLightweightRevisionRequest(userTextClean)
-    const shouldUseExternalResearch = generationMode === 'general' &&
-      researchTopic.length >= 2 &&
-      (!hasDraftContext || requestsNewTopic) &&
-      !isFollowUpRevision
-    const shouldUseRssFallback = generationMode === 'general' &&
-      Boolean(lastUserMessage) &&
-      (!hasDraftContext || requestsNewTopic) &&
-      !isFollowUpRevision
-
-    const [scrapeResult, researchBrief, rssResult] = await Promise.all([
-      // URL scrape (only if URL present)
-      urlMatch ? (async () => {
         try {
-          const productContext = await collectBrandUrlContext(urlMatch[0])
-          const scraped = productContext.promptContext.slice(0, 5000)
-          const apiKey = process.env.OPENAI_API_KEY
-          if (apiKey && apiKey.length > 10) {
-            const openai = new OpenAI({
-              apiKey,
-              ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
-            })
-            const persuasion = await analyzePurchasePersuasionWithOpenAI({
-              openai,
-              collected: productContext,
-              locale: language,
-            })
-            return { scraped, persuasion: formatPurchasePersuasionForPrompt(persuasion) }
+          // 2a. Parse memory
+          let preferencesText = '과거 선호 스타일 기록 없음 (브랜드 정보 기준 기본 기획)'
+          if (brand.editorPreferences) {
+            try {
+              const pref = JSON.parse(brand.editorPreferences)
+              preferencesText = `
+              - 과거 사용자가 선호한 타이포그래피 프리셋: ${pref.typographyPreset || '기본'}
+              - 과거 사용자가 선호한 오버레이 프리셋: ${pref.overlay?.preset || '기본'}
+              - 과거 선호한 텍스트 폰트/크기: ${pref.titleStyle?.fontPreset || '기본'} (크기: ${pref.titleStyle?.fontSize || '기본'})
+              `
+            } catch { /* ignore */ }
           }
-          return { scraped, persuasion: '' }
-        } catch (err) {
-          console.warn('[GenerateAgent] Scrape failed:', err)
-          return { scraped: '', persuasion: '' }
-        }
-      })() : Promise.resolve({ scraped: '', persuasion: '' }),
 
-      // OpenAI Web Search research (only for general/editorial mode)
-      shouldUseExternalResearch ? (async () => {
-        try {
-          return await buildCarouselResearchBrief({
-            topic: researchTopic,
-            category: brand.industry || 'information',
-            keyContent: [
-              `프로필 분야: ${brand.industry || 'information'}`,
-              `주요 독자: ${brand.targetAudience || '일반 독자'}`,
-              `톤앤매너: ${brand.toneOfVoice || '명확하고 읽기 쉬운 톤'}`,
-            ].join('\n'),
-            contentType: normalizeGeneralProfileCategory(brand.industry),
-            slideCount: 7,
-            language: language || 'ko',
-            mode: 'fast',
+          const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
+          const allUserText = messages.filter(m => m.role === 'user').map(m => m.content).join('\n')
+          const userTurnCount = messages.filter(m => m.role === 'user').length
+          const urlMatch = lastUserMessage?.content.match(/https?:\/\/[^\s]+/)
+          const userTextClean = lastUserMessage?.content.replace(/https?:\/\/[^\s]+/g, '').trim() || ''
+          const researchTopic = buildAgentResearchTopic(userTextClean, allUserText)
+          const keywords = extractGenerationKeywords(researchTopic || userTextClean)
+          const hasDraftContext = hasPriorDraftContext(messages)
+          const requestsNewTopic = isNewTopicRequest(userTextClean)
+          const isFollowUpRevision = userTurnCount > 1 && !requestsNewTopic && isLightweightRevisionRequest(userTextClean)
+          const shouldUseExternalResearch = generationMode === 'general' && researchTopic.length >= 2 && (!hasDraftContext || requestsNewTopic) && !isFollowUpRevision
+          const shouldUseRssFallback = generationMode === 'general' && Boolean(lastUserMessage) && (!hasDraftContext || requestsNewTopic) && !isFollowUpRevision
+
+          // 2b. Parallel: URL scrape + research + RSS — with think events
+          if (urlMatch) emit('think', { step: 'url_scrape', text: `URL 분석 중: ${urlMatch[0].slice(0, 60)}...` })
+          if (shouldUseExternalResearch) emit('think', { step: 'research_start', text: `"${researchTopic.slice(0, 40)}" 관련 자료 검색 중...` })
+          else if (shouldUseRssFallback) emit('think', { step: 'rss_start', text: `관련 뉴스 수집 중 (키워드: ${keywords.slice(0, 3).join(', ')})...` })
+
+          const [scrapeResult, researchBrief, rssResult] = await Promise.all([
+            urlMatch ? (async () => {
+              try {
+                const productContext = await collectBrandUrlContext(urlMatch[0])
+                emit('think', { step: 'url_done', text: `URL 분석 완료` })
+                const scraped = productContext.promptContext.slice(0, 5000)
+                const apiKey = process.env.OPENAI_API_KEY
+                if (apiKey && apiKey.length > 10) {
+                  const openai = new OpenAI({ apiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
+                  const persuasion = await analyzePurchasePersuasionWithOpenAI({ openai, collected: productContext, locale: language })
+                  return { scraped, persuasion: formatPurchasePersuasionForPrompt(persuasion) }
+                }
+                return { scraped, persuasion: '' }
+              } catch (err) {
+                emit('think', { step: 'url_failed', text: 'URL 직접 수집 실패 — 대체 분석으로 전환' })
+                console.warn('[GenerateAgent] Scrape failed:', err)
+                return { scraped: '', persuasion: '' }
+              }
+            })() : Promise.resolve({ scraped: '', persuasion: '' }),
+
+            shouldUseExternalResearch ? (async () => {
+              try {
+                const brief = await buildCarouselResearchBrief({
+                  topic: researchTopic,
+                  category: brand.industry || 'information',
+                  keyContent: [`프로필 분야: ${brand.industry || 'information'}`, `주요 독자: ${brand.targetAudience || '일반 독자'}`, `톤앤매너: ${brand.toneOfVoice || '명확하고 읽기 쉬운 톤'}`].join('\n'),
+                  contentType: normalizeGeneralProfileCategory(brand.industry),
+                  slideCount: 7,
+                  language: language || 'ko',
+                  mode: 'fast',
+                })
+                if (brief) {
+                  const sourceCount = brief.sources?.length || 0
+                  emit('think', { step: 'research_done', text: `자료 수집 완료 — 출처 ${sourceCount}건 확인` })
+                }
+                return brief
+              } catch (err) {
+                console.warn('[GenerateAgent] OpenAI web research failed:', err)
+                return null
+              }
+            })() : Promise.resolve(null),
+
+            shouldUseRssFallback ? (async () => {
+              try {
+                const result = await fetchRssForGeneration({
+                  category: inferRssCategory(researchTopic || userTextClean, brand.industry || 'information'),
+                  keywords,
+                  topic: (researchTopic || userTextClean).slice(0, 80),
+                  limit: 5,
+                  language: language || 'ko',
+                })
+                if (result && result.articles.length > 0) {
+                  emit('think', { step: 'rss_done', text: `뉴스 ${result.articles.length}건 수집됨:\n${result.articles.map(a => `• ${a.title}`).join('\n')}` })
+                }
+                return result
+              } catch (err) {
+                console.warn('[GenerateAgent] RSS fetch failed:', err)
+                return null
+              }
+            })() : Promise.resolve(null),
+          ])
+
+          const scrapedContext = scrapeResult.scraped
+          const purchasePersuasionContext = scrapeResult.persuasion
+          const researchContext = formatResearchBriefForPrompt(researchBrief, language || 'ko')
+          let rssContext = ''
+          if (!researchContext && rssResult && rssResult.matched && rssResult.articles.length > 0) {
+            const lines = [
+              `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
+              `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요.`,
+              '',
+            ]
+            rssResult.articles.forEach((a, i) => {
+              lines.push(`기사 ${i + 1}: ${a.title}`)
+              if (a.description) lines.push(`  → ${a.description.slice(0, 150)}`)
+            })
+            rssContext = lines.join('\n')
+          }
+
+          const apiKey = process.env.OPENAI_API_KEY
+          if (!apiKey || apiKey.length < 10) {
+            emit('message', {
+              message: '안녕하세요! API Key 설정이 확인되지 않습니다.',
+              ready: true,
+              params: { topic: lastUserMessage?.content || '신규 캠페인', visualHint: 'dark-editorial', contentType: '저장형 카드뉴스', objective: '상품 홍보 및 브랜딩 강화', slideCount: 5, productUrl: null, brandAnalysis: 'API Key 없음으로 분석 스킵', targetEmotion: '호기심', hookDirection: '기본 타이틀 제공', recommendedCta: '프로필 링크 확인', reasonForStyle: '기본 에디토리얼 설정 적용', structurePreview: [{ slideNumber: 1, role: 'Hook', description: '제품 소개 메인 헤드라인' }] }
+            })
+            controller.close()
+            return
+          }
+
+          // 2c. LLM strategy call
+          emit('think', { step: 'llm_start', text: `AI 콘텐츠 디렉터가 카드뉴스 전략을 수립하고 있습니다...` })
+
+          const openai = new OpenAI({ apiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
+          const model = getCopywritingModel()
+          const diagnosticContext = { stepName: 'generate agent strategy', provider: 'openai' as const, model, baseURL: getOpenAIBaseURLHost(), keyFingerprint: getOpenAIKeyFingerprint(apiKey), userId: user.id, brandId: brand.id, metadata: { language, generationMode } }
+          const systemPrompt = buildSystemPrompt(brand, preferencesText, [scrapedContext, purchasePersuasionContext, researchContext].filter(Boolean).join('\n\n'), language, generationMode, rssContext, userTurnCount)
+          const modelMessages = requestsNewTopic ? messages.map(m => m.role === 'assistant' ? { ...m, content: stripAgentMemoryContext(m.content) } : m) : messages
+
+          logAiDiagnostic({ status: 'start', ...diagnosticContext })
+          const response = await openai.chat.completions.create({
+            model,
+            messages: [{ role: 'system', content: systemPrompt }, ...modelMessages],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 4000,
           })
-        } catch (err) {
-          console.warn('[GenerateAgent] OpenAI web research failed:', err)
-          return null
-        }
-      })() : Promise.resolve(null),
+          logAiDiagnostic({ status: 'success', ...diagnosticContext, promptTokens: response.usage?.prompt_tokens, completionTokens: response.usage?.completion_tokens, totalTokens: response.usage?.total_tokens })
 
-      // RSS fetch (only for general mode)
-      shouldUseRssFallback ? (async () => {
-        try {
-          return await fetchRssForGeneration({
-            category: inferRssCategory(researchTopic || userTextClean, brand.industry || 'information'),
-            keywords,
-            topic: (researchTopic || userTextClean).slice(0, 80),
-            limit: 5,
-            language: language || 'ko',
-          })
-        } catch (err) {
-          console.warn('[GenerateAgent] RSS fetch failed:', err)
-          return null
-        }
-      })() : Promise.resolve(null),
-    ])
+          const content = response.choices[0]?.message?.content
+          if (!content) {
+            emit('message', { message: '디렉터 기획 수립에 실패했습니다. 다시 말씀해 주세요.', ready: false })
+            controller.close()
+            return
+          }
 
-    const scrapedContext = scrapeResult.scraped
-    const purchasePersuasionContext = scrapeResult.persuasion
-    const researchContext = formatResearchBriefForPrompt(researchBrief, language || 'ko')
-    let rssContext = ''
-    if (!researchContext && rssResult && rssResult.matched && rssResult.articles.length > 0) {
-      const lines = [
-        `[실시간 관련 뉴스 — ${rssResult.matched ? '주제 키워드 매칭' : '최신 뉴스'}]`,
-        `아래 최신 뉴스를 참고하여 훅·슬라이드 흐름을 기획하세요. 실제 이슈 기반으로 제안해야 독자의 공감을 얻습니다.`,
-        '',
-      ]
-      rssResult.articles.forEach((a, i) => {
-        lines.push(`기사 ${i + 1}: ${a.title}`)
-        if (a.description) lines.push(`  → ${a.description.slice(0, 150)}`)
-      })
-      rssContext = lines.join('\n')
-    }
+          let parsed: AgentResponse
+          try {
+            parsed = JSON.parse(content) as AgentResponse
+          } catch (parseError) {
+            console.error('[GenerateAgent] Invalid JSON response:', parseError, content)
+            emit('message', { message: '기획안 응답 형식이 올바르지 않았습니다. 같은 요청으로 한 번만 다시 시도해 주세요.', ready: false })
+            controller.close()
+            return
+          }
 
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey || apiKey.length < 10) {
-      const fallback: AgentResponse = {
-        message: '안녕하세요! 상품이나 캠페인 정보가 수집되었으나, API Key 설정이 확인되지 않습니다. 기획을 바로 생성할까요?',
-        ready: true,
-        params: {
-          topic: lastUserMessage?.content || '신규 캠페인',
-          visualHint: 'dark-editorial',
-          contentType: '저장형 카드뉴스',
-          objective: '상품 홍보 및 브랜딩 강화',
-          slideCount: 5,
-          productUrl: null,
-          brandAnalysis: 'API Key 없음으로 분석 스킵',
-          targetEmotion: '호기심',
-          hookDirection: '기본 타이틀 제공',
-          recommendedCta: '프로필 링크 확인',
-          reasonForStyle: '기본 에디토리얼 설정 적용',
-          structurePreview: [
-            { slideNumber: 1, role: 'Hook', description: '제품 소개 메인 헤드라인' },
-            { slideNumber: 2, role: 'Detail', description: '디테일 정보' },
-            { slideNumber: 3, role: 'CTA', description: '행동 유도' }
-          ]
+          if (parsed.ready && parsed.params) {
+            if (!validateParams(parsed.params)) {
+              emit('message', { message: parsed.message || '세부 기획 매개변수 형식을 더 정교하게 다듬는 중입니다. 슬라이드 수와 원하는 스타일 방향을 간단히 말씀해 주세요.', ready: false })
+              controller.close()
+              return
+            }
+            parsed.params.slideCount = Number(parsed.params.slideCount)
+            normalizeDraftSlides(parsed.params, language || 'ko')
+            if (!validateDraftSlides(parsed.params)) {
+              parsed.ready = false
+              parsed.message = language === 'en'
+                ? 'I prepared the strategy, but the slide draft was incomplete. Please send the same request once more or add one preferred angle so I can return the full draft.'
+                : '기획 방향은 잡혔지만 슬라이드 카피 초안이 완성되지 않았습니다. 같은 요청을 한 번만 다시 보내주시거나 원하는 관점을 한 줄만 덧붙여 주세요.'
+            }
+          }
+
+          if (!parsed.ready && parsed.clarification && !validateClarification(parsed.clarification)) {
+            delete parsed.clarification
+          }
+
+          emit('message', parsed)
+          controller.close()
+
+        } catch (error) {
+          console.error('[GenerateAgent] Stream error:', error)
+          logAiDiagnostic({ status: 'failure', stepName: 'generate agent strategy', provider: 'openai', model: getCopywritingModel(), baseURL: getOpenAIBaseURLHost(), keyFingerprint: getOpenAIKeyFingerprint(), ...readOpenAIError(error) })
+          const mapped = getOpenAIUserFacingError(error)
+          emit('message', { message: mapped.message, ready: false })
+          controller.close()
         }
       }
-      return NextResponse.json(fallback)
-    }
-
-    const openai = new OpenAI({
-      apiKey,
-      ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
-    })
-    const model = getCopywritingModel()
-    const diagnosticContext = {
-      stepName: 'generate agent strategy',
-      provider: 'openai' as const,
-      model,
-      baseURL: getOpenAIBaseURLHost(),
-      keyFingerprint: getOpenAIKeyFingerprint(apiKey),
-      userId: user.id,
-      brandId: brand.id,
-      metadata: { language, generationMode },
-    }
-    const systemPrompt = buildSystemPrompt(
-      brand,
-      preferencesText,
-      [scrapedContext, purchasePersuasionContext, researchContext].filter(Boolean).join('\n\n'),
-      language,
-      generationMode,
-      rssContext,
-      userTurnCount
-    )
-    const modelMessages = requestsNewTopic
-      ? messages.map(message => (
-        message.role === 'assistant'
-          ? { ...message, content: stripAgentMemoryContext(message.content) }
-          : message
-      ))
-      : messages
-    logAiDiagnostic({ status: 'start', ...diagnosticContext })
-    const response = await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...modelMessages,
-      ],
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 4000,
-    })
-    logAiDiagnostic({
-      status: 'success',
-      ...diagnosticContext,
-      promptTokens: response.usage?.prompt_tokens,
-      completionTokens: response.usage?.completion_tokens,
-      totalTokens: response.usage?.total_tokens,
     })
 
-    const content = response.choices[0]?.message?.content
-    if (!content) {
-      return NextResponse.json({ message: '디렉터 기획 수립에 실패했습니다. 다시 말씀해 주세요.', ready: false })
-    }
-
-    let parsed: AgentResponse
-    try {
-      parsed = JSON.parse(content) as AgentResponse
-    } catch (parseError) {
-      console.error('[GenerateAgent] Invalid JSON response:', parseError, content)
-      return NextResponse.json({
-        message: '기획안 응답 형식이 올바르지 않았습니다. 같은 요청으로 한 번만 다시 시도해 주세요.',
-        ready: false,
-      }, { status: 502 })
-    }
-
-    // Validate parameters if the agent flagged ready
-    if (parsed.ready && parsed.params) {
-      if (!validateParams(parsed.params)) {
-        return NextResponse.json({
-          message: parsed.message || '세부 기획 매개변수 형식을 더 정교하게 다듬는 중입니다. 슬라이드 수와 원하는 스타일 방향을 간단히 말씀해 주세요.',
-          ready: false,
-        })
-      }
-      parsed.params.slideCount = Number(parsed.params.slideCount)
-      normalizeDraftSlides(parsed.params, language || 'ko')
-      if (!validateDraftSlides(parsed.params)) {
-        parsed.ready = false
-        parsed.message = language === 'en'
-          ? 'I prepared the strategy, but the slide draft was incomplete. Please send the same request once more or add one preferred angle so I can return the full draft.'
-          : '기획 방향은 잡혔지만 슬라이드 카피 초안이 완성되지 않았습니다. 같은 요청을 한 번만 다시 보내주시거나 원하는 관점을 한 줄만 덧붙여 주세요.'
-      }
-    }
-
-    // Trust LLM's own ready/clarification judgment — no heuristic override
-    if (!parsed.ready && parsed.clarification && !validateClarification(parsed.clarification)) {
-      delete parsed.clarification
-    }
-
-    return NextResponse.json(parsed)
-  } catch (error) {
-    console.error('[GenerateAgent] Error:', error)
-    logAiDiagnostic({
-      status: 'failure',
-      stepName: 'generate agent strategy',
-      provider: 'openai',
-      model: getCopywritingModel(),
-      baseURL: getOpenAIBaseURLHost(),
-      keyFingerprint: getOpenAIKeyFingerprint(),
-      ...readOpenAIError(error),
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     })
-    const mapped = getOpenAIUserFacingError(error)
-    return NextResponse.json({ message: mapped.message, ready: false }, { status: mapped.status })
+  } catch (outerError) {
+    console.error('[GenerateAgent] Outer error:', outerError)
+    return NextResponse.json({ error: '요청 처리 중 오류가 발생했습니다.' }, { status: 500 })
   }
 }
 

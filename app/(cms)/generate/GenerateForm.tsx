@@ -279,6 +279,7 @@ export default function GenerateForm({
   const [showPromoModal, setShowPromoModal] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [promoError, setPromoError] = useState<string | null>(null)
+  const [thinkingSteps, setThinkingSteps] = useState<Array<{ step: string; text: string }>>([])
 
   const generating = phase === 'generating'
 
@@ -456,6 +457,7 @@ export default function GenerateForm({
     abortControllerRef.current = controller
 
     setIsWaiting(true)
+    setThinkingSteps([])
     try {
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
@@ -463,49 +465,82 @@ export default function GenerateForm({
         body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode }),
         signal: controller.signal,
       })
-      const data = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }
 
-      if (data.error) {
-        appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
-        return
+      // SSE stream parsing
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('text/event-stream') && res.body) {
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let data: { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string } | null = null
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const parts = buffer.split('\n\n')
+          buffer = parts.pop() ?? ''
+
+          for (const part of parts) {
+            const eventMatch = part.match(/^event: (\w+)\ndata: ([\s\S]+)$/)
+            if (!eventMatch) continue
+            const [, event, rawData] = eventMatch
+            try {
+              const parsed = JSON.parse(rawData)
+              if (event === 'think') {
+                setThinkingSteps(prev => [...prev, { step: parsed.step, text: parsed.text }])
+              } else if (event === 'message') {
+                data = parsed
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+
+        if (!data) {
+          appendAiMessage(locale === 'en' ? 'An error occurred. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다.')
+          return
+        }
+
+        // Process final message data (same as before)
+        if (data.error) {
+          appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+          return
+        }
+
+        const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
+        const refinementPrompt = data.ready && data.params?.draftSlides?.length
+          ? buildDraftRefinementPrompt(locale, data.params.refinementOptions)
+          : undefined
+        appendAiMessage(msg, data.params ? data.params : undefined, refinementPrompt || (!data.ready ? data.clarification : undefined))
+        if (data.ready && data.params) {
+          analytics.generateBriefReady({ brandId: brand.id, generationMode, topic: data.params.topic, contentType: data.params.contentType, objective: data.params.objective, slideCount: data.params.slideCount, hasProductUrl: Boolean(data.params.productUrl), structureSlideCount: data.params.structurePreview?.length ?? 0, locale })
+        }
+        const clarificationContext = data.clarification ? ['\n', `[Clarification question shown to user] ${data.clarification.question}`, '[Clarification options]', ...data.clarification.options.map(o => `- ${o.label}: ${o.value}`)].join('\n') : ''
+        const draftContext = buildAgentMemoryContext(data.params)
+        setChatHistory(prev => [...prev, { role: 'assistant', content: `${msg}${clarificationContext}${draftContext}` }])
+
+      } else {
+        // Fallback: plain JSON response (e.g. greeting)
+        const data2 = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }
+        if (data2.error) {
+          appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+          return
+        }
+        const msg2 = data2.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
+        const refinementPrompt2 = data2.ready && data2.params?.draftSlides?.length ? buildDraftRefinementPrompt(locale, data2.params.refinementOptions) : undefined
+        appendAiMessage(msg2, data2.params ? data2.params : undefined, refinementPrompt2 || (!data2.ready ? data2.clarification : undefined))
+        const clarificationContext2 = data2.clarification ? ['\n', `[Clarification question shown to user] ${data2.clarification.question}`, '[Clarification options]', ...data2.clarification.options.map(o => `- ${o.label}: ${o.value}`)].join('\n') : ''
+        const draftContext2 = buildAgentMemoryContext(data2.params)
+        setChatHistory(prev => [...prev, { role: 'assistant', content: `${msg2}${clarificationContext2}${draftContext2}` }])
       }
-
-      const msg = data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.')
-      const refinementPrompt = data.ready && data.params?.draftSlides?.length
-        ? buildDraftRefinementPrompt(locale, data.params.refinementOptions)
-        : undefined
-      appendAiMessage(msg, data.params ? data.params : undefined, refinementPrompt || (!data.ready ? data.clarification : undefined))
-      if (data.ready && data.params) {
-        analytics.generateBriefReady({
-          brandId: brand.id,
-          generationMode,
-          topic: data.params.topic,
-          contentType: data.params.contentType,
-          objective: data.params.objective,
-          slideCount: data.params.slideCount,
-          hasProductUrl: Boolean(data.params.productUrl),
-          structureSlideCount: data.params.structurePreview?.length ?? 0,
-          locale,
-        })
-      }
-
-      const clarificationContext = data.clarification
-        ? [
-            '',
-            `[Clarification question shown to user] ${data.clarification.question}`,
-            '[Clarification options]',
-            ...data.clarification.options.map(option => `- ${option.label}: ${option.value}`),
-          ].join('\n')
-        : ''
-      const draftContext = buildAgentMemoryContext(data.params)
-      const assistantHistory: ChatMessage = { role: 'assistant', content: `${msg}${clarificationContext}${draftContext}` }
-      setChatHistory(prev => [...prev, assistantHistory])
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
       appendAiMessage(locale === 'en' ? 'Failed to connect to server. Please try again.' : '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       if (abortControllerRef.current === controller) abortControllerRef.current = null
       setIsWaiting(false)
+      setThinkingSteps([])
     }
   }, [appendAiMessage, brand.id, generationMode, locale, language])
 
@@ -1267,7 +1302,7 @@ export default function GenerateForm({
             >
               <div className="flex flex-col gap-2.5 items-start">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#9E7D68] to-[#C4A38E] text-[10px] font-black text-white shadow-sm ring-1 ring-white/20">S</div>
-                <ThinkingBubble />
+                <ThinkingBubble steps={thinkingSteps} />
               </div>
             </motion.div>
           )}
@@ -2023,52 +2058,42 @@ function PromoPaymentModal({
 }
 
 
-const THINKING_STEPS = [
-  { label: '브랜드 분석 중', detail: '브랜드 DNA와 타겟 고객을 분석하고 있습니다.' },
-  { label: '콘텐츠 방향 설계 중', detail: '주제에 맞는 슬라이드 구성과 훅 방향을 설계하고 있습니다.' },
-  { label: '카피 기획 중', detail: '각 슬라이드의 헤드라인과 본문 흐름을 구성하고 있습니다.' },
-  { label: '응답 정리 중', detail: '기획 결과를 정리해 전달할 준비를 하고 있습니다.' },
-]
-
-function ThinkingBubble() {
-  const [step, setStep] = useState(0)
+function ThinkingBubble({ steps }: { steps: Array<{ step: string; text: string }> }) {
   const [expanded, setExpanded] = useState(false)
+  const lastStep = steps[steps.length - 1]
+  const currentLabel = lastStep?.text || '생각하는 중...'
 
+  // Auto-expand when real steps arrive
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStep(prev => (prev < THINKING_STEPS.length - 1 ? prev + 1 : prev))
-    }, 2200)
-    return () => clearInterval(interval)
-  }, [])
-
-  const current = THINKING_STEPS[step]
+    if (steps.length > 0) setExpanded(true)
+  }, [steps.length])
 
   return (
     <button
       type="button"
       onClick={() => setExpanded(v => !v)}
-      className="group rounded-2xl rounded-tl-sm bg-[#FDFBF7] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)] text-left transition-all hover:border-[#C4A38E]/50"
+      className="group max-w-xs rounded-2xl rounded-tl-sm bg-[#FDFBF7] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)] text-left transition-all hover:border-[#C4A38E]/50"
     >
       <div className="flex items-center gap-2.5 px-4 py-3">
-        <div className="flex gap-1">
+        <div className="flex gap-1 shrink-0">
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '0ms' }} />
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '120ms' }} />
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '240ms' }} />
         </div>
-        <span className="text-[11px] font-semibold text-[#9E8B7D]">{current.label}</span>
-        <span className="ml-1 text-[10px] text-[#B8A99A] group-hover:text-[#9E8B7D] transition-colors">
+        <span className="text-[11px] font-semibold text-[#9E8B7D] line-clamp-1">{currentLabel}</span>
+        <span className="ml-auto shrink-0 text-[10px] text-[#B8A99A] group-hover:text-[#9E8B7D] transition-colors">
           {expanded ? '▲' : '▼'}
         </span>
       </div>
-      {expanded && (
-        <div className="border-t border-[#EDE6DE] px-4 pb-3 pt-2.5">
-          <div className="space-y-1.5">
-            {THINKING_STEPS.map((s, i) => (
-              <div key={s.label} className={`flex items-start gap-2 text-[11px] leading-5 ${i <= step ? 'text-[#7A6A5E]' : 'text-[#C0B4AA]'}`}>
-                <span className="mt-0.5 shrink-0">
-                  {i < step ? '✓' : i === step ? '→' : '·'}
-                </span>
-                <span>{i === step ? <strong>{s.detail}</strong> : s.label}</span>
+      {expanded && steps.length > 0 && (
+        <div className="border-t border-[#EDE6DE] px-4 pb-3 pt-2.5 max-h-48 overflow-y-auto">
+          <div className="space-y-2">
+            {steps.map((s, i) => (
+              <div key={i} className={`text-[11px] leading-5 ${i === steps.length - 1 ? 'text-[#7A6A5E]' : 'text-[#B0A096]'}`}>
+                <div className="flex items-start gap-1.5">
+                  <span className="shrink-0 mt-0.5">{i === steps.length - 1 ? '→' : '✓'}</span>
+                  <span className="whitespace-pre-wrap">{i === steps.length - 1 ? <strong>{s.text}</strong> : s.text}</span>
+                </div>
               </div>
             ))}
           </div>
