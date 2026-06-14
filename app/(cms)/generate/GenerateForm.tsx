@@ -1257,7 +1257,7 @@ export default function GenerateForm({
             ))}
           </AnimatePresence>
 
-          {/* AI typing indicator */}
+          {/* AI thinking indicator */}
           {isWaiting && displayMessages.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -1267,13 +1267,7 @@ export default function GenerateForm({
             >
               <div className="flex flex-col gap-2.5 items-start">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#9E7D68] to-[#C4A38E] text-[10px] font-black text-white shadow-sm ring-1 ring-white/20">S</div>
-                <div className="rounded-2xl rounded-tl-sm bg-[#FDFBF7] px-4 py-3 border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)]">
-                  <div className="flex gap-1.5">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '0ms' }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '120ms' }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '240ms' }} />
-                  </div>
-                </div>
+                <ThinkingBubble />
               </div>
             </motion.div>
           )}
@@ -2025,5 +2019,61 @@ function PromoPaymentModal({
       </div>
     </div>,
     document.body
+  )
+}
+
+
+const THINKING_STEPS = [
+  { label: '브랜드 분석 중', detail: '브랜드 DNA와 타겟 고객을 분석하고 있습니다.' },
+  { label: '콘텐츠 방향 설계 중', detail: '주제에 맞는 슬라이드 구성과 훅 방향을 설계하고 있습니다.' },
+  { label: '카피 기획 중', detail: '각 슬라이드의 헤드라인과 본문 흐름을 구성하고 있습니다.' },
+  { label: '응답 정리 중', detail: '기획 결과를 정리해 전달할 준비를 하고 있습니다.' },
+]
+
+function ThinkingBubble() {
+  const [step, setStep] = useState(0)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep(prev => (prev < THINKING_STEPS.length - 1 ? prev + 1 : prev))
+    }, 2200)
+    return () => clearInterval(interval)
+  }, [])
+
+  const current = THINKING_STEPS[step]
+
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded(v => !v)}
+      className="group rounded-2xl rounded-tl-sm bg-[#FDFBF7] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)] text-left transition-all hover:border-[#C4A38E]/50"
+    >
+      <div className="flex items-center gap-2.5 px-4 py-3">
+        <div className="flex gap-1">
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '0ms' }} />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '120ms' }} />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '240ms' }} />
+        </div>
+        <span className="text-[11px] font-semibold text-[#9E8B7D]">{current.label}</span>
+        <span className="ml-1 text-[10px] text-[#B8A99A] group-hover:text-[#9E8B7D] transition-colors">
+          {expanded ? '▲' : '▼'}
+        </span>
+      </div>
+      {expanded && (
+        <div className="border-t border-[#EDE6DE] px-4 pb-3 pt-2.5">
+          <div className="space-y-1.5">
+            {THINKING_STEPS.map((s, i) => (
+              <div key={s.label} className={`flex items-start gap-2 text-[11px] leading-5 ${i <= step ? 'text-[#7A6A5E]' : 'text-[#C0B4AA]'}`}>
+                <span className="mt-0.5 shrink-0">
+                  {i < step ? '✓' : i === step ? '→' : '·'}
+                </span>
+                <span>{i === step ? <strong>{s.detail}</strong> : s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </button>
   )
 }
