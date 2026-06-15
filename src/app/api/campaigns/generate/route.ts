@@ -13,6 +13,8 @@ import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, infe
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../lib/research/carouselResearch'
 import OpenAI from 'openai'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../../lib/rateLimiter'
+import { isTestAccount } from '../../../../../lib/auth/test-accounts'
+import { generateTestCampaign } from '../../../../lib/layout/testCampaignPipeline'
 
 export const runtime = 'nodejs'
 
@@ -98,6 +100,20 @@ export async function POST(request: Request) {
     }
 
     if (body.campaignType === 'media') {
+      // ── 테스트 계정: AI/이미지 호출 없이 고정 카드 즉시 반환 ──
+      if (isTestAccount(user.email)) {
+        const testResult = await generateTestCampaign({
+          userId: user.id,
+          brandId: brand.id,
+          brandName: brand.name,
+          slideCount: normalizeSlideCount(body.slideCount),
+        })
+        return NextResponse.json({
+          campaignId: testResult.campaignId,
+          postId: testResult.postId,
+          status: testResult.status,
+        })
+      }
       const account = await dbService.getInstagramAccount(user.id, brand.id)
       const source = body.source || account?.username || brand.name
 

@@ -64,13 +64,6 @@ export const metadata: Metadata = {
   },
   verification: {},
   category: 'technology',
-  alternates: {
-    canonical: BASE_URL,
-    languages: {
-      ko: `${BASE_URL}/ko`,
-      en: `${BASE_URL}/en`,
-    },
-  },
 };
 
 export default function RootLayout({

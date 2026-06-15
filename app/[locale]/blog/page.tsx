@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       : 'AI 카드뉴스 제작과 Shuffla 활용 가이드, FAQ를 확인하세요.',
     alternates: {
       canonical: `${base}/${locale}/blog`,
-      languages: { ko: `${base}/ko/blog`, en: `${base}/en/blog` },
+      languages: { ko: `${base}/ko/blog`, en: `${base}/en/blog`, 'x-default': `${base}/ko/blog` },
     },
     openGraph: {
       title: isEn ? 'Blog | Shuffla Card News Studio' : '블로그 | Shuffla 카드뉴스 스튜디오',

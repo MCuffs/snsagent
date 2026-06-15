@@ -16,6 +16,7 @@ import {
   readOpenAIError,
 } from '../../../../src/lib/ai/diagnostics'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
+import { isTestAccount } from '../../../../lib/auth/test-accounts'
 
 export const runtime = 'nodejs'
 
@@ -81,15 +82,15 @@ function getAgentDraftCopyConstraints(language: 'ko' | 'en' = 'ko') {
   return language === 'en'
     ? {
       maxHeadlineChars: 40,
-      maxBodyChars: 130,
-      maxBodyLines: 3,
-      lineLength: 34,
+      maxBodyChars: 160,
+      maxBodyLines: 6,
+      lineLength: 44,
     }
     : {
-      maxHeadlineChars: 22,
-      maxBodyChars: 85,
-      maxBodyLines: 3,
-      lineLength: 20,
+      maxHeadlineChars: 24,
+      maxBodyChars: 200,
+      maxBodyLines: 6,
+      lineLength: 32,
     }
 }
 
@@ -258,7 +259,7 @@ ${contextBlock || '추가 참고 정보 없음'}
 - visualHint는 dark-editorial, trend-feed, community-style, minimal-clean, breaking-news 중 하나입니다.
 - slideCount는 5, 7, 10 중 하나입니다. 기본은 5 또는 7입니다.
 - structurePreview와 draftSlides는 slideCount와 같은 개수여야 합니다.
-- draftSlides는 실제 카드에 들어갈 문구입니다. headline은 22자 이하, body는 85자 이하의 1~2문장으로 쓰세요.
+- draftSlides는 실제 카드에 들어갈 문구입니다. headline은 24자 이하, body는 100~200자의 2~3문장으로 구체적인 정보·이유·기준을 충분히 담아 쓰세요.
 - reasoning은 공백 포함 30자 이내의 짧은 한글 문장입니다.
 - refinementOptions는 이 초안을 더 좋게 바꾸는 관점 선택지 3개입니다. 새 조사 없이 기존 근거/초안만 재구성하는 방향이어야 합니다.
 
@@ -355,7 +356,7 @@ ${contextBlock}
 - Never invent performance metrics, medical claims, rankings, discounts, reviews, or unsupported facts.
 - Decide the domain, flow, tone, and headline angle from the input.
 - structurePreview and draftSlides must each contain exactly slideCount items.
-- draftSlides must be real card copy. headline: max 40 chars. body: 1-2 sentences, max 130 chars.
+- draftSlides must be real card copy. headline: max 40 chars. body: 2-3 complete sentences, 100-160 chars. Include specific facts, reasons, or data points.
 - reasoning: one short English sentence under 30 chars.
 - refinementOptions must contain exactly 3 topic-specific ways to improve this draft without new research.
 
@@ -519,6 +520,41 @@ export async function POST(request: Request) {
     const brand = await dbService.getBrand(brandId)
     if (!brand || brand.userId !== user.id) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    // ── 테스트 계정: "test" 입력 시 AI 호출 없이 mock ready 응답 반환 ──
+    if (isTestAccount(user.email) && messages?.length > 0) {
+      const lastUserText = [...messages].reverse().find(m => m.role === 'user')?.content?.trim().toLowerCase() ?? ''
+      if (lastUserText === 'test') {
+        const mockSlides = Array.from({ length: 5 }, (_, i) => ({
+          slideNumber: i + 1,
+          role: i === 0 ? 'hook' : i === 4 ? 'save-cta' : 'key-point',
+          headline: 'test',
+          body: 'test',
+          reasoning: 'test mode',
+        }))
+        const mockResponse: AgentResponse = {
+          message: '[테스트 모드] 바로 생성합니다.',
+          ready: true,
+          params: {
+            topic: 'test',
+            visualHint: 'dark-editorial',
+            contentType: '테스트 카드뉴스',
+            objective: '테스트',
+            slideCount: 5,
+            productUrl: null,
+            brandAnalysis: 'test',
+            targetEmotion: 'test',
+            hookDirection: 'test',
+            recommendedCta: 'test',
+            reasonForStyle: 'test',
+            structurePreview: mockSlides.map(s => ({ slideNumber: s.slideNumber, role: s.role, description: 'test' })),
+            draftSlides: mockSlides,
+            refinementOptions: [],
+          },
+        }
+        return NextResponse.json(mockResponse)
+      }
     }
 
     // 1. Greeting (no history) — no SSE needed, return JSON immediately

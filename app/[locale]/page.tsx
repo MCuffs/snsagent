@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       : 'URL과 주제를 입력하면 AI가 카피·이미지·레이아웃을 자동 생성합니다. 무료 2회 제공.',
     alternates: {
       canonical: `${base}/${locale}`,
-      languages: { ko: `${base}/ko`, en: `${base}/en` },
+      languages: { ko: `${base}/ko`, en: `${base}/en`, 'x-default': `${base}/ko` },
     },
     openGraph: {
       title: isEn ? 'Shuffla — AI Card News Generator' : 'Shuffla — AI 카드뉴스 생성기',

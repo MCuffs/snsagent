@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -62,14 +62,16 @@ export function LandingHero({
     offset: ['start start', 'end end'],
   })
 
-  // 렌더 중 랜덤 셔플을 피해서 SSR/CSR 결과를 안정적으로 유지
-  const [colA, colB, colC] = useMemo(() => {
-    const columns: [string[], string[], string[]] = [[], [], []]
-    ALL_CARDS.forEach((src, index) => {
-      columns[index % columns.length].push(src)
+  // 클라이언트 마운트 시 1회 셔플 — 페이지 방문마다 다른 순서, SSR은 고정 순서로 hydration 안전
+  const [columns] = useState<[string[], string[], string[]]>(() => {
+    const shuffled = [...ALL_CARDS].sort(() => Math.random() - 0.5)
+    const cols: [string[], string[], string[]] = [[], [], []]
+    shuffled.forEach((src, index) => {
+      cols[index % cols.length].push(src)
     })
-    return columns
-  }, [])
+    return cols
+  })
+  const [colA, colB, colC] = columns
 
   // 패럴렉스 폭을 줄여 상단 이탈 방지 (-6% / +5% / -8%)
   const yA = useTransform(scrollYProgress, [0, 1], ['0%', '-6%'])

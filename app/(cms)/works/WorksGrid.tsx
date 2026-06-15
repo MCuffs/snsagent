@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowRight, Clock, ImageOff, Loader2, Palette, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Clock, ImageOff, Loader2, Trash2 } from 'lucide-react'
 import { useTab } from '../TabContext'
 import { motion } from 'framer-motion'
 import { deleteWorkAction } from './actions'
@@ -178,32 +178,6 @@ export default function WorksGrid({
           </Link>
         )}
       </div>
-
-      {/* Painter growth nudge — visible after first campaign */}
-      {displayedCampaigns.length >= 1 && (
-        <div
-          className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-[#8b5cf6]/20 bg-gradient-to-r from-[#8b5cf6]/5 to-transparent px-4 py-3 cursor-pointer hover:border-[#8b5cf6]/40 transition-colors"
-          onClick={() => setActiveTab('painter')}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && setActiveTab('painter')}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#8b5cf6]/10">
-              <Palette className="h-4 w-4 text-[#8b5cf6]" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-[#111111]">
-                화가가 {displayedCampaigns.length}개의 작품을 분석했습니다
-              </p>
-              <p className="text-[11px] text-[#71717a] font-medium">
-                편집을 많이 할수록 다음 생성이 더 정확해집니다 → My Painter 확인
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-[#8b5cf6] shrink-0" />
-        </div>
-      )}
 
       {error && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">

@@ -30,7 +30,17 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     title: `${post.title} | Shuffla`,
     description: post.desc,
     alternates: {
-      canonical: `${base}/${locale}/blog/${post.slug}`,
+      canonical: encodeURI(`${base}/${locale}/blog/${post.slug}`),
+      languages: (() => {
+        const pairedSlug = SLUG_PAIR[post.slug]
+        const koSlug = locale === 'ko' ? post.slug : pairedSlug
+        const enSlug = locale === 'en' ? post.slug : pairedSlug
+        const langs: Record<string, string> = {}
+        if (koSlug) langs['ko'] = encodeURI(`${base}/ko/blog/${koSlug}`)
+        if (enSlug) langs['en'] = encodeURI(`${base}/en/blog/${enSlug}`)
+        langs['x-default'] = encodeURI(`${base}/ko/blog/${koSlug || post.slug}`)
+        return langs
+      })(),
     },
     openGraph: {
       title: post.title,
@@ -50,6 +60,22 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     },
     keywords: post.keywords,
   }
+}
+
+// ko ↔ en slug 대응 맵
+const SLUG_PAIR: Record<string, string> = {
+  '카드뉴스-자동화-가이드': 'card-news-automation-guide',
+  '카드뉴스-주제-선정법': 'best-topics-for-card-news',
+  '제품-이미지-카드뉴스-품질': 'product-images-card-news-quality',
+  '셔플라-공식-런칭': 'shuffla-official-launch',
+  '요금제-결제-faq': 'billing-subscription-faq',
+  'ai-저작권-faq': 'ai-copyright-faq',
+  'card-news-automation-guide': '카드뉴스-자동화-가이드',
+  'best-topics-for-card-news': '카드뉴스-주제-선정법',
+  'product-images-card-news-quality': '제품-이미지-카드뉴스-품질',
+  'shuffla-official-launch': '셔플라-공식-런칭',
+  'billing-subscription-faq': '요금제-결제-faq',
+  'ai-copyright-faq': 'ai-저작권-faq',
 }
 
 const postImages: Record<string, string> = {

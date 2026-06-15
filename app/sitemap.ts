@@ -6,19 +6,28 @@ const LOCALES = ['ko', 'en'] as const
 
 const staticPages = ['', '/pricing', '/blog', '/terms', '/privacy', '/login']
 
+// 실제 페이지 콘텐츠 마지막 수정일 — 배포할 때마다 업데이트
+const LAST_MODIFIED: Record<string, string> = {
+  '': '2026-06-15',
+  '/pricing': '2026-06-15',
+  '/blog': '2026-06-15',
+  '/terms': '2026-05-20',
+  '/privacy': '2026-05-20',
+  '/login': '2026-05-20',
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = []
-  const now = new Date()
 
   for (const page of staticPages) {
     for (const locale of LOCALES) {
       const url = `${BASE_URL}/${locale}${page}`
       const priority = page === '' ? 1.0 : page === '/pricing' ? 0.9 : page === '/blog' ? 0.8 : 0.6
-      const changeFrequency = page === '' ? 'weekly' : page === '/blog' ? 'daily' : 'monthly'
+      const changeFrequency = page === '' ? 'weekly' : page === '/blog' ? 'weekly' : 'monthly'
 
       entries.push({
         url,
-        lastModified: now,
+        lastModified: new Date(LAST_MODIFIED[page] ?? '2026-05-20'),
         changeFrequency,
         priority,
         alternates: {
@@ -33,7 +42,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   for (const { locale, slug } of getAllBlogPostPaths()) {
     entries.push({
       url: encodeURI(`${BASE_URL}/${locale}/blog/${slug}`),
-      lastModified: now,
+      lastModified: new Date('2026-05-20'),
       changeFrequency: 'monthly',
       priority: 0.7,
     })
