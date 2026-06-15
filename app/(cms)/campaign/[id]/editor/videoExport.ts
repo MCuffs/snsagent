@@ -1,5 +1,20 @@
-import type { EditorialDocument, EditorialLayer } from '../../../../../src/lib/editor/types'
-import { fontFamilyForPreset } from '../../../../../src/lib/editor/renderer'
+import type { EditorialDocument, EditorialLayer, FontPreset } from '../../../../../src/lib/editor/types'
+
+// renderer.ts는 서버 전용(resvg/sharp/fs) — 클라이언트 번들에서 import 불가
+// fontFamilyForPreset만 인라인으로 복사
+function fontFamilyForPreset(preset?: FontPreset | null) {
+  switch (preset) {
+    case 'serif':
+    case 'magazine':
+      return 'Georgia, Times New Roman, Noto Serif KR, serif'
+    case 'suit':
+      return 'SUIT, Pretendard, Noto Sans KR, sans-serif'
+    case 'noto-sans':
+      return 'Noto Sans KR, Pretendard, sans-serif'
+    default:
+      return 'Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif'
+  }
+}
 
 export interface VideoExportParams {
   videoUrl: string
