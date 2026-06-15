@@ -425,21 +425,54 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
           if (contextMenu) setContextMenu(null)
         }}
       >
-        {background?.visible && backgroundSource && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={backgroundSource}
-            alt=""
-            draggable={false}
-            onError={() => background.imageUrl && setFailedBackgroundUrl(background.imageUrl)}
-            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
-            style={{
-              opacity: background.opacity / 100,
-              filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
-              transform: `translate(${(background.x ?? 0) * SCALE}px, ${(background.y ?? 0) * SCALE}px) scale(${background.scale ?? 1})`,
-              transformOrigin: '0 0',
-            }}
-          />
+        {background?.visible && (
+          background.videoUrl
+            ? (
+              <video
+                key={background.videoUrl}
+                src={background.videoUrl}
+                autoPlay
+                muted
+                playsInline
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                style={{
+                  opacity: background.opacity / 100,
+                  filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
+                  transform: `translate(${(background.x ?? 0) * SCALE}px, ${(background.y ?? 0) * SCALE}px) scale(${background.scale ?? 1})`,
+                  transformOrigin: '0 0',
+                }}
+                onLoadedMetadata={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  v.currentTime = start
+                  v.play().catch(() => null)
+                }}
+                onTimeUpdate={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  const dur = background.videoDurationSec ?? 3
+                  if (v.currentTime >= start + dur) {
+                    v.currentTime = start
+                  }
+                }}
+              />
+            )
+            : backgroundSource && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={backgroundSource}
+                alt=""
+                draggable={false}
+                onError={() => background.imageUrl && setFailedBackgroundUrl(background.imageUrl)}
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                style={{
+                  opacity: background.opacity / 100,
+                  filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
+                  transform: `translate(${(background.x ?? 0) * SCALE}px, ${(background.y ?? 0) * SCALE}px) scale(${background.scale ?? 1})`,
+                  transformOrigin: '0 0',
+                }}
+              />
+            )
         )}
         {!showingRenderedPreview && (
           <div

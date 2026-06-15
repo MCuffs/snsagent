@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Loader2, Redo2, RotateCcw, Search, Sparkles, Trash2, Type, Underline, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Loader2, Redo2, RotateCcw, Search, Sparkles, Trash2, Type, Underline, Undo2, Upload, Video, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 import type { PexelsBackgroundCandidate } from '../../../../../src/lib/ai/providers/pexelsImageProvider'
@@ -23,13 +23,14 @@ interface Props {
   busy: boolean
   originalBackgroundUrl: string | null
   onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onApplyVideoBackground: (file: File) => void
   onApplyPexelsBackground: (image: PexelsBackgroundCandidate) => void
   onLoadPexelsBackgrounds: (slideId: string) => Promise<{ success: true; images: PexelsBackgroundCandidate[] } | { success: false; error: string }>
   onResetBackground: () => void
   onImageUpload: () => void
 }
 
-export function EditorialInspector({ slideId, slideNumber, busy, originalBackgroundUrl, onApplyBackground, onApplyPexelsBackground, onLoadPexelsBackgrounds, onResetBackground, onImageUpload }: Props) {
+export function EditorialInspector({ slideId, slideNumber, busy, originalBackgroundUrl, onApplyBackground, onApplyVideoBackground, onApplyPexelsBackground, onLoadPexelsBackgrounds, onResetBackground, onImageUpload }: Props) {
   const t = useTranslations('campaign')
   const document = useEditorialStore(state => state.documents[slideId])
   const dirty = useEditorialStore(state => state.dirtySlides[slideId])
@@ -187,6 +188,7 @@ export function EditorialInspector({ slideId, slideNumber, busy, originalBackgro
             busy={busy}
             originalBackgroundUrl={originalBackgroundUrl}
             onApplyBackground={onApplyBackground}
+            onApplyVideoBackground={onApplyVideoBackground}
             onApplyPexelsBackground={onApplyPexelsBackground}
             onLoadPexelsBackgrounds={onLoadPexelsBackgrounds}
             onResetBackground={onResetBackground}
@@ -421,6 +423,7 @@ function BackgroundPanel({
   busy,
   originalBackgroundUrl,
   onApplyBackground,
+  onApplyVideoBackground,
   onApplyPexelsBackground,
   onLoadPexelsBackgrounds,
   onResetBackground,
@@ -429,12 +432,14 @@ function BackgroundPanel({
   busy: boolean
   originalBackgroundUrl: string | null
   onApplyBackground: (file: File, scale: number, offsetX: number, offsetY: number) => void
+  onApplyVideoBackground: (file: File) => void
   onApplyPexelsBackground: (image: PexelsBackgroundCandidate) => void
   onLoadPexelsBackgrounds: (slideId: string) => Promise<{ success: true; images: PexelsBackgroundCandidate[] } | { success: false; error: string }>
   onResetBackground: () => void
 }) {
   const t = useTranslations('campaign')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [scale, setScale] = useState(100)
@@ -466,6 +471,13 @@ function BackgroundPanel({
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadPexels])
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (videoInputRef.current) videoInputRef.current.value = ''
+    onApplyVideoBackground(file)
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -550,6 +562,9 @@ function BackgroundPanel({
       <button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()} className="btn-primary w-full rounded-md">
         <Upload className="h-4 w-4" /> {t('replace_background')}
       </button>
+      <button type="button" disabled={busy} onClick={() => videoInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-md border border-[#e8dfd4] py-2.5 text-xs font-bold text-[#514a44] hover:border-[#0066ff] hover:text-[#0066ff] disabled:opacity-40">
+        <Video className="h-4 w-4" /> 영상으로 배경 교체
+      </button>
       <div className="rounded-lg border border-[#e8dfd4] bg-white p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -606,6 +621,7 @@ function BackgroundPanel({
         </button>
       )}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleVideoSelect} />
     </div>
   )
 }

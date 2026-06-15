@@ -26,6 +26,8 @@ import { applyBrandStyleMemory, parseEditorialDocument } from '../../../../src/l
 import type { EditorialLayer } from '../../../../src/lib/editor/types'
 import { EditorialCanvas, richTextHtmlForEditor } from './editor/EditorialCanvas'
 import { EditorialInspector } from './editor/EditorialInspector'
+import VideoTrimModal from './editor/VideoTrimModal'
+import { exportSlideAsVideo } from './editor/videoExport'
 import { useEditorialStore } from './editor/useEditorialStore'
 import { analytics } from '../../../../lib/analytics/thinkingdata'
 import type { EditorialDocument } from '../../../../src/lib/editor/types'
@@ -151,21 +153,52 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
 
   return (
     <div ref={ref} className="relative h-full w-full overflow-hidden bg-[#090a0d]" aria-label={alt}>
-      {background?.visible && background.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={background.imageUrl}
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-          style={{
-            opacity: background.opacity / 100,
-            filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
-            transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
-            transformOrigin: '0 0',
-          }}
-        />
+      {background?.visible && (
+        background.videoUrl
+          ? (
+            <video
+              key={background.videoUrl}
+              src={background.videoUrl}
+              autoPlay
+              muted
+              playsInline
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              style={{
+                opacity: background.opacity / 100,
+                filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
+                transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
+                transformOrigin: '0 0',
+              }}
+              onLoadedMetadata={e => {
+                const v = e.currentTarget
+                const start = background.videoStartSec ?? 0
+                v.currentTime = start
+                v.play().catch(() => null)
+              }}
+              onTimeUpdate={e => {
+                const v = e.currentTarget
+                const start = background.videoStartSec ?? 0
+                const dur = background.videoDurationSec ?? 3
+                if (v.currentTime >= start + dur) v.currentTime = start
+              }}
+            />
+          )
+          : background.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={background.imageUrl}
+              alt=""
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              style={{
+                opacity: background.opacity / 100,
+                filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
+                transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
+                transformOrigin: '0 0',
+              }}
+            />
+          )
       )}
-      {(!background?.imageUrl && fallbackImageUrl) && (
+      {(!background?.imageUrl && !background?.videoUrl && fallbackImageUrl) && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
       )}
@@ -248,6 +281,15 @@ async function downloadImage(url: string, fileName: string) {
   URL.revokeObjectURL(objectUrl)
 }
 
+function downloadBlob(blob: Blob, fileName: string) {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
 export default function CampaignResultView({
   campaign,
   post,
@@ -269,6 +311,7 @@ export default function CampaignResultView({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [uploadToast, setUploadToast] = useState<{ status: 'uploading' | 'done' | 'error'; text: string; progress: number } | null>(null)
   const [sidebarTab, setSidebarTab] = useState<'edit' | 'agent'>('edit')
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null)
   const documents = useEditorialStore(state => state.documents)
   const dirtySlides = useEditorialStore(state => state.dirtySlides)
   const initializeEditor = useEditorialStore(state => state.initialize)
@@ -523,6 +566,114 @@ export default function CampaignResultView({
     }
   }
 
+  const handleVideoBackgroundUpload = async (file: File, startSec: number, durationSec: number) => {
+    if (!activeSlide || !activeDocument) return
+    const slideId = activeSlide.id
+    const docSnapshot = activeDocument
+
+    setUploadToast({ status: 'uploading', text: '영상 업로드 중', progress: 0 })
+
+    try {
+      // 1. 영상 원본 업로드
+      const videoUrl = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        const formData = new FormData()
+        formData.append('files', file)
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 50)
+            setUploadToast({ status: 'uploading', text: '영상 업로드 중', progress: pct })
+          }
+        })
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText) as { urls?: string[]; error?: string }
+              if (data.urls?.[0]) resolve(data.urls[0])
+              else reject(new Error(data.error || '업로드 실패'))
+            } catch { reject(new Error('응답 파싱 실패')) }
+          } else {
+            reject(new Error(`HTTP ${xhr.status}`))
+          }
+        })
+        xhr.addEventListener('error', () => reject(new Error('네트워크 오류')))
+        xhr.open('POST', '/api/upload')
+        xhr.send(formData)
+      })
+
+      setUploadToast({ status: 'uploading', text: '썸네일 생성 중', progress: 55 })
+
+      // 2. 첫 프레임 캡처 → 이미지로 업로드 (export용)
+      const thumbnailUrl = await new Promise<string>((resolve, reject) => {
+        const video = window.document.createElement('video')
+        video.src = URL.createObjectURL(file)
+        video.muted = true
+        video.playsInline = true
+        video.preload = 'metadata'
+        video.addEventListener('loadeddata', () => { video.currentTime = 0 })
+        video.addEventListener('seeked', () => {
+          const canvas = window.document.createElement('canvas')
+          canvas.width = 1080
+          canvas.height = 1350
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { reject(new Error('canvas 초기화 실패')); return }
+          // 4:5 비율로 center-crop
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          const targetRatio = 1080 / 1350
+          const srcRatio = vw / vh
+          let sx = 0, sy = 0, sw = vw, sh = vh
+          if (srcRatio > targetRatio) { sw = vh * targetRatio; sx = (vw - sw) / 2 }
+          else { sh = vw / targetRatio; sy = (vh - sh) / 2 }
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, 1080, 1350)
+          URL.revokeObjectURL(video.src)
+          canvas.toBlob(async (blob) => {
+            if (!blob) { reject(new Error('프레임 캡처 실패')); return }
+            const thumbFile = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' })
+            const thumbForm = new FormData()
+            thumbForm.append('files', thumbFile)
+            try {
+              const res = await fetch('/api/upload', { method: 'POST', body: thumbForm })
+              const data = await res.json() as { urls?: string[]; error?: string }
+              if (data.urls?.[0]) resolve(data.urls[0])
+              else reject(new Error(data.error || '썸네일 업로드 실패'))
+            } catch (err) { reject(err) }
+          }, 'image/jpeg', 0.88)
+        })
+        video.addEventListener('error', () => reject(new Error('영상 로드 실패')))
+        video.load()
+      })
+
+      setUploadToast({ status: 'uploading', text: '배경 적용 중', progress: 80 })
+
+      // 3. 레이어 업데이트 — imageUrl을 썸네일로 교체해 export 파이프라인이 그대로 동작
+      const nextDocument = {
+        ...docSnapshot,
+        layers: docSnapshot.layers.map(layer =>
+          layer.type === 'background'
+            ? { ...layer, videoUrl, videoThumbnailUrl: thumbnailUrl, imageUrl: thumbnailUrl, videoStartSec: startSec, videoDurationSec: durationSec }
+            : layer
+        ),
+      }
+      updateDocument(slideId, () => nextDocument)
+
+      const result = await saveEditorialDocumentAction(slideId, JSON.stringify(nextDocument), true)
+      if (!result.success) {
+        setUploadToast({ status: 'error', text: result.error || '저장에 실패했습니다.', progress: 0 })
+        setTimeout(() => setUploadToast(null), 4000)
+        return
+      }
+
+      applyServerSlide(result.slide as Slide, result.document)
+      setUploadToast({ status: 'done', text: '영상 배경이 적용됐습니다', progress: 100 })
+      setTimeout(() => setUploadToast(null), 2500)
+
+    } catch (error) {
+      setUploadToast({ status: 'error', text: getErrorMessage(error, '영상 업로드 중 오류가 발생했습니다.'), progress: 0 })
+      setTimeout(() => setUploadToast(null), 4000)
+    }
+  }
+
   const handleResetBackground = async () => {
     if (!activeSlide || !activeDocument) return
     const originalUrl = slides.find(s => s.id === activeSlide.id)?.backgroundImageUrl || null
@@ -661,52 +812,45 @@ export default function CampaignResultView({
 
   const downloadActiveSlide = async () => {
     if (!activeSlide?.imageUrl) return
-    // 편집 중인 텍스트를 먼저 store에 flush
     await flushActiveTextEdit()
     setExporting(true)
     setMessage(null)
-    analytics.campaignDownload(campaign.id, 'png', 1, {
+
+    const bgLayer = activeDocument?.layers.find(l => l.type === 'background')
+    const isVideoSlide = Boolean(bgLayer?.videoUrl)
+    const format = isVideoSlide ? 'mp4' : 'png'
+
+    analytics.campaignDownload(campaign.id, format, 1, {
       export_scale: 1,
       slide_number: activeSlide.slideNumber,
       download_scope: 'single_slide',
     })
     try {
-      if (activeDocument) {
+      if (isVideoSlide && activeDocument && bgLayer?.videoUrl) {
+        // 영상 슬라이드 — 클라이언트 canvas 합성
+        setMessage({ type: 'success', text: '영상 합성 중… 잠시 기다려주세요.' })
+        const blob = await exportSlideAsVideo({
+          videoUrl: bgLayer.videoUrl,
+          videoStartSec: bgLayer.videoStartSec ?? 0,
+          videoDurationSec: bgLayer.videoDurationSec ?? 3,
+          document: activeDocument,
+          brandName: brand.name,
+        })
+        downloadBlob(blob, fileNameFor(campaign.title, activeSlide.slideNumber, 'mp4'))
+        setMessage({ type: 'success', text: '영상 다운로드가 완료됐습니다.' })
+      } else if (activeDocument) {
         const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), 'png', 1)
         if (!result.success) {
-          analytics.exportComplete({
-            campaignId: campaign.id,
-            slideId: activeSlide.id,
-            format: 'png',
-            scale: 1,
-            downloadScope: 'single_slide',
-            success: false,
-            reason: result.error,
-          })
+          analytics.exportComplete({ campaignId: campaign.id, slideId: activeSlide.id, format: 'png', scale: 1, downloadScope: 'single_slide', success: false, reason: result.error })
           return setMessage({ type: 'error', text: result.error })
         }
         await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber))
       } else {
         await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
       }
-      analytics.exportComplete({
-        campaignId: campaign.id,
-        slideId: activeSlide.id,
-        format: 'png',
-        scale: 1,
-        downloadScope: 'single_slide',
-        success: true,
-      })
+      analytics.exportComplete({ campaignId: campaign.id, slideId: activeSlide.id, format, scale: 1, downloadScope: 'single_slide', success: true })
     } catch (error) {
-      analytics.exportComplete({
-        campaignId: campaign.id,
-        slideId: activeSlide.id,
-        format: 'png',
-        scale: 1,
-        downloadScope: 'single_slide',
-        success: false,
-        reason: getErrorMessage(error, t('message_download_error')),
-      })
+      analytics.exportComplete({ campaignId: campaign.id, slideId: activeSlide.id, format, scale: 1, downloadScope: 'single_slide', success: false, reason: getErrorMessage(error, t('message_download_error')) })
       setMessage({ type: 'error', text: getErrorMessage(error, t('message_download_error')) })
     } finally {
       setExporting(false)
@@ -778,7 +922,19 @@ export default function CampaignResultView({
       const results = await Promise.all(
         slides.map(async slide => {
           const doc = documents[slide.id]
-          // Always export the slide to match the editor canvas layout
+          const bgLayer = doc?.layers.find(l => l.type === 'background')
+          // 영상 배경 슬라이드 — 클라이언트 canvas 합성
+          if (bgLayer?.videoUrl && doc) {
+            const blob = await exportSlideAsVideo({
+              videoUrl: bgLayer.videoUrl,
+              videoStartSec: bgLayer.videoStartSec ?? 0,
+              videoDurationSec: bgLayer.videoDurationSec ?? 3,
+              document: doc,
+              brandName: brand.name,
+            })
+            return { name: fileNameFor(campaign.title, slide.slideNumber, 'mp4'), blob }
+          }
+          // 이미지 슬라이드 — 기존 서버 PNG 렌더
           const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)
           if (!result.success) throw new Error(result.error)
           const response = await fetch(result.url, { cache: 'force-cache' })
@@ -842,6 +998,17 @@ export default function CampaignResultView({
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
+      {/* 영상 트림 모달 */}
+      {pendingVideoFile && (
+        <VideoTrimModal
+          file={pendingVideoFile}
+          onConfirm={({ file, startSec, durationSec }) => {
+            setPendingVideoFile(null)
+            void handleVideoBackgroundUpload(file, startSec, durationSec)
+          }}
+          onCancel={() => setPendingVideoFile(null)}
+        />
+      )}
       {/* 배경 업로드 토스트 — 화면 상단 고정 */}
       {uploadToast && (
         <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-72 rounded-2xl shadow-2xl overflow-hidden">
@@ -986,6 +1153,7 @@ export default function CampaignResultView({
                     busy={editorBusy}
                     originalBackgroundUrl={activeSlide.backgroundImageUrl}
                     onApplyBackground={handleBackgroundUpload}
+                    onApplyVideoBackground={(file) => setPendingVideoFile(file)}
                     onApplyPexelsBackground={handlePexelsBackgroundSelect}
                     onLoadPexelsBackgrounds={searchPexelsBackgroundsAction}
                     onResetBackground={handleResetBackground}

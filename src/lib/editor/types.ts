@@ -46,6 +46,10 @@ export interface EditorialLayer {
   text?: string
   textHtml?: string
   imageUrl?: string | null
+  videoUrl?: string | null          // 영상 배경 URL (에디터 미리보기 재생용)
+  videoThumbnailUrl?: string | null // 영상 첫 프레임 이미지 (SVG export 폴백용)
+  videoStartSec?: number            // 재생 시작 지점 (기본 0)
+  videoDurationSec?: number         // 재생 구간 길이 3~5초 (기본 3)
   fontPreset?: FontPreset
   fontSize?: number
   fontWeight?: number

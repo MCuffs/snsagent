@@ -100,7 +100,7 @@ export function timeEvent(event: string) {
 }
 
 type PaymentProvider = 'nicepay' | 'toss' | 'paypal'
-type ExportFormat = 'zip' | 'png' | 'jpg' | 'pdf'
+type ExportFormat = 'zip' | 'png' | 'jpg' | 'pdf' | 'mp4'
 type RegenerateScope = 'copy' | 'image' | 'all'
 
 // ── Typed event helpers ────────────────────────────────────────────────────
