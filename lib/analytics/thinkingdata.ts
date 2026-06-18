@@ -22,8 +22,8 @@ let initialized = false
 let initPromise: Promise<TD | null> | null = null
 const queuedTracks: Array<{ event: string; props: Record<string, unknown> }> = []
 
-const APP_ID = 'fb483555173b464fb64813eb7d82f294'
-const SERVER_URL = 'https://te-receiver-naver.thinkingdata.kr'
+const APP_ID = '3bd98ae26423469a9a124f4151bf3972'
+const SERVER_URL = 'http://49.51.180.241:8991'
 
 export async function initThinkingData(): Promise<TD | null> {
   if (typeof window === 'undefined') return null
