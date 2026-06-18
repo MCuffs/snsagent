@@ -7,6 +7,7 @@ import type {
   TypographyPreset,
 } from './types'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
+import type { TemplateSlideConfig } from '../../../lib/templates/types'
 
 const FONT_PRESETS: FontPreset[] = ['pretendard', 'suit', 'noto-sans', 'serif', 'magazine']
 const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
@@ -120,6 +121,52 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
     ],
     updatedAt: new Date().toISOString(),
   }
+}
+
+// 생성 파이프라인에서 선택된 카드 템플릿을 editorDocument에 반영한다.
+// 결과/편집/내보내기 화면이 editorDocument를 렌더하므로, 여기에 적용해야 사용자가 템플릿을 실제로 본다.
+export function createTemplatedEditorialDocument(seed: SlideEditorSeed, t: TemplateSlideConfig): EditorialDocument {
+  const doc = createEditorialDocument(seed)
+  const padX = Math.min(300, Math.max(0, Math.round(t.layout?.paddingX ?? 72)))
+  const padY = Math.min(400, Math.max(0, Math.round(t.layout?.paddingY ?? 96)))
+  const boxW = Math.max(220, 1080 - padX * 2)
+  const align: 'left' | 'center' | 'right' =
+    t.textPosition.endsWith('right') ? 'right' : t.textPosition.endsWith('center') ? 'center' : 'left'
+  const zone = t.textPosition.startsWith('top') ? 'top' : t.textPosition.startsWith('bottom') ? 'bottom' : 'middle'
+  const titleY = zone === 'top' ? Math.max(150, padY + 60) : zone === 'middle' ? 470 : 780
+  const subtitleY = Math.min(1120, titleY + 210)
+  const titleFs = Math.min(220, Math.max(12, Math.round(t.typography.fontSize)))
+  const bodyFs = Math.max(20, Math.round(titleFs * 0.42))
+  const titleColor = validColor(t.typography.textColor, '#ffffff')
+  const lineHeight = Math.min(2.4, Math.max(0.8, t.typography.lineHeight || 1.12))
+  const tracking = Math.min(40, Math.max(-10, t.typography.letterSpacing ?? 0))
+  const fontWeight = Math.min(900, Math.max(100, Math.round(t.typography.fontWeight) || 700))
+
+  doc.layers = doc.layers.map((layer) => {
+    if (layer.type === 'title') {
+      return { ...layer, x: padX, y: titleY, width: boxW, height: 230, textAlign: align,
+        fontSize: titleFs, fontWeight, lineHeight, tracking, color: titleColor }
+    }
+    if (layer.type === 'subtitle') {
+      return { ...layer, x: padX, y: subtitleY, width: boxW, height: 220, textAlign: align,
+        fontSize: bodyFs, lineHeight: Math.max(1.2, lineHeight * 1.08), color: titleColor }
+    }
+    return layer
+  })
+
+  // 오버레이: dark/gradient/custom은 어두움 정도(opacity)를 그대로, custom은 색상까지 반영.
+  // editorDocument 오버레이 모델은 어둡게만 가능하므로 none/light는 어두움 0으로 둔다.
+  const o = t.overlay
+  const lightish = o.type === 'none' || o.type === 'light'
+  doc.overlay = {
+    ...doc.overlay,
+    darkness: lightish ? 0 : Math.min(100, Math.max(0, Math.round(o.opacity))),
+    vignette: lightish ? 0 : doc.overlay.vignette,
+    colorFilter: o.type === 'custom' && o.customColor ? validColor(o.customColor, doc.overlay.colorFilter) : doc.overlay.colorFilter,
+  }
+
+  doc.updatedAt = new Date().toISOString()
+  return doc
 }
 
 export function parseEditorialDocument(raw: string | null | undefined, seed: SlideEditorSeed): EditorialDocument {

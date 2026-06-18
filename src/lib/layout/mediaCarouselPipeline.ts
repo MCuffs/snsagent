@@ -11,6 +11,7 @@ import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
 import { selectCardTemplateForContent } from '../../../lib/templates/select'
 import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../../lib/templates/applyToRender'
+import { createTemplatedEditorialDocument } from '../editor/document'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
@@ -76,6 +77,7 @@ export interface MediaCarouselSlideResult {
   designPrompt: string
   backgroundImageUrl: string
   finalImageUrl: string
+  editorDocument?: string | null
   qualityCheck: MediaCardQualityResult
 }
 
@@ -502,12 +504,24 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
       console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
 
-      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck }
+      // Persist a template-applied editorDocument so the result/editor/export screens
+      // (which render from editorDocument, not finalImageUrl) actually reflect the template.
+      const editorDocument = templateSlide
+        ? JSON.stringify(createTemplatedEditorialDocument({
+            slideNumber: slide.slideNumber,
+            headline: slide.headline,
+            body: slide.body,
+            imageUrl: finalImageUrl,
+            backgroundImageUrl,
+          }, templateSlide))
+        : null
+
+      return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, editorDocument }
     })
   )
 
   for (const result of slideResults) {
-    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck } = result
+    const { slide, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck, editorDocument } = result
 
     // Feed slide diagnostics to Quality Agent
     slide.diagnostics = slideQualityCheck.issues
@@ -522,6 +536,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       designPrompt: sanitizedVisualPrompt,
       backgroundImageUrl,
       finalImageUrl,
+      editorDocument,
       qualityCheck: slideQualityCheck,
     })
   }
@@ -648,6 +663,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       designPrompt: slide.designPrompt,
       imageUrl: slide.finalImageUrl,
       backgroundImageUrl: slide.backgroundImageUrl,
+      editorDocument: slide.editorDocument ?? null,
     }))
   )
 
