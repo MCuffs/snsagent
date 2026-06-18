@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import prisma from '../../../lib/db'
-import { AdminPageHeader, EmptyState, Td, Th, formatDate, statusPill } from '../_components/AdminShell'
+import { AdminPageHeader, EmptyState, Td, Th } from '../_components/AdminShell'
+import { formatDate, statusPill } from '../_components/adminUtils'
 
 export const dynamic = 'force-dynamic'
 

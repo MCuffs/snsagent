@@ -34,35 +34,6 @@ export function getGoogleOAuthSetupHint() {
   ].join(' ')
 }
 
-function hasEnv(name: string) {
-  return Boolean(process.env[name]?.trim())
-}
-
-function hasAnyEnv(names: string[]) {
-  return names.some(hasEnv)
-}
-
-export function getPayPalConfigStatus() {
-  const missing = [
-    hasEnv('PAYPAL_CLIENT_ID') ? null : 'PAYPAL_CLIENT_ID',
-    hasEnv('PAYPAL_CLIENT_SECRET') ? null : 'PAYPAL_CLIENT_SECRET',
-    hasEnv('PAYPAL_WEBHOOK_ID') ? null : 'PAYPAL_WEBHOOK_ID',
-    hasEnv('NEXT_PUBLIC_PAYPAL_CLIENT_ID') ? null : 'NEXT_PUBLIC_PAYPAL_CLIENT_ID',
-    hasAnyEnv(['NEXT_PUBLIC_PAYPAL_PLAN_LITE', 'NEXT_PUBLIC_PAYPAL_PLAN_STARTER'])
-      ? null
-      : 'NEXT_PUBLIC_PAYPAL_PLAN_LITE or NEXT_PUBLIC_PAYPAL_PLAN_STARTER',
-    hasEnv('NEXT_PUBLIC_PAYPAL_PLAN_PRO') ? null : 'NEXT_PUBLIC_PAYPAL_PLAN_PRO',
-    hasAnyEnv(['NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED', 'NEXT_PUBLIC_PAYPAL_PLAN_AGENCY'])
-      ? null
-      : 'NEXT_PUBLIC_PAYPAL_PLAN_UNLIMITED or NEXT_PUBLIC_PAYPAL_PLAN_AGENCY',
-  ].filter((name): name is string => Boolean(name))
-
-  return {
-    ready: missing.length === 0,
-    missing,
-  }
-}
-
 export function formatMissingConfigMessage(provider: string, missing: string[]) {
   return `${provider} 설정이 완료되지 않았습니다. 누락된 환경변수: ${missing.join(', ')}`
 }

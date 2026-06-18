@@ -89,12 +89,8 @@ export async function POST(request: Request) {
     const usage = await checkCampaignUsage(user.id)
     if (!usage.allowed) {
       return NextResponse.json({
-        error: usage.plan === 'LITE'
-          ? 'AI 재생성 1회권은 기존 결과물의 배경 재생성에 사용할 수 있습니다. 작업 히스토리에서 결과물을 열어 사용해주세요.'
-          : (usage.period as string) === 'lifetime'
+        error: (usage.period as string) === 'lifetime'
           ? '무료 플랜은 최초 2회만 카드뉴스를 생성할 수 있습니다. 계속 생성하시려면 Creator 플랜을 선택해 주세요.'
-          : (usage.period as string) === 'day'
-          ? '무료 플랜은 하루에 카드뉴스 1개를 생성할 수 있습니다. 내일 다시 시도하거나 Creator 플랜을 선택해주세요.'
           : `월간 카드뉴스 생성 한도를 초과했습니다. ${usage.current}/${usage.limit} (${usage.plan})`,
       }, { status: 429 })
     }

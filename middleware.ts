@@ -42,7 +42,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // 1. Admin route authentication guard
-  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+  // /admin 또는 /{locale}/admin 모두 처리
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+  const localeAdminMatch = pathname.match(/^\/(ko|en)(\/admin(?:\/.*)?)?$/)
+  const isLocaleAdminPath = localeAdminMatch && localeAdminMatch[2] !== undefined
+
+  if (isAdminPath || isLocaleAdminPath) {
+    // locale-prefixed admin URL → /admin(/*) 로 리디렉트
+    if (isLocaleAdminPath) {
+      const adminSuffix = localeAdminMatch![2] ?? '/admin'
+      return NextResponse.redirect(new URL(adminSuffix, request.url))
+    }
     const token = request.cookies.get(SESSION_COOKIE_NAME)?.value
     const email = await readSessionEmailEdge(token)
     if (!email) {
@@ -54,8 +64,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 2. Protected user routes guard (concept, generate, works, billing)
-  const protectedRoutes = ['/concept', '/generate', '/works', '/billing']
+  // 2. Protected user routes guard (billing only — concept/generate/works allow guest browsing)
+  const protectedRoutes = ['/billing']
   let relativePath = pathname
   let locale = 'ko'
 

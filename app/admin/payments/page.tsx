@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import prisma from '../../../lib/db'
 import { createManualPaymentRecordAction, updatePaymentStatusAction } from '../actions'
-import { AdminPageHeader, EmptyState, Section, Td, Th, btnCls, formatCurrency, formatDate, inputCls, statusPill } from '../_components/AdminShell'
+import { AdminPageHeader, EmptyState, Section, Td, Th } from '../_components/AdminShell'
+import { btnCls, formatCurrency, formatDate, inputCls, statusPill } from '../_components/adminUtils'
 
 export const dynamic = 'force-dynamic'
 

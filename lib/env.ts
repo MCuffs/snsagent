@@ -54,21 +54,6 @@ export function getSessionSigningSecret() {
   return 'shuffla-local-development-session-signing-key'
 }
 
-export function getNicepayReturnTokenSecret() {
-  const secret = readEnv('NICEPAY_RETURN_TOKEN_SECRET') || readEnv('SESSION_SECRET') || readEnv('AUTH_SECRET')
-
-  if (secret && secret !== 'replace-with-a-long-random-secret' && secret.length >= 32) {
-    return secret
-  }
-
-  if (isProduction()) {
-    throw new Error('NICEPAY_RETURN_TOKEN_SECRET must be set to a strong secret in production.')
-  }
-
-  return 'shuffla-local-development-nicepay-return-token-key'
-}
-
-
 export function isConfiguredOpenAIKey(apiKey: string | undefined) {
   if (!apiKey) return false
   const normalized = apiKey.trim()

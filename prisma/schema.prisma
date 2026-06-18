@@ -32,6 +32,8 @@ model User {
   nicepayLastPaidAt        DateTime?
   nicepayCanceledAt        DateTime?
   nicepayLastOrderId       String?                @unique
+  polarSubscriptionId      String?                @unique
+  polarSubscriptionStatus  String? // active, canceled, revoked
   mcpApiKey                String?                @unique
   mcpApiKeyHash            String?                @unique
   createdAt                DateTime               @default(now())
@@ -163,6 +165,23 @@ model Template {
   thumbnail   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Admin-authored carousel templates used by the AI generation pipeline.
+// Distinct from the per-user `Template` model above (which stores a single saved editor style).
+model CardTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  slideCount  Int      @default(5) // 5 or 7
+  status      String   @default("active") // active | draft
+  isDefault   Boolean  @default(false)
+  slides      String   @default("[]") // JSON: TemplateSlideConfig[]
+  tags        String   @default("{}") // JSON: { emotion, industry, style, visualTone }: string[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
 }
 
 model ErrorLog {

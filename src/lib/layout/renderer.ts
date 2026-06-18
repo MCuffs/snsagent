@@ -23,6 +23,14 @@ export interface RenderMediaCardInput {
   textColorOverride?: string
   headlineFontSizeOverride?: number
   bodyFontSizeOverride?: number
+  // Admin template support: one of the 9 logical positions (e.g. "top-right", "middle-center").
+  // When set, overrides the layout's built-in text anchor for full WYSIWYG fidelity.
+  textPositionOverride?: string
+  headlineWeightOverride?: number
+  headlineTrackingOverride?: number   // letter-spacing (px)
+  headlineLineHeightOverride?: number
+  paddingXOverride?: number
+  paddingYOverride?: number
 }
 
 export async function renderMediaCard(input: RenderMediaCardInput) {
@@ -30,7 +38,9 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
     return renderArchiveCta(input)
   }
 
-  const textBox = getTextBox(input.layout)
+  const textBox = input.textPositionOverride
+    ? getTextBoxFromPosition(input.textPositionOverride, input.layout, input.paddingXOverride, input.paddingYOverride)
+    : getTextBox(input.layout)
   const sourceHandle = normalizeInstagramHandle(input.source || 'shuffla')
   const sourceMark = escapeXml(formatSourceMark(sourceHandle))
   const backgroundImageDataUri = await toImageDataUri(input.backgroundImageUrl)
@@ -40,7 +50,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const secondaryTextColor = input.textColorOverride
     ? `${input.textColorOverride}cc`
     : (input.layout.overlayStyle === 'none' ? 'rgba(255,255,255,0.78)' : input.overlay.secondaryTextColor)
-  const headlineLineGap = input.layout.spacingRules?.headlineLineGap || 1.08
+  const headlineLineGap = input.headlineLineHeightOverride ?? (input.layout.spacingRules?.headlineLineGap || 1.08)
   const bodyLineGap = input.layout.spacingRules?.bodyLineGap || 1.42
   const badgeToHeadlineGap = input.layout.spacingRules?.badgeToHeadlineGap || 24
   const headlineToBodyGap = input.layout.spacingRules?.headlineToBodyGap || 36
@@ -58,7 +68,10 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   currentY += 24 + badgeToHeadlineGap
 
   const headlineStartBaseline = currentY + typography.headlineFontSize * 0.95
-  const headlineMarkup = renderHeadline(typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam)
+  const headlineMarkup = renderHeadline(typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam, {
+    weight: input.headlineWeightOverride,
+    tracking: input.headlineTrackingOverride,
+  })
   const bodyStartBaseline =
     headlineStartBaseline +
     (typography.headlineLines.length - 1) * typography.headlineFontSize * headlineLineGap +
@@ -119,6 +132,26 @@ function getTextBox(layout: LayoutDefinition) {
   }
 }
 
+// Resolves one of the 9 admin-template logical positions to an anchor box, supporting
+// left / center / right alignment for full WYSIWYG fidelity with the template editor.
+function getTextBoxFromPosition(
+  position: string,
+  layout: LayoutDefinition,
+  paddingX?: number,
+  paddingY?: number,
+): { x: number; y: number; align: 'left' | 'center' | 'right' } {
+  const padX = paddingX ?? layout.safeArea.left
+  const padY = paddingY ?? 0
+  const left = padX
+  const right = 1080 - padX
+  const topY = Math.max(120, padY + 96)
+  const bottomY = (layout.overlayStyle === 'archive-light' ? 880 : 860) - padY
+  const y = position.startsWith('top') ? topY : position.startsWith('bottom') ? bottomY : 540
+  if (position.endsWith('right')) return { x: right, y, align: 'right' }
+  if (position.endsWith('center')) return { x: 540, y, align: 'center' }
+  return { x: left, y, align: 'left' }
+}
+
 function fitTextBoxY(input: {
   layout: LayoutDefinition
   textBoxY: number
@@ -166,23 +199,25 @@ function renderTopChrome(source: string, pageNumber: number | undefined, totalPa
   `
 }
 
-function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: string, align: 'left' | 'center') {
+function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: string, align: 'left' | 'center' | 'right') {
   const label = buildSlideLabel(input)
   const opacity = fill === '#050505' ? 0.34 : 0.46
-  const anchor = align === 'center' ? 'middle' : 'start'
+  const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
   return `
     <text xml:space="preserve" x="${x}" y="${y + 22}" text-anchor="${anchor}" font-family="${fontFamily('clean-sans')}" font-size="18" font-weight="400" fill="${fill}" fill-opacity="${opacity}" letter-spacing="5">${escapeXml(label)}</text>
   `
 }
 
-function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center', fontFam: string) {
-  const anchor = align === 'center' ? 'middle' : 'start'
+function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center' | 'right', fontFam: string, override?: { weight?: number; tracking?: number }) {
+  const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
+  const weight = override?.weight ?? 650
+  const tracking = override?.tracking ?? -0.4
   let currentY = y
 
   return plan.headlineLines.map((line) => {
     const tspans = renderTokenTspans(line.tokens)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
-    const markup = `<text xml:space="preserve" x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="650" fill="${fill}" letter-spacing="-0.4">${tspans || fallback}</text>`
+    const markup = `<text xml:space="preserve" x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="${weight}" fill="${fill}" letter-spacing="${tracking}">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
     return markup
   }).join('')
@@ -195,8 +230,8 @@ function renderTokenTspans(tokens: TypographyToken[]) {
   }).join('')
 }
 
-function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center', fontFam: string, bodyLineGap: number) {
-  const anchor = align === 'center' ? 'middle' : 'start'
+function renderBody(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center' | 'right', fontFam: string, bodyLineGap: number) {
+  const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
   let currentY = y
 
   return plan.bodyLines.map((line) => {
@@ -267,6 +302,7 @@ function applyTypographyOverrides(input: RenderMediaCardInput): TypographyPlan {
     ...input.typography,
     headlineFontSize: input.headlineFontSizeOverride ?? input.typography.headlineFontSize,
     bodyFontSize: input.bodyFontSizeOverride ?? input.typography.bodyFontSize,
+    lineHeight: input.headlineLineHeightOverride ?? input.typography.lineHeight,
   }
 }
 

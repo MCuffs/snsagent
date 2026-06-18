@@ -40,8 +40,6 @@ interface GenerateFormProps {
   userId?: string
   userEmail?: string | null
   userName?: string | null
-  nicepayClientKey?: string
-  nicepayReturnTokens?: Record<string, string>
 }
 
 interface ChatMessage {
@@ -243,8 +241,6 @@ const formItemVariants = {
 
 export default function GenerateForm({
   brand,
-  nicepayClientKey,
-  nicepayReturnTokens,
 }: GenerateFormProps) {
   const router = useRouter()
   const locale = useLocale()
@@ -875,104 +871,29 @@ export default function GenerateForm({
     }
   }
 
-  const handlePromoPayment = async (
-    planKey: 'PRO' | 'UNLIMITED',
-    cardData: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }
-  ) => {
-    if (!nicepayReturnTokens || !nicepayClientKey) {
-      setPromoError('결제 환경 설정이 누락되었습니다.')
-      return
-    }
-    const returnToken = nicepayReturnTokens[planKey]
-    if (!returnToken) {
-      setPromoError('결제 토큰을 생성할 수 없습니다.')
-      return
-    }
-
+  const handleUpgradeCheckout = async (planKey: 'PRO' | 'UNLIMITED') => {
     setPromoError(null)
     setProcessingPayment(true)
 
-    const PLAN_AMOUNTS: Record<string, number> = { PRO: 25000, UNLIMITED: 39000 }
-    const originalAmount = PLAN_AMOUNTS[planKey] ?? 0
-    const amount = Math.round(originalAmount * 0.8)
-    const orderId = `shuffla_regist_promo_${Date.now()}_${planKey}`
-
-    analytics.planSelectClick(planKey, 'FREE', {
-      payment_provider: 'nicepay',
-      amount,
-      currency: 'KRW',
-      is_promo: true,
-    })
-    analytics.paymentStart(planKey, 'nicepay', {
-      amount,
-      currency: 'KRW',
-      order_id: orderId,
-      is_promo: true,
-    })
+    analytics.planSelectClick(planKey, 'FREE', { payment_provider: 'polar' })
+    analytics.paymentStart(planKey, 'polar', {})
 
     try {
-      const [encodedPayload] = returnToken.split('.')
-      if (!encodedPayload) {
-        throw new Error('Invalid payment token format')
-      }
-
-      const decodeBase64Url = (str: string) => {
-        let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
-        while (base64.length % 4) {
-          base64 += '='
-        }
-        return atob(base64)
-      }
-
-      const payloadObj = JSON.parse(decodeBase64Url(encodedPayload))
-      const encryptionKey = payloadObj.encryptionKey
-      if (!encryptionKey) {
-        throw new Error('Encryption key missing from payment token')
-      }
-
-      const plaintext = `cardNo=${cardData.cardNo}&cardExpire=${cardData.cardExpire}&idNo=${cardData.idNo}&cardPw=${cardData.cardPw}`
-      const { ciphertext, iv } = await encryptCardDataClient(plaintext, encryptionKey)
-
-      const res = await fetch('/api/nicepay/card-register', {
+      const res = await fetch('/api/polar/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: returnToken,
-          ciphertext,
-          iv,
-          plan: planKey,
-          isPromo: true,
-        }),
+        body: JSON.stringify({ plan: planKey }),
       })
-
-      const responseData = await res.json() as { error?: string }
-
-      if (!res.ok) {
-        analytics.paymentFailed(planKey, 'nicepay', responseData.error || 'api_error', {
-          amount,
-          currency: 'KRW',
-          order_id: orderId,
-        })
-        setPromoError(responseData.error || '결제 승인에 실패했습니다.')
+      const body = await res.json() as { url?: string; error?: string }
+      if (!res.ok || !body.url) {
+        analytics.paymentFailed(planKey, 'polar', body.error || 'checkout_error', {})
+        setPromoError(body.error || '결제창을 열 수 없습니다. 다시 시도해 주세요.')
         setProcessingPayment(false)
-      } else {
-        analytics.paymentSuccess(planKey, 'nicepay', {
-          amount,
-          currency: 'KRW',
-          order_id: orderId,
-          is_promo: true,
-        })
-        setShowPromoModal(false)
-        setProcessingPayment(false)
-        router.refresh()
-        
-        // Wait 1.5s for session to update plan, then resume campaign generation automatically
-        setTimeout(() => {
-          void handleGenerate(copyPreviewSlides)
-        }, 1500)
+        return
       }
+      window.location.href = body.url
     } catch (err) {
-      console.error('Promo payment registration error:', err)
+      console.error('Polar checkout error:', err)
       setPromoError('결제 처리 중 네트워크 오류가 발생했습니다.')
       setProcessingPayment(false)
     }
@@ -996,7 +917,7 @@ export default function GenerateForm({
           <PromoPaymentModal
             processing={processingPayment}
             error={promoError}
-            onSubmit={handlePromoPayment}
+            onSelect={handleUpgradeCheckout}
             onClose={() => setShowPromoModal(false)}
           />
         )}
@@ -1805,80 +1726,23 @@ function CopyPreviewPanel({
   )
 }
 
-function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-async function encryptCardDataClient(plainText: string, keyBase64: string): Promise<{ ciphertext: string; iv: string }> {
-  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0))
-
-  const cryptoKey = await window.crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt']
-  )
-
-  const iv = window.crypto.getRandomValues(new Uint8Array(12))
-
-  const encoder = new TextEncoder()
-  const encodedText = encoder.encode(plainText)
-
-  const ciphertextBuffer = await window.crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv: iv,
-    },
-    cryptoKey,
-    encodedText
-  )
-
-  return {
-    ciphertext: toBase64(new Uint8Array(ciphertextBuffer)),
-    iv: toBase64(iv),
-  }
-}
-
 interface PromoPaymentModalProps {
   processing: boolean
   error: string | null
-  onSubmit: (plan: 'PRO' | 'UNLIMITED', data: { cardNo: string; cardExpire: string; idNo: string; cardPw: string }) => void
+  onSelect: (plan: 'PRO' | 'UNLIMITED') => void
   onClose: () => void
 }
 
 function PromoPaymentModal({
   processing,
   error,
-  onSubmit,
+  onSelect,
   onClose,
 }: PromoPaymentModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const [selectedPlan, setSelectedPlan] = useState<'PRO' | 'UNLIMITED'>('PRO')
-  const [cardNo, setCardNo] = useState('')
-  const [cardExpire, setCardExpire] = useState('')
-  const [idNo, setIdNo] = useState('')
-  const [cardPw, setCardPw] = useState('')
-  const [formError, setFormError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setFormError('')
-    const rawCard = cardNo.replace(/-/g, '')
-    if (!/^\d{14,16}$/.test(rawCard)) { setFormError('카드번호를 올바르게 입력해 주세요.'); return }
-    if (!/^\d{4}$/.test(cardExpire.replace('/', ''))) { setFormError('유효기간을 MM/YY 형식으로 입력해 주세요.'); return }
-    if (!/^\d{6}(\d{4})?$/.test(idNo)) { setFormError('생년월일(6자리) 또는 사업자번호(10자리)를 입력해 주세요.'); return }
-    if (!/^\d{2}$/.test(cardPw)) { setFormError('비밀번호 앞 2자리를 입력해 주세요.'); return }
-    const [mm, yy] = cardExpire.split('/')
-    onSubmit(selectedPlan, { cardNo: rawCard, cardExpire: `${yy}${mm}`, idNo, cardPw })
-  }
-
-  const planPrice = selectedPlan === 'PRO' ? '20,000원' : '31,200원'
-  const planOriginalPrice = selectedPlan === 'PRO' ? '25,000원' : '39,000원'
+  const planPrice = selectedPlan === 'PRO' ? '25,000원' : '39,000원'
 
   return createPortal(
     <div
@@ -1931,7 +1795,7 @@ function PromoPaymentModal({
             무료 체험 기간이<br />끝났어도<br />괜찮습니다
           </h2>
           <p className="text-xs text-white/55 font-medium leading-relaxed">
-            20%의 특별 혜택을 제공합니다,<br />천천히 고민해보세요
+            플랜을 선택하면 계속<br />카드뉴스를 만들 수 있어요
           </p>
         </div>
 
@@ -1953,103 +1817,43 @@ function PromoPaymentModal({
               >
                 <span>{plan === 'PRO' ? 'Creator' : 'Studio'}</span>
                 <span className={`ml-1 text-[10px] font-bold ${selectedPlan === plan ? 'text-[#9E7D68]' : 'text-white/25'}`}>
-                  {plan === 'PRO' ? '20,000원' : '31,200원'}
+                  {plan === 'PRO' ? '25,000원' : '39,000원'}
                 </span>
               </button>
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-2">
-            {/* 카드번호 */}
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="카드번호  0000 - 0000 - 0000 - 0000"
-              maxLength={19}
-              value={cardNo}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, '').slice(0, 16)
-                setCardNo(v.replace(/(.{4})/g, '$1-').replace(/-$/, ''))
-              }}
-              disabled={processing}
-              required
-              className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs tracking-widest text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
-              style={{ background: 'rgba(200,192,185,0.13)' }}
-            />
-
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="유효기간  MM/YY"
-                maxLength={5}
-                value={cardExpire}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '').slice(0, 4)
-                  setCardExpire(v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v)
-                }}
-                disabled={processing}
-                required
-                className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
-                style={{ background: 'rgba(200,192,185,0.13)' }}
-              />
-              <input
-                type="password"
-                inputMode="numeric"
-                placeholder="비밀번호 앞 2자리"
-                maxLength={2}
-                value={cardPw}
-                onChange={(e) => setCardPw(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                disabled={processing}
-                required
-                className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
-                style={{ background: 'rgba(200,192,185,0.13)' }}
-              />
-            </div>
-
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="생년월일 6자리  (법인: 사업자번호 10자리)"
-              maxLength={10}
-              value={idNo}
-              onChange={(e) => setIdNo(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              disabled={processing}
-              required
-              className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-xs text-white placeholder-white/25 outline-none focus:border-white/25 disabled:opacity-40 transition"
-              style={{ background: 'rgba(200,192,185,0.13)' }}
-            />
-
-            {(formError || error) && (
+          <div className="space-y-2">
+            {error && (
               <p className="rounded-xl bg-red-500/15 px-4 py-2 text-[11px] font-bold text-red-400 border border-red-500/20">
-                {formError || error}
+                {error}
               </p>
             )}
 
             {/* 결제 버튼 */}
             <button
-              type="submit"
+              type="button"
+              onClick={() => onSelect(selectedPlan)}
               disabled={processing}
               className="w-full rounded-2xl bg-white py-3 text-sm font-black text-[#1a1410] shadow-[0_8px_24px_rgba(255,255,255,0.12)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-1"
             >
               {processing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  결제 처리 중...
+                  결제창 여는 중...
                 </>
               ) : (
                 <>
                   <CreditCard className="h-4 w-4" />
-                  <span>{planPrice}로 시작하기</span>
-                  <span className="ml-0.5 text-xs font-bold text-gray-400 line-through">{planOriginalPrice}</span>
+                  <span>{planPrice} · {selectedPlan === 'PRO' ? 'Creator' : 'Studio'} 구독하기</span>
                 </>
               )}
             </button>
 
             <p className="text-[9px] text-white/20 text-center pt-0.5">
-              첫 달 20% 할인 · 언제든 해지 가능 · 카드 정보 AES-256 암호화
+              월 정기결제 · 언제든 해지 가능 · 안전한 결제(Polar)
             </p>
-          </form>
+          </div>
         </div>
       </div>
     </div>,

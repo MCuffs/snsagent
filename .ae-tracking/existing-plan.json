@@ -1,0 +1,17 @@
+node:internal/url:819
+      href = bindingUrl.parse(input, base, true);
+                        ^
+
+TypeError: Invalid URL
+    at new URL (node:internal/url:819:25)
+    at Object.parseURL (/opt/homebrew/lib/node_modules/ae-tracking/node_modules/undici/lib/core/util.js:136:11)
+    at /opt/homebrew/lib/node_modules/ae-tracking/node_modules/undici/index.js:86:18
+    at fetchPlan (file:///opt/homebrew/lib/node_modules/ae-tracking/dist/src/te-plan/fetch.js:5:40)
+    at Command.<anonymous> (file:///opt/homebrew/lib/node_modules/ae-tracking/dist/src/cli/plan.js:233:29)
+    at async Command.parseAsync (/opt/homebrew/lib/node_modules/ae-tracking/node_modules/commander/lib/command.js:1092:5)
+    at async file:///opt/homebrew/lib/node_modules/ae-tracking/dist/bin/ae-tracking.js:20:1 {
+  code: 'ERR_INVALID_URL',
+  input: 'ae-demo.thinkingdata.io/v1/ta/bury/manage/program/query?@t=1781599372474&projectId=8'
+}
+
+Node.js v25.8.0

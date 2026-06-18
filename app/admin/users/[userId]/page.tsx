@@ -9,8 +9,8 @@ import {
 } from '../../actions'
 import {
   AdminPageHeader, EmptyState, Section, Td, Th,
-  btnCls, formatCurrency, formatDate, inputCls, statusPill,
 } from '../../_components/AdminShell'
+import { btnCls, formatCurrency, formatDate, inputCls, statusPill } from '../../_components/adminUtils'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,7 +146,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             <form action={changeUserPlanAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
               <select name="plan" defaultValue={user.plan} className={inputCls}>
-                {['FREE', 'LITE', 'PRO', 'UNLIMITED'].map(p => <option key={p}>{p}</option>)}
+                {['FREE', 'PRO', 'UNLIMITED'].map(p => <option key={p}>{p}</option>)}
               </select>
               <input name="reason" placeholder="변경 사유" className={inputCls} />
               <button className={`${btnCls} w-full`}>플랜 변경</button>

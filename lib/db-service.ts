@@ -14,7 +14,7 @@ export interface User {
   id: string
   email: string
   name: string | null
-  plan: string // FREE, LITE, PRO, UNLIMITED
+  plan: string // FREE, PRO, UNLIMITED
   accountStatus: string // active, blocked
   paypalSubscriptionId: string | null
   paypalSubscriptionStatus: string | null
@@ -32,6 +32,8 @@ export interface User {
   nicepayLastPaidAt: Date | null
   nicepayCanceledAt: Date | null
   nicepayLastOrderId: string | null
+  polarSubscriptionId: string | null
+  polarSubscriptionStatus: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -209,6 +211,10 @@ function hydrateUser(user: StoredUser | User): User {
     nicepayCanceledAt: (user as any).nicepayCanceledAt ? new Date((user as any).nicepayCanceledAt) : null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nicepayLastOrderId: (user as any).nicepayLastOrderId ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    polarSubscriptionId: (user as any).polarSubscriptionId ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    polarSubscriptionStatus: (user as any).polarSubscriptionStatus ?? null,
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   }
@@ -377,10 +383,13 @@ export const dbService = {
         nicepayLastPaidAt: null,
         nicepayCanceledAt: null,
         nicepayLastOrderId: null,
+        polarSubscriptionId: null,
+        polarSubscriptionStatus: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
-      db.users.push(user)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db.users.push(user as any)
       writeMockDb(db)
     }
     return user!
@@ -558,6 +567,37 @@ export const dbService = {
     }
     const db = initMockDb()
     return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
+  },
+
+  async updateUserPolar(userId: string, data: {
+    polarSubscriptionId?: string | null
+    polarSubscriptionStatus?: string | null
+    plan?: string
+  }): Promise<void> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma.user as any).update({ where: { id: userId }, data })
+    } else {
+      const db = initMockDb()
+      const idx = db.users.findIndex(u => u.id === userId)
+      if (idx !== -1) {
+        if (data.plan !== undefined) db.users[idx].plan = data.plan
+        if (data.polarSubscriptionId !== undefined) (db.users[idx] as any).polarSubscriptionId = data.polarSubscriptionId
+        if (data.polarSubscriptionStatus !== undefined) (db.users[idx] as any).polarSubscriptionStatus = data.polarSubscriptionStatus
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(db.users[idx] as any).updatedAt = new Date().toISOString()
+        writeMockDb(db)
+      }
+    }
+  },
+
+  async getUserByPolarSubscriptionId(polarSubscriptionId: string): Promise<User | null> {
+    if (!isMock()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (prisma.user as any).findUnique({ where: { polarSubscriptionId } }) as unknown as Promise<User | null>
+    }
+    const db = initMockDb()
+    return (db.users.find((u: any) => u.polarSubscriptionId === polarSubscriptionId) || null) as User | null
   },
 
   // Brand operations

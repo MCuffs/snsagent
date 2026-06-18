@@ -82,7 +82,7 @@ export default async function CampaignDetailsPage({
       post={serializedPost}
       brand={serializedBrand}
       planName={planName}
-      regenerationAccess={userPlan === 'FREE' ? 'blocked' : userPlan === 'LITE' ? 'single-use' : 'included'}
+      regenerationAccess={userPlan === 'FREE' ? 'blocked' : 'included'}
     />
   )
 }

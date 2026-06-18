@@ -93,12 +93,6 @@ function hasAiRegenerationAccess(plan: string, email?: string | null) {
   return normalizePlan(plan) !== 'FREE'
 }
 
-async function consumeRegenerationPass(userId: string, plan: string) {
-  if (normalizePlan(plan) === 'LITE') {
-    await dbService.updateUserPlan(userId, 'FREE')
-  }
-}
-
 function slideEditorSeed(slide: {
   slideNumber: number
   headline: string
@@ -255,12 +249,8 @@ export async function createCampaignAction(brandId: string, data: {
   // Limit Check
   const limitCheck = await checkCampaignCreationLimit(user.id)
   if (!limitCheck.allowed) {
-    return failed(normalizePlan(user.plan) === 'LITE'
-      ? 'AI 재생성 1회권은 기존 결과물의 배경 재생성에 사용할 수 있습니다. 작업 히스토리에서 결과물을 열어 사용해주세요.'
-      : (limitCheck.period as string) === 'lifetime'
+    return failed((limitCheck.period as string) === 'lifetime'
       ? '무료 플랜은 최초 2회만 카드뉴스를 생성할 수 있습니다. 계속 생성하시려면 Creator 플랜을 선택해 주세요.'
-      : (limitCheck.period as string) === 'day'
-      ? '무료 플랜은 하루에 카드뉴스 1개를 생성할 수 있습니다. 내일 다시 시도하거나 Creator 플랜을 선택해주세요.'
       : `월간 카드뉴스 생성 한도를 초과했습니다. 이번 달 누적 생성 건수: ${limitCheck.current}/${limitCheck.limit}개 (${user.plan} 플랜)`)
   }
 
@@ -382,7 +372,6 @@ export async function rerenderMediaSlideAction(
       imageUrl,
       backgroundImageUrl: background.imageUrl,
     })
-    await consumeRegenerationPass(user.id, user.plan)
     logEditEvent({ userId: user.id, brandId: existingSlide.campaign.brandId, campaignId: existingSlide.campaign.id, slideId, eventType: 'layout_change', metadata: { action: 'rerenderMediaSlide', fontFamily: options?.fontFamily } })
     return { success: true as const, slide, regenerationUsage }
   } catch (err: unknown) {
@@ -480,7 +469,6 @@ export async function regenerateEditorialBackgroundAction(
       backgroundImageUrl: result.imageUrl,
       editorDocument: JSON.stringify(document),
     })
-    await consumeRegenerationPass(user.id, user.plan)
     return { success: true as const, slide, document, regenerationUsage: usage }
   } catch (err: unknown) {
     return failed(getErrorMessage(err, '배경 변형 생성에 실패했습니다.'))
@@ -871,7 +859,6 @@ export async function regenerateCampaignImagesAction(campaignId: string, styleNa
       })
     )
 
-    await consumeRegenerationPass(user.id, user.plan)
     return {
       success: true as const,
       slides: updatedSlides.sort((a, b) => a.slideNumber - b.slideNumber),

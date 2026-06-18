@@ -1,6 +1,7 @@
 import prisma from '../../lib/db'
 import Link from 'next/link'
-import { AdminPageHeader, StatCard, formatCurrency } from './_components/AdminShell'
+import { AdminPageHeader, StatCard } from './_components/AdminShell'
+import { formatCurrency } from './_components/adminUtils'
 
 export const dynamic = 'force-dynamic'
 

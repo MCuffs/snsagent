@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { getSessionUser, loginWithPasswordAction, registerAction } from '../../actions'
 import { getTranslations } from 'next-intl/server'
 import LoginForm from './LoginForm'
@@ -45,7 +45,6 @@ export default async function LoginPage({
   const t = await getTranslations('login')
   const sp = searchParams ? await searchParams : {}
   const errorMessage = sp.error ? getLoginErrorMessage(sp.error, locale) : ''
-  const fromCampaign = sp.from === 'campaign'
   const defaultTab = sp.tab === 'signup' ? 'signup' : 'login'
   const isEn = locale === 'en'
 
@@ -69,48 +68,47 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="app-shell min-h-screen text-[#1f1512]">
-      <header className="flex h-[76px] items-center justify-between border-b border-[#ece2d6] bg-[#fffdf8]/88 px-6 backdrop-blur-xl lg:px-12">
-        <Link href={`/${locale}`} className="flex items-center gap-2 text-2xl font-black tracking-[-0.05em]">
-          <Image src="/shuffla-logo-mark.png" width={34} height={34} alt="Shuffla 로고" />
-          Shuffla
+    <main
+      className="min-h-screen"
+      style={{ backgroundColor: '#f5f3ef' }}
+    >
+      {/* 상단 로고 */}
+      <header className="flex h-14 items-center justify-between px-6 md:px-10">
+        <Link href={`/${locale}`} className="flex items-center gap-2">
+          <Image src="/shuffla-logo-mark.png" width={26} height={26} alt="Shuffla" />
+          <span className="text-[17px] font-bold tracking-tight text-[#1a1a1a]">Shuffla</span>
         </Link>
-        <Link href={`/${locale}`} className="flex items-center gap-2 text-sm font-black text-[#1f1512]">
-          <ArrowLeft className="h-4 w-4" />
-          {t('back_home')}
+        <Link
+          href={`/${locale}`}
+          className="flex items-center gap-1.5 text-sm text-[#6b6560] hover:text-[#1a1a1a] transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {isEn ? 'Back' : '홈으로'}
         </Link>
       </header>
 
-      <section className="mx-auto grid min-h-[calc(100vh-76px)] max-w-[1320px] items-center gap-12 px-6 py-14 lg:grid-cols-[1fr_520px] lg:px-12">
-        <div>
-          <p className="mb-8 text-sm font-black uppercase tracking-[0.14em] text-[#746a62]">
-            Shuffla Card News Studio
-          </p>
-          {fromCampaign ? (
-            <>
-              <h1 className="max-w-3xl whitespace-pre-line text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
-                {isEn ? 'Log in to view\nthis card news' : '카드뉴스를 보려면\n로그인하세요'}
-              </h1>
-              <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
-                {isEn ? 'Free plan included — 2 card news to create. No payment required.' : '무료 2회 생성 포함 — 결제 없이 바로 시작할 수 있어요.'}
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="max-w-3xl whitespace-pre-line text-6xl font-black leading-[0.95] tracking-[-0.075em] md:text-7xl">
-                {t('title')}
-              </h1>
-              <p className="mt-7 max-w-2xl text-xl leading-8 text-[#332925]">
-                {t('desc')}
-              </p>
-            </>
-          )}
-        </div>
+      {/* 본문 */}
+      <div className="mx-auto grid min-h-[calc(100vh-56px)] max-w-[1200px] grid-cols-1 items-center gap-8 px-6 py-10 md:grid-cols-2 md:gap-16 md:px-10 lg:gap-24">
 
-        <div className="paper-noise rounded-[10px] bg-[#91a8c9] p-8 shadow-[0_34px_100px_rgba(57,69,90,0.22)]">
-          <div className="rounded-[8px] border border-[#e8dfd4] bg-[#fffdf8] p-8 shadow-[0_18px_50px_rgba(31,21,18,0.12)]">
+        {/* 좌측: 타이틀 + 폼 */}
+        <div className="flex flex-col">
+          <h1 className="mb-8 text-[38px] font-bold leading-[1.15] tracking-[-0.03em] text-[#1a1a1a] md:text-[44px]">
+            {isEn ? (
+              <>Think fast,<br />build faster</>
+            ) : (
+              <>빠르게 생각하고,<br />더 빠르게 구축하세요</>
+            )}
+          </h1>
+          <p className="mb-8 text-[15px] text-[#6b6560]">
+            {isEn
+              ? 'AI card news, instantly. No design skills needed.'
+              : 'AI로 카드뉴스를 즉시 생성하세요. 디자인 없이도 완성됩니다.'}
+          </p>
+
+          {/* 폼 카드 */}
+          <div className="rounded-2xl bg-white p-7 shadow-[0_2px_20px_rgba(0,0,0,0.08)]">
             {errorMessage && (
-              <div className="mb-5 rounded-[5px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {errorMessage}
               </div>
             )}
@@ -119,34 +117,53 @@ export default async function LoginPage({
             <Link
               href="/api/auth/google/start"
               prefetch={false}
-              className="flex h-14 w-full items-center justify-center gap-3 rounded-[5px] border border-[#7d756c] bg-white text-base font-bold transition hover:bg-[#fff8f0]"
+              className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#e0dbd5] bg-white text-[15px] font-medium text-[#1a1a1a] transition hover:bg-[#faf8f5] hover:border-[#ccc7c1]"
             >
-              <span className="grid h-6 w-6 place-items-center rounded-full border border-[#dadce0] bg-white text-sm font-black text-[#4285f4]">
-                G
-              </span>
-              {isEn ? 'Continue with Google' : 'Google로 로그인'}
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              {isEn ? 'Continue with Google' : 'Google로 계속하기'}
             </Link>
 
-            <div className="my-6 flex items-center gap-4 text-xs font-bold text-[#a29a91]">
-              <div className="h-px flex-1 bg-[#e8dfd4]" />
-              {isEn ? 'or use email' : '또는 이메일로'}
-              <div className="h-px flex-1 bg-[#e8dfd4]" />
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[#e8e3de]" />
+              <span className="text-xs text-[#a09990]">{isEn ? 'or' : '또는'}</span>
+              <div className="h-px flex-1 bg-[#e8e3de]" />
             </div>
 
-            {/* 로그인 / 신규 가입 탭 */}
+            {/* 이메일 로그인 탭 */}
             <LoginForm
               locale={locale}
               defaultTab={defaultTab}
               loginAction={handleLogin}
               registerAction={handleRegister}
             />
+          </div>
 
-            <p className="mt-5 text-center text-xs text-[#a29a91]">
-              {isEn ? 'No payment info required · 2 free card news · Cancel anytime' : '결제 정보 없이 가입 · 무료 2회 카드뉴스 즉시 생성 · 언제든 탈퇴 가능'}
-            </p>
+          <p className="mt-4 text-center text-xs text-[#a09990]">
+            {isEn
+              ? 'No payment info required · 2 free card news'
+              : '결제 정보 없이 가입 · 무료 2회 카드뉴스 즉시 생성'}
+          </p>
+        </div>
+
+        {/* 우측: 이미지 */}
+        <div className="hidden md:block">
+          <div className="overflow-hidden rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
+            <Image
+              src="/login-showcase.png"
+              alt="Shuffla preview"
+              width={600}
+              height={720}
+              className="w-full object-cover"
+              priority
+            />
           </div>
         </div>
-      </section>
+      </div>
     </main>
   )
 }

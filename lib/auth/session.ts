@@ -4,15 +4,12 @@ import { getSessionSigningSecret, isProduction } from '../env'
 export const SESSION_COOKIE_NAME = 'shuffla_session'
 export const LEGACY_SESSION_COOKIE_NAME = 'instaagent_session_email'
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = 'google_oauth_state'
-// 토큰 자체의 절대 만료 시간 (1시간). 로그인 후 경과 시간 기준.
-export const SESSION_DURATION_SECONDS = 60 * 60 // 1 hour
+// 세션 유효 기간: 7일. 쿠키 maxAge와 토큰 expiresAt 모두 이 값을 사용한다.
+export const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60 // 7 days
 
 export function sessionCookieOptions() {
-  // maxAge를 의도적으로 빼서 "세션 쿠키"로 만든다.
-  // → 브라우저(탭 전체) 종료 시 쿠키가 자동 삭제되어 세션이 끊긴다.
-  // 토큰 내부 expiresAt은 SESSION_DURATION_SECONDS(1시간)로 여전히 강제되므로,
-  // 브라우저를 닫지 않아도 1시간이 지나면 무효화된다.
   return {
+    maxAge: SESSION_DURATION_SECONDS,
     path: '/',
     httpOnly: true,
     sameSite: 'lax' as const,
@@ -68,3 +65,4 @@ export function readSessionEmail(token: string | undefined, now = Date.now()) {
 function sign(payload: string) {
   return createHmac('sha256', getSessionSigningSecret()).update(payload).digest('base64url')
 }
+

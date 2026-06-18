@@ -1,11 +1,8 @@
 import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
 import { getSessionUser, getCachedBrands } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
 import { getHistoryRetentionStatus } from '../../../lib/history-retention'
-import { normalizePlan, PRICING_PLANS, PAID_SUBSCRIPTION_PLANS } from '../../../lib/limits-types'
-import { isPaidPlan } from '../../../lib/nicepay'
-import { createNicepayReturnToken } from '../../../lib/nicepay-return-token'
+import { normalizePlan, PRICING_PLANS } from '../../../lib/limits-types'
 import DashboardContainer from './DashboardContainer'
 import { Loader2 } from 'lucide-react'
 
@@ -29,7 +26,24 @@ export default function ConceptPage() {
 
 async function DashboardDataLoader() {
   const user = await getSessionUser()
-  if (!user) redirect('/login')
+
+  if (!user) {
+    return (
+      <DashboardContainer
+        existingBrand={null}
+        existingGeneralProfile={null}
+        campaigns={[]}
+        planName={PRICING_PLANS['FREE'].name}
+        retentionDays={PRICING_PLANS['FREE'].historyRetentionDays}
+        canUpgradeRetention={true}
+        userEmail={null}
+        userId={undefined}
+        userName={null}
+        summarizedPreference={null}
+        isGuest={true}
+      />
+    )
+  }
 
   const plan = normalizePlan(user.plan || 'FREE')
   void dbService.deleteExpiredCampaignsForUser(user.id, plan)
@@ -90,10 +104,6 @@ async function DashboardDataLoader() {
     }
   })
 
-  const nicepayReturnTokens = Object.fromEntries(
-    PAID_SUBSCRIPTION_PLANS.filter(isPaidPlan).map((p) => [p, createNicepayReturnToken(user.id, p)]),
-  )
-
   return (
     <DashboardContainer
       existingBrand={serializedBrand}
@@ -105,8 +115,6 @@ async function DashboardDataLoader() {
       userEmail={user.email}
       userId={user.id}
       userName={user.name}
-      nicepayClientKey={(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()}
-      nicepayReturnTokens={nicepayReturnTokens}
       summarizedPreference={summarizedPreference}
     />
   )

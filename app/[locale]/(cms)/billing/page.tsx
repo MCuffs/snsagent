@@ -2,9 +2,6 @@ import { redirect } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { PAID_SUBSCRIPTION_PLANS, normalizePlan } from '../../../../lib/limits-types'
-import { isPaidPlan } from '../../../../lib/nicepay'
-import { getPublicPayPalClientId, PAYPAL_PLAN_IDS } from '../../../../lib/paypal'
-import { createNicepayReturnToken } from '../../../../lib/nicepay-return-token'
 import PricingClientView from '../../../(cms)/billing/PricingClientView'
 import { getTranslations } from 'next-intl/server'
 
@@ -23,24 +20,8 @@ export default async function PricingPage({
 
   const t = await getTranslations('billing')
   const sp = searchParams ? await searchParams : {}
-  const plansList = PAID_SUBSCRIPTION_PLANS
-  const hasSubscription = Boolean(user.paypalSubscriptionId || user.nicepayBid)
-  const paymentProvider = user.nicepayBid ? 'nicepay' : user.paypalSubscriptionId ? 'paypal' : null
-
-  // Locale-based payment provider filtering:
-  // ko → NicePay only (hide PayPal), en → PayPal only (hide NicePay)
-  const isKo = locale === 'ko'
-  const paypalPlanIds: Record<string, string> = {}
-  if (!isKo) {
-    for (const [key, value] of Object.entries(PAYPAL_PLAN_IDS)) {
-      if (value) paypalPlanIds[key] = value
-    }
-  }
-  const paypalClientId = isKo ? '' : getPublicPayPalClientId()
-  const nicepayClientKey = isKo ? (process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim() : ''
-  const nicepayReturnTokens = Object.fromEntries(
-    plansList.filter(isPaidPlan).map((plan) => [plan, createNicepayReturnToken(user.id, plan)]),
-  )
+  const hasSubscription = Boolean(user.polarSubscriptionId)
+  const paymentProvider = user.polarSubscriptionId ? 'polar' : null
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">
@@ -68,20 +49,21 @@ export default async function PricingPage({
 
       <PricingClientView
         currentPlan={normalizePlan(user.plan)}
-        plansList={plansList}
+        plansList={PAID_SUBSCRIPTION_PLANS}
         hasSubscription={hasSubscription}
         paymentProvider={paymentProvider}
         userId={user.id}
-        paypalClientId={paypalClientId}
-        paypalPlanIds={paypalPlanIds}
-        nicepayClientKey={nicepayClientKey}
-        nicepayReturnTokens={nicepayReturnTokens}
-        customerName={user.name}
-        customerEmail={user.email}
         showRegenerationOffer={sp.offer === 'regeneration'}
         paymentSuccess={sp.success === 'true'}
         locale={locale}
       />
+
+      <div className="mt-12 border-t border-[#e4e4e7] pt-6 text-[11px] leading-6 text-[#a1a1aa] space-y-0.5">
+        <p className="font-semibold text-[#71717a]">파랑버섯 스튜디오</p>
+        <p>대표자: 정민수 · 사업자등록번호: 354-14-0333 · 통신판매업 신고번호: 2026-서울영등포-1320호</p>
+        <p>주소: 서울특별시 영등포구 · 고객센터: admin@shuffla.io</p>
+        <p>부가세 포함 가격 · 구독 취소 시 잔여 기간 부분 환불 미제공</p>
+      </div>
     </div>
   )
 }

@@ -17,7 +17,6 @@
     "@prisma/client": "^5.22.0",
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/blob": "^2.4.0",
-    "ae-tracking": "file:package",
     "framer-motion": "^12.40.0",
     "groq-sdk": "^1.2.0",
     "inngest": "^4.4.0",

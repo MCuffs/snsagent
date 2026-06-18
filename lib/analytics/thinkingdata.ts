@@ -99,7 +99,7 @@ export function timeEvent(event: string) {
   td?.timeEvent(event)
 }
 
-type PaymentProvider = 'nicepay' | 'toss' | 'paypal'
+type PaymentProvider = 'polar'
 type ExportFormat = 'zip' | 'png' | 'jpg' | 'pdf' | 'mp4'
 type RegenerateScope = 'copy' | 'image' | 'all'
 

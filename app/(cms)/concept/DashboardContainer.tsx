@@ -9,7 +9,8 @@ import GenerateForm from '../generate/GenerateForm'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { CheckCircle2, Globe, TrendingUp, Sparkles } from 'lucide-react'
+import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn } from 'lucide-react'
+import Link from 'next/link'
 
 interface BrandProfileData {
   id: string
@@ -51,9 +52,8 @@ interface DashboardContainerProps {
   userEmail?: string | null
   userId?: string
   userName?: string | null
-  nicepayClientKey?: string
-  nicepayReturnTokens?: Record<string, string>
   summarizedPreference?: SummarizedPreferenceData | null
+  isGuest?: boolean
 }
 
 export default function DashboardContainer({
@@ -66,9 +66,8 @@ export default function DashboardContainer({
   userEmail,
   userId,
   userName,
-  nicepayClientKey,
-  nicepayReturnTokens,
   summarizedPreference,
+  isGuest = false,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const t = useTranslations('concept')
@@ -76,6 +75,15 @@ export default function DashboardContainer({
   const urlBrandId = searchParams?.get('brandId') || null
   const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+
+  const handleGuestAction = () => {
+    if (isGuest) {
+      setShowLoginPrompt(true)
+      return true
+    }
+    return false
+  }
 
   // null = 선택 화면, 'brand' = URL 프로필 폼, 'general' = 시사/트렌드 폼
   const [subProfile, setSubProfile] = useState<'brand' | 'general' | null>(() => {
@@ -121,6 +129,9 @@ export default function DashboardContainer({
 
   return (
     <div className="h-full">
+      {showLoginPrompt && (
+        <GuestLoginOverlay onClose={() => setShowLoginPrompt(false)} />
+      )}
       <div className={activeTab === 'concept' ? 'h-full' : 'hidden'}>
         <div className="flex h-full flex-col">
           {subProfile !== null && (
@@ -140,7 +151,10 @@ export default function DashboardContainer({
               <ProfileSelectScreen
                 hasUrlProfile={existingBrand && Boolean(existingBrand.websiteUrl) ? true : false}
                 hasGeneralProfile={Boolean(generalProfile)}
-                onSelect={setSubProfile}
+                onSelect={(type) => {
+                  if (handleGuestAction()) return
+                  setSubProfile(type)
+                }}
                 summarizedPreference={summarizedPreference}
               />
             )}
@@ -195,8 +209,6 @@ export default function DashboardContainer({
             userId={userId}
             userEmail={userEmail}
             userName={userName}
-            nicepayClientKey={nicepayClientKey}
-            nicepayReturnTokens={nicepayReturnTokens}
           />
         </div>
       )}
@@ -312,3 +324,39 @@ function ProfileSelectScreen({
   )
 }
 
+function GuestLoginOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#eff6ff]">
+          <LogIn className="h-6 w-6 text-[#0066ff]" />
+        </div>
+        <h2 className="text-lg font-bold text-[#111111]">로그인이 필요해요</h2>
+        <p className="mt-2 text-sm text-[#71717a]">
+          카드뉴스를 만들려면 먼저 로그인해 주세요.
+        </p>
+        <div className="mt-6 flex flex-col gap-3">
+          <Link
+            href="/login"
+            className="w-full rounded-xl bg-[#111111] py-3 text-sm font-semibold text-white hover:bg-[#333] transition-colors"
+          >
+            로그인 / 회원가입
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-[#71717a] hover:text-[#111111] transition-colors"
+          >
+            나중에
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

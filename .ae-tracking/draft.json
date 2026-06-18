@@ -1,0 +1,11 @@
+{
+  "meta": {
+    "app_type": "",
+    "sdk_integration_mode": "client_only",
+    "plan_name": "AE 데이터 트래킹 예제 템플릿"
+  },
+  "events": [],
+  "event_properties": [],
+  "common_event_properties": [],
+  "user_properties": []
+}

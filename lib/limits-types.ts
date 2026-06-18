@@ -1,6 +1,6 @@
-export type SubscriptionPlan = 'FREE' | 'LITE' | 'PRO' | 'UNLIMITED'
+export type SubscriptionPlan = 'FREE' | 'PRO' | 'UNLIMITED'
 
-export const SUBSCRIPTION_PLANS = ['FREE', 'LITE', 'PRO', 'UNLIMITED'] as const
+export const SUBSCRIPTION_PLANS = ['FREE', 'PRO', 'UNLIMITED'] as const
 export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['PRO', 'UNLIMITED']
 
 export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
@@ -31,34 +31,14 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     price: '무료',
     price_en: 'Free',
     features: [
-      '월 2회 카드뉴스 생성',
+      '최초 2회 무료 카드뉴스 생성',
       '30일 히스토리 보관',
       '기본 편집 기능',
     ],
     features_en: [
-      '2 card news per month',
+      '2 free card news to start',
       '30-day history retention',
       'Basic editing tools',
-    ],
-  },
-  LITE: {
-    name: 'AI 재생성 1회권',
-    monthlyCardLimit: 0,
-    historyRetentionDays: 30,
-    hasWatermark: false,
-    description: '무료 결과물의 AI 재생성을 한 번 추가하는 단건 이용권',
-    description_en: 'Add one AI background regeneration to your existing result.',
-    price: '3,000원',
-    price_en: '₩3,000',
-    features: [
-      'AI 재생성 1회',
-      '기존 결과물 개선',
-      '워터마크 제거',
-    ],
-    features_en: [
-      '1 AI regeneration',
-      'Improve existing results',
-      'Remove watermark',
     ],
   },
   PRO: {
@@ -113,9 +93,10 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   },
 }
 
-// Fallback for legacy plan values stored in DB (STARTER → LITE, AGENCY → UNLIMITED)
+// Fallback for legacy plan values stored in DB.
+// LITE/STARTER were a discontinued one-time pass → treat as FREE; AGENCY → UNLIMITED.
 export function normalizePlan(plan: string): SubscriptionPlan {
-  if (plan === 'STARTER') return 'LITE'
+  if (plan === 'STARTER' || plan === 'LITE') return 'FREE'
   if (plan === 'AGENCY') return 'UNLIMITED'
   if (isSubscriptionPlan(plan)) return plan
   return 'FREE'

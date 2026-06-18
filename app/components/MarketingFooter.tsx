@@ -9,7 +9,7 @@ interface MarketingFooterProps {
 
 export async function MarketingFooter({ authenticated = false, locale }: MarketingFooterProps) {
   const prefix = locale ? `/${locale}` : ''
-  const accessHref = authenticated ? `${prefix}/concept` : '/api/auth/google/start'
+  const accessHref = `${prefix}/concept`
 
   let t: Awaited<ReturnType<typeof getTranslations>> | null = null
   try {

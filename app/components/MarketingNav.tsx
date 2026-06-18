@@ -23,7 +23,7 @@ type NavKey =
 export async function MarketingNav({ authenticated = false, locale }: MarketingNavProps) {
   const prefix = locale ? `/${locale}` : ''
   const loginHref = `${prefix}/login`
-  const accessHref = authenticated ? `${prefix}/concept` : loginHref
+  const accessHref = `${prefix}/concept`
 
   let t: Awaited<ReturnType<typeof getTranslations>> | null = null
   try {

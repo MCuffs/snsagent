@@ -10,19 +10,17 @@ interface Props {
   userPlan: string
   createdAt: string
   hasSubscription: boolean
-  paymentProvider: 'paypal' | 'nicepay' | null
 }
 
 const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   FREE:      { label: 'Free',      color: 'text-[#71717a] bg-[#f4f4f5]' },
-  LITE:      { label: 'Lite',      color: 'text-[#0066ff] bg-[#eff6ff]' },
   PRO:       { label: 'Creator',   color: 'text-[#7c3aed] bg-[#f5f3ff]' },
   UNLIMITED: { label: 'Studio',    color: 'text-[#059669] bg-[#ecfdf5]' },
 }
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_USER_EMAIL || 'demo@shuffla.ai'
 
-export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, hasSubscription, paymentProvider }: Props) {
+export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, hasSubscription }: Props) {
   const [open, setOpen] = useState(false)
   const [key, setKey] = useState<string | null>(null)
   const [hasKey, setHasKey] = useState(false)
@@ -93,10 +91,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
     setCanceling(true)
     setCancelError('')
     try {
-      const endpoint = paymentProvider === 'nicepay'
-        ? '/api/payments/nicepay/cancel'
-        : '/api/paypal/cancel'
-      const res = await fetch(endpoint, { method: 'POST' })
+      const res = await fetch('/api/polar/cancel', { method: 'POST' })
       const data = await res.json() as { error?: string }
       if (!res.ok) {
         setCancelError(data.error || '구독 취소에 실패했습니다.')

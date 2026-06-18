@@ -9,6 +9,8 @@ import { checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
+import { selectCardTemplateForContent } from '../../../lib/templates/select'
+import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../../lib/templates/applyToRender'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
 import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
@@ -361,6 +363,29 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const imageProvider = input.imageProvider || getPipelineImageProvider()
   const slides: MediaCarouselSlideResult[] = []
 
+  // Select an admin-authored card template via tag-heuristic matching.
+  // Returns null when no active template fits the slide count → existing default behavior (no regression).
+  const selectedTemplate = await selectCardTemplateForContent({
+    slideCount,
+    contentType: input.category,
+    industry: input.brandIndustry,
+    emotion: input.tone,
+    topic: input.topic,
+    keywords: [input.visualHint, input.brandToneOfVoice].filter((v): v is string => Boolean(v)),
+  }).catch((err) => {
+    console.warn('[MediaCarouselPipeline] template selection skipped:', err instanceof Error ? err.message : err)
+    return null
+  })
+  if (selectedTemplate) {
+    agentReportLogs.push({
+      agentName: 'TemplateSelector',
+      role: 'layout-template',
+      status: 'info',
+      message: `Selected template "${selectedTemplate.name}" (${selectedTemplate.id}) for ${slideCount}-slide carousel.`,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
   // 5. Render slides and evaluate quality metrics
   const slideResults = await Promise.all(
     agentSlides.map(async (slide) => {
@@ -399,9 +424,16 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
       const sanitizedVisualPrompt = sanitizeImagePrompt(visualDirection.prompt)
 
+      // Inject the selected template's background style directive so each template yields a
+      // distinct background mood (gated: no template → unchanged prompt).
+      const templateSlide = selectedTemplate?.slides.find(s => s.slideNumber === slide.slideNumber)
+      const harnessedPrompt = buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection)
+      const templateStyleHint = templateSlide ? sanitizeImagePrompt(templateBackgroundPromptHint(templateSlide.background)) : ''
+      const finalVisualPrompt = templateStyleHint ? `${harnessedPrompt}\n${templateStyleHint}` : harnessedPrompt
+
       let backgroundImageUrl = ''
       try {
-        const background = await imageProvider.generateImage(buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection), {
+        const background = await imageProvider.generateImage(finalVisualPrompt, {
           size: '1024x1536',
           productImageUrls: input.productImageUrls || [],
         })
@@ -440,11 +472,14 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         qualityCheck: baseSlideQualityCheck,
       })
 
+      // Apply the selected template's per-slide layout/overlay/typography (templateSlide resolved above).
+      const applied = templateSlide ? applyTemplateSlideToRender(harness.layout, templateSlide) : null
+
       const finalImageUrl = await renderMediaCard({
         id: `media-card-${Date.now()}-${slide.slideNumber}-${Math.random().toString(36).slice(2, 8)}`,
-        layout: harness.layout,
+        layout: applied?.layout ?? harness.layout,
         typography: harness.typography,
-        overlay: harness.overlay,
+        overlay: applied?.overlay ?? harness.overlay,
         category: input.category,
         headline: slide.headline,
         body: slide.body,
@@ -452,6 +487,17 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         source: input.source || input.brandName,
         pageNumber: slide.slideNumber,
         totalPages: slideCount,
+        ...(applied ? {
+          textColorOverride: applied.overrides.textColorOverride,
+          headlineFontSizeOverride: applied.overrides.headlineFontSizeOverride,
+          bodyFontSizeOverride: applied.overrides.bodyFontSizeOverride,
+          textPositionOverride: applied.overrides.textPositionOverride,
+          headlineWeightOverride: applied.overrides.headlineWeightOverride,
+          headlineTrackingOverride: applied.overrides.headlineTrackingOverride,
+          headlineLineHeightOverride: applied.overrides.headlineLineHeightOverride,
+          paddingXOverride: applied.overrides.paddingXOverride,
+          paddingYOverride: applied.overrides.paddingYOverride,
+        } : {}),
       })
 
       console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)

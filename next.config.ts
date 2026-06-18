@@ -16,16 +16,15 @@ const nextConfig: NextConfig = {
     // Content Security Policy
     const cspHeader = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://js.tosspayments.com https://pay.nicepay.co.kr",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https: http:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.openai.com https://api.perplexity.ai https://generativelanguage.googleapis.com https://api.groq.com https://openapi.naver.com https://graph.instagram.com https://api.nicepay.co.kr https://pay.nicepay.co.kr https://*.nicepay.co.kr https://api-m.sandbox.paypal.com https://api-m.paypal.com https://*.vercel.app https://*.blob.vercel-storage.com https://r.jina.ai https://commons.wikimedia.org https://api.thinkingdata.com",
+      "connect-src 'self' https://api.openai.com https://api.perplexity.ai https://generativelanguage.googleapis.com https://api.groq.com https://openapi.naver.com https://graph.instagram.com https://api.polar.sh https://*.vercel.app https://*.blob.vercel-storage.com https://r.jina.ai https://commons.wikimedia.org https://api.thinkingdata.com",
       "media-src 'self' blob:",
       "object-src 'none'",
-      "frame-src https://pay.nicepay.co.kr https://*.nicepay.co.kr",
       "base-uri 'self'",
-      "form-action 'self' https://pay.nicepay.co.kr https://*.nicepay.co.kr",
+      "form-action 'self'",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
     ].join('; ')
