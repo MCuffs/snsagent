@@ -1,3 +1,5 @@
+import { cleanOrphanedParticles } from '../carousel/agents'
+
 export type CardNewsAgentRole = 'hook' | 'context' | 'key-point' | 'detail' | 'stat' | 'summary' | 'save-cta'
 
 export interface CardNewsAgentInput {
@@ -122,10 +124,11 @@ function parseForbiddenWords(value?: string) {
 }
 
 function removeForbiddenWords(value: string, forbiddenWords: string[]) {
-  return forbiddenWords.reduce((text, word) => {
+  const stripped = forbiddenWords.reduce((text, word) => {
     if (!word) return text
     return text.split(word).join('')
-  }, value).replace(/\s+/g, ' ').trim()
+  }, value)
+  return cleanOrphanedParticles(stripped)
 }
 
 function trimToNaturalLength(value: string, maxLength: number) {

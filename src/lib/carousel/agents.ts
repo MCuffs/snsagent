@@ -133,11 +133,27 @@ export class BrandIdentityAgent {
   }
 
   private removeForbiddenWords(value: string, forbiddenWords: string[]) {
-    return forbiddenWords.reduce((text, word) => {
+    const stripped = forbiddenWords.reduce((text, word) => {
       if (!word) return text
       return text.split(word).join('')
-    }, value).replace(/\s+/g, ' ').trim()
+    }, value)
+    return cleanOrphanedParticles(stripped)
   }
+}
+
+// 금칙어로 명사가 삭제되면 한국어 조사("AI가" -> "가")가 고아로 남아 비문이 된다.
+// 단독으로 떨어진 조사 토큰과 그로 인한 공백/문장부호 잔여를 정리해 가독성을 복구한다.
+const ORPHAN_PARTICLE =
+  /(^|\s)(은|는|이|가|을|를|와|과|의|에|에서|에게|께|도|만|로|으로|부터|까지|보다|처럼|마다|이나|라도|이라|라는|이라는)(?=\s|[.,!?…)\]]|$)/g
+
+export function cleanOrphanedParticles(value: string) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(ORPHAN_PARTICLE, '$1')
+    .replace(/\s+([.,!?…)\]])/g, '$1')   // 부호 앞 공백 제거
+    .replace(/([(\[])\s+/g, '$1')         // 여는 괄호 뒤 공백 제거
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // 2. CopywritingAgent: 카피 최적화 및 가독성 메이커

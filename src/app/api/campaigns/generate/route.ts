@@ -139,28 +139,28 @@ export async function POST(request: Request) {
 
       let researchContext = ''
       const hasConfirmedSlides = Boolean(body.confirmedSlides?.length)
-      if (hasConfirmedSlides) {
-        console.log(`[ResearchBrief] Skipped because confirmed copy was provided for topic "${body.topic}"`)
-      } else {
-        try {
-          const researchBrief = await buildCarouselResearchBrief({
-            topic: body.topic!,
-            category: body.category,
-            keyContent: enrichedKeyContent,
-            contentType: body.contentType,
-            slideCount: normalizeSlideCount(body.slideCount),
-            language: body.language || 'ko',
-          })
-          researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
-          if (researchContext) {
-            enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
-            console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}"`)
-          } else {
-            console.log(`[ResearchBrief] No topic-matched external research found for "${body.topic}"`)
-          }
-        } catch (researchErr) {
-          console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
+      // Always build the research brief — even when copy is confirmed — so grounding sources
+      // are recorded on the campaign for fact-checking/credibility. Confirmed copy is NOT
+      // overwritten (the pipeline uses confirmedSlides); the brief only enriches keyContent
+      // for grounding extraction and visual prompts.
+      try {
+        const researchBrief = await buildCarouselResearchBrief({
+          topic: body.topic!,
+          category: body.category,
+          keyContent: enrichedKeyContent,
+          contentType: body.contentType,
+          slideCount: normalizeSlideCount(body.slideCount),
+          language: body.language || 'ko',
+        })
+        researchContext = formatResearchBriefForPrompt(researchBrief, body.language || 'ko')
+        if (researchContext) {
+          enrichedKeyContent = `${enrichedKeyContent}\n\n${researchContext}`
+          console.log(`[ResearchBrief] Injected ${researchBrief?.verifiedFacts.length || 0} facts and ${researchBrief?.sources.length || 0} sources for topic "${body.topic}" (confirmed=${hasConfirmedSlides})`)
+        } else {
+          console.log(`[ResearchBrief] No topic-matched external research found for "${body.topic}"`)
         }
+      } catch (researchErr) {
+        console.warn('[ResearchBrief] Failed to build external research brief, continuing without it:', researchErr)
       }
 
       // RSS is now a fallback only. Raw news blocks can add weakly related health/trend items,
