@@ -13,7 +13,6 @@ import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, infe
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../lib/research/carouselResearch'
 import OpenAI from 'openai'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../../lib/rateLimiter'
-import { isTestAccount } from '../../../../../lib/auth/test-accounts'
 import { generateTestCampaign } from '../../../../lib/layout/testCampaignPipeline'
 
 export const runtime = 'nodejs'
@@ -96,8 +95,8 @@ export async function POST(request: Request) {
     }
 
     if (body.campaignType === 'media') {
-      // ── 테스트 계정: AI/이미지 호출 없이 고정 카드 즉시 반환 ──
-      if (isTestAccount(user.email)) {
+      // ── 테스트 모드: 주제를 "test"로 입력하면 AI/이미지 호출 없이 고정 카드 즉시 반환 ──
+      if (body.topic?.trim().toLowerCase() === 'test') {
         const testResult = await generateTestCampaign({
           userId: user.id,
           brandId: brand.id,

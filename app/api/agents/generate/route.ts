@@ -16,7 +16,6 @@ import {
   readOpenAIError,
 } from '../../../../src/lib/ai/diagnostics'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
-import { isTestAccount } from '../../../../lib/auth/test-accounts'
 
 export const runtime = 'nodejs'
 
@@ -522,8 +521,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    // ── 테스트 계정: "test" 입력 시 AI 호출 없이 mock ready 응답 반환 ──
-    if (isTestAccount(user.email) && messages?.length > 0) {
+    // ── 테스트 모드: "test" 입력 시 AI 호출 없이 mock ready 응답 반환 ──
+    if (messages?.length > 0) {
       const lastUserText = [...messages].reverse().find(m => m.role === 'user')?.content?.trim().toLowerCase() ?? ''
       if (lastUserText === 'test') {
         const mockSlides = Array.from({ length: 5 }, (_, i) => ({
