@@ -54,7 +54,17 @@ const FOOD_TRANSLATIONS: Record<string, string> = {
 const TOPIC_STOPWORDS = [
   '카드뉴스', '카드 뉴스', '콘텐츠', '컨텐츠', '본문', '소개', '추천', '효능', '효과', '장점',
   '올바른', '섭취', '가이드', '만들어주세요', '만들어줘', '만들어', '제작', '생성',
+  // 시간/시점 표현 — 핵심 주제가 아니므로 제거 (예: "최근 3일 한국 AI 트렌드" → "최근"이 주제로 잡히는 문제)
+  '최근', '요즘', '근래', '최신', '오늘', '오늘자', '어제', '내일', '이번', '지난', '현재', '지금', '올해', '작년',
+  // 트렌드/주목 수식어 — 주제어가 아님 (예: "요즘 뜨는 다이어트" → "뜨는"이 잡히는 문제)
+  '뜨는', '뜨거운', '핫한', '화제의', '화제', '인기', '주목받는', '주목', '대세',
 ]
+
+// 주제어로 부적절한 일반/지시어 — 더 구체적인 키워드가 있으면 건너뛴다.
+const WEAK_SUBJECT_TOKENS = new Set([
+  '한국', '미국', '중국', '일본', '유럽', '글로벌', '세계', '국내', '해외',
+  '트렌드', '이슈', '동향', '뉴스', '소식', '정보', '근황', '정리', '핵심', '관련',
+])
 
 export async function buildCarouselResearchBrief(input: ResearchInput): Promise<CarouselResearchBrief | null> {
   const subject = extractResearchSubject(input.topic)
@@ -351,15 +361,21 @@ function extractResearchSubject(topic: string) {
   for (const stopword of TOPIC_STOPWORDS) {
     cleaned = cleaned.replaceAll(stopword, ' ')
   }
-  return cleaned
+  const tokens = cleaned
     .replace(/효능\s*과|효과\s*와|장점\s*과|특징\s*과/g, ' ')
     .replace(/\b(?:과|와|및|에|대한|대해)\b/g, ' ')
     .replace(/의\s*(?:과|와)\b/g, ' ')
+    .replace(/\d+\s*(?:일|주|개월|달|년|시간|분)(?=\s|$|[^가-힣])/gu, ' ')   // "3일", "2주" 등 기간 표현 제거 (\b는 한글 뒤에서 동작하지 않음)
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/의$/u, '')
-    .split(/\s+/)[0] || normalized
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (tokens.length === 0) return normalized
+  // 일반/지시어("한국", "트렌드"…)보다 더 구체적인 키워드("AI" 등)를 주제로 우선 선택한다.
+  return tokens.find((t) => !WEAK_SUBJECT_TOKENS.has(t)) || tokens[0]
 }
 
 function inferUserIntent(topic: string, contentType?: string) {
