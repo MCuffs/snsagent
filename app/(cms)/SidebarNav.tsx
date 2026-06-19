@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, LucideIcon } from 'lucide-react'
+import { BookOpen, Film, Grid3X3, LucideIcon, Zap } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
@@ -13,11 +13,13 @@ interface NavItem {
   icon: LucideIcon
   descKey: string
   href: string
+  beta?: boolean
 }
 
 const navItems: NavItem[] = [
   { key: 'concept', label: 'Concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
   { key: 'generate', label: 'Generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
+  { key: 'video', label: '영상 카드뉴스', icon: Film, descKey: 'nav_video_desc', href: '/concept?tab=video', beta: true },
   { key: 'works', label: 'Works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
 ]
 
@@ -86,7 +88,14 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
           >
             <Icon className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="font-medium leading-none">{item.label}</p>
+              <div className="flex items-center gap-1.5 leading-none">
+                <p className="font-medium">{item.label}</p>
+                {item.beta && (
+                  <span className={`rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide ${isActive ? 'bg-white/20 text-white' : 'bg-[#e4e4e7] text-[#71717a]'}`}>
+                    Beta
+                  </span>
+                )}
+              </div>
               <p className={`mt-0.5 text-[11px] ${isActive ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
                 {t(item.descKey as Parameters<typeof t>[0])}
               </p>

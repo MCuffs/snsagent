@@ -157,6 +157,8 @@
     "nav_concept_desc": "브랜드 프로필",
     "nav_generate": "Generate",
     "nav_generate_desc": "카드뉴스 생성",
+    "nav_video": "영상 카드뉴스",
+    "nav_video_desc": "영상 카드뉴스 생성",
     "nav_works": "Works",
     "nav_works_desc": "작업 히스토리",
     "nav_painter": "Artist",

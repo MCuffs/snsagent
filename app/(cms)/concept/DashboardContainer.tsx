@@ -6,6 +6,7 @@ import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
+import VideoCardNewsForm from '../video/VideoCardNewsForm'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
@@ -212,6 +213,16 @@ export default function DashboardContainer({
           />
         </div>
       )}
+
+      <div className={activeTab === 'video' ? 'h-full' : 'hidden'}>
+        <VideoCardNewsForm
+          brand={brandToPass}
+          userId={userId}
+          userEmail={userEmail}
+          userName={userName}
+          isGuest={isGuest}
+        />
+      </div>
 
       <div className={activeTab === 'works' ? 'h-full' : 'hidden'}>
         <WorksGrid

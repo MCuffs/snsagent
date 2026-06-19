@@ -102,3 +102,11 @@ export function isConfiguredNaverApi(clientId: string | undefined, clientSecret:
   return !!(clientId && clientId.trim() && clientId !== 'your-naver-client-id-here'
     && clientSecret && clientSecret.trim() && clientSecret !== 'your-naver-client-secret-here')
 }
+
+export function getSeedanceApiKey() {
+  return process.env.SEEDANCE_API_KEY?.trim() || ''
+}
+
+export function isConfiguredSeedanceKey(apiKey: string | undefined) {
+  return Boolean(apiKey && apiKey.trim().length > 10)
+}
