@@ -135,12 +135,12 @@ export function createTemplatedEditorialDocument(seed: SlideEditorSeed, t: Templ
   const zone = t.textPosition.startsWith('top') ? 'top' : t.textPosition.startsWith('bottom') ? 'bottom' : 'middle'
   const titleY = zone === 'top' ? Math.max(150, padY + 60) : zone === 'middle' ? 470 : 780
   const subtitleY = Math.min(1120, titleY + 210)
-  const titleFs = Math.min(220, Math.max(12, Math.round(t.typography.fontSize)))
-  const bodyFs = Math.max(20, Math.round(titleFs * 0.42))
+  const titleFs = Math.min(220, Math.max(64, Math.round(t.typography.fontSize)))
+  const bodyFs = Math.max(28, Math.round(titleFs * 0.46))
   const titleColor = validColor(t.typography.textColor, '#ffffff')
   const lineHeight = Math.min(2.4, Math.max(0.8, t.typography.lineHeight || 1.12))
   const tracking = Math.min(40, Math.max(-10, t.typography.letterSpacing ?? 0))
-  const fontWeight = Math.min(900, Math.max(100, Math.round(t.typography.fontWeight) || 700))
+  const fontWeight = Math.min(900, Math.max(700, Math.round(t.typography.fontWeight) || 800))
 
   doc.layers = doc.layers.map((layer) => {
     if (layer.type === 'title') {
