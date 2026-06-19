@@ -791,13 +791,40 @@ async function generateMediaSlideCopies(
   })
   const isEnglish = input.language === 'en'
 
+  const KO_SYSTEM_BASE = `카피를 작성하기 전에 먼저 주제의 성격을 분석하고 아래 유형 중 하나를 선택하세요:
+뉴스/시사 | 경제/비즈니스 | AI/테크 | 마케팅 | 건강 | 자기계발 | 소비/트렌드 | 브랜드/제품 | 라이프스타일
+
+선택된 유형에 적합한 서사 구조를 사용하세요. 모든 주제를 동일한 구조로 쓰지 마세요.
+뉴스 앵커처럼 정보를 전달하지 마세요. "보도에 따르면", "발표에 따르면" 같은 번역투는 절대 금지입니다.
+에디토리얼 톤을 유지하면서 날카롭게 쓰세요.
+실시간 뉴스 컨텍스트가 있으면 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요.
+제공된 자료에서 확인할 수 없는 수치는 쓰지 마세요.
+
+좋은 카드뉴스는 정보를 설명하는 것이 아니라, 독자의 이해를 한 단계 앞으로 이동시키는 것이다.
+단순 요약보다 해석을, 해석보다 통찰을 우선하라.
+
+유효한 JSON으로만 응답하세요.`
+
+  const EN_SYSTEM_BASE = `Before writing, analyze the topic and select one content type:
+News/Current Affairs | Economy/Business | AI/Tech | Marketing | Health | Self-Improvement | Consumer/Trends | Brand/Product | Lifestyle
+
+Use a narrative structure appropriate for the selected type. Do not apply the same structure to every topic.
+Do not write like a news anchor. Be sharp and editorial.
+Reflect actual article angles when real-time news context is provided.
+Do not invent unverified claims.
+
+Good card news does not explain information — it moves the reader's understanding one step forward.
+Prioritize interpretation over summary, insight over interpretation.
+
+Return valid JSON only.`
+
   const systemPrompt = isEnglish
     ? (isGeneral
-      ? 'You are an English editorial carousel writer in the style of The Verge, Axios, or Morning Brew. Write punchy, specific, journalist-quality card news copy. Each slide = one sharp insight, not a paragraph. Reflect actual article angles when real-time news context is provided. Talk TO the reader, not AT them. Return valid JSON only.'
-      : 'You are an English Instagram carousel copywriter in the style of Morning Brew or The Hustle. Write native, punchy, editorial social copy. Headline = 4–7 words, one bold thesis. Body = 1–2 complete sentences, specific insight only. Do not invent unverified claims. Return valid JSON only.')
+      ? `You are an English editorial carousel writer in the style of The Verge, Axios, or Morning Brew.\n${EN_SYSTEM_BASE}\nTalk TO the reader, not AT them.`
+      : `You are an English Instagram carousel copywriter in the style of Morning Brew or The Hustle.\n${EN_SYSTEM_BASE}\nHeadline = 4–7 words, one bold thesis. Body = 1–2 complete sentences, specific insight only.`)
     : (isGeneral
-      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 뉴스 앵커처럼 정보를 전달하지 마세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. "보도에 따르면", "발표에 따르면" 같은 번역투는 절대 금지입니다. 실시간 뉴스 컨텍스트가 제공된 경우 반드시 해당 기사들의 실제 앵글·키워드·트렌드를 카피에 반영하세요. 브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요. 유효한 JSON으로만 응답하세요.`
-      : `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다. 상품 설명을 요약하지 말고, 감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요. 에디토리얼 톤을 유지하면서 날카롭게 쓰세요. 실시간 뉴스 컨텍스트가 제공된 경우 해당 뉴스 트렌드를 훅과 첫 슬라이드에 반영하세요. 제공된 자료에서 확인할 수 없는 수치는 쓰지 말고, 유효한 JSON으로만 응답하세요.`)
+      ? `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다.\n${KO_SYSTEM_BASE}\n브랜드 이름이나 브랜드 DNA를 노출하지 말고 오직 뉴스/정보 전달에만 집중하세요.`
+      : `당신은 한국 인스타그램 SNS 에디토리얼 카피라이터입니다. 대학내일, 뉴닉 스타일의 카드뉴스 카피를 씁니다.\n${KO_SYSTEM_BASE}\n감성적 훅·페르소나·서사 흐름을 기반으로 네이티브 한국어 카피를 생성하세요.`)
 
   const languageRule = isEnglish
     ? 'Write every headline, body, caption, and hashtag in natural English only. Do not use Korean in any field.'
@@ -841,6 +868,31 @@ Rules:
 - Use only facts supported by the reference brief.${hasRssContext ? `\n- Use only topic-relevant real-time news angles.` : ''}${researchInstruction}
 - ${languageRule}
 
+[Headline rules]
+- headline must create curiosity for the next slide, not summarize the body.
+  Good headline: specific, creates a question, reveals a tension or argument.
+  Bad headline: abstract, preachy, or repeats the body verbatim.
+
+[Slide quality]
+- Each slide must deliver new value to the reader. At least one of these must be present:
+  new information / new perspective / new cause analysis / new case / new action point
+- Do not restate the previous slide in different words.
+
+[Avoid abstract filler]
+- Avoid phrases like "this is the essence of", "ultimately it's about", "what matters is".
+- Prioritize insight over explanation. Do not repeat what the reader already knows.
+
+[Slide-to-slide flow]
+- Each slide should answer the previous slide's implied question and open the next one.
+- Reading headlines in sequence should feel like a natural progression.
+
+[Pre-output self-check]
+□ Does each slide say something different from the others?
+□ Is abstract language kept to a minimum?
+□ Does each slide offer new information the reader can use?
+□ Do headlines alone form a coherent narrative arc?
+□ Does no slide end with generic textbook explanation?
+
 JSON response format:
 {
   "slides": [
@@ -866,6 +918,31 @@ ${slideDescriptions}
 - 각 슬라이드는 앞 슬라이드와 다른 정보를 말해야 합니다.
 - 확인되지 않은 수치, 순위, 효과는 만들지 마세요.${rssInstruction}${researchInstruction}
 - ${languageRule}
+
+[헤드라인 규칙]
+- headline은 본문 요약이 아닌 독자의 다음 슬라이드 탐색 욕구를 만들어야 합니다.
+  좋은 headline: 구체적이고, 궁금증을 만들고, 논점을 드러낸다.
+  나쁜 headline: 추상적이거나, 교훈적이거나, 본문을 그대로 반복한다.
+
+[슬라이드 품질]
+- 각 슬라이드는 독자에게 새로운 가치를 제공해야 합니다. 다음 중 최소 1개가 반드시 포함되어야 합니다:
+  새로운 정보 / 새로운 관점 / 새로운 원인 분석 / 새로운 사례 / 새로운 행동 포인트
+- 앞 슬라이드의 내용을 다른 표현으로 반복하지 마세요.
+
+[추상어 억제]
+- 다음 표현은 특별한 이유 없이 사용하지 마세요: "~의 본질이다", "~의 문제다", "~의 핵심이다", "결국 ~이다", "중요한 것은 ~이다"
+- 독자가 이미 아는 일반론과 교과서적 정의는 반복하지 마세요. 설명보다 통찰을 우선하세요.
+
+[슬라이드 연결]
+- 각 슬라이드는 이전 슬라이드의 질문에 답하고 다음 슬라이드의 궁금증을 만드는 구조로 작성하세요.
+- headline만 순서대로 읽었을 때 자연스러운 흐름이 느껴져야 합니다.
+
+[출력 전 자기 검수]
+□ 각 슬라이드가 서로 다른 내용을 말하는가
+□ 추상어 비중이 과도하지 않은가
+□ 독자가 얻는 새로운 정보가 있는가
+□ headline만 읽어도 흐름이 이어지는가
+□ 교과서식 설명으로 끝나지 않았는가
 
 JSON 응답 형식:
 {
@@ -1027,6 +1104,9 @@ body: ${slide.body}
 - body는 일반 슬라이드 120~200자, 마무리 슬라이드 100~160자를 권장합니다. 구체적인 정보, 이유, 사례를 2~3문장으로 충분히 서술하세요.
 - 각 body에는 주제의 구체 기준, 이유, 실제 행동 중 최소 2개를 자연스럽게 연결하세요.
 - 영어 기획 토큰이나 내부 계획 용어를 본문에 쓰지 마세요.
+- 각 슬라이드 body는 독자에게 새로운 정보, 관점, 원인 분석, 사례, 행동 포인트 중 하나를 반드시 포함해야 합니다.
+- 추상적 정의형 문장("~의 본질이다", "결국 ~이다", "중요한 것은 ~이다" 등)을 구체적 문장으로 바꾸세요.
+- headline은 본문 요약이 아닌 다음 슬라이드 탐색 욕구를 만들어야 합니다. 구체적이고 논점을 드러내세요.
 
 JSON만 반환:
 {
