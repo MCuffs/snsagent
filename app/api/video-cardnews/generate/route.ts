@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Generate copy for all slides
+    console.log(`[VideoCardNews] Copy generation: topic="${topic}", slides=${slideCount}, lang=${language}`)
     const slides = await generateVideoCardCopy({
       topic,
       slideCount,
@@ -48,7 +49,10 @@ export async function POST(request: NextRequest) {
       language,
     })
 
-    // 2. Generate Seedance videos for all slides in parallel
+    console.log(`[VideoCardNews] Copy ready: ${slides.length} slides`, slides.map(s => `[${s.role}] ${s.headline}`).join(' | '))
+
+    // 2. Generate Seedance videos with concurrency limit + partial failure tolerance
+    console.log(`[VideoCardNews] Video generation start: ${slides.length} slides, ${durationSeconds}s each`)
     const result = await generateVideoCardNews({
       userId: user.id,
       brandId,
@@ -59,10 +63,28 @@ export async function POST(request: NextRequest) {
       durationSeconds,
     })
 
+    const successSlides = result.slides.filter(s => s.videoUrl)
+    const failedSlides = result.slides.filter(s => !s.videoUrl)
+
+    if (successSlides.length === 0) {
+      console.error('[VideoCardNews] All slides failed')
+      return NextResponse.json(
+        { error: '모든 영상 생성에 실패했습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 500 },
+      )
+    }
+
+    if (failedSlides.length > 0) {
+      console.warn(`[VideoCardNews] Partial failures: ${failedSlides.length}/${result.totalSlides} — slides ${failedSlides.map(s => s.slideNumber).join(', ')}`)
+    }
+
+    console.log(`[VideoCardNews] Done: ${successSlides.length}/${result.totalSlides} succeeded`)
+
     return NextResponse.json({
       success: true,
       topic: result.topic,
       totalSlides: result.totalSlides,
+      partialFailures: result.partialFailures,
       slides: result.slides.map(s => ({
         slideNumber: s.slideNumber,
         headline: s.headline,
@@ -70,6 +92,7 @@ export async function POST(request: NextRequest) {
         role: s.role,
         videoUrl: s.videoUrl,
         durationSeconds: s.durationSeconds,
+        error: s.error || null,
       })),
     })
 

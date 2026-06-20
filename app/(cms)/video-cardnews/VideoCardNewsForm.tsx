@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { Loader2, Video, AlertCircle, Send, Clapperboard, ImagePlus, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -18,19 +19,43 @@ interface VideoSlide {
   headline: string
   body: string
   role: string
-  videoUrl: string
+  videoUrl: string | null
   durationSeconds: number
+  error?: string | null
 }
 
 interface VideoCardNewsFormProps {
   brand: Brand
-  hasApiKey: boolean
+  hasApiKey?: boolean
 }
 
 const smoothTransition = { duration: 0.6, ease: [0.19, 1, 0.22, 1] as const }
 
+interface UserChatMessage {
+  id: string
+  content: string
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T | null> {
+  const text = await response.text()
+  if (!text.trim()) return null
+
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    console.warn('[VideoCardNewsForm] Non-JSON response received', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      preview: text.slice(0, 180),
+      error,
+    })
+    return null
+  }
+}
+
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const [topic, setTopic] = useState('')
+  const [userMessages, setUserMessages] = useState<UserChatMessage[]>([])
   const [attachedImages, setAttachedImages] = useState<Array<{ file: File; preview: string }>>([])
   const [isDragging, setIsDragging] = useState(false)
   const [slideCount, setSlideCount] = useState<3 | 5 | 7>(5)
@@ -86,20 +111,29 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [slides, generating, error])
+  }, [slides, generating, error, userMessages])
 
   const handleGenerate = async () => {
     if (!topic.trim() || generating) return
     const currentTopic = topic.trim()
+    flushSync(() => {
+      setUserMessages(prev => [...prev, { id: `${Date.now()}-${prev.length}`, content: currentTopic }])
+    })
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+
     setGenerating(true)
     setError(null)
     setSlides([])
     setStage('copy')
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000) // 4 minutes
+
     try {
       const res = await fetch('/api/video-cardnews/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           topic: currentTopic,
           brandId: brand.id,
@@ -110,11 +144,17 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           language: 'ko',
         }),
       })
+      clearTimeout(timeoutId)
       setStage('video')
-      const data = await res.json() as {
+      const data = await readJsonResponse<{
         success?: boolean
         slides?: VideoSlide[]
         error?: string
+        partialFailures?: number
+      }>(res)
+      if (!data) {
+        setError('생성 중 오류가 발생했습니다.')
+        return
       }
       if (!res.ok || data.error) {
         setError(data.error || '생성 중 오류가 발생했습니다.')
@@ -123,8 +163,21 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       setSlides(data.slides || [])
       setActiveSlide(0)
       setTopic('')
+      
+      if (data.partialFailures && data.partialFailures > 0) {
+        setError(`${data.partialFailures}개 슬라이드 영상 생성에 실패했습니다. 성공한 슬라이드만 표시됩니다.`)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '서버 오류가 발생했습니다.')
+      clearTimeout(timeoutId)
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('요청 시간이 초과되었습니다. 슬라이드 수를 줄이거나 다시 시도해주세요.')
+        } else {
+          setError(err.message)
+        }
+      } else {
+        setError('서버 오류가 발생했습니다.')
+      }
     } finally {
       setGenerating(false)
       setStage(null)
@@ -187,6 +240,24 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             </div>
           </motion.div>
 
+          {/* User messages */}
+          <AnimatePresence initial={false}>
+            {userMessages.map(message => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={smoothTransition}
+                className="flex justify-end"
+              >
+                <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-[#4c6ef5] px-4 py-3 text-sm font-medium leading-6 text-white shadow-sm whitespace-pre-wrap">
+                  {message.content}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
           {/* Generating indicator */}
           {generating && (
             <motion.div
@@ -238,6 +309,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                   </div>
                   <div className="rounded-2xl rounded-tl-sm bg-white/80 border border-[#dde5f5] px-4 py-3 shadow-sm text-sm text-[#2c3e6b] mb-2">
                     영상 {slides.length}개가 완성됐습니다. 우측에서 확인하세요.
+                    {slides.some(s => !s.videoUrl) && (
+                      <p className="text-[11px] text-orange-600 mt-1">
+                        ⚠ 일부 슬라이드 영상 생성 실패
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2 w-full">
                     {slides.map((s, i) => (
@@ -245,15 +321,19 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                         key={s.slideNumber}
                         type="button"
                         onClick={() => setActiveSlide(i)}
+                        disabled={!s.videoUrl}
                         className={`w-full rounded-xl border p-3 text-left text-[11px] transition-all bg-white/70 backdrop-blur-sm ${
                           i === activeSlide
                             ? 'border-[#4c6ef5] shadow-sm'
                             : 'border-[#dde5f5] hover:border-[#a5b4fc]'
-                        }`}
+                        } ${!s.videoUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <Video className="h-3 w-3 text-[#4c6ef5] shrink-0" />
+                          <Video className={`h-3 w-3 shrink-0 ${s.videoUrl ? 'text-[#4c6ef5]' : 'text-gray-400'}`} />
                           <span className="font-bold text-[#1a2a5e] truncate">{s.headline}</span>
+                          {!s.videoUrl && (
+                            <span className="text-[9px] text-red-500 font-semibold ml-auto">실패</span>
+                          )}
                         </div>
                         <p className="text-[#6b7fad] line-clamp-2 leading-4">{s.body}</p>
                       </button>
@@ -402,7 +482,17 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             <p className="text-[10px] text-[#a5b4fc] mt-3">영상 길이 : 슬라이드당 3~5초</p>
           </div>
         ) : current ? (
-          <VideoCardPreview slide={current} />
+          current.videoUrl ? (
+            <VideoCardPreview slide={current} />
+          ) : (
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 border border-red-200">
+                <AlertCircle className="h-7 w-7 text-red-500" />
+              </div>
+              <p className="text-sm font-medium text-red-600">영상 생성 실패</p>
+              <p className="text-[11px] text-[#8899cc] mt-1">{current.error || '다시 시도해주세요'}</p>
+            </div>
+          )
         ) : null}
       </div>
     </div>
@@ -417,6 +507,22 @@ function VideoCardPreview({ slide }: { slide: VideoSlide }) {
     if (!videoRef.current) return
     if (playing) { videoRef.current.pause() } else { void videoRef.current.play() }
     setPlaying(!playing)
+  }
+
+  if (!slide.videoUrl) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative overflow-hidden rounded-2xl shadow-2xl" style={{ width: 270, height: 480 }}>
+          <div className="h-full bg-red-50 flex items-center justify-center">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+              <p className="text-sm font-medium text-red-600">영상 생성 실패</p>
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-[#7c9cf5]">슬라이드 {slide.slideNumber}</p>
+      </div>
+    )
   }
 
   return (
