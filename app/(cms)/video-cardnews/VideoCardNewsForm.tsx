@@ -10,6 +10,7 @@ interface Brand {
   industry: string
   targetAudience: string
   toneOfVoice: string
+  mainColor?: string
 }
 
 interface VideoSlide {

@@ -234,6 +234,7 @@ export default function DashboardContainer({
               industry: brandToPass.industry,
               targetAudience: brandToPass.targetAudience,
               toneOfVoice: brandToPass.toneOfVoice,
+              mainColor: brandToPass.mainColor,
             }}
             hasApiKey={hasVideoApiKey}
           />
