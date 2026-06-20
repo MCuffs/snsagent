@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Loader2, Play, Pause, Send, Video, AlertCircle } from 'lucide-react'
+import { Loader2, Play, Pause, Video, AlertCircle } from 'lucide-react'
 
 interface Brand {
   id: string
@@ -87,13 +87,6 @@ export default function VideoCardNewsForm({ brand, hasApiKey }: VideoCardNewsFor
           <p className="text-[11px] text-[#a1a1aa]">상단 영상 + 하단 텍스트 · 9:16 포맷</p>
         </div>
 
-        {!hasApiKey && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>영상 생성 API 준비 중입니다. BYTEDANCE_API_KEY를 설정하면 바로 사용 가능합니다.</span>
-          </div>
-        )}
-
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-[#52525b]">주제 또는 키워드</label>
@@ -138,7 +131,7 @@ export default function VideoCardNewsForm({ brand, hasApiKey }: VideoCardNewsFor
           <button
             type="button"
             onClick={handleGenerate}
-            disabled={generating || !topic.trim() || !hasApiKey}
+            disabled={generating || !topic.trim()}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {generating ? (
@@ -185,13 +178,20 @@ export default function VideoCardNewsForm({ brand, hasApiKey }: VideoCardNewsFor
         )}
       </div>
 
-      {/* Right: preview */}
-      <div className="flex-1 overflow-y-auto bg-[#111111] flex items-center justify-center p-8">
+      {/* Right: preview — 은은한 하늘색 그라데이션 배경 */}
+      <div
+        className="flex-1 overflow-y-auto flex items-center justify-center p-8"
+        style={{
+          background: 'linear-gradient(135deg, #e8f4fd 0%, #dbeeff 30%, #eef6ff 60%, #f0f8ff 100%)',
+        }}
+      >
         {slides.length === 0 ? (
           <div className="text-center">
-            <Video className="mx-auto h-12 w-12 text-[#333333] mb-3" />
-            <p className="text-sm text-[#555555]">주제를 입력하고 생성 버튼을 누르세요</p>
-            <p className="text-[11px] text-[#444444] mt-1">상단 영상 + 하단 텍스트 · 9:16</p>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/60 shadow-sm backdrop-blur-sm">
+              <Video className="h-8 w-8 text-[#7fb3d3]" />
+            </div>
+            <p className="text-sm font-medium text-[#4a7fa5]">주제를 입력하고 생성 버튼을 누르세요</p>
+            <p className="text-[11px] text-[#7fb3d3] mt-1">상단 영상 + 하단 텍스트 · 9:16</p>
           </div>
         ) : current ? (
           <VideoCardPreview slide={current} />
