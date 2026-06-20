@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Loader2, Video, AlertCircle, Send, Clapperboard } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Loader2, Video, AlertCircle, Send, Clapperboard, ImagePlus, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Brand {
@@ -31,6 +31,8 @@ const smoothTransition = { duration: 0.6, ease: [0.19, 1, 0.22, 1] as const }
 
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const [topic, setTopic] = useState('')
+  const [attachedImages, setAttachedImages] = useState<Array<{ file: File; preview: string }>>([])
+  const [isDragging, setIsDragging] = useState(false)
   const [slideCount, setSlideCount] = useState<3 | 5 | 7>(5)
   const [duration, setDuration] = useState<3 | 5>(5)
   const [generating, setGenerating] = useState(false)
@@ -40,6 +42,47 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const [activeSlide, setActiveSlide] = useState(0)
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropZoneRef = useRef<HTMLDivElement>(null)
+
+  const addImages = useCallback((files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    const newImages = imageFiles.slice(0, 3 - attachedImages.length).map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }))
+    setAttachedImages(prev => [...prev, ...newImages].slice(0, 3))
+  }, [attachedImages.length])
+
+  const removeImage = (index: number) => {
+    setAttachedImages(prev => {
+      URL.revokeObjectURL(prev[index].preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  // Paste handler
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const imageFiles = items
+        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter(Boolean) as File[]
+      if (imageFiles.length > 0) addImages(imageFiles)
+    }
+    window.addEventListener('paste', handler)
+    return () => window.removeEventListener('paste', handler)
+  }, [addImages])
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }
+  const handleDragLeave = () => setIsDragging(false)
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    addImages(e.dataTransfer.files)
+  }
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -225,7 +268,42 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         </div>
 
         {/* Config bar + input */}
-        <div className="shrink-0 border-t border-[#e8edf8] bg-white/60 backdrop-blur-sm px-4 py-3 space-y-2">
+        <div
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`shrink-0 border-t px-4 py-3 space-y-2 transition-colors ${
+            isDragging
+              ? 'border-[#4c6ef5] bg-[#eef4ff]'
+              : 'border-[#e8edf8] bg-white/60 backdrop-blur-sm'
+          }`}
+        >
+          {isDragging && (
+            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#4c6ef5] bg-[#eef4ff] py-3 text-sm font-medium text-[#4c6ef5]">
+              이미지를 여기에 놓으세요
+            </div>
+          )}
+
+          {/* Attached image previews */}
+          {attachedImages.length > 0 && (
+            <div className="flex gap-2">
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#dde5f5]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.preview} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Options row */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-[#8899cc] font-medium">슬라이드</span>
@@ -253,13 +331,31 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
           {/* Input row */}
           <div className="flex items-end gap-2">
+            {/* Image attach button */}
+            <button
+              type="button"
+              disabled={generating || attachedImages.length >= 3}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dde5f5] bg-white/80 text-[#7c9cf5] transition hover:border-[#4c6ef5] hover:text-[#4c6ef5] disabled:opacity-40"
+            >
+              <ImagePlus className="h-4.5 w-4.5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }}
+            />
+
             <textarea
               ref={inputRef}
               rows={2}
               value={topic}
               onChange={e => setTopic(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="주제나 키워드를 입력하세요... (이미지 첨부 권장)"
+              placeholder="주제나 키워드를 입력하세요... (이미지 붙여넣기/드래그 가능)"
               disabled={generating}
               className="flex-1 resize-none rounded-xl border border-[#dde5f5] bg-white/80 px-3.5 py-2.5 text-sm text-[#1a2a5e] placeholder-[#a0aecf] outline-none focus:border-[#4c6ef5] disabled:opacity-50"
             />
