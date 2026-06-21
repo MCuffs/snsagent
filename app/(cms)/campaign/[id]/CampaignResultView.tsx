@@ -314,6 +314,9 @@ export default function CampaignResultView({
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('campaign')
+  // Detect video cardnews campaigns
+  const isVideoCardNews = campaign.imageModel?.includes('seedance') ||
+    campaign.slides.some(s => /\.(mp4|webm|mov)(\?|$)/i.test(s.imageUrl ?? ''))
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [caption, setCaption] = useState(post.caption)
@@ -1019,7 +1022,14 @@ export default function CampaignResultView({
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
+    <div
+      className="mx-auto max-w-[1500px] px-5 py-8 md:px-8"
+      style={isVideoCardNews ? {
+        background: 'linear-gradient(135deg, #ffffff 0%, #f4f8ff 30%, #eaf1ff 65%, #e2ecfe 100%)',
+        minHeight: '100%',
+        borderRadius: '0',
+      } : undefined}
+    >
       {/* 영상 트림 모달 */}
       {pendingVideoFile && (
         <VideoTrimModal
@@ -1057,12 +1067,23 @@ export default function CampaignResultView({
       )}
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="eyebrow">{t('page_eyebrow')}</p>
-          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] text-[#1f1512] md:text-5xl">
+          {isVideoCardNews ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#c0d0f5] bg-[#eef4ff] px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm mb-3">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-[#4c6ef5] animate-pulse" />
+              VIDEO CARD NEWS STUDIO
+            </div>
+          ) : (
+            <p className="eyebrow">{t('page_eyebrow')}</p>
+          )}
+          <h1 className={`mt-2 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] md:text-5xl ${
+            isVideoCardNews ? 'text-[#1a2a5e]' : 'text-[#1f1512]'
+          }`}>
             {campaign.title}
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
-            {t('page_desc')}
+          <p className={`mt-3 max-w-2xl text-sm leading-6 ${isVideoCardNews ? 'text-[#5a6ea8]' : 'text-[#746a62]'}`}>
+            {isVideoCardNews
+              ? 'AI가 생성한 영상 슬라이드를 확인하고, 텍스트를 직접 편집한 뒤 다운로드하세요.'
+              : t('page_desc')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
