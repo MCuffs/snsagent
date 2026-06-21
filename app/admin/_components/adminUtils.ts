@@ -3,8 +3,32 @@ export function formatDate(value?: Date | string | null) {
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(value))
 }
 
-export function formatCurrency(value?: number | null) {
-  return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 }).format(value || 0)
+export function formatCurrency(value?: number | null, currency = 'krw') {
+  return new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: 0,
+  }).format(value || 0)
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  FREE: 'Free',
+  PRO: 'Creator',
+  UNLIMITED: 'Studio',
+  ENTERPRISE: 'Enterprise',
+  AGENCY: 'Enterprise (legacy)',
+  LITE: 'Free (legacy)',
+  STARTER: 'Free (legacy)',
+}
+
+/**
+ * Keep persisted plan codes stable while the product-facing names evolve.
+ * A data migration can replace the legacy codes after every consumer is ready.
+ */
+export function formatPlan(plan?: string | null, includeCode = false) {
+  const code = (plan || 'FREE').toUpperCase()
+  const label = PLAN_LABELS[code] || code
+  return includeCode && label !== code ? `${label} (${code})` : label
 }
 
 export function statusPill(status?: string | null) {

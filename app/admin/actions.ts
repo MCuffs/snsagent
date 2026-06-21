@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import prisma from '../../lib/db'
 import { requireAdminUser } from '../../lib/admin'
+import { cancelSubscription } from '../../lib/polar'
 
 const VALID_PLANS = new Set(['FREE', 'PRO', 'UNLIMITED'])
 const VALID_PAYMENT_STATUSES = new Set(['paid', 'cancelled', 'partial_refund', 'failed'])
@@ -87,6 +88,12 @@ export async function updatePaymentStatusAction(formData: FormData) {
   const internalNote = stringValue(formData, 'internalNote')
   if (!paymentId || !VALID_PAYMENT_STATUSES.has(status)) return
 
+  const payment = await prisma.paymentRecord.findUnique({
+    where: { id: paymentId },
+    select: { provider: true },
+  })
+  if (!payment || payment.provider !== 'manual') return
+
   await prisma.paymentRecord.update({
     where: { id: paymentId },
     data: {
@@ -100,6 +107,43 @@ export async function updatePaymentStatusAction(formData: FormData) {
   await logAdminAction(admin.email, 'payment.status.update', 'payment', paymentId, refundReason || internalNote, { status })
   revalidatePath('/admin')
   revalidatePath('/admin/payments')
+}
+
+export async function revokePolarSubscriptionAction(formData: FormData) {
+  const admin = await requireAdminUser()
+  const userId = stringValue(formData, 'userId')
+  const reason = stringValue(formData, 'reason')
+  if (!userId || !reason) return
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { polarSubscriptionId: true, polarSubscriptionStatus: true, plan: true },
+  })
+  if (!user?.polarSubscriptionId) return
+
+  const subscriptionId = user.polarSubscriptionId
+  try {
+    await cancelSubscription(subscriptionId)
+  } catch (error) {
+    if (!(error instanceof Error && error.message.includes('404'))) throw error
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      polarSubscriptionId: null,
+      polarSubscriptionStatus: 'revoked',
+      plan: 'FREE',
+    },
+  })
+  await logAdminAction(admin.email, 'polar.subscription.revoke', 'user', userId, reason, {
+    subscriptionId,
+    previousStatus: user.polarSubscriptionStatus,
+    previousPlan: user.plan,
+  })
+  revalidatePath('/admin')
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
 }
 
 export async function createManualPaymentRecordAction(formData: FormData) {

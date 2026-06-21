@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import prisma from '../../../lib/db'
 import { AdminPageHeader, EmptyState, Td, Th } from '../_components/AdminShell'
-import { formatDate, statusPill } from '../_components/adminUtils'
+import { formatDate, formatPlan, statusPill } from '../_components/adminUtils'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +21,19 @@ export default async function AdminUsersPage({
       _count: { select: { campaigns: true } },
       campaigns: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
       editLogs: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
-      creditLedger: { select: { amount: true } },
     },
   })
+
+  const creditBalances = users.length
+    ? await prisma.creditLedger.groupBy({
+        by: ['userId'],
+        where: { userId: { in: users.map(user => user.id) } },
+        _sum: { amount: true },
+      })
+    : []
+  const creditBalanceByUserId = new Map(
+    creditBalances.map(entry => [entry.userId, entry._sum.amount || 0]),
+  )
 
   return (
     <>
@@ -58,7 +68,7 @@ export default async function AdminUsersPage({
               </thead>
               <tbody className="divide-y divide-[#f5f5f5]">
                 {users.map(user => {
-                  const creditBalance = user.creditLedger.reduce((sum, item) => sum + item.amount, 0)
+                  const creditBalance = creditBalanceByUserId.get(user.id) || 0
                   const lastActive = maxDate(user.campaigns[0]?.updatedAt, user.editLogs[0]?.createdAt, user.updatedAt)
                   return (
                     <tr key={user.id} className="hover:bg-[#fafafa]">
@@ -69,7 +79,7 @@ export default async function AdminUsersPage({
                         {user.name && <div className="text-xs text-[#aaa]">{user.name}</div>}
                       </Td>
                       <Td className="text-[#888]">{formatDate(user.createdAt)}</Td>
-                      <Td><span className="font-bold">{user.plan}</span></Td>
+                      <Td><span className="font-bold">{formatPlan(user.plan)}</span></Td>
                       <Td className="font-semibold">{creditBalance}</Td>
                       <Td>{user._count.campaigns}건</Td>
                       <Td className="text-[#888]">{formatDate(lastActive)}</Td>

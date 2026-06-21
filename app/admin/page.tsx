@@ -13,29 +13,32 @@ export default async function AdminDashboardPage() {
     totalGenerationsToday,
     failedGenerationsToday,
     paymentsToday,
-    refundCount,
-    activeSubscriptions,
+    refundsToday,
+    activeSubscriptionsByPlan,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: start } } }),
     prisma.campaign.count({ where: { createdAt: { gte: start } } }),
     prisma.campaign.count({ where: { createdAt: { gte: start }, status: 'failed' } }),
     prisma.paymentRecord.aggregate({
-      where: { paidAt: { gte: start }, status: 'paid' },
+      where: { provider: 'polar', paidAt: { gte: start } },
       _sum: { amount: true },
     }),
-    prisma.paymentRecord.count({
-      where: { refundedAt: { gte: start }, status: { in: ['cancelled', 'partial_refund'] } },
+    prisma.paymentRecord.aggregate({
+      where: { provider: 'polar', refundedAt: { gte: start } },
+      _sum: { refundedAmount: true },
+      _count: { _all: true },
     }),
-    prisma.user.count({
-      where: {
-        OR: [
-          { nicepaySubscriptionStatus: 'ACTIVE' },
-          { paypalSubscriptionStatus: 'ACTIVE' },
-        ],
-      },
+    prisma.user.groupBy({
+      by: ['plan'],
+      where: { polarSubscriptionStatus: 'active' },
+      _count: { _all: true },
     }),
   ])
+
+  const activeSubscriptions = activeSubscriptionsByPlan.reduce((sum, row) => sum + row._count._all, 0)
+  const activeCreatorSubscriptions = activeSubscriptionsByPlan.find(row => row.plan === 'PRO')?._count._all || 0
+  const activeStudioSubscriptions = activeSubscriptionsByPlan.find(row => row.plan === 'UNLIMITED')?._count._all || 0
 
   return (
     <>
@@ -44,17 +47,25 @@ export default async function AdminDashboardPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="전체 가입자" value={totalUsers.toLocaleString()} />
         <StatCard label="오늘 신규 가입" value={newUsersToday} />
-        <StatCard label="활성 구독자" value={activeSubscriptions} />
+        <StatCard
+          label="Polar 활성 구독자"
+          value={activeSubscriptions}
+          hint={`Creator ${activeCreatorSubscriptions} · Studio ${activeStudioSubscriptions}`}
+        />
         <StatCard label="오늘 생성 건수" value={totalGenerationsToday} hint={failedGenerationsToday > 0 ? `실패 ${failedGenerationsToday}건` : undefined} />
-        <StatCard label="오늘 결제액" value={formatCurrency(paymentsToday._sum.amount || 0)} />
-        <StatCard label="오늘 환불 건수" value={refundCount} />
+        <StatCard label="오늘 Polar 결제액" value={formatCurrency(paymentsToday._sum.amount || 0)} />
+        <StatCard
+          label="오늘 Polar 환불액"
+          value={formatCurrency(refundsToday._sum.refundedAmount || 0)}
+          hint={`${refundsToday._count._all}건`}
+        />
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-3">
         {[
           { href: '/admin/users', title: '사용자 관리', desc: '플랜 변경, 크레딧 조정, 계정 상태 관리' },
           { href: '/admin/generations', title: '생성 내역', desc: '실패 원인 분석 및 상세 로그 확인' },
-          { href: '/admin/payments', title: '결제 관리', desc: '수동 결제 기록 생성 및 환불 처리' },
+          { href: '/admin/payments', title: '결제 운영 기록', desc: '수동 결제 및 상태 조정 기록 관리' },
         ].map(item => (
           <Link
             key={item.href}

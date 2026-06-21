@@ -255,6 +255,8 @@ model PaymentRecord {
   orderId        String   @unique
   provider       String   @default("manual") // nicepay, toss, paypal, manual
   amount         Int      @default(0)
+  currency       String   @default("krw")
+  refundedAmount Int      @default(0)
   pgTransactionId String?
   status         String   @default("paid") // paid, cancelled, partial_refund, failed
   paidAt         DateTime?
