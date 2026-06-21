@@ -23,6 +23,7 @@ export function AdminPolarSubscriptionActions({
       }}
     >
       <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="returnTo" value={`/admin/users/${userId}`} />
       <p className="break-all rounded-lg bg-[#f7f7f7] px-3 py-2 font-mono text-[11px] text-[#777]">
         {subscriptionId}
       </p>

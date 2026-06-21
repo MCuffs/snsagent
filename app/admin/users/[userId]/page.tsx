@@ -8,15 +8,23 @@ import {
   updateAccountStatusAction,
 } from '../../actions'
 import {
-  AdminPageHeader, EmptyState, Section, Td, Th,
+  AdminFlash, AdminPageHeader, EmptyState, Section, Td, Th,
 } from '../../_components/AdminShell'
 import { btnCls, formatCurrency, formatDate, formatPlan, inputCls, statusPill } from '../../_components/adminUtils'
 import { AdminPolarSubscriptionActions } from './AdminPolarSubscriptionActions'
+import { AdminSubmitButton } from '../../_components/AdminSubmitButton'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminUserDetailPage({ params }: { params: Promise<{ userId: string }> }) {
+export default async function AdminUserDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ userId: string }>
+  searchParams?: Promise<{ message?: string; error?: string }>
+}) {
   const { userId } = await params
+  const feedback = await searchParams
   const [user, creditBalanceResult] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -44,6 +52,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   return (
     <>
       <AdminPageHeader title={user.email} description={`가입일 ${formatDate(user.createdAt)} · 플랜 ${formatPlan(user.plan)}`} />
+      <AdminFlash message={feedback?.message} error={feedback?.error} />
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <div className="space-y-5">
@@ -157,38 +166,42 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <Section title="크레딧 수동 조정">
             <form action={addCreditsAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <input name="amount" placeholder="수량 (예: 10 또는 -3)" className={inputCls} />
               <input name="reason" placeholder="사유" className={inputCls} />
-              <button className={`${btnCls} w-full`}>크레딧 추가</button>
+              <AdminSubmitButton className={`${btnCls} w-full`}>크레딧 반영</AdminSubmitButton>
             </form>
           </Section>
 
           <Section title="플랜 수동 변경">
             <form action={changeUserPlanAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <select name="plan" defaultValue={user.plan} className={inputCls}>
                 {['FREE', 'PRO', 'UNLIMITED'].map(p => <option key={p} value={p}>{formatPlan(p, true)}</option>)}
               </select>
               <input name="reason" placeholder="변경 사유" className={inputCls} />
-              <button className={`${btnCls} w-full`}>플랜 변경</button>
+              <AdminSubmitButton className={`${btnCls} w-full`}>플랜 변경</AdminSubmitButton>
             </form>
           </Section>
 
           <Section title="계정 상태 변경">
             <form action={updateAccountStatusAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <select name="status" defaultValue={accountStatus} className={inputCls}>
                 <option value="active">활성 (active)</option>
                 <option value="blocked">차단 (blocked)</option>
               </select>
               <input name="reason" placeholder="변경 사유" className={inputCls} />
-              <button className={`${btnCls} w-full`}>상태 저장</button>
+              <AdminSubmitButton className={`${btnCls} w-full`}>상태 저장</AdminSubmitButton>
             </form>
           </Section>
 
           <Section title="내부 결제 기록 생성">
             <form action={createManualPaymentRecordAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <input name="orderId" placeholder="주문 ID" className={inputCls} />
               <input name="amount" placeholder="금액 (KRW)" className={inputCls} />
               <input name="pgTransactionId" placeholder="PG 거래 ID" className={inputCls} />
@@ -196,15 +209,16 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 {['paid', 'cancelled', 'partial_refund', 'failed'].map(s => <option key={s}>{s}</option>)}
               </select>
               <input name="internalNote" placeholder="내부 메모" className={inputCls} />
-              <button className={`${btnCls} w-full`}>내부 기록 생성</button>
+              <AdminSubmitButton className={`${btnCls} w-full`} pendingLabel="생성 중…">내부 기록 생성</AdminSubmitButton>
             </form>
           </Section>
 
           <Section title="내부 메모 추가">
             <form action={addAdminNoteAction} className="space-y-2">
               <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <textarea name="content" rows={4} placeholder="운영 메모를 작성하세요." className={`${inputCls} resize-none`} />
-              <button className={`${btnCls} w-full`}>메모 저장</button>
+              <AdminSubmitButton className={`${btnCls} w-full`}>메모 저장</AdminSubmitButton>
             </form>
           </Section>
         </div>

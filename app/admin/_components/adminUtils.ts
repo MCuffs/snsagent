@@ -31,6 +31,24 @@ export function formatPlan(plan?: string | null, includeCode = false) {
   return includeCode && label !== code ? `${label} (${code})` : label
 }
 
+export function parseAdminPage(value?: string) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
+export function parseAdminPageSize(value?: string) {
+  const parsed = Number(value)
+  return [25, 50, 100].includes(parsed) ? parsed : 50
+}
+
+export function dateRange(from?: string, to?: string) {
+  const start = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? new Date(`${from}T00:00:00+09:00`) : undefined
+  const end = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? new Date(`${to}T23:59:59.999+09:00`) : undefined
+  const gte = start && !Number.isNaN(start.getTime()) ? start : undefined
+  const lte = end && !Number.isNaN(end.getTime()) ? end : undefined
+  return gte || lte ? { gte, lte } : undefined
+}
+
 export function statusPill(status?: string | null) {
   const s = (status || '').toLowerCase()
   const color =
