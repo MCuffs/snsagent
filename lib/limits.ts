@@ -80,6 +80,45 @@ export async function checkBrandCountLimit(userId: string, isGeneral = false): P
 }
 
 /**
+ * Checks if user is allowed to generate a new video card news.
+ * FREE: 1 lifetime, PRO: 10/month, UNLIMITED: 25/month
+ */
+export async function checkVideoCardNewsLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'month' | 'lifetime' }> {
+  const user = await dbService.getUser(userId)
+  const plan = normalizePlan(user?.plan || 'FREE')
+
+  if (isSuperUser(user?.email)) {
+    return { allowed: true, current: 0, limit: 999999, period: 'month' }
+  }
+
+  const allCampaigns = await dbService.getCampaigns(userId)
+  const videoCampaigns = allCampaigns.filter(c => (c as { mediaType?: string }).mediaType === 'video')
+
+  if (plan === 'FREE') {
+    const limit = PRICING_PLANS.FREE.monthlyVideoCardLimit  // 1
+    return {
+      allowed: videoCampaigns.length < limit,
+      current: videoCampaigns.length,
+      limit,
+      period: 'lifetime',
+    }
+  }
+
+  const periodStart = getCampaignUsagePeriodStart(plan)
+  const recentVideo = videoCampaigns.filter(
+    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
+  )
+  const limit = PRICING_PLANS[plan].monthlyVideoCardLimit
+
+  return {
+    allowed: recentVideo.length < limit,
+    current: recentVideo.length,
+    limit,
+    period: 'month',
+  }
+}
+
+/**
  * Checks if watermark should be appended to generated images
  */
 export async function hasWatermark(userId: string): Promise<boolean> {

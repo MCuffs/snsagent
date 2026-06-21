@@ -6,6 +6,7 @@ import { dbService } from '../../../../lib/db-service'
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
 import { persistGeneratedVideo } from '../../../../lib/video-storage'
+import { checkVideoCardNewsLimit } from '../../../../lib/limits'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -36,6 +37,18 @@ export async function POST(request: NextRequest) {
       JSON.stringify({ error: '영상 생성 API가 준비되지 않았습니다. 관리자에게 문의하세요.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     )
+  }
+
+  // Quota check
+  const videoUsage = await checkVideoCardNewsLimit(user.id)
+  if (!videoUsage.allowed) {
+    const msg = videoUsage.period === 'lifetime'
+      ? `무료 플랜은 영상 카드뉴스를 ${videoUsage.limit}회만 생성할 수 있습니다. Creator 플랜으로 업그레이드하면 월 ${videoUsage.limit}회 이상 이용 가능합니다.`
+      : `이번 달 영상 카드뉴스 생성 횟수(${videoUsage.limit}회)를 초과했습니다. (${videoUsage.current}/${videoUsage.limit})`
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   let body: {

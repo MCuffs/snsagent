@@ -17,7 +17,7 @@ const plans = [
         period: '',
         desc: PRICING_PLANS.FREE.description,
         cta: '무료로 시작하기',
-        features: ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
+        features: ['최초 2회 카드뉴스 생성', '영상 카드뉴스 1회 체험', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
     },
     {
@@ -29,6 +29,7 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 20회 카드뉴스 생성',
+            '월 10회 영상 카드뉴스 생성',
             '작업 히스토리 90일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
@@ -47,6 +48,7 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 30회 카드뉴스 생성',
+            '월 25회 영상 카드뉴스 생성',
             '작업 히스토리 365일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
@@ -95,6 +97,7 @@ const faqs = [
 
 const compareFeatures = [
     { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
+    { feature: '영상 카드뉴스 생성 수', free: '1회 체험', creator: '월 10회', studio: '월 25회' },
     { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
     { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
