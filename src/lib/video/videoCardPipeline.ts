@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Video card news pipeline
  *
  * Layout: 9:16 vertical (1080×1920)
@@ -8,7 +8,7 @@
 
 import { SeedanceVideoProvider, canUseSeedance } from '../ai/providers/seedanceVideoProvider'
 import { buildCarouselVideoPrompts } from './videoPromptEngine'
-import { getLLMClient, getCopywritingModel } from '../ai/llmClient'
+import { getLLMClient, getLightClient, getCopywritingModel, getQwenModel } from '../ai/llmClient'
 import type { EditorialSlideRole } from '../editorial/editorialDirector'
 
 export interface VideoCardSlideInput {
@@ -140,7 +140,7 @@ export async function generateVideoCardCopy(params: {
   language: 'ko' | 'en'
   researchContext?: string   // injected from carouselResearch + RSS
 }): Promise<VideoCardSlideInput[]> {
-  const client = getLLMClient()
+  const client = getLightClient()
   const { topic, slideCount, language, researchContext } = params
 
   const isKo = language === 'ko'
@@ -191,7 +191,7 @@ Respond with JSON only:
     () => ({
       slides: buildFallbackSlides(slideCount, topic, isKo),
     }),
-    { model: getCopywritingModel(), temperature: 0.4 },
+    { model: getQwenModel(), temperature: 0.4 },
   )
 
   const rawSlides = (result && Array.isArray(result.slides))
@@ -229,3 +229,4 @@ function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text
   return text.slice(0, maxLen - 1).trimEnd() + '…'
 }
+

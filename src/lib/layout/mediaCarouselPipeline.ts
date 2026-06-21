@@ -1,4 +1,4 @@
-import { dbService } from '../../../lib/db-service'
+﻿import { dbService } from '../../../lib/db-service'
 import { type ImageProvider, sanitizeImagePrompt } from '../ai/imageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
@@ -13,7 +13,7 @@ import { selectCardTemplateForContent } from '../../../lib/templates/select'
 import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../../lib/templates/applyToRender'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
-import { getCopywritingModel, getLLMClient } from '../ai/llmClient'
+import { getCopywritingModel, getLLMClient, getLightClient, getQwenModel } from '../ai/llmClient'
 import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
@@ -743,7 +743,7 @@ async function generateMediaSlideCopies(
   knowledgeCtx: ReturnType<typeof buildCopyKnowledgeContext> | undefined,
   domainProfile: DomainProfile
 ): Promise<MediaSlidePlan[]> {
-  const client = getLLMClient()
+  const client = getLightClient()
 
   const slideDescriptions = slides
     .map(s => `슬라이드 ${s.slideNumber} [${s.role}]: ${rolePurpose(s.role)}`)
@@ -864,7 +864,7 @@ JSON 응답 형식:
     prompt,
     () => ({ slides: slides.map(s => ({ slideNumber: s.slideNumber, headline: s.headline, body: s.body })) }),
     {
-      model: getCopywritingModel(),
+      model: getQwenModel(),
       temperature: 0.35,
       systemPrompt,
       diagnostics: {
@@ -946,7 +946,7 @@ async function enforceSemanticMeaning(params: {
   const weakSlideNumbers = new Set(initialReport.issues.filter(issue => issue.severity === 'block').map(issue => issue.slideNumber))
   if (weakSlideNumbers.size === 0) return params.slides
 
-  const client = getLLMClient()
+  const client = getLightClient()
   const weakSlides = params.slides.filter(slide => weakSlideNumbers.has(slide.slideNumber))
   const isEnglish = params.input.language === 'en'
   const reviewPrompt = isEnglish
@@ -1025,7 +1025,7 @@ JSON만 반환:
     reviewPrompt,
     () => ({ slides: [] }),
     {
-      model: getCopywritingModel(),
+      model: getQwenModel(),
       temperature: 0.25,
       systemPrompt: `${params.systemPrompt}\n${isEnglish ? 'You are an English social carousel editorial desk. Judge whether each slide completes a useful meaning and rewrite weak slides. Return JSON only.' : '당신은 의미 완성성을 검수하는 한국 SNS 에디토리얼 데스크입니다. 문장 어미가 아니라 슬라이드가 실제로 하나의 의미를 완성했는지 판단하고 재작성합니다. JSON으로만 응답하세요.'}`,
       diagnostics: {
@@ -1409,7 +1409,7 @@ ${slidesSummary}
 - 전체 4~7줄. 불릿 포인트 없음. 마크다운 없음. 순수 텍스트만.
 - 첫 단어로 주제명이나 카드뉴스 제목을 그대로 쓰지 말 것`
 
-  const client = getLLMClient()
+  const client = getLightClient()
   const systemPrompt = isEn
     ? 'You are a professional Instagram content writer. Write only in natural English. Never use Korean.'
     : '당신은 인스타그램 카드뉴스 전문 카피라이터입니다. 반드시 한국어로만 작성하세요.'
@@ -1419,7 +1419,7 @@ ${slidesSummary}
       prompt + '\n\nRespond with JSON: { "caption": "<the caption text>" }',
       () => ({ caption: fallbackCaption(input, slides, isEn) }),
       {
-        model: getCopywritingModel(),
+        model: getQwenModel(),
         temperature: 0.7,
         systemPrompt,
         diagnostics: {
@@ -1467,3 +1467,4 @@ function tomorrowAt20() {
   date.setHours(20, 0, 0, 0)
   return date
 }
+

@@ -1,4 +1,4 @@
-import { getLLMClient, getTextGenerationModel } from '../ai/llmClient'
+﻿import { getLLMClient, getLightClient, getTextGenerationModel, getQwenModel } from '../ai/llmClient'
 
 export type ContentDomain =
   | 'fashion'
@@ -815,7 +815,7 @@ export async function resolveGenerationDomainProfile(params: {
     return ruleResolution
   }
 
-  const client = getLLMClient()
+  const client = getLightClient()
   const allowedDomains: ContentDomain[] = [
     'fashion',
     'food',
@@ -859,7 +859,7 @@ export async function resolveGenerationDomainProfile(params: {
     ].join('\n'),
     fallback,
     {
-      model: getTextGenerationModel(),
+      model: getQwenModel(),
       temperature: 0,
       systemPrompt: 'You classify content domains for a carousel generation pipeline. Return compact valid JSON only.',
       diagnostics: {
@@ -935,3 +935,4 @@ export function formatDomainVisualGuidance(profile: DomainProfile): string {
     `Avoid: ${profile.imageExclusions.join(', ')}.`,
   ].join(' ')
 }
+
