@@ -6,7 +6,7 @@
  *   GET   https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations/{id}  (poll until succeeded)
  */
 
-const DEFAULT_ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3'
+const DEFAULT_ARK_BASE = 'https://ark.cn-beijing.volces.com/api/v3'
 const ARK_BASE = normalizeBaseUrl(
   process.env.BYTEDANCE_BASE_URL ||
   process.env.ARK_BASE_URL ||
