@@ -151,8 +151,8 @@ export class QwenLLMClient implements LLMClient {
           { role: 'user', content: prompt },
         ],
         response_format: { type: 'json_object' },
-        // Disable Qwen3 extended thinking for JSON tasks — saves tokens, faster
-        ...({ extra_body: { enable_thinking: false } } as object),
+        // enable_thinking: false must be at root level (not extra_body) per Alibaba MaaS API
+        ...({ enable_thinking: false } as object),
         temperature: options?.temperature ?? 0.7,
       })
 
