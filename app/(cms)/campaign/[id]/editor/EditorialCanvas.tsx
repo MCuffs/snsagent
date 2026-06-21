@@ -402,7 +402,9 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
   const background = document.layers.find(layer => layer.type === 'background')
   const backgroundFailed = Boolean(background?.imageUrl && failedBackgroundUrl === background.imageUrl)
-  const showingRenderedPreview = Boolean(fallbackImageUrl && (!background?.imageUrl || backgroundFailed))
+  // Video slides: background.videoUrl is set, imageUrl is null — never fall back to rendered preview
+  const isVideoBackground = Boolean(background?.videoUrl)
+  const showingRenderedPreview = !isVideoBackground && Boolean(fallbackImageUrl && (!background?.imageUrl || backgroundFailed))
   const backgroundSource = showingRenderedPreview ? fallbackImageUrl : background?.imageUrl
   const overlay = document.overlay
   const elements = showingRenderedPreview

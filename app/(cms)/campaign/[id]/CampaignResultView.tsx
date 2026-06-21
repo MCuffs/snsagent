@@ -214,8 +214,14 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
           )
       )}
       {(!background?.imageUrl && !background?.videoUrl && fallbackImageUrl) && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        /\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl) ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video src={fallbackImageUrl} autoPlay loop muted playsInline
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        )
       )}
       <div
         className="pointer-events-none absolute inset-0"
