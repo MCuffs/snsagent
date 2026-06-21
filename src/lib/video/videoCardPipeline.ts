@@ -138,15 +138,22 @@ export async function generateVideoCardCopy(params: {
   slideCount: number
   brandTone?: string
   language: 'ko' | 'en'
+  researchContext?: string   // injected from carouselResearch + RSS
 }): Promise<VideoCardSlideInput[]> {
   const client = getLLMClient()
-  const { topic, slideCount, language } = params
+  const { topic, slideCount, language, researchContext } = params
 
   const isKo = language === 'ko'
 
+  const researchBlock = researchContext
+    ? (isKo
+      ? `\n참고 자료 (최신 뉴스 및 리서치):\n${researchContext.slice(0, 2000)}\n`
+      : `\nReference material (latest news & research):\n${researchContext.slice(0, 2000)}\n`)
+    : ''
+
   const prompt = isKo
     ? `당신은 인스타그램 영상 카드뉴스 카피라이터입니다.
-주제: "${topic}"
+주제: "${topic}"${researchBlock}
 슬라이드 수: ${slideCount}장
 
 각 슬라이드에 어울리는 짧고 강렬한 카피를 작성하세요.

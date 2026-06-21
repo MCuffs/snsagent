@@ -195,7 +195,9 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
         if (eventName === 'stage') {
           const stage = data.stage as string
-          if (stage === 'saving') {
+          if (stage === 'research') {
+            updateActiveMsg(m => ({ ...m, stageLabel: '✦ 최신 뉴스와 트렌드를 수집하는 중...' }))
+          } else if (stage === 'saving') {
             updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.saving }))
           } else if (stage === 'video') {
             updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.video_start }))
@@ -344,24 +346,26 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   return (
     <div
-      className="flex h-full flex-col"
+      className="flex h-full overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #ffffff 0%, #f8faff 30%, #eef4ff 65%, #e8f0fe 100%)' }}
     >
-      {/* Header */}
-      <div className="shrink-0 border-b border-[#e8edf8] bg-white/70 backdrop-blur-md px-5 py-3.5 flex items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#dde5f5] bg-white px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm">
-          <Clapperboard className="h-3.5 w-3.5" />
-          영상 카드뉴스
-          <span className="rounded-full bg-[#4c6ef5] px-1.5 py-0.5 text-[9px] font-black text-white tracking-wide">BETA</span>
+      {/* Left: Chat */}
+      <div className="flex min-w-0 flex-1 flex-col border-r border-[#e8edf8]">
+        {/* Header */}
+        <div className="shrink-0 border-b border-[#e8edf8] bg-white/70 backdrop-blur-md px-5 py-3.5 flex items-center justify-between gap-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#dde5f5] bg-white px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm">
+            <Clapperboard className="h-3.5 w-3.5" />
+            영상 카드뉴스
+            <span className="rounded-full bg-[#4c6ef5] px-1.5 py-0.5 text-[9px] font-black text-white tracking-wide">BETA</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-[#dde5f5] bg-[#f0f5ff] px-3 py-1.5 text-xs font-bold text-[#4c6ef5]">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: brand.mainColor || '#4c6ef5' }} />
+            {brand.name}
+          </div>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-xl border border-[#dde5f5] bg-[#f0f5ff] px-3 py-1.5 text-xs font-bold text-[#4c6ef5]">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: brand.mainColor || '#4c6ef5' }} />
-          {brand.name}
-        </div>
-      </div>
 
-      {/* Chat */}
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
+        {/* Chat */}
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
         {/* Greeting */}
         <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
           <div className="flex flex-col gap-2.5 items-start max-w-md">
@@ -471,6 +475,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           </button>
         </div>
       </div>
+      {/* End left panel */}
+      </div>
+
+      {/* Right: Script panel */}
+      <ScriptPanel aiMessages={aiMessages} />
     </div>
   )
 }
@@ -617,6 +626,114 @@ function SlideProgressRow({ sp }: { sp: SlideProgress }) {
           animate={{ width: barWidth }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
         />
+      </div>
+    </div>
+  )
+}
+
+// ── Script panel (right side) ────────────────────────────────────
+
+const ROLE_LABEL: Record<string, string> = {
+  hook: 'HOOK',
+  context: 'CONTEXT',
+  'key-point': 'KEY POINT',
+  detail: 'DETAIL',
+  stat: 'STAT',
+  summary: 'SUMMARY',
+  'save-cta': 'CTA',
+}
+
+function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
+  // Get the latest progress from the most recent AI message
+  const latest = aiMessages[aiMessages.length - 1]
+  const slideProgress = latest?.slideProgress ?? []
+  const resultSlides = latest?.slides
+
+  return (
+    <div className="hidden w-[340px] shrink-0 flex-col xl:flex" style={{
+      background: 'linear-gradient(160deg, #f8faff 0%, #eef4ff 60%, #e4edfe 100%)',
+      borderLeft: '1px solid #e8edf8',
+    }}>
+      {/* Panel header */}
+      <div className="shrink-0 border-b border-[#e8edf8] bg-white/60 backdrop-blur-md px-5 py-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7c9cf5] mb-1 flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3" /> 슬라이드 스크립트
+        </p>
+        <p className="text-sm font-bold text-[#1a2a5e]">AI 기획 내용</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3">
+        <AnimatePresence initial={false}>
+          {slideProgress.length === 0 && !resultSlides && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center h-48 text-center gap-3"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 border border-[#dde5f5] shadow-sm">
+                <Film className="h-5 w-5 text-[#a5b4fc]" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#4c6ef5]">스크립트 미리보기</p>
+                <p className="text-[11px] text-[#8899cc] mt-1">주제를 입력하면<br />슬라이드별 스크립트가 여기 나타납니다</p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* During generation: show slide progress as script cards */}
+          {slideProgress.length > 0 && !resultSlides && slideProgress.map((sp, i) => (
+            <motion.div
+              key={`sp-${sp.slideNumber}`}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.04 }}
+              className={`rounded-2xl border p-3.5 transition-all ${
+                sp.status === 'done' ? 'bg-emerald-50/60 border-emerald-100' :
+                sp.status === 'generating' ? 'bg-white border-[#4c6ef5] shadow-sm' :
+                sp.status === 'error' ? 'bg-red-50/60 border-red-100' :
+                'bg-white/60 border-[#e8edf8]'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#4c6ef5]/10 text-[10px] font-black text-[#4c6ef5]">
+                  {sp.slideNumber}
+                </span>
+                {sp.status === 'generating' && <Loader2 className="h-3 w-3 text-[#4c6ef5] animate-spin ml-auto" />}
+                {sp.status === 'done' && <Check className="h-3 w-3 text-emerald-500 ml-auto" />}
+                {sp.status === 'error' && <AlertCircle className="h-3 w-3 text-red-400 ml-auto" />}
+              </div>
+              <div className="text-[11px] text-[#8899cc]">
+                {sp.status === 'waiting' && '영상 생성 대기 중'}
+                {sp.status === 'generating' && `렌더링 중${sp.elapsed ? ` (${sp.elapsed}초)` : '...'}`}
+                {sp.status === 'done' && '영상 완성'}
+                {sp.status === 'error' && <span className="text-red-400 text-[10px]">{sp.error}</span>}
+              </div>
+            </motion.div>
+          ))}
+
+          {/* After completion: show full script */}
+          {resultSlides && resultSlides.map((slide, i) => (
+            <motion.div
+              key={`slide-${slide.slideNumber}`}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.06 }}
+              className={`rounded-2xl border p-3.5 ${slide.videoUrl ? 'bg-white/80 border-[#dde5f5]' : 'bg-red-50/60 border-red-100 opacity-60'}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#4c6ef5] text-[9px] font-black text-white">
+                  {slide.slideNumber}
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#4c6ef5] bg-[#eef4ff] rounded-full px-2 py-0.5">
+                  {ROLE_LABEL[slide.role] ?? slide.role}
+                </span>
+                {slide.videoUrl
+                  ? <Check className="h-3 w-3 text-emerald-500 ml-auto" />
+                  : <AlertCircle className="h-3 w-3 text-red-400 ml-auto" />}
+              </div>
+              <p className="text-[12px] font-bold text-[#1a2a5e] leading-5 mb-1">{slide.headline}</p>
+              <p className="text-[11px] text-[#5a6ea8] leading-relaxed">{slide.body}</p>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   )

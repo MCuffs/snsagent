@@ -3,6 +3,8 @@ import { getSessionUser } from '../../../actions'
 import { generateVideoCardCopy, generateVideoCardNews } from '../../../../src/lib/video/videoCardPipeline'
 import { canUseSeedance } from '../../../../src/lib/ai/providers/seedanceVideoProvider'
 import { dbService } from '../../../../lib/db-service'
+import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
+import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -77,7 +79,48 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Stage 1: Copy generation
+        // Stage 1: Research & RSS context gathering
+        sse(controller, 'stage', { stage: 'research', message: '최신 뉴스와 정보를 수집하는 중...' })
+
+        let researchContext = ''
+        try {
+          const researchBrief = await buildCarouselResearchBrief({
+            topic,
+            category: body.domainLabel,
+            keyContent: topic,
+            slideCount,
+            language,
+          })
+          researchContext = formatResearchBriefForPrompt(researchBrief, language)
+          if (researchContext) {
+            console.log(`[VideoCardNews:Research] ${researchBrief?.verifiedFacts.length ?? 0} facts, ${researchBrief?.sources.length ?? 0} sources for "${topic}"`)
+          }
+        } catch (err) {
+          console.warn('[VideoCardNews:Research] Research brief failed, continuing without it:', err)
+        }
+
+        // RSS fallback if research returned nothing
+        if (!researchContext) {
+          try {
+            const keywords = extractGenerationKeywords(topic, [body.domainLabel || ''])
+            const rssResult = await fetchRssForGeneration({
+              category: inferRssCategory(topic, body.domainLabel || 'information'),
+              keywords,
+              topic,
+              limit: 5,
+              language,
+            })
+            const rssCtx = buildRssContext(rssResult, language)
+            if (rssCtx) {
+              researchContext = rssCtx
+              console.log(`[VideoCardNews:RSS] Injected ${rssResult.articles.length} articles for "${topic}"`)
+            }
+          } catch (err) {
+            console.warn('[VideoCardNews:RSS] RSS fetch failed, continuing without it:', err)
+          }
+        }
+
+        // Stage 2: Copy generation
         sse(controller, 'stage', { stage: 'copy', message: '슬라이드 카피 기획 중...' })
 
         let slides: Awaited<ReturnType<typeof generateVideoCardCopy>>
@@ -87,6 +130,7 @@ export async function POST(request: NextRequest) {
             slideCount,
             brandTone: body.brandTone,
             language,
+            researchContext: researchContext || undefined,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
