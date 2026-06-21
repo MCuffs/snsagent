@@ -68,15 +68,13 @@ export class SeedanceVideoProvider {
     aspectRatio: string
     resolution: string
   }) {
-    // ByteDance Ark API accepts prompt in "content" array format
+    // ByteDance Ark Seedance API — flat top-level fields (not nested under "parameters")
     return {
       model: SEEDANCE_MODEL,
       content: [{ type: 'text', text: params.prompt }],
-      parameters: {
-        duration: params.duration,
-        resolution: params.resolution,
-        aspect_ratio: params.aspectRatio,
-      },
+      duration: params.duration,
+      resolution: params.resolution,
+      aspect_ratio: params.aspectRatio,
     }
   }
 
@@ -128,8 +126,8 @@ export class SeedanceVideoProvider {
       try {
         data = JSON.parse(text)
       } catch {
-        lastError = new Error(`Seedance submit returned invalid JSON (${res.status}): ${text.slice(0, 200)}`)
-        console.warn(`[Seedance] submit bad JSON attempt ${attempt + 1}`)
+        lastError = new Error(`Seedance submit returned invalid JSON (${res.status}), content-type=${res.headers.get('content-type')}: ${text.slice(0, 300)}`)
+        console.warn(`[Seedance] submit bad JSON attempt ${attempt + 1}, full response:`, text.slice(0, 500))
         continue
       }
 
