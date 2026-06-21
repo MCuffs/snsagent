@@ -247,6 +247,7 @@ export async function POST(request: NextRequest) {
             slideCount: durableSlides.length,
             imageModel: 'seedance-1-5-pro-251215',
             initialImageCount: successSlides.length,
+            mediaType: 'video',
           },
           durableSlides.map(s => ({
             slideNumber: s.slideNumber,

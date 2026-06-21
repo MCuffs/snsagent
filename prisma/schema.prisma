@@ -112,6 +112,7 @@ model Campaign {
   initialImageCount          Int               @default(0)
   regenerationImageCount     Int               @default(0)
   lastRegenerationImageModel String?
+  mediaType                  String?           @default("image") // "image" | "video"
   createdAt                  DateTime          @default(now())
   updatedAt                  DateTime          @updatedAt
   slides                     CarouselSlide[]

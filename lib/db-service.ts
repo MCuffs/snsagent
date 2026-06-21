@@ -986,6 +986,7 @@ export const dbService = {
       agentReport?: string | null
       imageModel?: string | null
       initialImageCount?: number
+      mediaType?: string | null
     },
     slides: {
       slideNumber: number
