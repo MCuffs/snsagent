@@ -166,6 +166,7 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
   const background = document.layers.find(layer => layer.type === 'background')
   const overlayLayer = document.layers.find(layer => layer.type === 'overlay')
   const overlay = document.overlay
+  const isVideoBackground = Boolean(background?.videoUrl)
   const layers = document.layers
     .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
     .sort((a, b) => a.zIndex - b.zIndex)
@@ -175,32 +176,36 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
       {background?.visible && (
         background.videoUrl
           ? (
-            <video
-              key={background.videoUrl}
-              src={background.videoUrl}
-              autoPlay
-              muted
-              playsInline
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-              style={{
-                opacity: background.opacity / 100,
-                filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
-                transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
-                transformOrigin: '0 0',
-              }}
-              onLoadedMetadata={e => {
-                const v = e.currentTarget
-                const start = background.videoStartSec ?? 0
-                v.currentTime = start
-                v.play().catch(() => null)
-              }}
-              onTimeUpdate={e => {
-                const v = e.currentTarget
-                const start = background.videoStartSec ?? 0
-                const dur = background.videoDurationSec ?? 3
-                if (v.currentTime >= start + dur) v.currentTime = start
-              }}
-            />
+            // Video cardnews: clip video to top half only
+            <div className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden" style={{ height: '50%' }}>
+              <video
+                key={background.videoUrl}
+                src={background.videoUrl}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+                style={{
+                  opacity: background.opacity / 100,
+                  filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
+                }}
+                onLoadedMetadata={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  v.currentTime = start
+                  v.play().catch(() => null)
+                }}
+                onTimeUpdate={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  const dur = background.videoDurationSec ?? 3
+                  if (v.currentTime >= start + dur) v.currentTime = start
+                }}
+              />
+              {/* Gradient fade bottom of video → black */}
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0"
+                style={{ height: '60%', background: 'linear-gradient(to bottom, transparent 0%, rgba(5,5,8,0.55) 55%, #050508 100%)' }} />
+            </div>
           )
           : background.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -226,14 +231,21 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
           <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
         )
       )}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          opacity: (overlayLayer?.opacity ?? 100) / 100,
-          background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
-          mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
-        }}
-      />
+      {/* Video cardnews: solid black bottom half */}
+      {isVideoBackground && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0" style={{ height: '50%', background: '#050508' }} />
+      )}
+      {/* Standard overlay (skip for video cardnews — video has its own gradient) */}
+      {!isVideoBackground && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            opacity: (overlayLayer?.opacity ?? 100) / 100,
+            background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
+            mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
+          }}
+        />
+      )}
       {layers.map(layer => (
         <div
           key={layer.id}

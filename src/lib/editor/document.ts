@@ -34,6 +34,11 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
   const backgroundImageUrl = resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
   // Video cardnews: use mp4 URL as background video layer
   const backgroundVideoUrl = seed.videoUrl ?? undefined
+  // Video layout: text in bottom half (y > 675 of 1350px canvas)
+  const isVideo = Boolean(backgroundVideoUrl)
+  const titleY = isVideo ? 730 : 780
+  const subtitleY = isVideo ? 920 : 990
+  const ctaY = isVideo ? 1255 : 1265
 
   return {
     version: 1,
@@ -55,7 +60,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       colorFilter: '#17121f',
     },
     layers: [
-      layer('background', '배경 영상', 0, {
+      layer('background', isVideo ? '배경 영상' : '배경 이미지', 0, {
         imageUrl: backgroundVideoUrl ? null : backgroundImageUrl,
         videoUrl: backgroundVideoUrl,
         videoThumbnailUrl: seed.videoThumbnailUrl ?? null,
@@ -80,25 +85,25 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       layer('title', '타이틀', 40, {
         text: seed.headline,
         x: 72,
-        y: 780,
+        y: titleY,
         width: 910,
         height: 200,
         fontPreset,
-        fontSize: seed.headlineFontSize || 66,
+        fontSize: seed.headlineFontSize || (isVideo ? 60 : 66),
         fontWeight: 800,
         lineHeight: 1.08,
         tracking: -1,
         color: textColor,
-        shadow: 18,
+        shadow: isVideo ? 0 : 18,
       }),
       layer('subtitle', '본문', 50, {
         text: safeSubtitleText(seed.headline, seed.body),
         x: 72,
-        y: 990,
+        y: subtitleY,
         width: 820,
         height: 200,
         fontPreset,
-        fontSize: seed.bodyFontSize || 26,
+        fontSize: seed.bodyFontSize || (isVideo ? 24 : 26),
         fontWeight: 450,
         lineHeight: 1.36,
         tracking: 0,
@@ -108,7 +113,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       layer('cta', 'CTA', 60, {
         text: 'SWIPE  ->',
         x: 72,
-        y: 1265,
+        y: ctaY,
         width: 320,
         height: 38,
         fontPreset: 'pretendard',

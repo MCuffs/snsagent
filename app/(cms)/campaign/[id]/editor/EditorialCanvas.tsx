@@ -431,36 +431,48 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
         {background?.visible && (
           background.videoUrl
             ? (
-              <video
-                key={background.videoUrl}
-                src={background.videoUrl}
-                autoPlay
-                muted
-                playsInline
-                className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
-                style={{
-                  opacity: background.opacity / 100,
-                  filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
-                  transform: `translate(${(background.x ?? 0) * SCALE}px, ${(background.y ?? 0) * SCALE}px) scale(${background.scale ?? 1})`,
-                  transformOrigin: '0 0',
-                }}
-                onLoadedMetadata={e => {
-                  setFailedVideoUrl(null)
-                  const v = e.currentTarget
-                  const start = background.videoStartSec ?? 0
-                  v.currentTime = start
-                  v.play().catch(() => null)
-                }}
-                onTimeUpdate={e => {
-                  const v = e.currentTarget
-                  const start = background.videoStartSec ?? 0
-                  const dur = background.videoDurationSec ?? 3
-                  if (v.currentTime >= start + dur) {
+              // Video cardnews: clip video to top half only
+              <div
+                className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden"
+                style={{ height: '50%' }}
+              >
+                <video
+                  key={background.videoUrl}
+                  src={background.videoUrl}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full select-none object-cover"
+                  style={{
+                    opacity: background.opacity / 100,
+                    filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,
+                  }}
+                  onLoadedMetadata={e => {
+                    setFailedVideoUrl(null)
+                    const v = e.currentTarget
+                    const start = background.videoStartSec ?? 0
                     v.currentTime = start
-                  }
-                }}
-                onError={() => setFailedVideoUrl(background.videoUrl || null)}
-              />
+                    v.play().catch(() => null)
+                  }}
+                  onTimeUpdate={e => {
+                    const v = e.currentTarget
+                    const start = background.videoStartSec ?? 0
+                    const dur = background.videoDurationSec ?? 3
+                    if (v.currentTime >= start + dur) {
+                      v.currentTime = start
+                    }
+                  }}
+                  onError={() => setFailedVideoUrl(background.videoUrl || null)}
+                />
+                {/* Gradient fade at bottom of video → black panel */}
+                <div
+                  className="pointer-events-none absolute bottom-0 left-0 right-0"
+                  style={{
+                    height: '60%',
+                    background: 'linear-gradient(to bottom, transparent 0%, rgba(5,5,8,0.55) 55%, #050508 100%)',
+                  }}
+                />
+              </div>
             )
             : backgroundSource && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -479,12 +491,19 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
               />
             )
         )}
+        {/* Video cardnews: solid black bottom half panel */}
+        {isVideoBackground && (
+          <div
+            className="pointer-events-none absolute bottom-0 left-0 right-0"
+            style={{ height: '50%', background: '#050508' }}
+          />
+        )}
         {background?.videoUrl && failedVideoUrl === background.videoUrl && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#111318] px-8 text-center text-sm font-bold text-red-300">
             영상을 불러오지 못했습니다. 원본 URL 만료 또는 저장소 접근 설정을 확인해 주세요.
           </div>
         )}
-        {!showingRenderedPreview && (
+        {!showingRenderedPreview && !isVideoBackground && (
           <div
             className="pointer-events-none absolute inset-0"
             style={{
