@@ -74,17 +74,14 @@ export class SeedanceVideoProvider {
     aspectRatio: string
     resolution: string
   }) {
-    // BytePlus Seedance: duration and camerafixed are inlined into the prompt text
-    // as CLI-style flags, not separate API fields.
-    // Ref: official BytePlus sample code
-    const promptWithFlags = `${params.prompt}  --duration ${params.duration} --camerafixed false`
-
+    // seedance-1-5-pro-251215 does not support --duration flag in prompt text.
+    // Send prompt as-is; model uses its default duration.
     return {
       model: SEEDANCE_MODEL,
       content: [
         {
           type: 'text',
-          text: promptWithFlags,
+          text: params.prompt,
         },
       ],
     }
