@@ -4,11 +4,6 @@
  * Layout: 9:16 vertical (1080×1920)
  *   - Top half (1080×960):  Seedance video (3–5 sec loop)
  *   - Bottom half (1080×960): Black background + headline + body text
- *
- * Each slide = one .mp4 file with text baked in on the bottom half via
- * server-side canvas rendering (node-canvas) over the video frames.
- * If canvas is unavailable, returns the raw video URL + a JSON descriptor
- * so the client can composite locally.
  */
 
 import { SeedanceVideoProvider, canUseSeedance } from '../ai/providers/seedanceVideoProvider'
@@ -31,7 +26,15 @@ export interface VideoCardPipelineInput {
   domainLabel?: string
   brandTone?: string
   durationSeconds?: 3 | 5
+  onProgress?: (event: VideoCardProgressEvent) => void
 }
+
+export type VideoCardProgressEvent =
+  | { type: 'copy_done'; slides: Array<{ slideNumber: number; role: string; headline: string }> }
+  | { type: 'video_start'; slideNumber: number; total: number }
+  | { type: 'video_polling'; slideNumber: number; elapsed: number }
+  | { type: 'video_done'; slideNumber: number }
+  | { type: 'video_error'; slideNumber: number; error: string }
 
 export interface VideoCardSlideResult {
   slideNumber: number
@@ -51,7 +54,6 @@ export interface VideoCardPipelineResult {
   partialFailures: number
 }
 
-const VIDEO_CONCURRENCY = 3
 const HEADLINE_MAX_KO = 20
 const HEADLINE_MAX_EN = 30
 const BODY_MAX_KO = 100
@@ -66,8 +68,8 @@ export async function generateVideoCardNews(
 
   const provider = new SeedanceVideoProvider()
   const duration = input.durationSeconds ?? 5
+  const onProgress = input.onProgress
 
-  // Build cinematic prompts for all slides (with coherence anchoring)
   const prompts = buildCarouselVideoPrompts(
     input.slides,
     input.topic,
@@ -75,18 +77,20 @@ export async function generateVideoCardNews(
     input.brandTone,
   )
 
-  // Generate videos with concurrency limit to avoid rate limiting
-  const results: VideoCardSlideResult[] = []
-
-  const generateOne = async (slide: VideoCardSlideInput, index: number) => {
+  const generateOne = async (slide: VideoCardSlideInput, index: number): Promise<VideoCardSlideResult> => {
     const { prompt } = prompts[index]
+    onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
+
     try {
-      const videoResult = await provider.generateVideo({
-        prompt,
-        duration,
-        aspectRatio: '9:16',
-        resolution: '720p',
-      })
+      const videoResult = await provider.generateVideo(
+        { prompt, duration, aspectRatio: '9:16', resolution: '720p' },
+        (event) => {
+          if (event.type === 'poll') {
+            onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed: event.elapsed })
+          }
+        },
+      )
+      onProgress?.({ type: 'video_done', slideNumber: slide.slideNumber })
       return {
         slideNumber: slide.slideNumber,
         headline: slide.headline,
@@ -95,10 +99,11 @@ export async function generateVideoCardNews(
         videoUrl: videoResult.videoUrl,
         videoPrompt: prompt,
         durationSeconds: videoResult.durationSeconds,
-      } satisfies VideoCardSlideResult
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown video generation error'
-      console.error(`[VideoCardPipeline] Slide ${slide.slideNumber} video failed:`, msg)
+      console.error(`[VideoCardPipeline] Slide ${slide.slideNumber} failed:`, msg)
+      onProgress?.({ type: 'video_error', slideNumber: slide.slideNumber, error: msg })
       return {
         slideNumber: slide.slideNumber,
         headline: slide.headline,
@@ -108,18 +113,14 @@ export async function generateVideoCardNews(
         videoPrompt: prompt,
         durationSeconds: duration,
         error: msg,
-      } satisfies VideoCardSlideResult
+      }
     }
   }
 
-  // Run with concurrency limit
-  for (let i = 0; i < input.slides.length; i += VIDEO_CONCURRENCY) {
-    const batch = input.slides.slice(i, i + VIDEO_CONCURRENCY)
-    const batchResults = await Promise.all(
-      batch.map((slide, j) => generateOne(slide, i + j)),
-    )
-    results.push(...batchResults)
-  }
+  // All slides in parallel — each has its own 270s timeout
+  const results = await Promise.all(
+    input.slides.map((slide, index) => generateOne(slide, index)),
+  )
 
   const partialFailures = results.filter(r => !r.videoUrl).length
 

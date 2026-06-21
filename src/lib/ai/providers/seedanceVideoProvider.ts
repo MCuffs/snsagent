@@ -2,8 +2,8 @@
  * ByteDance Volcano Ark — Seedance video generation provider
  *
  * API flow:
- *   POST  https://ark.cn-beijing.volces.com/api/v3/videos/generations
- *   GET   https://ark.cn-beijing.volces.com/api/v3/videos/generations/{id}  (poll until succeeded)
+ *   POST  https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations
+ *   GET   https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations/{id}  (poll until succeeded)
  */
 
 const DEFAULT_ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3'
@@ -19,7 +19,6 @@ export interface SeedanceVideoOptions {
   duration?: 3 | 5          // seconds
   aspectRatio?: '9:16' | '16:9' | '1:1'
   resolution?: '480p' | '720p' | '1080p'
-  cameraFixed?: boolean      // lock camera — more stable, less dynamic
 }
 
 export interface SeedanceVideoResult {
@@ -28,6 +27,12 @@ export interface SeedanceVideoResult {
   coverUrl?: string
   durationSeconds: number
 }
+
+export type SeedanceProgressEvent =
+  | { type: 'submit_ok'; taskId: string }
+  | { type: 'poll'; status: string; elapsed: number }
+  | { type: 'done'; videoUrl: string }
+  | { type: 'error'; message: string }
 
 // Transient HTTP status codes that are safe to retry
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
@@ -43,19 +48,36 @@ export class SeedanceVideoProvider {
     this.apiKey = normalizedKey
   }
 
-  async generateVideo(options: SeedanceVideoOptions): Promise<SeedanceVideoResult> {
+  async generateVideo(
+    options: SeedanceVideoOptions,
+    onProgress?: (event: SeedanceProgressEvent) => void,
+  ): Promise<SeedanceVideoResult> {
     const { prompt, duration = 5, aspectRatio = '9:16', resolution = '720p' } = options
 
-    const taskId = await this.submitWithRetry({
-      prompt,
-      duration,
-      aspectRatio,
-      resolution,
-      cameraFixed: options.cameraFixed,
-    })
+    const taskId = await this.submitWithRetry({ prompt, duration, aspectRatio, resolution })
+    onProgress?.({ type: 'submit_ok', taskId })
 
-    const videoUrl = await this.pollUntilDone(taskId, 240_000, 3_000)
+    const videoUrl = await this.pollUntilDone(taskId, 270_000, 4_000, onProgress)
+    onProgress?.({ type: 'done', videoUrl })
     return { taskId, videoUrl, durationSeconds: duration }
+  }
+
+  private buildRequestBody(params: {
+    prompt: string
+    duration: number
+    aspectRatio: string
+    resolution: string
+  }) {
+    // ByteDance Ark API accepts prompt in "content" array format
+    return {
+      model: SEEDANCE_MODEL,
+      content: [{ type: 'text', text: params.prompt }],
+      parameters: {
+        duration: params.duration,
+        resolution: params.resolution,
+        aspect_ratio: params.aspectRatio,
+      },
+    }
   }
 
   private async submitWithRetry(
@@ -64,16 +86,16 @@ export class SeedanceVideoProvider {
       duration: number
       aspectRatio: string
       resolution: string
-      cameraFixed?: boolean
     },
   ): Promise<string> {
     let lastError: Error | null = null
 
     for (let attempt = 0; attempt < MAX_SUBMIT_ATTEMPTS; attempt++) {
       if (attempt > 0) {
-        // Exponential backoff: 1s, 2s
         await sleep(1000 * Math.pow(2, attempt - 1))
       }
+
+      const reqBody = this.buildRequestBody(params)
 
       let res: Response
       try {
@@ -83,67 +105,77 @@ export class SeedanceVideoProvider {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model: SEEDANCE_MODEL,
-            content: [{ type: 'text', text: params.prompt }],
-            parameters: {
-              duration: params.duration,
-              resolution: params.resolution,
-              aspect_ratio: params.aspectRatio,
-              camera_fixed: params.cameraFixed ?? false,
-            },
-          }),
+          body: JSON.stringify(reqBody),
         })
       } catch (err) {
-        // Network-level failure (DNS, connection reset, etc.) — retry
         lastError = err instanceof Error ? err : new Error(String(err))
         console.warn(`[Seedance] submit network error (attempt ${attempt + 1}/${MAX_SUBMIT_ATTEMPTS}):`, lastError.message)
         continue
       }
 
       const text = await res.text()
-      let data: { id?: string; task_id?: string; error?: { message: string; code?: string } }
+      console.log(`[Seedance] submit ${res.status} (attempt ${attempt + 1}):`, text.slice(0, 400))
+
+      let data: {
+        id?: string
+        task_id?: string
+        request_id?: string
+        error?: { message: string; code?: string | number }
+        // some error formats
+        message?: string
+        code?: string | number
+      }
       try {
         data = JSON.parse(text)
       } catch {
-        lastError = new Error(`Seedance submit returned invalid JSON response: ${text.slice(0, 180)}`)
-        console.warn(`[Seedance] submit bad JSON (attempt ${attempt + 1}/${MAX_SUBMIT_ATTEMPTS})`)
+        lastError = new Error(`Seedance submit returned invalid JSON (${res.status}): ${text.slice(0, 200)}`)
+        console.warn(`[Seedance] submit bad JSON attempt ${attempt + 1}`)
         continue
       }
 
-      if (data.error) {
-        // Server-side errors may be transient (rate limit / overload) — retry
-        lastError = new Error(`Seedance error: ${data.error.message}`)
+      // Handle various error response shapes
+      const errorMsg = data.error?.message || (typeof data.message === 'string' ? data.message : null)
+      const errorCode = data.error?.code ?? data.code
+
+      if (!res.ok || errorMsg) {
+        lastError = new Error(`Seedance API error (HTTP ${res.status}, code: ${errorCode ?? 'none'}): ${errorMsg ?? 'unknown error'}`)
+        console.error(`[Seedance] submit error attempt ${attempt + 1}:`, { status: res.status, errorCode, errorMsg, body: text.slice(0, 300) })
+
+        // Non-retryable client errors — fail immediately with full detail
         if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 422) {
-          // Non-retryable client errors
           throw lastError
         }
-        console.warn(`[Seedance] submit error ${res.status} (attempt ${attempt + 1}/${MAX_SUBMIT_ATTEMPTS}):`, data.error.message)
         continue
       }
 
       const taskId = data.id || data.task_id
       if (!taskId) {
-        lastError = new Error('Seedance: no task_id returned')
-        console.warn(`[Seedance] submit missing task_id (attempt ${attempt + 1}/${MAX_SUBMIT_ATTEMPTS})`)
+        lastError = new Error(`Seedance submit returned no task ID. Response: ${text.slice(0, 200)}`)
+        console.warn(`[Seedance] submit missing task_id attempt ${attempt + 1}`)
         continue
       }
 
+      console.log(`[Seedance] task submitted: ${taskId}`)
       return taskId
     }
 
     throw lastError ?? new Error('Seedance: submit failed after retries')
   }
 
-  private async pollUntilDone(taskId: string, timeoutMs: number, intervalMs: number): Promise<string> {
-    const deadline = Date.now() + timeoutMs
+  private async pollUntilDone(
+    taskId: string,
+    timeoutMs: number,
+    intervalMs: number,
+    onProgress?: (event: SeedanceProgressEvent) => void,
+  ): Promise<string> {
+    const startAt = Date.now()
+    const deadline = startAt + timeoutMs
     let transientErrorCount = 0
 
-    // Check immediately — some providers finish quickly
     const firstResult = await this.pollOnce(taskId)
     if (firstResult.done) return firstResult.videoUrl!
-    // If the task already failed/cancelled, fail fast
     if (firstResult.terminalError) throw new Error(firstResult.terminalError)
+    onProgress?.({ type: 'poll', status: firstResult.status ?? 'pending', elapsed: 0 })
 
     while (Date.now() < deadline) {
       await sleep(intervalMs)
@@ -152,7 +184,6 @@ export class SeedanceVideoProvider {
       try {
         result = await this.pollOnce(taskId)
       } catch (err) {
-        // Network-level failure during poll — don't throw, keep trying
         transientErrorCount++
         const msg = err instanceof Error ? err.message : String(err)
         console.warn(`[Seedance] poll transient error (${transientErrorCount}/${MAX_POLL_TRANSIENT_ERRORS}):`, msg)
@@ -162,12 +193,12 @@ export class SeedanceVideoProvider {
         continue
       }
 
-      // Successful poll resets transient counter
       transientErrorCount = 0
+      const elapsed = Math.round((Date.now() - startAt) / 1000)
+      onProgress?.({ type: 'poll', status: result.status ?? 'running', elapsed })
 
       if (result.done) return result.videoUrl!
       if (result.terminalError) throw new Error(result.terminalError)
-      // otherwise pending/running — continue
     }
 
     throw new Error(`Seedance: task ${taskId} timed out after ${timeoutMs / 1000}s`)
@@ -179,21 +210,20 @@ export class SeedanceVideoProvider {
     })
 
     if (!res.ok) {
-      // Retryable HTTP error on poll — surface as transient
       if (RETRYABLE_STATUSES.has(res.status)) {
         const errText = await res.text().catch(() => '')
         throw new Error(`Seedance poll HTTP ${res.status}: ${errText.slice(0, 120)}`)
       }
-      // Non-retryable (auth/not-found) — fail fast
       const errText = await res.text().catch(() => '')
-      throw new Error(`Seedance poll failed (${res.status}): ${errText}`)
+      throw new Error(`Seedance poll failed (${res.status}): ${errText.slice(0, 200)}`)
     }
 
     const text = await res.text()
     let data: {
       status?: string
-      output?: { video_url?: string; cover_image_url?: string }
+      output?: { video_url?: string; cover_image_url?: string } | string | null
       error?: { message: string }
+      video_url?: string  // some versions return at top level
     }
     try {
       data = JSON.parse(text)
@@ -202,21 +232,30 @@ export class SeedanceVideoProvider {
     }
 
     if (data.error) {
-      return { done: false, terminalError: `Seedance task error: ${data.error.message}` }
+      console.error(`[Seedance] poll task error for ${taskId}:`, data.error, text.slice(0, 300))
+      return { done: false, terminalError: `Seedance task error: ${data.error.message}`, status: 'failed' }
     }
 
-    if (data.status === 'succeeded' || data.status === 'completed') {
-      const url = data.output?.video_url
-      if (!url) return { done: false, terminalError: 'Seedance: task succeeded but no video_url' }
-      return { done: true, videoUrl: url }
+    const status = data.status ?? 'unknown'
+    console.log(`[Seedance] poll ${taskId} status=${status}`)
+
+    if (status === 'succeeded' || status === 'completed') {
+      const url =
+        (typeof data.output === 'object' && data.output !== null ? data.output.video_url : undefined) ||
+        data.video_url
+      if (!url) {
+        console.error('[Seedance] task succeeded but no video_url. Full response:', text.slice(0, 500))
+        return { done: false, terminalError: 'Seedance: task succeeded but video_url is missing in response', status }
+      }
+      return { done: true, videoUrl: url, status }
     }
 
-    if (data.status === 'failed' || data.status === 'cancelled') {
-      return { done: false, terminalError: `Seedance task ${data.status}` }
+    if (status === 'failed' || status === 'cancelled') {
+      console.error(`[Seedance] task ${status} for ${taskId}. Response:`, text.slice(0, 500))
+      return { done: false, terminalError: `Seedance task ${status}`, status }
     }
 
-    // pending / running / queued
-    return { done: false }
+    return { done: false, status }
   }
 }
 
@@ -224,6 +263,7 @@ interface PollResult {
   done: boolean
   videoUrl?: string
   terminalError?: string
+  status?: string
 }
 
 export function canUseSeedance(): boolean {
