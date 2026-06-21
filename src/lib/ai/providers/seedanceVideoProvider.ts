@@ -100,10 +100,12 @@ export class SeedanceVideoProvider {
       }
 
       const reqBody = this.buildRequestBody(params)
+      const submitUrl = `${ARK_BASE}/videos/generations`
+      console.log(`[Seedance] submit attempt ${attempt + 1} → ${submitUrl}`, JSON.stringify(reqBody).slice(0, 200))
 
       let res: Response
       try {
-        res = await fetch(`${ARK_BASE}/videos/generations`, {
+        res = await fetch(submitUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
@@ -118,7 +120,7 @@ export class SeedanceVideoProvider {
       }
 
       const text = await res.text()
-      console.log(`[Seedance] submit ${res.status} (attempt ${attempt + 1}):`, text.slice(0, 400))
+      console.log(`[Seedance] submit ${res.status} content-type=${res.headers.get('content-type')} body=${text.slice(0, 400)}`)
 
       let data: {
         id?: string
