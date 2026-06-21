@@ -70,13 +70,17 @@ export class SeedanceVideoProvider {
     aspectRatio: string
     resolution: string
   }) {
-    // ByteDance Ark Seedance API — flat top-level fields (not nested under "parameters")
+    // BytePlus ModelArk Seedance API
+    // Ref: https://www.byteplus.com/en/docs/modelark/seedance
+    // Primary format: content array with text type + parameters object
+    // Fallback tested: prompt at root, size field
     return {
       model: SEEDANCE_MODEL,
       content: [{ type: 'text', text: params.prompt }],
-      duration: params.duration,
-      resolution: params.resolution,
-      aspect_ratio: params.aspectRatio,
+      parameters: {
+        duration: params.duration,
+        size: aspectRatioToSize(params.aspectRatio, params.resolution),
+      },
     }
   }
 
@@ -286,6 +290,18 @@ function sanitizeEnvValue(val: string | undefined): string | undefined {
     clean = clean.slice(1, -1).trim()
   }
   return clean
+}
+
+// BytePlus Seedance uses a "size" string like "720x1280" instead of separate
+// aspect_ratio + resolution fields.
+function aspectRatioToSize(aspectRatio: string, resolution: string): string {
+  const height = resolution === '1080p' ? 1920 : resolution === '480p' ? 854 : 1280
+  const shortSide = Math.round(height * 9 / 16)
+
+  if (aspectRatio === '9:16') return `${shortSide}x${height}`
+  if (aspectRatio === '16:9') return `${height}x${shortSide}`
+  // 1:1
+  return `${shortSide}x${shortSide}`
 }
 
 function normalizeBaseUrl(value: string) {

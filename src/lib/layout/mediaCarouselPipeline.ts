@@ -501,7 +501,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         } : {}),
       })
 
-      console.log(`[DEBUG] Slide ${slide.slideNumber} - Background Prompt: "${sanitizedVisualPrompt}" | Headline: "${slide.headline}" | Body: "${slide.body}" | Final Image URL: "${finalImageUrl}"`)
+      console.info(`[Slide ${slide.slideNumber}] rendered ok — headline="${slide.headline}" url="${finalImageUrl.slice(-40)}"`)
 
       return { slide, harness, sanitizedVisualPrompt, backgroundImageUrl, finalImageUrl, slideQualityCheck }
     })
