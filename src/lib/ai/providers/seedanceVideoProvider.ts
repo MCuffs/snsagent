@@ -6,13 +6,15 @@
  *   GET   https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations/{id}  (poll until succeeded)
  */
 
-const DEFAULT_ARK_BASE = 'https://ark.cn-beijing.volces.com/api/v3'
+const DEFAULT_ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3'
 const ARK_BASE = normalizeBaseUrl(
   process.env.BYTEDANCE_BASE_URL ||
   process.env.ARK_BASE_URL ||
   DEFAULT_ARK_BASE,
 )
-const SEEDANCE_MODEL = process.env.BYTEDANCE_VIDEO_MODEL || 'seedance-1-5-pro-250528'
+// BytePlus international model ID: bytedance-seedance-1.5-pro
+// Volcengine (China) model ID: seedance-1-5-pro-250528
+const SEEDANCE_MODEL = process.env.BYTEDANCE_VIDEO_MODEL || 'bytedance-seedance-1.5-pro'
 
 export interface SeedanceVideoOptions {
   prompt: string
@@ -43,7 +45,7 @@ export class SeedanceVideoProvider {
   private apiKey: string
 
   constructor(apiKey = process.env.BYTEDANCE_API_KEY || process.env.ARK_API_KEY) {
-    const normalizedKey = apiKey?.trim()
+    const normalizedKey = sanitizeEnvValue(apiKey)
     if (!normalizedKey) throw new Error('BYTEDANCE_API_KEY or ARK_API_KEY is not set.')
     this.apiKey = normalizedKey
   }
@@ -136,7 +138,12 @@ export class SeedanceVideoProvider {
       const errorCode = data.error?.code ?? data.code
 
       if (!res.ok || errorMsg) {
-        lastError = new Error(`Seedance API error (HTTP ${res.status}, code: ${errorCode ?? 'none'}): ${errorMsg ?? 'unknown error'}`)
+        let errorWithDiagnostics = `Seedance API error (HTTP ${res.status}, code: ${errorCode ?? 'none'}): ${errorMsg ?? 'unknown error'}`
+        if (res.status === 401) {
+          const maskedKey = this.apiKey ? `${this.apiKey.slice(0, 6)}...${this.apiKey.slice(-6)} (len: ${this.apiKey.length})` : 'empty'
+          errorWithDiagnostics += ` (Endpoint: ${ARK_BASE}/videos/generations, API Key: ${maskedKey})`
+        }
+        lastError = new Error(errorWithDiagnostics)
         console.error(`[Seedance] submit error attempt ${attempt + 1}:`, { status: res.status, errorCode, errorMsg, body: text.slice(0, 300) })
 
         // Non-retryable client errors — fail immediately with full detail
@@ -266,11 +273,24 @@ interface PollResult {
 
 export function canUseSeedance(): boolean {
   const key = process.env.BYTEDANCE_API_KEY || process.env.ARK_API_KEY
-  return Boolean(key?.trim() && key.trim().length > 10)
+  const cleanKey = sanitizeEnvValue(key)
+  return Boolean(cleanKey && cleanKey.length > 10)
+}
+
+function sanitizeEnvValue(val: string | undefined): string | undefined {
+  if (!val) return val
+  let clean = val.trim()
+  if (clean.startsWith('"') && clean.endsWith('"')) {
+    clean = clean.slice(1, -1).trim()
+  } else if (clean.startsWith("'") && clean.endsWith("'")) {
+    clean = clean.slice(1, -1).trim()
+  }
+  return clean
 }
 
 function normalizeBaseUrl(value: string) {
-  return value.trim().replace(/\/+$/, '')
+  const clean = sanitizeEnvValue(value) || ''
+  return clean.replace(/\/+$/, '')
 }
 
 function sleep(ms: number) {
