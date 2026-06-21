@@ -232,6 +232,7 @@ export class SeedanceVideoProvider {
     const text = await res.text()
     let data: {
       status?: string
+      content?: { video_url?: string } | null        // BytePlus response shape
       output?: { video_url?: string; cover_image_url?: string } | string | null
       error?: { message: string }
       video_url?: string
@@ -251,7 +252,9 @@ export class SeedanceVideoProvider {
     console.log(`[Seedance] poll ${taskId} status=${status}`)
 
     if (status === 'succeeded' || status === 'completed') {
+      // BytePlus returns video_url inside "content" object (not "output")
       const url =
+        data.content?.video_url ||
         (typeof data.output === 'object' && data.output !== null ? data.output.video_url : undefined) ||
         data.video_url
       if (!url) {
