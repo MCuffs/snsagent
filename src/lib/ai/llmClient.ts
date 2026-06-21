@@ -150,19 +150,33 @@ export class QwenLLMClient implements LLMClient {
           },
           { role: 'user', content: prompt },
         ],
-        response_format: { type: 'json_object' },
-        // enable_thinking: false must be at root level (not extra_body) per Alibaba MaaS API
+        // Do NOT pass response_format with Qwen3 MaaS — it causes content to be empty
+        // and JSON to appear only in reasoning_content.
+        // enable_thinking: false must be at root level per Alibaba MaaS API
         ...({ enable_thinking: false } as object),
         temperature: options?.temperature ?? 0.7,
       })
 
-      const content = response.choices[0]?.message?.content
-      if (!content) {
+      const choice = response.choices[0]?.message
+      // Qwen3 MaaS sometimes puts the actual response in reasoning_content when
+      // response_format is set. Use content first, fall back to reasoning_content.
+      const rawContent = choice?.content ||
+        (choice as { reasoning_content?: string })?.reasoning_content || ''
+
+      if (!rawContent) {
         logAiDiagnostic({
           status: 'fallback', stepName, provider: 'qwen' as never, model,
           baseURL: this.baseURL, errorMessage: 'empty response',
         })
-        // Graceful fallback to GPT
+        return new OpenAILLMClient().generateJson(stepName, prompt, fallback, options)
+      }
+
+      // Strip <think>...</think> blocks, then extract JSON
+      const stripped = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      const jsonMatch = stripped.match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+      if (!jsonMatch) {
+        console.warn(`[QwenClient] ${stepName}: no JSON found in response, falling back to GPT. raw:`, stripped.slice(0, 200))
+        logAiDiagnostic({ status: 'fallback', stepName, provider: 'qwen' as never, model, baseURL: this.baseURL, errorMessage: 'no JSON in response' })
         return new OpenAILLMClient().generateJson(stepName, prompt, fallback, options)
       }
 
@@ -177,9 +191,7 @@ export class QwenLLMClient implements LLMClient {
         metadata: options?.diagnostics?.metadata,
       })
 
-      // Qwen3 may wrap output in <think>...</think> — strip before parsing
-      const cleaned = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-      return JSON.parse(cleaned) as T
+      return JSON.parse(jsonMatch[0]) as T
     } catch (error) {
       logAiDiagnostic({
         status: 'failure', stepName, provider: 'qwen' as never, model,
