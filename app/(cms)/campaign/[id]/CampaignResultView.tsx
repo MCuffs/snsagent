@@ -433,12 +433,19 @@ export default function CampaignResultView({
   }, [activeSlide, activeDocument, uploadAndAddImageLayer])
 
   useEffect(() => {
-    const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
-      slide.id,
-      slide.editorDocument
-        ? parseEditorialDocument(slide.editorDocument, slide)
-        : applyBrandStyleMemory(parseEditorialDocument(null, slide), brand.editorPreferences),
-    ]))
+    const initialDocuments = Object.fromEntries(campaign.slides.map(slide => {
+      // Video cardnews: imageUrl is an mp4 URL → pass as videoUrl to editor seed
+      const isVideoSlide = /\.(mp4|webm|mov)(\?|$)/i.test(slide.imageUrl ?? '')
+      const seed = isVideoSlide
+        ? { ...slide, videoUrl: slide.imageUrl, imageUrl: null }
+        : slide
+      return [
+        slide.id,
+        slide.editorDocument
+          ? parseEditorialDocument(slide.editorDocument, seed)
+          : applyBrandStyleMemory(parseEditorialDocument(null, seed), brand.editorPreferences),
+      ]
+    }))
     if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
   }, [brand.editorPreferences, campaign.slides, initializeEditor])
 

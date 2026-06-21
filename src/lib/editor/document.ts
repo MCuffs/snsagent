@@ -32,6 +32,8 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
   const fontPreset = toFontPreset(seed.fontPreset)
   const textColor = validColor(seed.textColor, '#ffffff')
   const backgroundImageUrl = resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
+  // Video cardnews: use mp4 URL as background video layer
+  const backgroundVideoUrl = seed.videoUrl ?? undefined
 
   return {
     version: 1,
@@ -53,7 +55,11 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       colorFilter: '#17121f',
     },
     layers: [
-      layer('background', '배경 이미지', 0, { imageUrl: backgroundImageUrl, locked: true }),
+      layer('background', '배경 영상', 0, {
+        imageUrl: backgroundVideoUrl ? null : backgroundImageUrl,
+        videoUrl: backgroundVideoUrl,
+        locked: true,
+      }),
       layer('overlay', '시네마틱 오버레이', 10, { locked: true }),
       layer('watermark', 'Shuffla 워터마크', 20, {
         text: 'SHUFFLA / EDITORIAL',
