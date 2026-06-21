@@ -102,6 +102,9 @@ export interface SlideEditorSeed {
   imageUrl: string | null
   backgroundImageUrl?: string | null
   videoUrl?: string | null          // mp4 from Seedance — used as video background layer
+  videoThumbnailUrl?: string | null
+  videoStartSec?: number | null
+  videoDurationSec?: number | null
   fontPreset?: string | null
   textColor?: string | null
   headlineFontSize?: number | null

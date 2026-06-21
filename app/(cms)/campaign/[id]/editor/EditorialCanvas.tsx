@@ -342,6 +342,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
 
   const [guides, setGuides] = useState<{ x?: number; y?: number }>({})
   const [failedBackgroundUrl, setFailedBackgroundUrl] = useState<string | null>(null)
+  const [failedVideoUrl, setFailedVideoUrl] = useState<string | null>(null)
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null)
   const [isResizing, setIsResizing] = useState(false)
@@ -444,6 +445,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                   transformOrigin: '0 0',
                 }}
                 onLoadedMetadata={e => {
+                  setFailedVideoUrl(null)
                   const v = e.currentTarget
                   const start = background.videoStartSec ?? 0
                   v.currentTime = start
@@ -457,6 +459,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                     v.currentTime = start
                   }
                 }}
+                onError={() => setFailedVideoUrl(background.videoUrl || null)}
               />
             )
             : backgroundSource && (
@@ -475,6 +478,11 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                 }}
               />
             )
+        )}
+        {background?.videoUrl && failedVideoUrl === background.videoUrl && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#111318] px-8 text-center text-sm font-bold text-red-300">
+            영상을 불러오지 못했습니다. 원본 URL 만료 또는 저장소 접근 설정을 확인해 주세요.
+          </div>
         )}
         {!showingRenderedPreview && (
           <div

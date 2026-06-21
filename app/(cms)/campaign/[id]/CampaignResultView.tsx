@@ -40,6 +40,11 @@ interface Slide {
   designPrompt: string
   imageUrl: string | null
   backgroundImageUrl: string | null
+  mediaType: 'image' | 'video'
+  videoUrl: string | null
+  videoThumbnailUrl: string | null
+  videoStartSec: number | null
+  videoDurationSec: number | null
   fontPreset: string | null
   textColor: string | null
   headlineFontSize: number | null
@@ -142,7 +147,6 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
     // Video slide: mp4/webm URL → use <video> tag
     if (/\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl)) {
       return (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
         <video
           src={fallbackImageUrl}
           autoPlay
@@ -215,7 +219,6 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
       )}
       {(!background?.imageUrl && !background?.videoUrl && fallbackImageUrl) && (
         /\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl) ? (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
           <video src={fallbackImageUrl} autoPlay loop muted playsInline
             className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
         ) : (
@@ -322,7 +325,7 @@ export default function CampaignResultView({
   const t = useTranslations('campaign')
   // Detect video cardnews campaigns
   const isVideoCardNews = campaign.imageModel?.includes('seedance') ||
-    campaign.slides.some(s => /\.(mp4|webm|mov)(\?|$)/i.test(s.imageUrl ?? ''))
+    campaign.slides.some(s => s.mediaType === 'video' || Boolean(s.videoUrl))
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [caption, setCaption] = useState(post.caption)
@@ -443,10 +446,19 @@ export default function CampaignResultView({
 
   useEffect(() => {
     const initialDocuments = Object.fromEntries(campaign.slides.map(slide => {
-      // Video cardnews: imageUrl is an mp4 URL → pass as videoUrl to editor seed
-      const isVideoSlide = /\.(mp4|webm|mov)(\?|$)/i.test(slide.imageUrl ?? '')
+      // Prefer explicit media metadata. Seedance/image URL checks only support legacy rows.
+      const legacyVideoUrl = campaign.imageModel?.includes('seedance') ? slide.imageUrl : null
+      const videoUrl = slide.videoUrl || legacyVideoUrl
+      const isVideoSlide = slide.mediaType === 'video' || Boolean(videoUrl)
       const seed = isVideoSlide
-        ? { ...slide, videoUrl: slide.imageUrl, imageUrl: null }
+        ? {
+            ...slide,
+            videoUrl,
+            videoThumbnailUrl: slide.videoThumbnailUrl,
+            videoStartSec: slide.videoStartSec,
+            videoDurationSec: slide.videoDurationSec,
+            imageUrl: slide.videoThumbnailUrl,
+          }
         : slide
       return [
         slide.id,
@@ -456,7 +468,7 @@ export default function CampaignResultView({
       ]
     }))
     if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
-  }, [brand.editorPreferences, campaign.slides, initializeEditor])
+  }, [brand.editorPreferences, campaign.imageModel, campaign.slides, initializeEditor])
 
   useEffect(() => {
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
@@ -544,7 +556,7 @@ export default function CampaignResultView({
         ...docSnapshot,
         layers: docSnapshot.layers.map(layer =>
           layer.type === 'background'
-            ? { ...layer, imageUrl: backgroundUrl, scale, x: Math.round(offsetX * (1080 - 1080 * scale)), y: Math.round(offsetY * (1350 - 1350 * scale)) }
+            ? { ...layer, imageUrl: backgroundUrl, videoUrl: null, videoThumbnailUrl: null, videoStartSec: undefined, videoDurationSec: undefined, scale, x: Math.round(offsetX * (1080 - 1080 * scale)), y: Math.round(offsetY * (1350 - 1350 * scale)) }
             : layer
         ),
       }
@@ -714,7 +726,7 @@ export default function CampaignResultView({
       const nextDocument = {
         ...activeDocument,
         layers: activeDocument.layers.map(layer =>
-          layer.type === 'background' ? { ...layer, imageUrl: originalUrl } : layer
+          layer.type === 'background' ? { ...layer, imageUrl: originalUrl, videoUrl: null, videoThumbnailUrl: null } : layer
         ),
       }
       updateDocument(activeSlide.id, () => nextDocument)
@@ -761,7 +773,7 @@ export default function CampaignResultView({
         ...activeDocument,
         layers: activeDocument.layers.map(layer =>
           layer.type === 'background'
-            ? { ...layer, imageUrl: image.imageUrl, scale: 1, x: 0, y: 0 }
+            ? { ...layer, imageUrl: image.imageUrl, videoUrl: null, videoThumbnailUrl: null, videoStartSec: undefined, videoDurationSec: undefined, scale: 1, x: 0, y: 0 }
             : layer
         ),
       }
@@ -842,7 +854,7 @@ export default function CampaignResultView({
   }
 
   const downloadActiveSlide = async () => {
-    if (!activeSlide?.imageUrl) return
+    if (!activeSlide || (!activeSlide.imageUrl && !activeSlide.videoUrl && !activeDocument)) return
     await flushActiveTextEdit()
     setExporting(true)
     setMessage(null)
@@ -877,6 +889,7 @@ export default function CampaignResultView({
         }
         await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber))
       } else {
+        if (!activeSlide.imageUrl) throw new Error('다운로드할 이미지가 없습니다.')
         await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
       }
       analytics.exportComplete({ campaignId: campaign.id, slideId: activeSlide.id, format, scale: 1, downloadScope: 'single_slide', success: true })
@@ -1340,9 +1353,9 @@ export default function CampaignResultView({
               {t('download_desc')}
             </p>
             <div className="flex flex-wrap gap-2">
-              {activeSlide?.imageUrl && (
+              {(activeSlide?.imageUrl || activeSlide?.videoUrl) && (
                 <>
-                  <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
+                  <a href={activeSlide.videoUrl || activeSlide.imageUrl || '#'} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
                     <ExternalLink className="h-4 w-4" />
                     {t('open_original')}
                   </a>

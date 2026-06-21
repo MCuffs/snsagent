@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-loader ./tests/ts-extension-loader.mjs --test tests/*.test.ts",
+    "backfill:video-assets": "node --experimental-loader ./tests/ts-extension-loader.mjs scripts/backfill-video-assets.ts",
     "quality": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {

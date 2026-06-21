@@ -5,6 +5,7 @@ import { canUseSeedance } from '../../../../src/lib/ai/providers/seedanceVideoPr
 import { dbService } from '../../../../lib/db-service'
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
+import { persistGeneratedVideo } from '../../../../lib/video-storage'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -186,8 +187,35 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        const successSlides = result.slides.filter(s => s.videoUrl)
-        const failedSlides = result.slides.filter(s => !s.videoUrl)
+        // Provider URLs may expire. Persist each successful result before saving the campaign.
+        sse(controller, 'stage', { stage: 'saving', message: '생성 영상을 영구 저장소로 옮기는 중...' })
+        const durableSlides: typeof result.slides = []
+        for (const slide of result.slides) {
+          if (!slide.videoUrl) {
+            durableSlides.push(slide)
+            continue
+          }
+          try {
+            const durableUrl = await persistGeneratedVideo({
+              sourceUrl: slide.videoUrl,
+              userId: user.id,
+              slideNumber: slide.slideNumber,
+            })
+            durableSlides.push({ ...slide, videoUrl: durableUrl })
+          } catch (error) {
+            const message = error instanceof Error ? error.message : '영상 영구 저장 실패'
+            console.error(`[VideoCardNews] Slide ${slide.slideNumber} persistence failed:`, message)
+            durableSlides.push({ ...slide, videoUrl: null, error: message })
+            sse(controller, 'slide_error', {
+              slideNumber: slide.slideNumber,
+              error: message,
+              message: `슬라이드 ${slide.slideNumber} 저장 실패: ${message}`,
+            })
+          }
+        }
+
+        const successSlides = durableSlides.filter(s => s.videoUrl)
+        const failedSlides = durableSlides.filter(s => !s.videoUrl)
 
         if (successSlides.length === 0) {
           const firstError = failedSlides[0]?.error ?? '알 수 없는 오류'
@@ -216,18 +244,22 @@ export async function POST(request: NextRequest) {
             productDescription: topic,
             keyBenefits: '영상 카드뉴스',
             objective: '영상 카드뉴스',
-            slideCount: result.slides.length,
+            slideCount: durableSlides.length,
             imageModel: 'seedance-1-5-pro-251215',
             initialImageCount: successSlides.length,
           },
-          result.slides.map(s => ({
+          durableSlides.map(s => ({
             slideNumber: s.slideNumber,
             headline: s.headline,
             body: s.body,
             designPrompt: s.videoPrompt,
             // imageUrl: rendered png/svg (none for video — use videoUrl as background)
-            imageUrl: s.videoUrl ?? null,
-            backgroundImageUrl: s.videoUrl ?? null,
+            imageUrl: null,
+            backgroundImageUrl: null,
+            mediaType: s.videoUrl ? 'video' : 'image',
+            videoUrl: s.videoUrl,
+            videoStartSec: 0,
+            videoDurationSec: s.durationSeconds,
           }))
         )
 
@@ -244,9 +276,9 @@ export async function POST(request: NextRequest) {
           success: true,
           campaignId: campaign.id,
           topic: result.topic,
-          totalSlides: result.totalSlides,
-          partialFailures: result.partialFailures,
-          slides: result.slides.map(s => ({
+          totalSlides: durableSlides.length,
+          partialFailures: failedSlides.length,
+          slides: durableSlides.map(s => ({
             slideNumber: s.slideNumber,
             headline: s.headline,
             body: s.body,

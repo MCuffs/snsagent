@@ -58,6 +58,9 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
       layer('background', '배경 영상', 0, {
         imageUrl: backgroundVideoUrl ? null : backgroundImageUrl,
         videoUrl: backgroundVideoUrl,
+        videoThumbnailUrl: seed.videoThumbnailUrl ?? null,
+        videoStartSec: seed.videoStartSec ?? 0,
+        videoDurationSec: seed.videoDurationSec ?? 5,
         locked: true,
       }),
       layer('overlay', '시네마틱 오버레이', 10, { locked: true }),
@@ -143,7 +146,14 @@ export function parseEditorialDocument(raw: string | null | undefined, seed: Sli
       resolveEditableBackgroundImageUrl(seed.backgroundImageUrl, seed.imageUrl)
     doc.layers = doc.layers.map(layer =>
       layer.type === 'background'
-        ? { ...layer, imageUrl: backgroundImageUrl }
+        ? {
+            ...layer,
+            imageUrl: seed.videoUrl ? (seed.videoThumbnailUrl ?? null) : backgroundImageUrl,
+            videoUrl: seed.videoUrl ?? layer.videoUrl ?? null,
+            videoThumbnailUrl: seed.videoThumbnailUrl ?? layer.videoThumbnailUrl ?? null,
+            videoStartSec: seed.videoStartSec ?? layer.videoStartSec ?? 0,
+            videoDurationSec: seed.videoDurationSec ?? layer.videoDurationSec ?? 5,
+          }
         : layer.type === 'subtitle'
           ? { ...layer, text: safeSubtitleText(seed.headline, layer.text || seed.body) }
           : layer
@@ -373,6 +383,10 @@ function normalizeLayer(candidate: EditorialLayer, fallback: EditorialLayer, ind
     text: typeof candidate.text === 'string' ? candidate.text.slice(0, 500) : fallback.text,
     textHtml: typeof candidate.textHtml === 'string' ? candidate.textHtml.slice(0, 5000) : fallback.textHtml,
     imageUrl: typeof candidate.imageUrl === 'string' ? candidate.imageUrl.slice(0, 4096) : fallback.imageUrl,
+    videoUrl: typeof candidate.videoUrl === 'string' ? candidate.videoUrl.slice(0, 4096) : fallback.videoUrl,
+    videoThumbnailUrl: typeof candidate.videoThumbnailUrl === 'string' ? candidate.videoThumbnailUrl.slice(0, 4096) : fallback.videoThumbnailUrl,
+    videoStartSec: number(candidate.videoStartSec, 0, 3600, fallback.videoStartSec ?? 0),
+    videoDurationSec: number(candidate.videoDurationSec, 1, 30, fallback.videoDurationSec ?? 5),
     visible: candidate.visible !== false,
     locked: candidate.locked === true,
     opacity: number(candidate.opacity, 0, 100, fallback.opacity),
