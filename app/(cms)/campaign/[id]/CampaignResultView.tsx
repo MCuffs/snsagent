@@ -138,10 +138,25 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
   }, [])
 
   if (!document) {
-    return fallbackImageUrl ? (
+    if (!fallbackImageUrl) return null
+    // Video slide: mp4/webm URL → use <video> tag
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl)) {
+      return (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video
+          src={fallbackImageUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-full w-full object-cover"
+        />
+      )
+    }
+    return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={fallbackImageUrl} alt={alt} className="h-full w-full object-cover" />
-    ) : null
+    )
   }
 
   const background = document.layers.find(layer => layer.type === 'background')

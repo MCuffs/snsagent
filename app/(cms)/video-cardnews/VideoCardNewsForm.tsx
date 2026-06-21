@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
+import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { Loader2, Video, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -54,6 +56,8 @@ interface AiChatMessage {
 }
 
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
+  const router = useRouter()
+  const locale = useLocale()
   const [topic, setTopic] = useState('')
   const [userMessages, setUserMessages] = useState<UserChatMessage[]>([])
   const [aiMessages, setAiMessages] = useState<AiChatMessage[]>([])
@@ -241,15 +245,19 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
         } else if (eventName === 'done') {
           const resultSlides = (data.slides as VideoSlide[]) ?? []
-          setSlides(resultSlides)
-          setActiveSlide(0)
+          const campaignId = data.campaignId as string | undefined
           updateActiveMsg(m => ({
             ...m,
             type: 'result',
-            stageLabel: `완료! ${resultSlides.filter(s => s.videoUrl).length}개 영상 생성됨`,
+            stageLabel: `완료! ${resultSlides.filter(s => s.videoUrl).length}개 영상 생성됨. 편집 화면으로 이동 중...`,
             slides: resultSlides,
             partialFailures: data.partialFailures as number ?? 0,
           }))
+          // 캠페인 편집 페이지로 이동
+          if (campaignId) {
+            const path = locale === 'en' ? `/en/campaign/${campaignId}` : `/ko/campaign/${campaignId}`
+            setTimeout(() => router.push(path), 800)
+          }
 
         } else if (eventName === 'error') {
           updateActiveMsg(m => ({

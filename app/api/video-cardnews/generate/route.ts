@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import { generateVideoCardCopy, generateVideoCardNews } from '../../../../src/lib/video/videoCardPipeline'
 import { canUseSeedance } from '../../../../src/lib/ai/providers/seedanceVideoProvider'
+import { dbService } from '../../../../lib/db-service'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -9,6 +10,13 @@ export const maxDuration = 600  // 10 minutes — all slides generate in paralle
 function sse(controller: ReadableStreamDefaultController, event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
   controller.enqueue(new TextEncoder().encode(payload))
+}
+
+function tomorrowAt20() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  date.setHours(20, 0, 0, 0)
+  return date
 }
 
 export async function POST(request: NextRequest) {
@@ -152,8 +160,45 @@ export async function POST(request: NextRequest) {
           console.warn(`[VideoCardNews] Partial failures: ${failedSlides.length}/${result.totalSlides}`)
         }
 
+        // Stage 3: Save to DB and redirect to campaign editor
+        sse(controller, 'stage', { stage: 'saving', message: '캠페인 저장 중...' })
+
+        const campaign = await dbService.createCampaign(
+          user.id,
+          brandId,
+          {
+            title: `${topic} 영상 카드뉴스`,
+            productName: topic,
+            productDescription: topic,
+            keyBenefits: '영상 카드뉴스',
+            objective: '영상 카드뉴스',
+            slideCount: result.slides.length,
+            imageModel: 'seedance-1-5-pro-251215',
+            initialImageCount: successSlides.length,
+          },
+          result.slides.map(s => ({
+            slideNumber: s.slideNumber,
+            headline: s.headline,
+            body: s.body,
+            designPrompt: s.videoPrompt,
+            // imageUrl: rendered png/svg (none for video — use videoUrl as background)
+            imageUrl: s.videoUrl ?? null,
+            backgroundImageUrl: s.videoUrl ?? null,
+          }))
+        )
+
+        await dbService.updateCampaignStatus(campaign.id, 'pending_approval')
+
+        const post = await dbService.createPost(user.id, brandId, campaign.id, {
+          caption: `${topic} 영상 카드뉴스`,
+          hashtags: '#카드뉴스 #영상카드뉴스 #숏폼',
+          scheduledAt: tomorrowAt20(),
+        })
+        void dbService.updatePostStatus(post.id, 'pending_approval')
+
         sse(controller, 'done', {
           success: true,
+          campaignId: campaign.id,
           topic: result.topic,
           totalSlides: result.totalSlides,
           partialFailures: result.partialFailures,
