@@ -1,9 +1,14 @@
 /**
- * ByteDance Volcano Ark — Seedance video generation provider
+ * BytePlus ModelArk — Seedance video generation provider
  *
- * API flow:
- *   POST  https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations
- *   GET   https://ark.ap-southeast.bytepluses.com/api/v3/videos/generations/{id}  (poll until succeeded)
+ * Correct API flow (from official BytePlus sample code):
+ *   POST  https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks
+ *   GET   https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks/{id}
+ *
+ * Key differences from generic Ark:
+ * - Path: /contents/generations/tasks  (NOT /videos/generations)
+ * - Model: seedance-1-5-pro-251215
+ * - Duration/camera params: inlined into the prompt text as --duration 5 --camerafixed false
  */
 
 const DEFAULT_ARK_BASE = 'https://ark.ap-southeast.bytepluses.com/api/v3'
@@ -12,9 +17,8 @@ const ARK_BASE = normalizeBaseUrl(
   process.env.ARK_BASE_URL ||
   DEFAULT_ARK_BASE,
 )
-// BytePlus international model ID: bytedance-seedance-1.5-pro
-// Volcengine (China) model ID: seedance-1-5-pro-250528
-const SEEDANCE_MODEL = process.env.BYTEDANCE_VIDEO_MODEL || 'bytedance-seedance-1.5-pro'
+// BytePlus ModelArk model ID (from official sample code)
+const SEEDANCE_MODEL = process.env.BYTEDANCE_VIDEO_MODEL || 'seedance-1-5-pro-251215'
 
 export interface SeedanceVideoOptions {
   prompt: string
@@ -70,17 +74,19 @@ export class SeedanceVideoProvider {
     aspectRatio: string
     resolution: string
   }) {
-    // BytePlus ModelArk Seedance API
-    // Ref: https://www.byteplus.com/en/docs/modelark/seedance
-    // Primary format: content array with text type + parameters object
-    // Fallback tested: prompt at root, size field
+    // BytePlus Seedance: duration and camerafixed are inlined into the prompt text
+    // as CLI-style flags, not separate API fields.
+    // Ref: official BytePlus sample code
+    const promptWithFlags = `${params.prompt}  --duration ${params.duration} --camerafixed false`
+
     return {
       model: SEEDANCE_MODEL,
-      content: [{ type: 'text', text: params.prompt }],
-      parameters: {
-        duration: params.duration,
-        size: aspectRatioToSize(params.aspectRatio, params.resolution),
-      },
+      content: [
+        {
+          type: 'text',
+          text: promptWithFlags,
+        },
+      ],
     }
   }
 
@@ -94,13 +100,15 @@ export class SeedanceVideoProvider {
   ): Promise<string> {
     let lastError: Error | null = null
 
+    // Correct BytePlus path: /contents/generations/tasks
+    const submitUrl = `${ARK_BASE}/contents/generations/tasks`
+
     for (let attempt = 0; attempt < MAX_SUBMIT_ATTEMPTS; attempt++) {
       if (attempt > 0) {
         await sleep(1000 * Math.pow(2, attempt - 1))
       }
 
       const reqBody = this.buildRequestBody(params)
-      const submitUrl = `${ARK_BASE}/videos/generations`
       console.log(`[Seedance] submit attempt ${attempt + 1} → ${submitUrl}`, JSON.stringify(reqBody).slice(0, 200))
 
       let res: Response
@@ -127,7 +135,6 @@ export class SeedanceVideoProvider {
         task_id?: string
         request_id?: string
         error?: { message: string; code?: string | number }
-        // some error formats
         message?: string
         code?: string | number
       }
@@ -139,20 +146,14 @@ export class SeedanceVideoProvider {
         continue
       }
 
-      // Handle various error response shapes
       const errorMsg = data.error?.message || (typeof data.message === 'string' ? data.message : null)
       const errorCode = data.error?.code ?? data.code
 
       if (!res.ok || errorMsg) {
-        let errorWithDiagnostics = `Seedance API error (HTTP ${res.status}, code: ${errorCode ?? 'none'}): ${errorMsg ?? 'unknown error'}`
-        if (res.status === 401) {
-          const maskedKey = this.apiKey ? `${this.apiKey.slice(0, 6)}...${this.apiKey.slice(-6)} (len: ${this.apiKey.length})` : 'empty'
-          errorWithDiagnostics += ` (Endpoint: ${ARK_BASE}/videos/generations, API Key: ${maskedKey})`
-        }
-        lastError = new Error(errorWithDiagnostics)
-        console.error(`[Seedance] submit error attempt ${attempt + 1}:`, { status: res.status, errorCode, errorMsg, body: text.slice(0, 300) })
+        const maskedKey = this.apiKey ? `${this.apiKey.slice(0, 6)}...${this.apiKey.slice(-6)} (len: ${this.apiKey.length})` : 'empty'
+        lastError = new Error(`Seedance API error (HTTP ${res.status}, code: ${errorCode ?? 'none'}): ${errorMsg ?? 'unknown error'} — url=${submitUrl} key=${maskedKey}`)
+        console.error(`[Seedance] submit error attempt ${attempt + 1}:`, { status: res.status, errorCode, errorMsg, url: submitUrl, body: text.slice(0, 300) })
 
-        // Non-retryable client errors — fail immediately with full detail
         if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 422) {
           throw lastError
         }
@@ -216,7 +217,9 @@ export class SeedanceVideoProvider {
   }
 
   private async pollOnce(taskId: string): Promise<PollResult> {
-    const res = await fetch(`${ARK_BASE}/videos/generations/${taskId}`, {
+    // Correct BytePlus path: /contents/generations/tasks/{id}
+    const pollUrl = `${ARK_BASE}/contents/generations/tasks/${taskId}`
+    const res = await fetch(pollUrl, {
       headers: { 'Authorization': `Bearer ${this.apiKey}` },
     })
 
@@ -234,7 +237,7 @@ export class SeedanceVideoProvider {
       status?: string
       output?: { video_url?: string; cover_image_url?: string } | string | null
       error?: { message: string }
-      video_url?: string  // some versions return at top level
+      video_url?: string
     }
     try {
       data = JSON.parse(text)
@@ -292,18 +295,6 @@ function sanitizeEnvValue(val: string | undefined): string | undefined {
     clean = clean.slice(1, -1).trim()
   }
   return clean
-}
-
-// BytePlus Seedance uses a "size" string like "720x1280" instead of separate
-// aspect_ratio + resolution fields.
-function aspectRatioToSize(aspectRatio: string, resolution: string): string {
-  const height = resolution === '1080p' ? 1920 : resolution === '480p' ? 854 : 1280
-  const shortSide = Math.round(height * 9 / 16)
-
-  if (aspectRatio === '9:16') return `${shortSide}x${height}`
-  if (aspectRatio === '16:9') return `${height}x${shortSide}`
-  // 1:1
-  return `${shortSide}x${shortSide}`
 }
 
 function normalizeBaseUrl(value: string) {
