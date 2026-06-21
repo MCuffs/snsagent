@@ -582,7 +582,9 @@ export const dbService = {
       const idx = db.users.findIndex(u => u.id === userId)
       if (idx !== -1) {
         if (data.plan !== undefined) db.users[idx].plan = data.plan
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (data.polarSubscriptionId !== undefined) (db.users[idx] as any).polarSubscriptionId = data.polarSubscriptionId
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (data.polarSubscriptionStatus !== undefined) (db.users[idx] as any).polarSubscriptionStatus = data.polarSubscriptionStatus
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(db.users[idx] as any).updatedAt = new Date().toISOString()
@@ -597,6 +599,7 @@ export const dbService = {
       return (prisma.user as any).findUnique({ where: { polarSubscriptionId } }) as unknown as Promise<User | null>
     }
     const db = initMockDb()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (db.users.find((u: any) => u.polarSubscriptionId === polarSubscriptionId) || null) as User | null
   },
 
