@@ -49,6 +49,7 @@ const IDENTITIES: Identity[] = [
     base: 'Editorial Dark',
     description: '권위 있고 프리미엄한 비즈니스 톤. 어두운 시네마틱 배경에 흰색 헤드라인.',
     tags: {
+      domain: ['finance', 'commerce'],
       emotion: ['authority', 'premium', 'serious', 'confidence', '권위', '프리미엄', '진중', '신뢰'],
       industry: ['business', 'finance', 'b2b', 'consulting', '비즈니스', '금융', '기업', '컨설팅'],
       style: ['editorial', 'luxury', '에디토리얼', '럭셔리'],
@@ -75,6 +76,7 @@ const IDENTITIES: Identity[] = [
     base: 'Modern Clean',
     description: '스타트업/테크용 밝고 깔끔한 톤. 여백이 넉넉하고 또렷한 산세리프.',
     tags: {
+      domain: ['tech'],
       emotion: ['innovative', 'confident', 'optimistic', '혁신', '자신감', '긍정'],
       industry: ['startup', 'tech', 'saas', 'app', '스타트업', '테크', 'IT', '앱', '서비스', '플랫폼'],
       style: ['modern', 'minimal', 'clean', '모던', '미니멀', '깔끔'],
@@ -101,6 +103,7 @@ const IDENTITIES: Identity[] = [
     base: 'Bright Minimal',
     description: '동기부여·교육 콘텐츠용. 밝고 따뜻하며 가운데 정렬의 차분한 구성.',
     tags: {
+      domain: ['education', 'health', 'travel'],
       emotion: ['optimistic', 'uplifting', 'friendly', 'calm', '긍정', '희망', '따뜻', '차분', '동기부여'],
       industry: ['education', 'wellness', 'lifestyle', 'coaching', '교육', '웰니스', '라이프스타일', '자기계발', '건강'],
       style: ['minimal', 'bright', 'soft', '미니멀', '밝음', '부드러움'],
@@ -127,6 +130,7 @@ const IDENTITIES: Identity[] = [
     base: 'Magazine Layout',
     description: '뉴스·시사·트렌드 톤. 상단 키커식 헤드라인, 강한 대비, 매거진 편집 감성.',
     tags: {
+      domain: ['news', 'finance'],
       emotion: ['informative', 'credible', 'bold', 'urgent', '정보', '신뢰', '임팩트', '속보'],
       industry: ['news', 'media', 'journalism', 'politics', 'trends', '뉴스', '미디어', '저널리즘', '정치', '시사', '트렌드', '이슈', '리포트'],
       style: ['magazine', 'editorial', 'reportage', '매거진', '에디토리얼', '시사'],
@@ -153,6 +157,7 @@ const IDENTITIES: Identity[] = [
     base: 'Bold Statement',
     description: '뷰티·라이프스타일·푸드용. 큼직한 가운데 헤드라인과 강렬한 컬러.',
     tags: {
+      domain: ['fashion', 'food', 'beauty', 'living', 'health', 'commerce'],
       emotion: ['energetic', 'bold', 'playful', 'excited', '에너지', '대담', '경쾌', '설렘'],
       industry: ['beauty', 'fashion', 'food', 'lifestyle', 'fitness', '뷰티', '패션', '푸드', '음식', '라이프스타일', '피트니스', '운동'],
       style: ['bold', 'vibrant', '볼드', '비비드', '강렬'],

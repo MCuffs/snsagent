@@ -24,6 +24,12 @@ export type CropStyle = (typeof CROP_STYLES)[number]
 export const SUPPORTED_SLIDE_COUNTS = [5, 7] as const
 export type SupportedSlideCount = (typeof SUPPORTED_SLIDE_COUNTS)[number]
 
+export const CARD_TEMPLATE_DOMAINS = [
+  'fashion', 'food', 'beauty', 'living', 'tech', 'health',
+  'news', 'finance', 'commerce', 'education', 'travel', 'general',
+] as const
+export type CardTemplateDomain = (typeof CARD_TEMPLATE_DOMAINS)[number]
+
 export interface TemplateTypography {
   fontSize: number        // headline font size (px @ 1080x1350)
   fontWeight: number      // 100–900
@@ -62,6 +68,7 @@ export interface TemplateSlideConfig {
 }
 
 export interface CardTemplateTags {
+  domain: CardTemplateDomain[]
   emotion: string[]
   industry: string[]
   style: string[]
@@ -130,6 +137,7 @@ export const slideConfigSchema = z.object({
 })
 
 export const tagsSchema = z.object({
+  domain: z.array(z.enum(CARD_TEMPLATE_DOMAINS)).max(CARD_TEMPLATE_DOMAINS.length),
   emotion: z.array(z.string().trim().min(1).max(40)).max(20),
   industry: z.array(z.string().trim().min(1).max(40)).max(20),
   style: z.array(z.string().trim().min(1).max(40)).max(20),
@@ -148,7 +156,7 @@ export const templateConfigSchema = z.object({
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 export function emptyTags(): CardTemplateTags {
-  return { emotion: [], industry: [], style: [], visualTone: [] }
+  return { domain: [], emotion: [], industry: [], style: [], visualTone: [] }
 }
 
 const ROLE_PRESETS: Array<Partial<TemplateSlideConfig> & { label: string }> = [

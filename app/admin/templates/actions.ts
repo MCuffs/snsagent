@@ -17,7 +17,11 @@ const savePayloadSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).optional().nullable(),
   status: z.enum(['active', 'draft']),
+  isDefault: z.boolean(),
   config: templateConfigSchema,
+}).refine((payload) => !payload.isDefault || payload.status === 'active', {
+  message: '기본 템플릿은 활성 상태여야 합니다.',
+  path: ['isDefault'],
 })
 
 function parsePayload(formData: FormData) {
@@ -40,6 +44,7 @@ export async function createTemplateAction(formData: FormData) {
     description: payload.description ?? null,
     config: payload.config,
     status: payload.status,
+    isDefault: payload.isDefault,
   })
   revalidatePath('/admin/templates')
   redirect(`/admin/templates/${created.id}`)
@@ -70,6 +75,7 @@ export async function updateTemplateAction(formData: FormData) {
     description: payload.description ?? null,
     config: payload.config,
     status: payload.status,
+    isDefault: payload.isDefault,
   })
   revalidatePath('/admin/templates')
   revalidatePath(`/admin/templates/${id}`)

@@ -367,6 +367,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   // Returns null when no active template fits the slide count → existing default behavior (no regression).
   const selectedTemplate = await selectCardTemplateForContent({
     slideCount,
+    domain: domainProfile.domain,
     contentType: input.category,
     industry: input.brandIndustry,
     emotion: input.tone,
