@@ -942,7 +942,7 @@ export default function GenerateForm({
     ]
 
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[#f4f4f4] px-6 py-16 text-[#111111] relative overflow-hidden">
+      <div className="flex h-full flex-col items-center justify-center bg-[#f7f7f7] px-6 py-16 text-[#111111] relative overflow-hidden">
         {/* Glow ambient background bubbles */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
@@ -1041,7 +1041,7 @@ export default function GenerateForm({
       variants={formContainerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full overflow-hidden bg-[#f4f4f4]"
+      className="flex h-full overflow-hidden bg-[#f7f7f7]"
     >
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {
@@ -1063,10 +1063,10 @@ export default function GenerateForm({
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="flex min-w-0 flex-1 flex-col bg-[#f4f4f4] border-r border-[#e5e7eb]"
+        className="flex min-w-0 flex-1 flex-col bg-[#f7f7f7] border-r border-[#e5e7eb]"
       >
         {/* Header containing Brand chip & Mode Label */}
-        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3 bg-[#f4f4f4] flex items-center justify-between gap-4">
+        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3 bg-[#f7f7f7] flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
             {brand.name}
@@ -1083,7 +1083,7 @@ export default function GenerateForm({
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
+                <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
                 <div className="rounded-xl rounded-tl-sm bg-white px-4 py-2.5">
                   <div className="flex gap-1.5 py-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '0ms' }} />
@@ -1107,9 +1107,7 @@ export default function GenerateForm({
               >
                 <div className={`flex max-w-[85%] flex-col gap-2.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.role === 'ai' && (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">
-                      S
-                    </div>
+                    <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
                   )}
                   <div
                     className={`rounded-xl px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line ${
@@ -1153,7 +1151,7 @@ export default function GenerateForm({
                             type="button"
                             onClick={() => handleClarificationSelect(option)}
                             disabled={isWaiting || isRevealingMessage}
-                            className="group flex w-full items-center gap-3 rounded-lg bg-[#f4f4f4] hover:bg-[#eeeeee] px-3 py-2.5 text-left transition-colors disabled:opacity-50"
+                            className="group flex w-full items-center gap-3 rounded-lg bg-[#f7f7f7] hover:bg-[#efefef] px-3 py-2.5 text-left transition-colors disabled:opacity-50"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#6b7280] shadow-sm group-hover:text-[#3b82f6]">
                               {index + 1}
@@ -1222,7 +1220,7 @@ export default function GenerateForm({
               className="flex justify-start"
             >
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
+                <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
                 <ThinkingBubble steps={thinkingSteps} />
               </div>
             </motion.div>
@@ -1302,7 +1300,7 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 bg-[#f4f4f4] px-4 pb-5 pt-3">
+        <div className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3">
           <form onSubmit={handleSend}>
             <div className="flex items-center gap-2 bg-white rounded-2xl border border-[#e5e7eb] shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2">
               <input

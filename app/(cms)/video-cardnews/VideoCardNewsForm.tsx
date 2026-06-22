@@ -344,11 +344,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-[#f4f4f4]">
+    <div className="flex h-full overflow-hidden bg-[#f7f7f7]">
       {/* Left: Chat */}
-      <div className="flex min-w-0 flex-1 flex-col border-r border-[#e5e7eb] bg-[#f4f4f4]">
+      <div className="flex min-w-0 flex-1 flex-col border-r border-[#e5e7eb] bg-[#f7f7f7]">
         {/* Header */}
-        <div className="shrink-0 border-b border-[#e5e7eb] bg-[#f4f4f4] px-5 py-3 flex items-center justify-between gap-4">
+        <div className="shrink-0 border-b border-[#e5e7eb] bg-[#f7f7f7] px-5 py-3 flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <Clapperboard className="h-3.5 w-3.5" />
             영상 카드뉴스
@@ -404,7 +404,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="shrink-0 bg-[#f4f4f4] px-4 pb-5 pt-3 space-y-2.5"
+        className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3 space-y-2.5"
       >
         {isDragging && (
           <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
@@ -482,9 +482,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
 function AiBubbleAvatar() {
   return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm ring-1 ring-white/30">
-      <Film className="h-3 w-3" />
-    </div>
+    <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
   )
 }
 
