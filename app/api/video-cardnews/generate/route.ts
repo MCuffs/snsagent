@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUser } from '../../../actions'
+import { getSessionUser } from '../../../actions/auth'
 import { generateVideoCardCopy, generateVideoCardNews } from '../../../../src/lib/video/videoCardPipeline'
 import { canUseSeedance } from '../../../../src/lib/ai/providers/seedanceVideoProvider'
 import { dbService } from '../../../../lib/db-service'
@@ -7,6 +7,8 @@ import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
 import { persistGeneratedVideo } from '../../../../lib/video-storage'
 import { checkVideoCardNewsLimit } from '../../../../lib/limits'
+import { inferContentDomain } from '../../../../src/lib/content/domainProfile'
+import type { ContentDomain } from '../../../../src/lib/content/domainProfile'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -53,6 +55,8 @@ export async function POST(request: NextRequest) {
 
   let body: {
     topic: string
+    targetAndMessage?: string
+    mood?: string
     brandId: string
     slideCount?: number
     durationSeconds?: 3 | 5
@@ -69,7 +73,14 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { topic, brandId, slideCount = 5, durationSeconds = 5, language = 'ko' } = body
+  const { topic, targetAndMessage, mood, brandId, slideCount = 5, durationSeconds = 5, language = 'ko' } = body
+
+  // Resolve domain from topic + industry + target/message using the shared domainProfile engine.
+  // This maps Korean industry labels (e.g. "카페/F&B") to English domain keys (e.g. "food")
+  // that DOMAIN_VISUAL_STYLE in videoPromptEngine understands.
+  const resolvedDomain: ContentDomain = inferContentDomain(topic, body.domainLabel, targetAndMessage)
+  const domainLabel = resolvedDomain === 'general' ? (body.domainLabel ?? 'general') : resolvedDomain
+  console.log(`[VideoCardNews] domain resolution: industry="${body.domainLabel}" → domain="${resolvedDomain}"`)
 
   if (!topic?.trim()) {
     return new Response(JSON.stringify({ error: '주제를 입력해주세요.' }), {
@@ -100,7 +111,7 @@ export async function POST(request: NextRequest) {
         try {
           const researchBrief = await buildCarouselResearchBrief({
             topic,
-            category: body.domainLabel,
+            category: domainLabel,
             keyContent: topic,
             slideCount,
             language,
@@ -116,9 +127,9 @@ export async function POST(request: NextRequest) {
         // RSS fallback if research returned nothing
         if (!researchContext) {
           try {
-            const keywords = extractGenerationKeywords(topic, [body.domainLabel || ''])
+            const keywords = extractGenerationKeywords(topic, [domainLabel])
             const rssResult = await fetchRssForGeneration({
-              category: inferRssCategory(topic, body.domainLabel || 'information'),
+              category: inferRssCategory(topic, domainLabel),
               keywords,
               topic,
               limit: 5,
@@ -141,6 +152,8 @@ export async function POST(request: NextRequest) {
         try {
           slides = await generateVideoCardCopy({
             topic,
+            targetAndMessage,
+            mood,
             slideCount,
             brandTone: body.brandTone,
             language,
@@ -169,7 +182,7 @@ export async function POST(request: NextRequest) {
           brandId,
           topic,
           slides,
-          domainLabel: body.domainLabel,
+          domainLabel,
           brandTone: body.brandTone,
           durationSeconds,
           onProgress: (event) => {

@@ -1,12 +1,13 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { dbService } from '../../../../lib/db-service'
+import { isProduction } from '../../../../lib/env'
 import { createSessionToken, LEGACY_SESSION_COOKIE_NAME, normalizeSessionEmail, sessionCookieOptions, SESSION_COOKIE_NAME } from '../../../../lib/auth/session'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction()) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

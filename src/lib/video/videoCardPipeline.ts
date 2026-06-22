@@ -77,6 +77,16 @@ export async function generateVideoCardNews(
     input.brandTone,
   )
 
+  // Diagnostic: log pipeline inputs and first prompt for debugging
+  console.log(`[VideoCardPipeline] generateVideoCardNews started`, {
+    slideCount: input.slides.length,
+    domainLabel: input.domainLabel ?? '(none)',
+    brandTone: input.brandTone ?? '(none)',
+    durationSeconds: duration,
+    topicPreview: input.topic.slice(0, 100),
+    firstPromptPreview: prompts[0]?.prompt.slice(0, 200) ?? '(empty)',
+  })
+
   const generateOne = async (slide: VideoCardSlideInput, index: number): Promise<VideoCardSlideResult> => {
     const { prompt } = prompts[index]
     onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
@@ -117,10 +127,25 @@ export async function generateVideoCardNews(
     }
   }
 
-  // All slides in parallel — each has its own 270s timeout
-  const results = await Promise.all(
-    input.slides.map((slide, index) => generateOne(slide, index)),
+  // Process slides with a concurrency limit to avoid BytePlus API rate limits (429).
+  // Each slide has its own 270s timeout; we allow at most 3 concurrent submissions.
+  const MAX_CONCURRENCY = 3
+  const results: VideoCardSlideResult[] = new Array(input.slides.length)
+
+  let nextIndex = 0
+  const worker = async () => {
+    while (true) {
+      const i = nextIndex++
+      if (i >= input.slides.length) break
+      results[i] = await generateOne(input.slides[i], i)
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(MAX_CONCURRENCY, input.slides.length) },
+    () => worker(),
   )
+  await Promise.all(workers)
 
   const partialFailures = results.filter(r => !r.videoUrl).length
 
@@ -135,13 +160,15 @@ export async function generateVideoCardNews(
 // LLM을 이용해 영상 카드뉴스용 슬라이드 카피 생성
 export async function generateVideoCardCopy(params: {
   topic: string
+  targetAndMessage?: string   // 사용자 입력: 타겟 독자층 + 핵심 메시지
+  mood?: string               // 사용자 입력: 영상 분위기 (예: "감성적·따뜻한")
   slideCount: number
   brandTone?: string
   language: 'ko' | 'en'
   researchContext?: string   // injected from carouselResearch + RSS
 }): Promise<VideoCardSlideInput[]> {
   const client = getLightClient()
-  const { topic, slideCount, language, researchContext } = params
+  const { topic, targetAndMessage, mood, slideCount, language, researchContext } = params
 
   const isKo = language === 'ko'
 
@@ -151,9 +178,21 @@ export async function generateVideoCardCopy(params: {
       : `\nReference material (latest news & research):\n${researchContext.slice(0, 2000)}\n`)
     : ''
 
+  // 구조화된 사용자 입력을 프롬프트에 명확하게 주입
+  const audienceBlock = targetAndMessage
+    ? (isKo
+      ? `\n타겟 독자 및 핵심 메시지: ${targetAndMessage}\n`
+      : `\nTarget audience & key message: ${targetAndMessage}\n`)
+    : ''
+  const moodBlock = mood
+    ? (isKo
+      ? `\n영상 분위기: ${mood}\n`
+      : `\nVideo mood: ${mood}\n`)
+    : ''
+
   const prompt = isKo
     ? `당신은 인스타그램 영상 카드뉴스 카피라이터입니다.
-주제: "${topic}"${researchBlock}
+주제: "${topic}"${audienceBlock}${moodBlock}${researchBlock}
 슬라이드 수: ${slideCount}장
 
 각 슬라이드에 어울리는 짧고 강렬한 카피를 작성하세요.
@@ -168,7 +207,7 @@ export async function generateVideoCardCopy(params: {
 JSON으로만 응답:
 { "slides": [{ "slideNumber": 1, "role": "hook", "headline": "...", "body": "..." }] }`
     : `You are a vertical video card news copywriter for Instagram.
-Topic: "${topic}"
+Topic: "${topic}"${audienceBlock}${moodBlock}${researchBlock}
 Slides: ${slideCount}
 
 Write short, punchy copy for each slide.

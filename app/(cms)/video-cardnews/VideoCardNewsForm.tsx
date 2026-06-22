@@ -176,7 +176,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   // ── 실제 영상 생성 호출 ──────────────────────────────────────────
 
-  const runGenerate = async (refinedTopic: string) => {
+  const runGenerate = async (info: CollectedInfo) => {
     setPhase('generating')
     setGenerating(true)
 
@@ -201,7 +201,9 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          topic: refinedTopic,
+          topic: info.rawTopic,
+          targetAndMessage: info.targetAndMessage,
+          mood: info.mood,
           brandId: brand.id,
           slideCount,
           durationSeconds: 5,
@@ -398,14 +400,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   const handleConfirmGenerate = () => {
-    if (!collectedInfo.refinedTopic) return
-    const confirmMsgId = `ai-confirm-start-${Date.now()}`
+    if (!collectedInfo.rawTopic) return
     flushSync(() => {
       setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
-      setAiMessages(prev => [...prev, { id: confirmMsgId, type: 'progress', stageLabel: STAGE_LABELS.copy_thinking, slideProgress: [] }])
     })
-    activeMsgIdRef.current = confirmMsgId
-    void runGenerate(collectedInfo.refinedTopic)
+    void runGenerate(collectedInfo as CollectedInfo)
   }
 
   const handleReset = () => {
@@ -428,7 +427,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
     if (phase === 'clarifying_1') return '독자층과 핵심 메시지를 알려주세요...'
     if (phase === 'clarifying_2') return '분위기를 선택하거나 직접 입력하세요...'
-    if (phase === 'confirming') return '"수정할게요" 또는 [지금 만들기] 버튼을 눌러주세요'
+    if (phase === 'confirming') return '[지금 만들기] 또는 [처음부터] 버튼을 눌러주세요'
     return '생성 중...'
   }
 

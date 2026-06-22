@@ -74,14 +74,23 @@ export class SeedanceVideoProvider {
     aspectRatio: string
     resolution: string
   }) {
-    // seedance-1-5-pro-251215 does not support --duration flag in prompt text.
-    // Send prompt as-is; model uses its default duration.
+    // BytePlus Seedance API accepts video parameters as inline flags appended
+    // to the prompt text. Without these, the model uses defaults (which may
+    // not match the desired 9:16 aspect ratio or requested duration).
+    const paramFlags = ` --ratio ${params.aspectRatio} --duration ${params.duration} --resolution ${params.resolution}`
+    const promptWithParams = params.prompt + paramFlags
+
+    console.log(
+      `[Seedance] buildRequestBody: inlining params → --ratio ${params.aspectRatio} ` +
+      `--duration ${params.duration} --resolution ${params.resolution}`,
+    )
+
     return {
       model: SEEDANCE_MODEL,
       content: [
         {
           type: 'text',
-          text: params.prompt,
+          text: promptWithParams,
         },
       ],
     }

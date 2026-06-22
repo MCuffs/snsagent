@@ -19,17 +19,15 @@ import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligen
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
 import {
-  BrandIdentityAgent,
-  CopywritingAgent,
-  VisualConceptAgent,
   QualityGuardAgent,
   type AgentReport,
   type AgentReportItem,
   type AgentSlideData
 } from '../carousel/agents'
+import { runMediaNarrativeAgents } from '../carousel/mediaNarrativeAdapter'
 import { buildCopyKnowledgeContext } from '../copywriting/copyKnowledgeBase'
 import { resolveGenerationDomainProfile, type DomainProfile } from '../content/domainProfile'
-import type { BrandProfile, CampaignInput } from '../carousel/types'
+import type { BrandProfile, CampaignInput, ContentStrategy } from '../carousel/types'
 import {
   buildEditorialDirectorPlan,
   evaluateEditorialCarousel,
@@ -244,17 +242,18 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     slideCount: input.slideCount,
     productImageUrls: input.productImageUrls || [],
   }
+  const mediaStrategy: ContentStrategy = {
+    strategyType: 'problem_solution',
+    targetEmotion: input.briefing?.targetEmotion || '',
+    contentGoal: input.objective || input.contentType,
+    angle: input.briefing?.hookDirection || '',
+    recommendedSlideCount: input.slideCount,
+    reason: '',
+  }
   const knowledgeCtx = buildCopyKnowledgeContext({
     brand: mediaBrand,
     input: mediaCampaignInput,
-    strategy: {
-      strategyType: 'problem_solution',
-      targetEmotion: input.briefing?.targetEmotion || '',
-      contentGoal: input.objective || input.contentType,
-      angle: input.briefing?.hookDirection || '',
-      recommendedSlideCount: input.slideCount,
-      reason: '',
-    },
+    strategy: mediaStrategy,
   })
 
   const editorialPlan = await buildEditorialDirectorPlan({
@@ -285,10 +284,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   }
   // NOTE: harness is applied once at the end of the agent pipeline — do not enforce here
 
-  // 1. Initialize Agents
-  const brandAgent = new BrandIdentityAgent()
-  const copyAgent = new CopywritingAgent()
-  const visualAgent = new VisualConceptAgent()
+  // 1. Initialize QualityGuardAgent (post-render quality gate)
   const qualityAgent = new QualityGuardAgent()
 
   const agentReportLogs: AgentReportItem[] = []
@@ -301,48 +297,21 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     timestamp: new Date().toISOString(),
   })
 
-  let agentSlides: AgentSlideData[] = plannedSlides.map(s => ({
-    slideNumber: s.slideNumber,
-    role: s.role,
-    headline: s.headline,
-    body: s.body,
-    layoutType: s.layoutType,
-  }))
-
-  const brandRes = brandAgent.run({
-    brandName: input.brandName,
-    brandToneOfVoice: input.brandToneOfVoice,
-    forbiddenWords: input.brandForbiddenWords,
-    ctaStyle: input.brandCtaStyle,
-    brandDna: input.brandDna,
-    slides: agentSlides,
-    isGeneralMode: input.generationMode === 'general',
+  // 2. Run narrative pipeline agents (BrandConsistencyAgent + CriticAgent)
+  //    Replaces old BrandIdentityAgent, CopywritingAgent, VisualConceptAgent
+  const narrativeResult = await runMediaNarrativeAgents({
+    brand: mediaBrand,
+    input: mediaCampaignInput,
+    strategy: mediaStrategy,
+    knowledgeCtx,
+    editorialPlan,
+    plannedSlides,
   })
-  agentSlides = brandRes.slides
-  agentReportLogs.push(...brandRes.logs)
+  agentReportLogs.push(...narrativeResult.logs)
 
-  // 3. Execute CopywritingAgent
-  const copyRes = copyAgent.run({
-    title: input.title,
-    topic: input.topic,
-    category: input.category,
-    brandName: input.brandName,
-    slides: agentSlides,
-  })
-  agentSlides = copyRes.slides
-  agentReportLogs.push(...copyRes.logs)
+  let agentSlides: AgentSlideData[] = narrativeResult.slides
 
-  // 4. Execute VisualConceptAgent
-  const visualRes = visualAgent.run({
-    category: input.category,
-    topic: input.topic,
-    tone: input.tone,
-    brandMainColor: input.brandMainColor,
-    brandIndustry: input.brandIndustry,
-    slides: agentSlides,
-  })
-  agentSlides = visualRes.slides
-  agentReportLogs.push(...visualRes.logs)
+  // 3. Media-specific post-processing (preserved from original pipeline)
   agentSlides = reinforceSlidesWithBrandDna(agentSlides, input.brandDna)
   agentReportLogs.push({
     agentName: 'BrandHarness',
@@ -546,6 +515,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const qualityRes = qualityAgent.run({
     slides: agentSlides,
     hasFallbackImage: false,
+    copyQualityReport: narrativeResult.copyQualityReport,
   })
   agentReportLogs.push(...qualityRes.logs)
 

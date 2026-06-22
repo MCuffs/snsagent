@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Loader2, Award, FileText, Zap, TrendingUp, Star, ChevronRight } from 'lucide-react'
-import { getPainterStatusAction } from '../../actions'
+import { getPainterStatusAction } from '../../actions/painter'
 
 interface Brand {
   id: string

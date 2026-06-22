@@ -16,22 +16,6 @@ export interface User {
   name: string | null
   plan: string // FREE, PRO, UNLIMITED
   accountStatus: string // active, blocked
-  paypalSubscriptionId: string | null
-  paypalSubscriptionStatus: string | null
-  tossCustomerKey: string | null
-  tossBillingKey: string | null
-  tossPaymentKey: string | null
-  tossLastOrderId: string | null
-  tossSubscriptionStatus: string | null
-  tossNextBillingAt: Date | null
-  tossLastPaidAt: Date | null
-  tossCanceledAt: Date | null
-  nicepayBid: string | null
-  nicepaySubscriptionStatus: string | null
-  nicepayNextBillingAt: Date | null
-  nicepayLastPaidAt: Date | null
-  nicepayCanceledAt: Date | null
-  nicepayLastOrderId: string | null
   polarSubscriptionId: string | null
   polarSubscriptionStatus: string | null
   createdAt: Date
@@ -194,28 +178,6 @@ function hydrateUser(user: StoredUser | User): User {
   return {
     ...user,
     accountStatus: (user as User).accountStatus ?? 'active',
-    paypalSubscriptionId: user.paypalSubscriptionId ?? null,
-    paypalSubscriptionStatus: user.paypalSubscriptionStatus ?? null,
-    tossCustomerKey: user.tossCustomerKey ?? null,
-    tossBillingKey: user.tossBillingKey ?? null,
-    tossPaymentKey: user.tossPaymentKey ?? null,
-    tossLastOrderId: user.tossLastOrderId ?? null,
-    tossSubscriptionStatus: user.tossSubscriptionStatus ?? null,
-    tossNextBillingAt: user.tossNextBillingAt ? new Date(user.tossNextBillingAt) : null,
-    tossLastPaidAt: user.tossLastPaidAt ? new Date(user.tossLastPaidAt) : null,
-    tossCanceledAt: user.tossCanceledAt ? new Date(user.tossCanceledAt) : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepayBid: (user as any).nicepayBid ?? null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepaySubscriptionStatus: (user as any).nicepaySubscriptionStatus ?? null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepayNextBillingAt: (user as any).nicepayNextBillingAt ? new Date((user as any).nicepayNextBillingAt) : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepayLastPaidAt: (user as any).nicepayLastPaidAt ? new Date((user as any).nicepayLastPaidAt) : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepayCanceledAt: (user as any).nicepayCanceledAt ? new Date((user as any).nicepayCanceledAt) : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nicepayLastOrderId: (user as any).nicepayLastOrderId ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     polarSubscriptionId: (user as any).polarSubscriptionId ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -377,22 +339,6 @@ export const dbService = {
         name: name || email.split('@')[0],
         plan: 'FREE',
         accountStatus: 'active',
-        paypalSubscriptionId: null,
-        paypalSubscriptionStatus: null,
-        tossCustomerKey: null,
-        tossBillingKey: null,
-        tossPaymentKey: null,
-        tossLastOrderId: null,
-        tossSubscriptionStatus: null,
-        tossNextBillingAt: null,
-        tossLastPaidAt: null,
-        tossCanceledAt: null,
-        nicepayBid: null,
-        nicepaySubscriptionStatus: null,
-        nicepayNextBillingAt: null,
-        nicepayLastPaidAt: null,
-        nicepayCanceledAt: null,
-        nicepayLastOrderId: null,
         polarSubscriptionId: null,
         polarSubscriptionStatus: null,
         createdAt: new Date(),
@@ -425,22 +371,8 @@ export const dbService = {
       plan: 'FREE',
       accountStatus: 'active',
       passwordHash,
-      paypalSubscriptionId: null,
-      paypalSubscriptionStatus: null,
-      tossCustomerKey: null,
-      tossBillingKey: null,
-      tossPaymentKey: null,
-      tossLastOrderId: null,
-      tossSubscriptionStatus: null,
-      tossNextBillingAt: null,
-      tossLastPaidAt: null,
-      tossCanceledAt: null,
-      nicepayBid: null,
-      nicepaySubscriptionStatus: null,
-      nicepayNextBillingAt: null,
-      nicepayLastPaidAt: null,
-      nicepayCanceledAt: null,
-      nicepayLastOrderId: null,
+      polarSubscriptionId: null,
+      polarSubscriptionStatus: null,
       brandDna: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -475,108 +407,6 @@ export const dbService = {
       return db.users[userIndex]
     }
     throw new Error('User not found')
-  },
-
-  async updateUserPayPal(userId: string, data: {
-    paypalSubscriptionId?: string | null
-    paypalSubscriptionStatus?: string | null
-    plan?: string
-  }): Promise<void> {
-    if (!isMock()) {
-      await prisma.user.update({
-        where: { id: userId },
-        data,
-      })
-    } else {
-      const db = initMockDb()
-      const userIndex = db.users.findIndex(u => u.id === userId)
-      if (userIndex !== -1) {
-        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
-        if (data.paypalSubscriptionId !== undefined) db.users[userIndex].paypalSubscriptionId = data.paypalSubscriptionId
-        if (data.paypalSubscriptionStatus !== undefined) db.users[userIndex].paypalSubscriptionStatus = data.paypalSubscriptionStatus
-        db.users[userIndex].updatedAt = new Date()
-        writeMockDb(db)
-      }
-    }
-  },
-
-  async ensureTossCustomerKey(_userId: string): Promise<string> {
-    // Toss removed
-    return ''
-  },
-
-  async updateUserToss(_userId: string, _data: Record<string, unknown>): Promise<void> {
-    // Toss removed
-  },
-
-  async getDueTossSubscriptions(_at: Date): Promise<User[]> {
-    // Toss removed
-    return []
-  },
-
-    async updateUserNicepay(userId: string, data: {
-    nicepayBid?: string | null
-    nicepaySubscriptionStatus?: string | null
-    nicepayNextBillingAt?: Date | null
-    nicepayLastPaidAt?: Date | null
-    nicepayCanceledAt?: Date | null
-    nicepayLastOrderId?: string | null
-    plan?: string
-  }): Promise<void> {
-    if (!isMock()) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (prisma.user as any).update({
-        where: { id: userId },
-        data,
-      })
-    } else {
-      const db = initMockDb()
-      const userIndex = db.users.findIndex(u => u.id === userId)
-      if (userIndex !== -1) {
-        if (data.plan !== undefined) db.users[userIndex].plan = data.plan
-        if (data.nicepayBid !== undefined) db.users[userIndex].nicepayBid = data.nicepayBid
-        if (data.nicepaySubscriptionStatus !== undefined) db.users[userIndex].nicepaySubscriptionStatus = data.nicepaySubscriptionStatus
-        if (data.nicepayNextBillingAt !== undefined) db.users[userIndex].nicepayNextBillingAt = data.nicepayNextBillingAt
-        if (data.nicepayLastPaidAt !== undefined) db.users[userIndex].nicepayLastPaidAt = data.nicepayLastPaidAt
-        if (data.nicepayCanceledAt !== undefined) db.users[userIndex].nicepayCanceledAt = data.nicepayCanceledAt
-        if (data.nicepayLastOrderId !== undefined) db.users[userIndex].nicepayLastOrderId = data.nicepayLastOrderId
-        db.users[userIndex].updatedAt = new Date()
-        writeMockDb(db)
-      }
-    }
-  },
-
-  async getUserByNicepayBid(nicepayBid: string): Promise<User | null> {
-    if (!isMock()) {
-      return prisma.user.findUnique({
-        where: { nicepayBid },
-      }) as unknown as Promise<User | null>
-    }
-
-    const db = initMockDb()
-    return db.users.find(user => user.nicepayBid === nicepayBid) || null
-  },
-
-  async getDueNicepaySubscriptions(at: Date): Promise<User[]> {
-    if (!isMock()) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (prisma.user as any).findMany({
-        where: {
-          nicepaySubscriptionStatus: 'ACTIVE',
-          nicepayBid: { not: null },
-          nicepayNextBillingAt: { lte: at },
-        },
-      })
-    }
-    return []
-  },
-
-  async getUserByPayPalSubscriptionId(paypalSubscriptionId: string): Promise<User | null> {
-    if (!isMock()) {
-      return prisma.user.findUnique({ where: { paypalSubscriptionId } }) as unknown as Promise<User | null>
-    }
-    const db = initMockDb()
-    return db.users.find(user => user.paypalSubscriptionId === paypalSubscriptionId) || null
   },
 
   async updateUserPolar(userId: string, data: {

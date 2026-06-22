@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, Save, Sparkles } from 'lucide-react'
-import { saveBrandAction, analyzeGeneralProfileCoreWordAction } from '../../actions'
+import { saveBrandAction } from '../../actions/brand'
+import { analyzeGeneralProfileCoreWordAction } from '../../actions/brandCoreWord'
 import { motion } from 'framer-motion'
 import { useTranslations, useLocale } from 'next-intl'
 

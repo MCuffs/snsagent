@@ -142,6 +142,14 @@ const ROLE_CAMERA: Record<EditorialSlideRole, {
 export function buildVideoPrompt(input: VideoPromptInput): VideoPromptOutput {
   const domain = input.domainLabel || 'general'
   const style = DOMAIN_VISUAL_STYLE[domain] || DOMAIN_VISUAL_STYLE.general
+
+  // Diagnostic: log domainLabel resolution to detect Korean→English key mismatch
+  if (input.domainLabel && !DOMAIN_VISUAL_STYLE[input.domainLabel]) {
+    console.warn(
+      `[VideoPromptEngine] domainLabel "${input.domainLabel}" did not match any DOMAIN_VISUAL_STYLE key ` +
+      `(available: ${Object.keys(DOMAIN_VISUAL_STYLE).join(', ')}). Falling back to "general".`,
+    )
+  }
   const camera = ROLE_CAMERA[input.role] || ROLE_CAMERA['detail']
 
   const duration = '4-second cinematic loop'
@@ -182,7 +190,10 @@ function buildSubjectFromHeadline(headline: string, topic: string, domain: strin
     .replace(/\?|!|\.$/g, '')
     .trim()
 
-  return `Cinematic scene illustrating the concept of "${clean}" — ${style.subject}. The scene represents the topic "${topic}" through purely visual storytelling with no text`
+  // Use the headline as the primary visual subject.
+  // The topic is included as secondary context but the prompt is structured
+  // so the model focuses on visual storytelling rather than translating text.
+  return `Cinematic scene illustrating the concept of "${clean}" — ${style.subject}. The scene should visually evoke the theme without any text or readable elements`
 }
 
 function buildAtmosphere(role: EditorialSlideRole, brandTone?: string): string {
