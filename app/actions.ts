@@ -99,6 +99,11 @@ function slideEditorSeed(slide: {
   body: string
   imageUrl: string | null
   backgroundImageUrl: string | null
+  mediaType: string
+  videoUrl: string | null
+  videoThumbnailUrl: string | null
+  videoStartSec: number | null
+  videoDurationSec: number | null
   fontPreset: string | null
   textColor: string | null
   headlineFontSize: number | null
@@ -111,6 +116,10 @@ function slideEditorSeed(slide: {
     body: slide.body,
     imageUrl: slide.imageUrl,
     backgroundImageUrl: slide.backgroundImageUrl,
+    videoUrl: slide.mediaType === 'video' ? slide.videoUrl : null,
+    videoThumbnailUrl: slide.videoThumbnailUrl,
+    videoStartSec: slide.videoStartSec,
+    videoDurationSec: slide.videoDurationSec,
     fontPreset: slide.fontPreset,
     textColor: slide.textColor,
     headlineFontSize: slide.headlineFontSize,
@@ -410,9 +419,12 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
 
     const document = parseEditorialDocument(rawDocument, slideEditorSeed(existingSlide))
     const { headline, body } = documentText(document)
-    const backgroundImageUrl = layerByType(document, 'background')?.imageUrl || null
-    const renderDoc = renderOutput ? withBackgroundFallback(document, existingSlide.backgroundImageUrl) : document
-    const imageUrl = renderOutput
+    const background = layerByType(document, 'background')
+    const backgroundImageUrl = background?.imageUrl || null
+    const videoUrl = background?.videoUrl || null
+    const shouldRenderImage = renderOutput && !videoUrl
+    const renderDoc = shouldRenderImage ? withBackgroundFallback(document, existingSlide.backgroundImageUrl) : document
+    const imageUrl = shouldRenderImage
       ? await renderEditorialDocument(`editorial-${Date.now()}-${existingSlide.slideNumber}`, renderDoc)
       : existingSlide.imageUrl
 
@@ -421,6 +433,11 @@ export async function saveEditorialDocumentAction(slideId: string, rawDocument: 
       body,
       imageUrl,
       backgroundImageUrl,
+      mediaType: videoUrl ? 'video' : 'image',
+      videoUrl,
+      videoThumbnailUrl: background?.videoThumbnailUrl ?? null,
+      videoStartSec: background?.videoStartSec ?? null,
+      videoDurationSec: background?.videoDurationSec ?? null,
       editorDocument: JSON.stringify(document),
     })
     if (renderOutput) {

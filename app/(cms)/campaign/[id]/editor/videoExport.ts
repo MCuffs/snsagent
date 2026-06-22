@@ -141,15 +141,30 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
   const totalFrames = Math.ceil(videoDurationSec * FPS)
 
   // 1. 영상 로드
+  let sourceResponse: Response
+  try {
+    sourceResponse = await fetch(videoUrl, { cache: 'no-store', credentials: 'same-origin' })
+  } catch {
+    throw new Error('영상 저장소에 연결하지 못했습니다. CORS 또는 네트워크 설정을 확인해 주세요.')
+  }
+  if (!sourceResponse.ok) {
+    throw new Error(`영상 파일을 불러오지 못했습니다. (HTTP ${sourceResponse.status})`)
+  }
+  const sourceBlob = await sourceResponse.blob()
+  if (!sourceBlob.size) throw new Error('영상 파일이 비어 있습니다.')
+  const sourceObjectUrl = URL.createObjectURL(sourceBlob)
+
   const video = window.document.createElement('video')
-  video.src = videoUrl
+  video.src = sourceObjectUrl
   video.muted = true
   video.playsInline = true
-  video.crossOrigin = 'anonymous'
 
   await new Promise<void>((resolve, reject) => {
     video.onloadedmetadata = () => resolve()
-    video.onerror = () => reject(new Error('영상 로드 실패'))
+    video.onerror = () => {
+      URL.revokeObjectURL(sourceObjectUrl)
+      reject(new Error('브라우저가 영상 코덱을 재생하지 못했습니다.'))
+    }
     video.load()
   })
 
@@ -164,7 +179,14 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
     ? 'video/webm;codecs=vp9'
     : MediaRecorder.isTypeSupported('video/webm')
       ? 'video/webm'
-      : 'video/mp4'
+      : MediaRecorder.isTypeSupported('video/mp4')
+        ? 'video/mp4'
+        : null
+
+  if (!mimeType) {
+    URL.revokeObjectURL(sourceObjectUrl)
+    throw new Error('이 브라우저는 영상 내보내기를 지원하지 않습니다.')
+  }
 
   const stream = canvas.captureStream(FPS)
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
@@ -249,5 +271,6 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
     recorder.onstop = () => resolve()
   })
 
+  URL.revokeObjectURL(sourceObjectUrl)
   return new Blob(chunks, { type: mimeType })
 }

@@ -1,0 +1,3 @@
+ALTER TABLE "PaymentRecord"
+ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'krw',
+ADD COLUMN "refundedAmount" INTEGER NOT NULL DEFAULT 0;

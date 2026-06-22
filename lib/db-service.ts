@@ -110,6 +110,11 @@ export interface CarouselSlide {
   designPrompt: string
   imageUrl: string | null
   backgroundImageUrl: string | null
+  mediaType: string
+  videoUrl: string | null
+  videoThumbnailUrl: string | null
+  videoStartSec: number | null
+  videoDurationSec: number | null
   fontPreset: string | null
   textColor: string | null
   headlineFontSize: number | null
@@ -224,6 +229,11 @@ function hydrateSlide(slide: StoredCarouselSlide | CarouselSlide): CarouselSlide
   return {
     ...slide,
     backgroundImageUrl: slide.backgroundImageUrl ?? null,
+    mediaType: slide.mediaType === 'video' ? 'video' : 'image',
+    videoUrl: slide.videoUrl ?? null,
+    videoThumbnailUrl: slide.videoThumbnailUrl ?? null,
+    videoStartSec: slide.videoStartSec ?? null,
+    videoDurationSec: slide.videoDurationSec ?? null,
     fontPreset: slide.fontPreset ?? null,
     textColor: slide.textColor ?? null,
     headlineFontSize: slide.headlineFontSize ?? null,
@@ -582,7 +592,9 @@ export const dbService = {
       const idx = db.users.findIndex(u => u.id === userId)
       if (idx !== -1) {
         if (data.plan !== undefined) db.users[idx].plan = data.plan
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (data.polarSubscriptionId !== undefined) (db.users[idx] as any).polarSubscriptionId = data.polarSubscriptionId
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (data.polarSubscriptionStatus !== undefined) (db.users[idx] as any).polarSubscriptionStatus = data.polarSubscriptionStatus
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(db.users[idx] as any).updatedAt = new Date().toISOString()
@@ -597,6 +609,7 @@ export const dbService = {
       return (prisma.user as any).findUnique({ where: { polarSubscriptionId } }) as unknown as Promise<User | null>
     }
     const db = initMockDb()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (db.users.find((u: any) => u.polarSubscriptionId === polarSubscriptionId) || null) as User | null
   },
 
@@ -973,6 +986,7 @@ export const dbService = {
       agentReport?: string | null
       imageModel?: string | null
       initialImageCount?: number
+      mediaType?: string | null
     },
     slides: {
       slideNumber: number
@@ -981,6 +995,11 @@ export const dbService = {
       designPrompt: string
       imageUrl?: string | null
       backgroundImageUrl?: string | null
+      mediaType?: 'image' | 'video'
+      videoUrl?: string | null
+      videoThumbnailUrl?: string | null
+      videoStartSec?: number | null
+      videoDurationSec?: number | null
       fontPreset?: string | null
       textColor?: string | null
       headlineFontSize?: number | null
@@ -1004,6 +1023,11 @@ export const dbService = {
                 designPrompt: s.designPrompt,
                 imageUrl: s.imageUrl || null,
                 backgroundImageUrl: s.backgroundImageUrl || null,
+                mediaType: s.mediaType ?? 'image',
+                videoUrl: s.videoUrl ?? null,
+                videoThumbnailUrl: s.videoThumbnailUrl ?? null,
+                videoStartSec: s.videoStartSec ?? null,
+                videoDurationSec: s.videoDurationSec ?? null,
                 fontPreset: s.fontPreset || null,
                 textColor: s.textColor || null,
                 headlineFontSize: s.headlineFontSize ?? null,
@@ -1051,6 +1075,11 @@ export const dbService = {
       designPrompt: s.designPrompt,
       imageUrl: s.imageUrl || null,
       backgroundImageUrl: s.backgroundImageUrl || null,
+      mediaType: s.mediaType ?? 'image',
+      videoUrl: s.videoUrl ?? null,
+      videoThumbnailUrl: s.videoThumbnailUrl ?? null,
+      videoStartSec: s.videoStartSec ?? null,
+      videoDurationSec: s.videoDurationSec ?? null,
       fontPreset: s.fontPreset || null,
       textColor: s.textColor || null,
       headlineFontSize: s.headlineFontSize ?? null,
@@ -1388,6 +1417,11 @@ export const dbService = {
     body?: string
     imageUrl?: string | null
     backgroundImageUrl?: string | null
+    mediaType?: 'image' | 'video'
+    videoUrl?: string | null
+    videoThumbnailUrl?: string | null
+    videoStartSec?: number | null
+    videoDurationSec?: number | null
     fontPreset?: string | null
     textColor?: string | null
     headlineFontSize?: number | null

@@ -85,6 +85,7 @@ export async function createCardTemplate(input: {
   description?: string | null
   config: CardTemplateConfig
   status?: 'active' | 'draft'
+  isDefault?: boolean
 }): Promise<CardTemplateRecord> {
   const row = await prisma.cardTemplate.create({
     data: {
@@ -92,6 +93,7 @@ export async function createCardTemplate(input: {
       description: input.description ?? null,
       slideCount: input.config.slideCount,
       status: input.status ?? 'draft',
+      isDefault: input.isDefault ?? false,
       slides: JSON.stringify(input.config.slides),
       tags: JSON.stringify(input.config.tags),
     },
@@ -104,17 +106,27 @@ export async function updateCardTemplate(id: string, input: {
   description?: string | null
   config: CardTemplateConfig
   status: 'active' | 'draft'
+  isDefault?: boolean
 }): Promise<CardTemplateRecord> {
-  const row = await prisma.cardTemplate.update({
-    where: { id },
-    data: {
-      name: input.name,
-      description: input.description ?? null,
-      slideCount: input.config.slideCount,
-      status: input.status,
-      slides: JSON.stringify(input.config.slides),
-      tags: JSON.stringify(input.config.tags),
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    if (input.isDefault) {
+      await tx.cardTemplate.updateMany({
+        where: { slideCount: input.config.slideCount, isDefault: true, NOT: { id } },
+        data: { isDefault: false },
+      })
+    }
+    return tx.cardTemplate.update({
+      where: { id },
+      data: {
+        name: input.name,
+        description: input.description ?? null,
+        slideCount: input.config.slideCount,
+        status: input.status,
+        isDefault: input.isDefault,
+        slides: JSON.stringify(input.config.slides),
+        tags: JSON.stringify(input.config.tags),
+      },
+    })
   })
   return toRecord(row)
 }

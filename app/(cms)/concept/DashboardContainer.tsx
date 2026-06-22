@@ -8,6 +8,7 @@ import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import VideoCardNewsForm from '../video/VideoCardNewsForm'
 import WorksGrid from '../works/WorksGrid'
+import VideoCardNewsForm from '../video-cardnews/VideoCardNewsForm'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn } from 'lucide-react'
@@ -55,6 +56,7 @@ interface DashboardContainerProps {
   userName?: string | null
   summarizedPreference?: SummarizedPreferenceData | null
   isGuest?: boolean
+  hasVideoApiKey?: boolean
 }
 
 export default function DashboardContainer({
@@ -69,6 +71,7 @@ export default function DashboardContainer({
   userName,
   summarizedPreference,
   isGuest = false,
+  hasVideoApiKey = false,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const t = useTranslations('concept')
@@ -232,6 +235,22 @@ export default function DashboardContainer({
           canUpgradeRetention={canUpgradeRetention}
         />
       </div>
+
+      {activeTab === 'video-cardnews' && brandToPass && (
+        <div className="h-full">
+          <VideoCardNewsForm
+            brand={{
+              id: brandToPass.id,
+              name: brandToPass.name,
+              industry: brandToPass.industry,
+              targetAudience: brandToPass.targetAudience,
+              toneOfVoice: brandToPass.toneOfVoice,
+              mainColor: brandToPass.mainColor,
+            }}
+            hasApiKey={hasVideoApiKey}
+          />
+        </div>
+      )}
     </div>
   )
 }

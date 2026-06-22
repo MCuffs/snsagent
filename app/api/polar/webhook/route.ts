@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyPolarWebhook, planFromPolarProductId } from '../../../../lib/polar'
 import { dbService } from '../../../../lib/db-service'
+import prisma from '../../../../lib/db'
+import {
+  paymentStatusFromPolarOrder,
+  polarCentsToMajorUnits,
+  polarOrderTimestamp,
+  type PolarOrderWebhookData,
+} from '../../../../lib/polar-orders'
 
 export const runtime = 'nodejs'
 
@@ -24,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  let event: { type: string; data: Record<string, unknown> }
+  let event: { type: string; timestamp?: string; data: Record<string, unknown> }
   try {
     event = JSON.parse(rawBody) as typeof event
   } catch {
@@ -35,7 +42,9 @@ export async function POST(request: NextRequest) {
   console.log(`[Polar Webhook] ${type}`)
 
   try {
-    if (type === 'subscription.active' || type === 'subscription.created') {
+    if (type === 'order.paid' || type === 'order.refunded') {
+      await syncPolarOrder(type, data as PolarOrderWebhookData, event.timestamp)
+    } else if (type === 'subscription.active' || type === 'subscription.created') {
       const subscriptionId = data.id as string | undefined
       const productId = (data.product_id ?? (data.product as { id?: string } | undefined)?.id) as string | undefined
       const customerEmail = (data.customer as { email?: string } | undefined)?.email
@@ -104,4 +113,74 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ received: true })
+}
+
+async function syncPolarOrder(
+  type: 'order.paid' | 'order.refunded',
+  order: PolarOrderWebhookData,
+  eventTimestamp?: string,
+) {
+  if (!order.id || !order.customer) {
+    throw new Error(`Invalid ${type} payload: missing order id or customer`)
+  }
+
+  const metadataUserId = typeof order.metadata?.userId === 'string' ? order.metadata.userId : null
+  const externalUserId = order.customer.external_id || null
+  const customerEmail = order.customer.email || null
+
+  let user = metadataUserId
+    ? await prisma.user.findUnique({ where: { id: metadataUserId }, select: { id: true } })
+    : null
+  if (!user && externalUserId) {
+    user = await prisma.user.findUnique({ where: { id: externalUserId }, select: { id: true } })
+  }
+  if (!user && customerEmail) {
+    user = await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } })
+  }
+  if (!user && order.subscription_id) {
+    user = await prisma.user.findUnique({
+      where: { polarSubscriptionId: order.subscription_id },
+      select: { id: true },
+    })
+  }
+  if (!user) {
+    throw new Error(`Unable to resolve Shuffla user for Polar order ${order.id}`)
+  }
+
+  const amount = polarCentsToMajorUnits(order.total_amount)
+  const refundedAmount = polarCentsToMajorUnits(order.refunded_amount)
+  const occurredAt = polarOrderTimestamp(order, eventTimestamp)
+  const status = paymentStatusFromPolarOrder(order)
+  const currency = (order.currency || 'krw').toLowerCase()
+
+  await prisma.paymentRecord.upsert({
+    where: { orderId: order.id },
+    create: {
+      userId: user.id,
+      orderId: order.id,
+      provider: 'polar',
+      amount,
+      currency,
+      refundedAmount,
+      pgTransactionId: order.checkout_id || order.id,
+      status,
+      paidAt: type === 'order.paid'
+        ? occurredAt
+        : polarOrderTimestamp(order, order.created_at),
+      refundedAt: refundedAmount > 0 ? occurredAt : null,
+    },
+    update: {
+      userId: user.id,
+      provider: 'polar',
+      amount,
+      currency,
+      refundedAmount,
+      pgTransactionId: order.checkout_id || order.id,
+      status,
+      ...(type === 'order.paid' ? { paidAt: occurredAt } : {}),
+      refundedAt: refundedAmount > 0 ? occurredAt : null,
+    },
+  })
+
+  console.log(`[Polar Webhook] Synced ${type} for order ${order.id}`)
 }

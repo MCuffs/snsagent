@@ -40,6 +40,11 @@ interface Slide {
   designPrompt: string
   imageUrl: string | null
   backgroundImageUrl: string | null
+  mediaType: 'image' | 'video'
+  videoUrl: string | null
+  videoThumbnailUrl: string | null
+  videoStartSec: number | null
+  videoDurationSec: number | null
   fontPreset: string | null
   textColor: string | null
   headlineFontSize: number | null
@@ -138,15 +143,30 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
   }, [])
 
   if (!document) {
-    return fallbackImageUrl ? (
+    if (!fallbackImageUrl) return null
+    // Video slide: mp4/webm URL → use <video> tag
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl)) {
+      return (
+        <video
+          src={fallbackImageUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-full w-full object-cover"
+        />
+      )
+    }
+    return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={fallbackImageUrl} alt={alt} className="h-full w-full object-cover" />
-    ) : null
+    )
   }
 
   const background = document.layers.find(layer => layer.type === 'background')
   const overlayLayer = document.layers.find(layer => layer.type === 'overlay')
   const overlay = document.overlay
+  const isVideoBackground = Boolean(background?.videoUrl)
   const layers = document.layers
     .filter(layer => !['background', 'overlay'].includes(layer.type) && layer.visible)
     .sort((a, b) => a.zIndex - b.zIndex)
@@ -156,32 +176,36 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
       {background?.visible && (
         background.videoUrl
           ? (
-            <video
-              key={background.videoUrl}
-              src={background.videoUrl}
-              autoPlay
-              muted
-              playsInline
-              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-              style={{
-                opacity: background.opacity / 100,
-                filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
-                transform: `translate(${(background.x ?? 0) * scale}px, ${(background.y ?? 0) * scale}px) scale(${background.scale ?? 1})`,
-                transformOrigin: '0 0',
-              }}
-              onLoadedMetadata={e => {
-                const v = e.currentTarget
-                const start = background.videoStartSec ?? 0
-                v.currentTime = start
-                v.play().catch(() => null)
-              }}
-              onTimeUpdate={e => {
-                const v = e.currentTarget
-                const start = background.videoStartSec ?? 0
-                const dur = background.videoDurationSec ?? 3
-                if (v.currentTime >= start + dur) v.currentTime = start
-              }}
-            />
+            // Video cardnews: clip video to top half only
+            <div className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden" style={{ height: '50%' }}>
+              <video
+                key={background.videoUrl}
+                src={background.videoUrl}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+                style={{
+                  opacity: background.opacity / 100,
+                  filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,
+                }}
+                onLoadedMetadata={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  v.currentTime = start
+                  v.play().catch(() => null)
+                }}
+                onTimeUpdate={e => {
+                  const v = e.currentTarget
+                  const start = background.videoStartSec ?? 0
+                  const dur = background.videoDurationSec ?? 3
+                  if (v.currentTime >= start + dur) v.currentTime = start
+                }}
+              />
+              {/* Gradient fade bottom of video → black */}
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0"
+                style={{ height: '60%', background: 'linear-gradient(to bottom, transparent 0%, rgba(5,5,8,0.55) 55%, #050508 100%)' }} />
+            </div>
           )
           : background.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -199,17 +223,29 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
           )
       )}
       {(!background?.imageUrl && !background?.videoUrl && fallbackImageUrl) && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        /\.(mp4|webm|mov)(\?|$)/i.test(fallbackImageUrl) ? (
+          <video src={fallbackImageUrl} autoPlay loop muted playsInline
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={fallbackImageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        )
       )}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          opacity: (overlayLayer?.opacity ?? 100) / 100,
-          background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
-          mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
-        }}
-      />
+      {/* Video cardnews: solid black bottom half */}
+      {isVideoBackground && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0" style={{ height: '50%', background: '#050508' }} />
+      )}
+      {/* Standard overlay (skip for video cardnews — video has its own gradient) */}
+      {!isVideoBackground && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            opacity: (overlayLayer?.opacity ?? 100) / 100,
+            background: `radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,${overlay.vignette / 100}) 100%), linear-gradient(180deg, ${hexToRgba(overlay.colorFilter, overlay.darkness / 260)} 0%, rgba(5,5,8,${overlay.darkness / 100}) 100%)`,
+            mixBlendMode: overlay.preset === 'dreamy' ? 'soft-light' : 'normal',
+          }}
+        />
+      )}
       {layers.map(layer => (
         <div
           key={layer.id}
@@ -299,6 +335,9 @@ export default function CampaignResultView({
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('campaign')
+  // Detect video cardnews campaigns
+  const isVideoCardNews = campaign.imageModel?.includes('seedance') ||
+    campaign.slides.some(s => s.mediaType === 'video' || Boolean(s.videoUrl))
   const [slides, setSlides] = useState<Slide[]>([...campaign.slides].sort((a, b) => a.slideNumber - b.slideNumber))
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [caption, setCaption] = useState(post.caption)
@@ -418,14 +457,30 @@ export default function CampaignResultView({
   }, [activeSlide, activeDocument, uploadAndAddImageLayer])
 
   useEffect(() => {
-    const initialDocuments = Object.fromEntries(campaign.slides.map(slide => [
-      slide.id,
-      slide.editorDocument
-        ? parseEditorialDocument(slide.editorDocument, slide)
-        : applyBrandStyleMemory(parseEditorialDocument(null, slide), brand.editorPreferences),
-    ]))
+    const initialDocuments = Object.fromEntries(campaign.slides.map(slide => {
+      // Prefer explicit media metadata. Seedance/image URL checks only support legacy rows.
+      const legacyVideoUrl = campaign.imageModel?.includes('seedance') ? slide.imageUrl : null
+      const videoUrl = slide.videoUrl || legacyVideoUrl
+      const isVideoSlide = slide.mediaType === 'video' || Boolean(videoUrl)
+      const seed = isVideoSlide
+        ? {
+            ...slide,
+            videoUrl,
+            videoThumbnailUrl: slide.videoThumbnailUrl,
+            videoStartSec: slide.videoStartSec,
+            videoDurationSec: slide.videoDurationSec,
+            imageUrl: slide.videoThumbnailUrl,
+          }
+        : slide
+      return [
+        slide.id,
+        slide.editorDocument
+          ? parseEditorialDocument(slide.editorDocument, seed)
+          : applyBrandStyleMemory(parseEditorialDocument(null, seed), brand.editorPreferences),
+      ]
+    }))
     if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
-  }, [brand.editorPreferences, campaign.slides, initializeEditor])
+  }, [brand.editorPreferences, campaign.imageModel, campaign.slides, initializeEditor])
 
   useEffect(() => {
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
@@ -513,7 +568,7 @@ export default function CampaignResultView({
         ...docSnapshot,
         layers: docSnapshot.layers.map(layer =>
           layer.type === 'background'
-            ? { ...layer, imageUrl: backgroundUrl, scale, x: Math.round(offsetX * (1080 - 1080 * scale)), y: Math.round(offsetY * (1350 - 1350 * scale)) }
+            ? { ...layer, imageUrl: backgroundUrl, videoUrl: null, videoThumbnailUrl: null, videoStartSec: undefined, videoDurationSec: undefined, scale, x: Math.round(offsetX * (1080 - 1080 * scale)), y: Math.round(offsetY * (1350 - 1350 * scale)) }
             : layer
         ),
       }
@@ -683,7 +738,7 @@ export default function CampaignResultView({
       const nextDocument = {
         ...activeDocument,
         layers: activeDocument.layers.map(layer =>
-          layer.type === 'background' ? { ...layer, imageUrl: originalUrl } : layer
+          layer.type === 'background' ? { ...layer, imageUrl: originalUrl, videoUrl: null, videoThumbnailUrl: null } : layer
         ),
       }
       updateDocument(activeSlide.id, () => nextDocument)
@@ -730,7 +785,7 @@ export default function CampaignResultView({
         ...activeDocument,
         layers: activeDocument.layers.map(layer =>
           layer.type === 'background'
-            ? { ...layer, imageUrl: image.imageUrl, scale: 1, x: 0, y: 0 }
+            ? { ...layer, imageUrl: image.imageUrl, videoUrl: null, videoThumbnailUrl: null, videoStartSec: undefined, videoDurationSec: undefined, scale: 1, x: 0, y: 0 }
             : layer
         ),
       }
@@ -811,7 +866,7 @@ export default function CampaignResultView({
   }
 
   const downloadActiveSlide = async () => {
-    if (!activeSlide?.imageUrl) return
+    if (!activeSlide || (!activeSlide.imageUrl && !activeSlide.videoUrl && !activeDocument)) return
     await flushActiveTextEdit()
     setExporting(true)
     setMessage(null)
@@ -846,6 +901,7 @@ export default function CampaignResultView({
         }
         await downloadImage(result.url, fileNameFor(campaign.title, activeSlide.slideNumber))
       } else {
+        if (!activeSlide.imageUrl) throw new Error('다운로드할 이미지가 없습니다.')
         await downloadImage(activeSlide.imageUrl, fileNameFor(campaign.title, activeSlide.slideNumber))
       }
       analytics.exportComplete({ campaignId: campaign.id, slideId: activeSlide.id, format, scale: 1, downloadScope: 'single_slide', success: true })
@@ -997,7 +1053,14 @@ export default function CampaignResultView({
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-8 md:px-8">
+    <div
+      className="mx-auto max-w-[1500px] px-5 py-8 md:px-8"
+      style={isVideoCardNews ? {
+        background: 'linear-gradient(135deg, #ffffff 0%, #f4f8ff 30%, #eaf1ff 65%, #e2ecfe 100%)',
+        minHeight: '100%',
+        borderRadius: '0',
+      } : undefined}
+    >
       {/* 영상 트림 모달 */}
       {pendingVideoFile && (
         <VideoTrimModal
@@ -1035,12 +1098,23 @@ export default function CampaignResultView({
       )}
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="eyebrow">{t('page_eyebrow')}</p>
-          <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] text-[#1f1512] md:text-5xl">
+          {isVideoCardNews ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#c0d0f5] bg-[#eef4ff] px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm mb-3">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-[#4c6ef5] animate-pulse" />
+              VIDEO CARD NEWS STUDIO
+            </div>
+          ) : (
+            <p className="eyebrow">{t('page_eyebrow')}</p>
+          )}
+          <h1 className={`mt-2 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] md:text-5xl ${
+            isVideoCardNews ? 'text-[#1a2a5e]' : 'text-[#1f1512]'
+          }`}>
             {campaign.title}
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#746a62]">
-            {t('page_desc')}
+          <p className={`mt-3 max-w-2xl text-sm leading-6 ${isVideoCardNews ? 'text-[#5a6ea8]' : 'text-[#746a62]'}`}>
+            {isVideoCardNews
+              ? 'AI가 생성한 영상 슬라이드를 확인하고, 텍스트를 직접 편집한 뒤 다운로드하세요.'
+              : t('page_desc')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1291,9 +1365,9 @@ export default function CampaignResultView({
               {t('download_desc')}
             </p>
             <div className="flex flex-wrap gap-2">
-              {activeSlide?.imageUrl && (
+              {(activeSlide?.imageUrl || activeSlide?.videoUrl) && (
                 <>
-                  <a href={activeSlide.imageUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
+                  <a href={activeSlide.videoUrl || activeSlide.imageUrl || '#'} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
                     <ExternalLink className="h-4 w-4" />
                     {t('open_original')}
                   </a>

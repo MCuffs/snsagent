@@ -16,8 +16,8 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function tagSummary(tags: { emotion: string[]; industry: string[]; style: string[]; visualTone: string[] }) {
-  const all = [...tags.emotion, ...tags.industry, ...tags.style, ...tags.visualTone]
+function tagSummary(tags: { domain: string[]; emotion: string[]; industry: string[]; style: string[]; visualTone: string[] }) {
+  const all = [...tags.domain, ...tags.emotion, ...tags.industry, ...tags.style, ...tags.visualTone]
   return all.slice(0, 6)
 }
 

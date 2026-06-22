@@ -27,7 +27,7 @@ const HARNESS_RULES = [
   'bounded-title-fit',
 ]
 
-const HEADLINE_MAX_CHARS = 9
+const HEADLINE_MAX_CHARS = 13  // ~13 Korean syllables fits 2 lines at 66px on 1080px canvas
 const TEXT_BLOCK_MAX_HEIGHT = 560
 
 export function applyMediaCardHarness(input: {

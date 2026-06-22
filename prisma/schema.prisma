@@ -10,46 +10,46 @@ generator client {
 }
 
 model User {
-  id                       String                 @id @default(uuid())
-  email                    String                 @unique
-  name                     String?
-  passwordHash             String?
-  plan                     String                 @default("FREE") // FREE, LITE, PRO, UNLIMITED
-  accountStatus            String                 @default("active") // active, blocked
-  paypalSubscriptionId     String?                @unique
-  paypalSubscriptionStatus String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
-  tossCustomerKey          String?                @unique
-  tossBillingKey           String?                @unique
-  tossPaymentKey           String?                @unique
-  tossLastOrderId          String?                @unique
-  tossSubscriptionStatus   String? // PENDING, ACTIVE, PAST_DUE, CANCELED
-  tossNextBillingAt        DateTime?
-  tossLastPaidAt           DateTime?
-  tossCanceledAt           DateTime?
-  nicepayBid               String?                @unique
+  id                        String                 @id @default(uuid())
+  email                     String                 @unique
+  name                      String?
+  passwordHash              String?
+  plan                      String                 @default("FREE") // FREE, LITE, PRO, UNLIMITED
+  accountStatus             String                 @default("active") // active, blocked
+  paypalSubscriptionId      String?                @unique
+  paypalSubscriptionStatus  String? // ACTIVE, SUSPENDED, CANCELLED, EXPIRED
+  tossCustomerKey           String?                @unique
+  tossBillingKey            String?                @unique
+  tossPaymentKey            String?                @unique
+  tossLastOrderId           String?                @unique
+  tossSubscriptionStatus    String? // PENDING, ACTIVE, PAST_DUE, CANCELED
+  tossNextBillingAt         DateTime?
+  tossLastPaidAt            DateTime?
+  tossCanceledAt            DateTime?
+  nicepayBid                String?                @unique
   nicepaySubscriptionStatus String? // PENDING, ACTIVE, PAST_DUE, CANCELED
-  nicepayNextBillingAt     DateTime?
-  nicepayLastPaidAt        DateTime?
-  nicepayCanceledAt        DateTime?
-  nicepayLastOrderId       String?                @unique
-  polarSubscriptionId      String?                @unique
-  polarSubscriptionStatus  String? // active, canceled, revoked
-  mcpApiKey                String?                @unique
-  mcpApiKeyHash            String?                @unique
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
-  brands                   Brand[]
-  campaigns                Campaign[]
-  posts                    Post[]
-  templates                Template[]
-  instagramAccount         InstagramAccount?
-  editLogs                 UserEditLog[]
-  summarizedPreferences    SummarizedPreference[]
-  qualityScoreLogs         QualityScoreLog[]
-  aiGenerationLogs         AiGenerationLog[]
-  adminNotes               AdminNote[]
-  creditLedger             CreditLedger[]
-  paymentRecords           PaymentRecord[]
+  nicepayNextBillingAt      DateTime?
+  nicepayLastPaidAt         DateTime?
+  nicepayCanceledAt         DateTime?
+  nicepayLastOrderId        String?                @unique
+  polarSubscriptionId       String?                @unique
+  polarSubscriptionStatus   String? // active, canceled, revoked
+  mcpApiKey                 String?                @unique
+  mcpApiKeyHash             String?                @unique
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  brands                    Brand[]
+  campaigns                 Campaign[]
+  posts                     Post[]
+  templates                 Template[]
+  instagramAccount          InstagramAccount?
+  editLogs                  UserEditLog[]
+  summarizedPreferences     SummarizedPreference[]
+  qualityScoreLogs          QualityScoreLog[]
+  aiGenerationLogs          AiGenerationLog[]
+  adminNotes                AdminNote[]
+  creditLedger              CreditLedger[]
+  paymentRecords            PaymentRecord[]
 }
 
 model Brand {
@@ -95,25 +95,26 @@ model InstagramAccount {
 }
 
 model Campaign {
-  id                         String           @id @default(uuid())
+  id                         String            @id @default(uuid())
   userId                     String
-  user                       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   brandId                    String
-  brand                      Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand                      Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
   title                      String
   productName                String
   productDescription         String
   keyBenefits                String
   objective                  String
   slideCount                 Int
-  status                     String           @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
+  status                     String            @default("draft") // draft, generated, pending_approval, scheduled, posted, failed
   agentReport                String?
   imageModel                 String?
-  initialImageCount          Int              @default(0)
-  regenerationImageCount     Int              @default(0)
+  initialImageCount          Int               @default(0)
+  regenerationImageCount     Int               @default(0)
   lastRegenerationImageModel String?
-  createdAt                  DateTime         @default(now())
-  updatedAt                  DateTime         @updatedAt
+  mediaType                  String?           @default("image") // "image" | "video"
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
   slides                     CarouselSlide[]
   posts                      Post[]
   qualityScoreLogs           QualityScoreLog[]
@@ -129,6 +130,11 @@ model CarouselSlide {
   designPrompt       String
   imageUrl           String?
   backgroundImageUrl String?
+  mediaType          String   @default("image") // image | video
+  videoUrl           String?
+  videoThumbnailUrl  String?
+  videoStartSec      Float?
+  videoDurationSec   Float?
   fontPreset         String?
   textColor          String?
   headlineFontSize   Int?
@@ -160,8 +166,8 @@ model Template {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
-  document    String   // EditorialDocument JSON (text/image stripped)
-  slideNumber Int?     // which slide number this style is for (null = any)
+  document    String // EditorialDocument JSON (text/image stripped)
+  slideNumber Int? // which slide number this style is for (null = any)
   thumbnail   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -238,7 +244,7 @@ model CreditLedger {
   id         String   @id @default(cuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type       String   // purchase, usage, refund, bonus, adjustment
+  type       String // purchase, usage, refund, bonus, adjustment
   amount     Int
   reason     String?
   adminEmail String?
@@ -249,21 +255,23 @@ model CreditLedger {
 }
 
 model PaymentRecord {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId        String   @unique
-  provider       String   @default("manual") // nicepay, toss, paypal, manual
-  amount         Int      @default(0)
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId         String    @unique
+  provider        String    @default("manual") // nicepay, toss, paypal, manual
+  amount          Int       @default(0)
+  currency        String    @default("krw")
+  refundedAmount  Int       @default(0)
   pgTransactionId String?
-  status         String   @default("paid") // paid, cancelled, partial_refund, failed
-  paidAt         DateTime?
-  refundedAt     DateTime?
-  refundReason   String?
-  internalNote   String?
-  updatedBy      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status          String    @default("paid") // paid, cancelled, partial_refund, failed
+  paidAt          DateTime?
+  refundedAt      DateTime?
+  refundReason    String?
+  internalNote    String?
+  updatedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([userId, createdAt])
   @@index([status])
@@ -271,14 +279,14 @@ model PaymentRecord {
 }
 
 model AdminActionLog {
-  id          String   @id @default(cuid())
-  adminEmail  String
-  action      String
-  targetType  String
-  targetId    String?
-  reason      String?
-  metadata    String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  adminEmail String
+  action     String
+  targetType String
+  targetId   String?
+  reason     String?
+  metadata   String?
+  createdAt  DateTime @default(now())
 
   @@index([adminEmail, createdAt])
   @@index([targetType, targetId])
@@ -287,13 +295,13 @@ model AdminActionLog {
 // ─── Intelligence Layer Models ────────────────────────────────────────────────
 
 model CrawledPost {
-  id                 String   @id @default(uuid())
-  platform           String   // "instagram" | "threads" | "naver_blog" | "pinterest"
-  sourceUrl          String   @unique
-  crawledAt          DateTime @default(now())
-  isCarousel         Boolean  @default(false)
+  id                 String                       @id @default(uuid())
+  platform           String // "instagram" | "threads" | "naver_blog" | "pinterest"
+  sourceUrl          String                       @unique
+  crawledAt          DateTime                     @default(now())
+  isCarousel         Boolean                      @default(false)
   carouselConfidence Float?
-  carouselType       String?  // "product_showcase" | "how_to" | "list" | "story" | "unknown"
+  carouselType       String? // "product_showcase" | "how_to" | "list" | "story" | "unknown"
   slideCount         Int?
   estimatedLikes     Int?
   estimatedComments  Int?
@@ -301,36 +309,36 @@ model CrawledPost {
   headlineLength     Int?
   emotionSignal      String?
   designStyle        String?
-  colorPalette       String?  // JSON string: { dominant, accent }
-  textDensity        String?  // "low" | "medium" | "high"
-  trendKeywords      String?  // JSON string: string[]
-  hashtags           String?  // JSON string: string[]
+  colorPalette       String? // JSON string: { dominant, accent }
+  textDensity        String? // "low" | "medium" | "high"
+  trendKeywords      String? // JSON string: string[]
+  hashtags           String? // JSON string: string[]
   embedding          Unsupported("vector(1536)")?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
   @@index([platform, crawledAt])
   @@index([isCarousel])
 }
 
 model ViralCopyPattern {
-  id                    String   @id @default(uuid())
-  sourceType            String   // "url" | "image_url" | "crawled"
+  id                    String                       @id @default(uuid())
+  sourceType            String // "url" | "image_url" | "crawled"
   sourcePlatform        String?
   analyzedAt            DateTime
   headlineStyle         String
-  emotionalTrigger      String   // EmotionalIntent
-  detectedHookPattern   String   // HookPatternId
-  slideRole             String   // SlideRole
+  emotionalTrigger      String // EmotionalIntent
+  detectedHookPattern   String // HookPatternId
+  slideRole             String // SlideRole
   layoutType            String
   copyTone              String
   extractedPatternNotes String
-  engagementScore       Float    @default(0.0)
-  usageCount            Int      @default(0)
-  industry              String?  // IndustryCategory or null
+  engagementScore       Float                        @default(0.0)
+  usageCount            Int                          @default(0)
+  industry              String? // IndustryCategory or null
   embedding             Unsupported("vector(1536)")?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
 
   @@index([detectedHookPattern])
   @@index([industry])
@@ -338,23 +346,23 @@ model ViralCopyPattern {
 }
 
 model TrendSignal {
-  id                  String   @id @default(uuid())
-  platform            String   // "naver" | "instagram" | "pinterest" | "cross"
-  keyword             String
-  category            String?  // IndustryCategory or null
-  phase               String   @default("emerging") // "emerging" | "rising" | "peak" | "declining"
-  mentionCount        Int      @default(0)
-  velocityScore       Float    @default(0.0)
-  engagementProxy     Float    @default(0.0)
-  associatedLayouts   String?  // JSON string: LayoutType[]
-  associatedColors    String?  // JSON string: string[]
-  associatedEmotions  String?  // JSON string: EmotionalIntent[]
-  firstSeenAt         DateTime @default(now())
-  lastSeenAt          DateTime @default(now())
-  peakAt              DateTime?
-  embedding           Unsupported("vector(1536)")?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String                       @id @default(uuid())
+  platform           String // "naver" | "instagram" | "pinterest" | "cross"
+  keyword            String
+  category           String? // IndustryCategory or null
+  phase              String                       @default("emerging") // "emerging" | "rising" | "peak" | "declining"
+  mentionCount       Int                          @default(0)
+  velocityScore      Float                        @default(0.0)
+  engagementProxy    Float                        @default(0.0)
+  associatedLayouts  String? // JSON string: LayoutType[]
+  associatedColors   String? // JSON string: string[]
+  associatedEmotions String? // JSON string: EmotionalIntent[]
+  firstSeenAt        DateTime                     @default(now())
+  lastSeenAt         DateTime                     @default(now())
+  peakAt             DateTime?
+  embedding          Unsupported("vector(1536)")?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
   @@unique([platform, keyword])
   @@index([phase, platform])
@@ -369,10 +377,10 @@ model UserEditLog {
   brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   campaignId String?
   slideId    String?
-  eventType  String   // "headline_edit" | "body_edit" | "font_change" | "layout_change"
-                      // | "color_change" | "image_replace" | "copy_rewrite" | "reset"
-  editDelta  String?  // JSON: { beforeLength, afterLength } — NO raw text stored
-  metadata   String?  // JSON: { fontPreset, hookPatternApplied, layoutType, intent, ... }
+  eventType  String // "headline_edit" | "body_edit" | "font_change" | "layout_change"
+  // | "color_change" | "image_replace" | "copy_rewrite" | "reset"
+  editDelta  String? // JSON: { beforeLength, afterLength } — NO raw text stored
+  metadata   String? // JSON: { fontPreset, hookPatternApplied, layoutType, intent, ... }
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -380,23 +388,23 @@ model UserEditLog {
 }
 
 model SummarizedPreference {
-  id                     String   @id @default(uuid())
+  id                     String                       @id @default(uuid())
   userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  brandId                String   @unique
-  brand                  Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  preferredHookPatterns  String?  // JSON: { pattern: HookPatternId, weight: number }[]
-  preferredLayouts       String?  // JSON: { layout: LayoutType, weight: number }[]
-  preferredEmotions      String?  // JSON: { emotion: EmotionalIntent, weight: number }[]
-  preferredCopyTone      String?  // "short_punchy" | "emotional" | "informational" | "luxury"
-  preferredColorStyle    String?  // "dark" | "bright" | "neutral"
-  avoidPatterns          String?  // JSON: HookPatternId[]
-  summary                String?  // 200-char Korean plain text injected into prompts
+  user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brandId                String                       @unique
+  brand                  Brand                        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  preferredHookPatterns  String? // JSON: { pattern: HookPatternId, weight: number }[]
+  preferredLayouts       String? // JSON: { layout: LayoutType, weight: number }[]
+  preferredEmotions      String? // JSON: { emotion: EmotionalIntent, weight: number }[]
+  preferredCopyTone      String? // "short_punchy" | "emotional" | "informational" | "luxury"
+  preferredColorStyle    String? // "dark" | "bright" | "neutral"
+  avoidPatterns          String? // JSON: HookPatternId[]
+  summary                String? // 200-char Korean plain text injected into prompts
   embedding              Unsupported("vector(1536)")?
-  compressedAt           DateTime @default(now())
-  editLogCountAtCompress Int      @default(0)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  compressedAt           DateTime                     @default(now())
+  editLogCountAtCompress Int                          @default(0)
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
 }
 
 model QualityScoreLog {
@@ -411,10 +419,10 @@ model QualityScoreLog {
   personaFitScore    Int
   hookPatternScore   Int
   issueCount         Int
-  issuesJson         String?  // JSON: CopyQualityIssue[]
-  hookPatternUsed    String?  // HookPatternId
-  personaUsed        String?  // PersonaId
-  industryUsed       String?  // IndustryCategory
+  issuesJson         String? // JSON: CopyQualityIssue[]
+  hookPatternUsed    String? // HookPatternId
+  personaUsed        String? // PersonaId
+  industryUsed       String? // IndustryCategory
   trendContextUsed   Boolean  @default(false)
   memoryContextUsed  Boolean  @default(false)
   createdAt          DateTime @default(now())

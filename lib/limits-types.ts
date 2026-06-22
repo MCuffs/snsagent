@@ -10,6 +10,7 @@ export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
 export interface PlanFeature {
   name: string
   monthlyCardLimit: number
+  monthlyVideoCardLimit: number   // video cardnews generation limit
   historyRetentionDays: number
   hasWatermark: boolean
   description: string
@@ -24,6 +25,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
     name: 'Free',
     monthlyCardLimit: 2,
+    monthlyVideoCardLimit: 1,
     historyRetentionDays: 30,
     hasWatermark: true,
     description: '최초 2회 카드뉴스를 생성하는 무료 플랜',
@@ -32,11 +34,13 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     price_en: 'Free',
     features: [
       '최초 2회 무료 카드뉴스 생성',
+      '영상 카드뉴스 1회 체험',
       '30일 히스토리 보관',
       '기본 편집 기능',
     ],
     features_en: [
       '2 free card news to start',
+      '1 video card news trial',
       '30-day history retention',
       'Basic editing tools',
     ],
@@ -44,14 +48,16 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   PRO: {
     name: 'Creator',
     monthlyCardLimit: 20,
+    monthlyVideoCardLimit: 10,
     historyRetentionDays: 90,
     hasWatermark: false,
     description: '평일마다 콘텐츠를 제작하는 브랜드 운영 플랜',
     description_en: 'For brands publishing content regularly — 20 card news per month.',
-    price: '월 25,000원',
-    price_en: '₩25,000 / mo',
+    price: '월 19,000원',
+    price_en: '₩19,000 / mo',
     features: [
       '월 20회 카드뉴스 생성',
+      '월 10회 영상 카드뉴스 생성',
       '90일 히스토리 보관',
       '무제한 AI 재생성',
       '참고 이미지 업로드',
@@ -59,6 +65,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     ],
     features_en: [
       '20 card news per month',
+      '10 video card news per month',
       '90-day history retention',
       'Unlimited AI regeneration',
       'Reference image upload',
@@ -68,6 +75,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   UNLIMITED: {
     name: 'Studio',
     monthlyCardLimit: 30,
+    monthlyVideoCardLimit: 25,
     historyRetentionDays: 365,
     hasWatermark: false,
     description: '다수 캠페인을 운영하는 팀용 제작 플랜',
@@ -76,6 +84,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     price_en: '₩39,000 / mo',
     features: [
       '월 30회 카드뉴스 생성',
+      '월 25회 영상 카드뉴스 생성',
       '365일 히스토리 보관',
       '무제한 AI 재생성',
       '참고 이미지 업로드',
@@ -84,6 +93,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     ],
     features_en: [
       '30 card news per month',
+      '25 video card news per month',
       '365-day history retention',
       'Unlimited AI regeneration',
       'Reference image upload',

@@ -9,6 +9,8 @@ import {
   TEXT_POSITIONS,
   OVERLAY_TYPES,
   CROP_STYLES,
+  CARD_TEMPLATE_DOMAINS,
+  type CardTemplateDomain,
   makeDefaultSlide,
 } from '../../../../lib/templates/types'
 import { inputCls } from '../../_components/adminUtils'
@@ -33,6 +35,7 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
   const [name, setName] = useState(template.name)
   const [description, setDescription] = useState(template.description ?? '')
   const [status, setStatus] = useState<'active' | 'draft'>(template.status)
+  const [isDefault, setIsDefault] = useState(template.isDefault)
   const [slideCount, setSlideCount] = useState<SupportedSlideCount>(template.slideCount === 7 ? 7 : 5)
   const [slides, setSlides] = useState<TemplateSlideConfig[]>(
     resizeSlides(template.slides.length ? template.slides : [], template.slideCount === 7 ? 7 : 5),
@@ -48,9 +51,10 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
         name,
         description: description.trim() || null,
         status,
+        isDefault,
         config: { slideCount, slides: resizeSlides(slides, slideCount), tags },
       }),
-    [name, description, status, slideCount, slides, tags],
+    [name, description, status, isDefault, slideCount, slides, tags],
   )
 
   function patchSlide(idx: number, mutate: (s: TemplateSlideConfig) => TemplateSlideConfig) {
@@ -69,6 +73,7 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
 
   function changeSlideCount(count: SupportedSlideCount) {
     setSlideCount(count)
+    setIsDefault(false)
     setSlides((prev) => resizeSlides(prev, count))
     if (active >= count) setActive(count - 1)
   }
@@ -76,6 +81,15 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
   function tagsToString(arr: string[]) { return arr.join(', ') }
   function stringToTags(value: string) {
     return value.split(',').map((t) => t.trim()).filter(Boolean)
+  }
+
+  function toggleDomain(domain: CardTemplateDomain) {
+    setTags((prev) => ({
+      ...prev,
+      domain: prev.domain.includes(domain)
+        ? prev.domain.filter((item) => item !== domain)
+        : [...prev.domain, domain],
+    }))
   }
 
   return (
@@ -106,9 +120,26 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
           </div>
           <div>
             <Label>상태</Label>
-            <button type="button" onClick={() => setStatus((s) => (s === 'active' ? 'draft' : 'active'))}
+            <button type="button" onClick={() => setStatus((s) => {
+              if (s === 'active') {
+                setIsDefault(false)
+                return 'draft'
+              }
+              return 'active'
+            })}
               className={`rounded-lg px-3 py-2 text-sm font-bold ${status === 'active' ? 'bg-emerald-600 text-white' : 'border border-amber-300 bg-amber-50 text-amber-700'}`}>
               {status === 'active' ? '활성 (생성에 사용)' : '비활성 (draft)'}
+            </button>
+          </div>
+          <div>
+            <Label>기본 템플릿</Label>
+            <button
+              type="button"
+              disabled={status !== 'active'}
+              onClick={() => setIsDefault((value) => !value)}
+              className={`rounded-lg px-3 py-2 text-sm font-bold ${isDefault ? 'bg-blue-600 text-white' : 'border border-[#ddd] bg-white text-[#555]'} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              {isDefault ? `${slideCount}장 기본` : '기본으로 지정'}
             </button>
           </div>
           <form action={updateTemplateAction}>
@@ -135,6 +166,22 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
 
       {/* Tags */}
       <div className="rounded-xl border border-[#eee] bg-white p-4">
+        <div className="mb-4">
+          <Label>적용 도메인</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {CARD_TEMPLATE_DOMAINS.map((domain) => (
+              <button
+                key={domain}
+                type="button"
+                onClick={() => toggleDomain(domain)}
+                className={`rounded-full px-2.5 py-1 text-xs font-bold ${tags.domain.includes(domain) ? 'bg-blue-600 text-white' : 'bg-[#f4f4f5] text-[#666]'}`}
+              >
+                {domain}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-[#999]">여러 도메인을 선택할 수 있으며, 생성 시 판별된 도메인이 우선 반영됩니다.</p>
+        </div>
         <h3 className="mb-3 text-sm font-bold text-[#111]">AI 선택 태그 <span className="font-normal text-[#999]">— 콘텐츠와 매칭되어 템플릿이 자동 선택됩니다 (쉼표로 구분)</span></h3>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {([

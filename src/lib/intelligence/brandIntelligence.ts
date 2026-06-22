@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Brand Intelligence Compression Engine
  *
  * Reads accumulated QualityScoreLogs + userEditLogs for a brand,
@@ -11,7 +11,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { getLLMClient, getCopywritingModel } from '../ai/llmClient'
+import { getLLMClient, getLightClient, getCopywritingModel, getQwenModel } from '../ai/llmClient'
 import type { HookPatternId } from '../copywriting/copyKnowledgeBase'
 
 const prisma = new PrismaClient()
@@ -236,12 +236,12 @@ async function generateSummary(signals: BrandSignals, derivedTone: string): Prom
 JSON 없이 순수 텍스트만 응답하세요.`
 
   try {
-    const client = getLLMClient()
+    const client = getLightClient()
     const result = await client.generateJson<{ summary: string }>(
       'brand-intelligence-summary',
       prompt + '\n\n{"summary": "<100자 이내 인사이트>"}',
       () => ({ summary: '' }),
-      { model: getCopywritingModel(), temperature: 0.3 }
+      { model: getQwenModel(), temperature: 0.3 }
     )
     const text = result?.summary?.trim() ?? ''
     return text.slice(0, 200) // hard cap
@@ -249,3 +249,4 @@ JSON 없이 순수 텍스트만 응답하세요.`
     return ''
   }
 }
+

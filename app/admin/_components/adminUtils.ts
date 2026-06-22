@@ -3,8 +3,50 @@ export function formatDate(value?: Date | string | null) {
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(value))
 }
 
-export function formatCurrency(value?: number | null) {
-  return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 }).format(value || 0)
+export function formatCurrency(value?: number | null, currency = 'krw') {
+  return new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: 0,
+  }).format(value || 0)
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  FREE: 'Free',
+  PRO: 'Creator',
+  UNLIMITED: 'Studio',
+  ENTERPRISE: 'Enterprise',
+  AGENCY: 'Enterprise (legacy)',
+  LITE: 'Free (legacy)',
+  STARTER: 'Free (legacy)',
+}
+
+/**
+ * Keep persisted plan codes stable while the product-facing names evolve.
+ * A data migration can replace the legacy codes after every consumer is ready.
+ */
+export function formatPlan(plan?: string | null, includeCode = false) {
+  const code = (plan || 'FREE').toUpperCase()
+  const label = PLAN_LABELS[code] || code
+  return includeCode && label !== code ? `${label} (${code})` : label
+}
+
+export function parseAdminPage(value?: string) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
+export function parseAdminPageSize(value?: string) {
+  const parsed = Number(value)
+  return [25, 50, 100].includes(parsed) ? parsed : 50
+}
+
+export function dateRange(from?: string, to?: string) {
+  const start = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? new Date(`${from}T00:00:00+09:00`) : undefined
+  const end = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? new Date(`${to}T23:59:59.999+09:00`) : undefined
+  const gte = start && !Number.isNaN(start.getTime()) ? start : undefined
+  const lte = end && !Number.isNaN(end.getTime()) ? end : undefined
+  return gte || lte ? { gte, lte } : undefined
 }
 
 export function statusPill(status?: string | null) {

@@ -1,4 +1,4 @@
-import { getLLMClient } from '../ai/llmClient'
+﻿import { getLLMClient, getLightClient, getQwenModel } from '../ai/llmClient'
 import type { BrandProfile, CampaignInput, CaptionResult, ContentStrategy, HookCandidate } from './types'
 
 export async function generateCaption(
@@ -7,7 +7,7 @@ export async function generateCaption(
   strategy: ContentStrategy,
   selectedHook: HookCandidate
 ): Promise<CaptionResult> {
-  const client = getLLMClient()
+  const client = getLightClient()
 
   const prompt = `한국 인스타그램 카드뉴스 게시글의 캡션과 해시태그를 작성해주세요.
 
@@ -108,3 +108,4 @@ function buildFallbackHashtags(brand: BrandProfile, input: CampaignInput): strin
 
   return [...new Set([...base, ...extra])].slice(0, 15)
 }
+
