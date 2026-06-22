@@ -258,29 +258,37 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
       await seekVideo(targetTime)
 
       // 배경색
-      ctx.fillStyle = '#0c0d10'
+      ctx.fillStyle = '#050508'
       ctx.fillRect(0, 0, W, H)
 
-      // 영상 배경 (center-crop + transform)
+      // 영상 배경 (상단 50%만, center-crop + transform)
       ctx.save()
       ctx.globalAlpha = bgOpacity
       ctx.translate(bgX, bgY)
       ctx.scale(bgScale, bgScale)
 
+      const videoHeight = H / 2 // 상단 50%만
       const vw = video.videoWidth || W
       const vh = video.videoHeight || H
-      const targetRatio = W / H
+      const targetRatio = W / videoHeight
       const srcRatio = vw / vh
       let sx = 0, sy = 0, sw = vw, sh = vh
       if (srcRatio > targetRatio) { sw = vh * targetRatio; sx = (vw - sw) / 2 }
       else { sh = vw / targetRatio; sy = (vh - sh) / 2 }
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W / bgScale, H / bgScale)
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W / bgScale, videoHeight / bgScale)
+      
+      // 영상 하단 그라데이션 페이드
+      const gradient = ctx.createLinearGradient(0, videoHeight * 0.4, 0, videoHeight)
+      gradient.addColorStop(0, 'rgba(5,5,8,0)')
+      gradient.addColorStop(0.55, 'rgba(5,5,8,0.55)')
+      gradient.addColorStop(1, 'rgba(5,5,8,1)')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, W / bgScale, videoHeight / bgScale)
+      
       ctx.restore()
 
-      // 오버레이
-      if (overlayLayer?.visible !== false) {
-        drawOverlay(ctx, doc.overlay, W, H, overlayOpacity)
-      }
+      // 오버레이 (영상 카드뉴스에서는 자체 그라데이션 사용, 표준 오버레이 생략)
+      // isVideoBackground always true here, so skip standard overlay
 
       // 텍스트 레이어
       for (const layer of textLayers) {
