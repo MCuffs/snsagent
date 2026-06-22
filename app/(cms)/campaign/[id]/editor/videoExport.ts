@@ -191,7 +191,15 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
   const stream = canvas.captureStream(FPS)
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
   const chunks: Blob[] = []
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+  let recorderStopped = false
+  
+  recorder.ondataavailable = e => {
+    if (e.data.size > 0 && !recorderStopped) chunks.push(e.data)
+  }
+  
+  recorder.onstop = () => {
+    recorderStopped = true
+  }
 
   const overlayLayer = doc.layers.find((l: EditorialLayer) => l.type === 'overlay')
   const overlayOpacity = (overlayLayer?.opacity ?? 100) / 100
@@ -204,6 +212,32 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
   const bgY = bgLayer?.y ?? 0
   const bgOpacity = (bgLayer?.opacity ?? 100) / 100
 
+  // Helper: wait for video seek with timeout
+  const seekVideo = (targetTime: number): Promise<void> => {
+    return new Promise((resolve) => {
+      // Already at target time - no seek needed
+      if (Math.abs(video.currentTime - targetTime) < 0.04) {
+        resolve()
+        return
+      }
+      
+      video.currentTime = targetTime
+      
+      const timeout = setTimeout(() => {
+        video.removeEventListener('seeked', onSeeked)
+        resolve()
+      }, 2000)
+      
+      const onSeeked = () => {
+        clearTimeout(timeout)
+        video.removeEventListener('seeked', onSeeked)
+        resolve()
+      }
+      
+      video.addEventListener('seeked', onSeeked)
+    })
+  }
+
   // 3. 프레임별 렌더링
   await new Promise<void>((resolve, reject) => {
     recorder.start()
@@ -213,20 +247,15 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
     const renderFrame = async () => {
       if (frameCount >= totalFrames) {
         recorder.stop()
+        // Wait for final ondataavailable event after stop()
+        await new Promise(r => setTimeout(r, 100))
         resolve()
         return
       }
 
       // 영상 시간 설정 (균등 분배)
       const targetTime = videoStartSec + (frameCount / FPS)
-      video.currentTime = targetTime
-
-      await new Promise<void>(res => {
-        const onSeeked = () => { video.removeEventListener('seeked', onSeeked); res() }
-        video.addEventListener('seeked', onSeeked)
-        // 이미 근접한 시간이면 바로 진행
-        if (Math.abs(video.currentTime - targetTime) < 0.05) { video.removeEventListener('seeked', onSeeked); res() }
-      })
+      await seekVideo(targetTime)
 
       // 배경색
       ctx.fillStyle = '#0c0d10'
@@ -265,12 +294,11 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
     renderFrame().catch(err => { recorder.stop(); reject(err) })
   })
 
-  // 4. 녹화 완료 대기
-  await new Promise<void>(resolve => {
-    if (recorder.state === 'inactive') { resolve(); return }
-    recorder.onstop = () => resolve()
-  })
-
   URL.revokeObjectURL(sourceObjectUrl)
+  
+  if (chunks.length === 0) {
+    throw new Error('영상 녹화에 실패했습니다. 브라우저가 이 코덱을 지원하지 않을 수 있습니다.')
+  }
+  
   return new Blob(chunks, { type: mimeType })
 }
