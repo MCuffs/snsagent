@@ -178,12 +178,24 @@ function buildKoreanGeneralModeInstruction(category: string) {
 function buildEnglishGeneralModeInstruction(category: string) {
   switch (normalizeGeneralProfileCategory(category)) {
     case 'current-affairs':
-      return 'This is a current-affairs carousel. Help readers understand verified facts, background, key tensions, and impact without partisan certainty or unsupported claims.'
+      return [
+        'This is a current-affairs profile carousel.',
+        'The goal is to help readers understand the facts, background, key tensions, and impact of an event, policy, or social issue in a balanced way worth saving.',
+        'Separate verified evidence from what is still unfolding, without partisan certainty or exaggeration.',
+      ].join('\n')
     case 'trends':
-      return 'This is a trend carousel. Explain why people are reacting now, what cultural/consumer/content signals are emerging, and how readers can interpret or apply the trend. Do not make it feel like a hard-news explainer.'
+      return [
+        'This is a trend profile carousel.',
+        'The goal is to show why people are reacting now, what cultural / consumer / content shift is emerging, and how readers can apply or observe it.',
+        'Do not just summarize the issue like a news explainer — design the flow around the signal of change, the reaction points, and a practical applied angle.',
+      ].join('\n')
     case 'information':
     default:
-      return 'This is an information or tech carousel. Help readers understand the concept, change, use case, checklist, or decision criteria in a practical, easy-to-apply way.'
+      return [
+        'This is an information / tech profile carousel.',
+        'The goal is to help readers quickly grasp the concept, change, how-to, and checkpoints, and use them for a real decision or action.',
+        'Design the flow around the problem, the underlying principle, comparison criteria, and practical points rather than a dry encyclopedic explanation.',
+      ].join('\n')
   }
 }
 

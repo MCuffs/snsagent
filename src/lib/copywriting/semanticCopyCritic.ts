@@ -1,4 +1,4 @@
-import { getDomainBannedTerms, getDomainProfileForText, type DomainProfile } from '../content/domainProfile'
+import { getDomainBannedTerms, getDomainProfileForText, getRequiredCopyAnchors, type DomainProfile } from '../content/domainProfile'
 
 export interface SemanticSlideInput {
   slideNumber: number
@@ -45,6 +45,18 @@ const INCOMPLETE_MEANING_PATTERNS = [
   /다음\s*장/u,
   /(?:은|는|이|가|을|를|의|와|과|에서|부터|까지|처럼|보다|만|도|거나|이나|려면|하면|해야)[.!?。！？]$/u,
 ]
+
+// English equivalent of OPEN_EXPECTATION_PATTERNS — body sets up an expectation but stops
+// before delivering the payoff (teaser endings, trailing colon/dash).
+const EN_OPEN_EXPECTATION_PATTERNS = [
+  /\b(?:the reason is|the key is|the problem is|the catch is|what matters is|the point is|the truth is|here'?s why|here'?s the thing|which means)\b[,:]?\s*$/i,
+  /[:–—-]\s*$/,
+]
+
+// Picks a language-appropriate diagnostic message (KO default).
+function pick(language: 'ko' | 'en', ko: string, en: string) {
+  return language === 'en' ? en : ko
+}
 
 const META_COPY_TOKENS = [
   'daily use scene',
@@ -100,11 +112,12 @@ export function evaluateSemanticCopy(params: {
       })
     }
 
-    if (!isClosing && !hasDomainAnchor(combined, domainProfile.requiredCopyAnchors)) {
+    const copyAnchors = getRequiredCopyAnchors(domainProfile, language)
+    if (!isClosing && !hasDomainAnchor(combined, copyAnchors)) {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'warn',
-        message: `copy should include a concrete ${domainProfile.label} anchor such as ${domainProfile.requiredCopyAnchors.slice(0, 4).join(', ')}`,
+        message: `copy should include a concrete ${domainProfile.label} anchor such as ${copyAnchors.slice(0, 4).join(', ')}`,
       })
     }
 
@@ -112,7 +125,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: `본문이 너무 짧습니다. ${isClosing ? '마무리 슬라이드도' : '각 슬라이드는'} 구체 기준이 담긴 완성 문장이어야 합니다.`,
+        message: pick(language,
+          `본문이 너무 짧습니다. ${isClosing ? '마무리 슬라이드도' : '각 슬라이드는'} 구체 기준이 담긴 완성 문장이어야 합니다.`,
+          `Body copy is too short. ${isClosing ? 'Even the closing slide' : 'Each slide'} must be a complete sentence with a concrete point.`),
       })
     }
 
@@ -120,7 +135,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: '본문에 내부 기획 토큰이나 영어 메타 표현이 노출되었습니다.',
+        message: pick(language,
+          '본문에 내부 기획 토큰이나 영어 메타 표현이 노출되었습니다.',
+          'Body copy leaks internal planning tokens or meta expressions.'),
       })
     }
 
@@ -128,7 +145,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: '본문이 사용자의 핵심 주제와 직접 연결되지 않았습니다.',
+        message: pick(language,
+          '본문이 사용자의 핵심 주제와 직접 연결되지 않았습니다.',
+          'Body copy is not directly connected to the user\'s core topic.'),
       })
     }
 
@@ -145,6 +164,14 @@ export function evaluateSemanticCopy(params: {
         slideNumber: slide.slideNumber,
         severity: 'block',
         message: '본문이 문장처럼 보이지만 실제 의미가 완성되지 않았습니다. 독자가 이해할 결론까지 다시 작성해야 합니다.',
+      })
+    }
+
+    if (language === 'en' && EN_OPEN_EXPECTATION_PATTERNS.some(pattern => pattern.test(body))) {
+      issues.push({
+        slideNumber: slide.slideNumber,
+        severity: 'block',
+        message: 'Body sets up an expectation but stops before delivering the payoff. Complete the thought with a concrete takeaway.',
       })
     }
 
@@ -187,7 +214,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: `본문이 추상적인 표현(${genericHits.join(', ')})에 기대고 있습니다. 주제의 성분, 쓰임, 상황, 판단 포인트를 구체화해야 합니다.`,
+        message: pick(language,
+          `본문이 추상적인 표현(${genericHits.join(', ')})에 기대고 있습니다. 주제의 성분, 쓰임, 상황, 판단 포인트를 구체화해야 합니다.`,
+          `Body copy leans on vague phrases (${genericHits.join(', ')}). Replace them with concrete specifics, use cases, or decision criteria.`),
       })
     }
 
@@ -196,7 +225,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'block',
-        message: '다른 슬라이드와 본문이 중복됩니다. 각 슬라이드는 새 정보를 제공해야 합니다.',
+        message: pick(language,
+          '다른 슬라이드와 본문이 중복됩니다. 각 슬라이드는 새 정보를 제공해야 합니다.',
+          'Body copy duplicates another slide. Each slide must deliver new information.'),
       })
     }
 
@@ -212,7 +243,9 @@ export function evaluateSemanticCopy(params: {
       issues.push({
         slideNumber: slide.slideNumber,
         severity: 'warn',
-        message: '본문 안에서 같은 명사가 반복됩니다. 다음 문장은 새 정보로 전개해야 합니다.',
+        message: pick(language,
+          '본문 안에서 같은 명사가 반복됩니다. 다음 문장은 새 정보로 전개해야 합니다.',
+          'The same noun repeats within the body. The next sentence must develop new information.'),
       })
     }
   }
@@ -254,7 +287,8 @@ function extractMeaningTokens(value: string, language: 'ko' | 'en' = 'ko') {
 
 function hasDomainAnchor(value: string, anchors: string[]) {
   if (anchors.length === 0) return true
-  return anchors.some(anchor => value.includes(anchor))
+  const normalized = value.toLowerCase()
+  return anchors.some(anchor => normalized.includes(anchor.toLowerCase()))
 }
 
 function hasRepeatedNouns(body: string, language: 'ko' | 'en' = 'ko') {

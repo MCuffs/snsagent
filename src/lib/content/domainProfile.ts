@@ -523,6 +523,29 @@ export function getDomainProfileForText(...values: Array<string | undefined | nu
   return getDomainProfile(inferContentDomain(...values))
 }
 
+// English copy anchors per domain. `requiredCopyAnchors` on the profile is Korean, so the
+// semantic critic's anchor check never matches English copy without these. Keep terms
+// distinctive (not generic words like "use"/"data") so the gate stays meaningful.
+const REQUIRED_COPY_ANCHORS_EN: Record<ContentDomain, string[]> = {
+  fashion: ['silhouette', 'layering', 'accessories', 'fabric', 'styling', 'outfit'],
+  food: ['texture', 'flavor', 'ingredient', 'pairing', 'recipe', 'aroma'],
+  beauty: ['formula', 'ingredient', 'routine', 'texture', 'application'],
+  living: ['layout', 'storage', 'lighting', 'arrangement', 'material'],
+  tech: ['workflow', 'feature', 'integration', 'limitation', 'setup'],
+  health: ['routine', 'habit', 'evidence', 'symptom', 'dosage'],
+  news: ['background', 'impact', 'context', 'reaction', 'source'],
+  finance: ['metric', 'volatility', 'risk', 'valuation', 'return'],
+  commerce: ['comparison', 'benefit', 'difference', 'pricing', 'scenario'],
+  education: ['method', 'practice', 'mistake', 'exercise', 'level'],
+  travel: ['itinerary', 'booking', 'neighborhood', 'season', 'route'],
+  general: ['definition', 'example', 'comparison', 'criteria', 'context'],
+}
+
+/** Returns language-appropriate required copy anchors for a domain. */
+export function getRequiredCopyAnchors(profile: DomainProfile, language: 'ko' | 'en' = 'ko'): string[] {
+  return language === 'en' ? (REQUIRED_COPY_ANCHORS_EN[profile.domain] || REQUIRED_COPY_ANCHORS_EN.general) : profile.requiredCopyAnchors
+}
+
 export function getGenerationDomainProfile(params: {
   topic?: string | null
   category?: string | null
