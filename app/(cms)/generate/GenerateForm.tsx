@@ -942,7 +942,7 @@ export default function GenerateForm({
     ]
 
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-white px-6 py-16 text-[#111111] relative overflow-hidden">
+      <div className="flex h-full flex-col items-center justify-center bg-[#f4f4f4] px-6 py-16 text-[#111111] relative overflow-hidden">
         {/* Glow ambient background bubbles */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
@@ -1041,7 +1041,7 @@ export default function GenerateForm({
       variants={formContainerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full overflow-hidden bg-white"
+      className="flex h-full overflow-hidden bg-[#f4f4f4]"
     >
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {
@@ -1063,28 +1063,28 @@ export default function GenerateForm({
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="flex min-w-0 flex-1 flex-col bg-[#fafaf9] border-r border-[#e5e7eb]"
+        className="flex min-w-0 flex-1 flex-col bg-[#f4f4f4] border-r border-[#e5e7eb]"
       >
         {/* Header containing Brand chip & Mode Label */}
-        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3.5 bg-white flex items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-bold text-[#374151] shadow-sm">
+        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3 bg-[#f4f4f4] flex items-center justify-between gap-4">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
             {brand.name}
           </div>
 
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-[#f3f4f6] px-3.5 py-1.5 text-xs font-black text-[#374151] shadow-sm">
+          <div className="text-xs text-[#9ca3af]">
             {generationMode === 'general' ? t('mode_general') : t('mode_brand')}
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 custom-scrollbar" aria-live="polite">
+        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6 custom-scrollbar" aria-live="polite">
           {/* Initial loading skeleton */}
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
-                <div className="rounded-2xl rounded-tl-sm bg-white border border-[#e5e7eb] px-4 py-2.5 shadow-sm">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
+                <div className="rounded-xl rounded-tl-sm bg-white px-4 py-2.5">
                   <div className="flex gap-1.5 py-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '0ms' }} />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '120ms' }} />
@@ -1107,15 +1107,15 @@ export default function GenerateForm({
               >
                 <div className={`flex max-w-[85%] flex-col gap-2.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.role === 'ai' && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">
                       S
                     </div>
                   )}
                   <div
-                    className={`rounded-2xl px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line ${
+                    className={`rounded-xl px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line ${
                       msg.role === 'user'
-                        ? 'rounded-tr-sm bg-[#1e293b] text-white shadow-sm'
-                        : 'rounded-tl-sm bg-white text-[#111111] border border-[#e5e7eb] shadow-sm'
+                        ? 'rounded-tr-sm bg-white text-[#111111]'
+                        : 'rounded-tl-sm bg-white text-[#111111]'
                     }`}
                   >
                     {msg.role === 'ai' ? msg.revealedContent : msg.content}
@@ -1128,7 +1128,7 @@ export default function GenerateForm({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-                      className="w-full rounded-2xl border border-[#e5e7eb] bg-white p-3.5 shadow-sm"
+                      className="w-full rounded-xl bg-white p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-black leading-6 text-[#111111]">{msg.clarification.question}</p>
@@ -1153,7 +1153,7 @@ export default function GenerateForm({
                             type="button"
                             onClick={() => handleClarificationSelect(option)}
                             disabled={isWaiting || isRevealingMessage}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-transparent bg-[#f9fafb] px-3 py-3 text-left transition-all hover:border-[#e5e7eb] hover:bg-white disabled:opacity-50"
+                            className="group flex w-full items-center gap-3 rounded-lg bg-[#f4f4f4] hover:bg-[#eeeeee] px-3 py-2.5 text-left transition-colors disabled:opacity-50"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#6b7280] shadow-sm group-hover:text-[#3b82f6]">
                               {index + 1}
@@ -1222,7 +1222,7 @@ export default function GenerateForm({
               className="flex justify-start"
             >
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
                 <ThinkingBubble steps={thinkingSteps} />
               </div>
             </motion.div>
@@ -1242,7 +1242,7 @@ export default function GenerateForm({
                     {error}
                   </div>
                 )}
-                <div className="rounded-2xl border border-[#e5e7eb] bg-[#fafaf9] p-4.5 space-y-3.5 shadow-sm" onPaste={handlePaste}>
+                <div className="rounded-xl border border-[#e5e7eb] bg-[#fafaf9] p-4.5 space-y-3.5 shadow-sm" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-[#111111]">{t('attach_image')}</p>
@@ -1302,39 +1302,41 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-[#e5e7eb] bg-white px-4 py-3.5">
-          <form onSubmit={handleSend} className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                pendingNewTopic
-                  ? (locale === 'en' ? 'Enter the new topic to research from scratch' : '새로 만들 주제를 입력하세요')
-                  : readyParams ? t('feedback_placeholder') : t('input_placeholder')
-              }
-              disabled={isWaiting || isRevealingMessage}
-              className="h-12 flex-1 rounded-2xl border border-[#e5e7eb] bg-white px-4 text-sm text-[#111111] placeholder-[#9ca3af] outline-none focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/10 disabled:opacity-50 font-bold transition-all"
-              autoFocus
-            />
-            {isWaiting && (
+        <div className="shrink-0 bg-[#f4f4f4] px-4 pb-5 pt-3">
+          <form onSubmit={handleSend}>
+            <div className="flex items-center gap-2 bg-white rounded-2xl border border-[#e5e7eb] shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  pendingNewTopic
+                    ? (locale === 'en' ? 'Enter the new topic to research from scratch' : '새로 만들 주제를 입력하세요')
+                    : readyParams ? t('feedback_placeholder') : t('input_placeholder')
+                }
+                disabled={isWaiting || isRevealingMessage}
+                className="h-10 flex-1 bg-transparent border-none outline-none px-2 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 font-medium"
+                autoFocus
+              />
+              {isWaiting && (
+                <button
+                  type="button"
+                  onClick={handleCancelAgent}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-[#9ca3af] hover:text-[#6b7280] transition-colors"
+                  title={locale === 'en' ? 'Cancel' : '취소'}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
               <button
-                type="button"
-                onClick={handleCancelAgent}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#e5e7eb] bg-white text-[#6b7280] transition-all hover:border-red-300 hover:text-red-500 active:scale-95"
-                title={locale === 'en' ? 'Cancel' : '취소'}
+                type="submit"
+                disabled={!input.trim() || isWaiting || isRevealingMessage}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:opacity-30 shrink-0"
               >
-                <X className="h-4 w-4" />
+                <Send className="h-4 w-4" />
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={!input.trim() || isWaiting || isRevealingMessage}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#111827] text-white transition-all hover:bg-[#1f2937] hover:shadow-md disabled:opacity-30 active:scale-95 shadow-sm"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+            </div>
           </form>
         </div>
       </motion.div>
@@ -1376,7 +1378,7 @@ export default function GenerateForm({
             {/* 1. Core Summary Card */}
             <motion.div 
               variants={itemVariants}
-              className="rounded-2xl border border-[#e5e7eb] bg-white p-4.5 space-y-3.5 shadow-sm"
+              className="rounded-xl border border-[#e5e7eb] bg-white p-4.5 space-y-3.5 shadow-sm"
             >
               <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
                 <span className="text-[11px] text-[#6b7280] font-bold">{t('topic_label')}</span>
@@ -1413,7 +1415,7 @@ export default function GenerateForm({
                   <h4 className="text-xs font-black uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
                     <Target className="h-3.5 w-3.5 text-[#6b7280]" /> {t('hook_section')}
                   </h4>
-                  <div className="bg-white border border-[#e5e7eb] rounded-2xl p-4 space-y-3 shadow-sm">
+                  <div className="bg-white border border-[#e5e7eb] rounded-xl p-4 space-y-3 shadow-sm">
                     {readyParams.hookDirection && (
                       <div>
                         <span className="block text-[9px] font-bold text-[#9ca3af]">{t('hook_label')}</span>
@@ -1454,7 +1456,7 @@ export default function GenerateForm({
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1], delay: idx * 0.05 }}
-                        className="relative bg-white border border-[#e5e7eb] rounded-2xl p-4.5 shadow-sm space-y-2.5 hover:border-[#9ca3af] transition-all"
+                        className="relative bg-white border border-[#e5e7eb] rounded-xl p-4.5 shadow-sm space-y-2.5 hover:border-[#d1d5db] transition-all"
                       >
                         <div className="flex items-center justify-between border-b border-[#e5e7eb] pb-2">
                           <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#111827] text-[10px] font-black text-white shadow-sm">
@@ -1607,7 +1609,7 @@ function CopyPreviewPanel({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1], delay: idx * 0.04 }}
-              className="group rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-sm transition-all focus-within:border-[#3b82f6] focus-within:bg-white hover:border-[#d1d5db] hover:bg-white"
+              className="group rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-sm transition-all focus-within:border-[#3b82f6] focus-within:bg-white hover:border-[#d1d5db] hover:bg-white"
             >
               <div className="grid gap-4 sm:grid-cols-[92px_minmax(0,1fr)]">
                 <div className="flex items-center gap-2 sm:block">
@@ -1656,7 +1658,7 @@ function CopyPreviewPanel({
         </div>
 
         {/* Image attach */}
-        <div className="mx-auto mt-4 max-w-4xl rounded-2xl border border-[#e5e7eb] bg-[#fafaf9] p-4 shadow-sm">
+        <div className="mx-auto mt-4 max-w-4xl rounded-xl border border-[#e5e7eb] bg-[#fafaf9] p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black text-[#111111]">{t('attach_image')}</p>
@@ -1876,7 +1878,7 @@ function ThinkingBubble({ steps }: { steps: Array<{ step: string; text: string }
     <button
       type="button"
       onClick={() => setExpanded(v => !v)}
-      className="group max-w-xs rounded-2xl rounded-tl-sm bg-white border border-[#e5e7eb] shadow-sm text-left transition-all hover:border-[#9ca3af]/50"
+      className="group max-w-xs rounded-xl rounded-tl-sm bg-white border border-[#e5e7eb] shadow-sm text-left transition-all hover:border-[#9ca3af]/50"
     >
       <div className="flex items-center gap-2.5 px-4 py-3">
         <div className="flex gap-1 shrink-0">
