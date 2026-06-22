@@ -56,7 +56,7 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
     <nav className="flex-1 space-y-0.5 px-2 py-3">
       {navItems.map((item) => {
         const Icon = item.icon
-        const disabled = !hasCompleteBrand && item.key !== 'concept'
+        const disabled = false
         const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`
         const isActive = pathname === conceptPath && activeTab === item.key
 

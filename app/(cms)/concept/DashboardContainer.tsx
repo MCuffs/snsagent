@@ -99,7 +99,7 @@ export default function DashboardContainer({
   })
 
   const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || generalProfile
-  const activeTab = (!hasProfile && tab !== 'concept') ? 'concept' : tab
+  const activeTab = tab
 
   const handleGeneralProfileSaved = (profile: BrandProfileData) => {
     setGeneralProfile(profile)
