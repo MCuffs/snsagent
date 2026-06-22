@@ -98,7 +98,6 @@ export default function DashboardContainer({
     return null
   })
 
-  const hasProfile = (existingBrand && Boolean(existingBrand.websiteUrl)) || generalProfile
   const activeTab = tab
 
   const handleGeneralProfileSaved = (profile: BrandProfileData) => {
@@ -114,6 +113,16 @@ export default function DashboardContainer({
     const newUrl = `${window.location.pathname}?${params.toString()}`
     window.history.replaceState(null, '', newUrl)
     setActiveTab('generate')
+  }
+
+  const handleGenerateProfileChange = (profile: BrandProfileData) => {
+    if (profile.id === activeBrandId) return
+
+    setSelectedBrandId(profile.id)
+    const params = new URLSearchParams(window.location.search)
+    params.set('brandId', profile.id)
+    params.set('tab', 'generate')
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`)
   }
 
   let brandToPass = existingBrand
@@ -194,25 +203,48 @@ export default function DashboardContainer({
       </div>
 
       {brandToPass && (
-        <div className={activeTab === 'generate' ? 'h-full' : 'hidden'}>
-          <GenerateForm
-            key={brandToPass.id}
-            brand={{
-              id: brandToPass.id,
-              name: brandToPass.name,
-              industry: brandToPass.industry,
-              targetAudience: brandToPass.targetAudience,
-              toneOfVoice: brandToPass.toneOfVoice,
-              mainColor: brandToPass.mainColor,
-              forbiddenWords: brandToPass.forbiddenWords,
-              ctaStyle: brandToPass.ctaStyle,
-              brandDna: brandToPass.brandDna || null,
-              websiteUrl: brandToPass.websiteUrl || null,
-            }}
-            userId={userId}
-            userEmail={userEmail}
-            userName={userName}
-          />
+        <div className={activeTab === 'generate' ? 'flex h-full flex-col' : 'hidden'}>
+          <div className="flex shrink-0 items-center gap-3 border-b border-[#e5e7eb] bg-white px-5 py-2.5">
+            <span className="text-xs font-semibold text-[#71717a]">{t('generate_profile_label')}</span>
+            <div className="flex items-center gap-1 rounded-lg bg-[#f4f4f5] p-1">
+              {existingBrand && Boolean(existingBrand.websiteUrl) && (
+                <GenerateProfileButton
+                  active={brandToPass.id === existingBrand.id}
+                  icon={Globe}
+                  label={t('select_url_title')}
+                  onClick={() => handleGenerateProfileChange(existingBrand)}
+                />
+              )}
+              {generalProfile && (
+                <GenerateProfileButton
+                  active={brandToPass.id === generalProfile.id}
+                  icon={TrendingUp}
+                  label={t('select_general_title')}
+                  onClick={() => handleGenerateProfileChange(generalProfile)}
+                />
+              )}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1">
+            <GenerateForm
+              key={brandToPass.id}
+              brand={{
+                id: brandToPass.id,
+                name: brandToPass.name,
+                industry: brandToPass.industry,
+                targetAudience: brandToPass.targetAudience,
+                toneOfVoice: brandToPass.toneOfVoice,
+                mainColor: brandToPass.mainColor,
+                forbiddenWords: brandToPass.forbiddenWords,
+                ctaStyle: brandToPass.ctaStyle,
+                brandDna: brandToPass.brandDna || null,
+                websiteUrl: brandToPass.websiteUrl || null,
+              }}
+              userId={userId}
+              userEmail={userEmail}
+              userName={userName}
+            />
+          </div>
         </div>
       )}
 
@@ -254,6 +286,34 @@ export default function DashboardContainer({
         </div>
       )}
     </div>
+  )
+}
+
+function GenerateProfileButton({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  active: boolean
+  icon: typeof Globe
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+        active
+          ? 'bg-white text-[#111111] shadow-sm'
+          : 'text-[#71717a] hover:text-[#111111]'
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
   )
 }
 

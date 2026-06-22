@@ -227,6 +227,7 @@
     "select_url_title": "URL Profile",
     "select_url_desc": "Auto-analyze brand info from a website URL to create content.",
     "select_general_title": "News/Trend Profile",
+    "generate_profile_label": "Profile for generation",
     "select_general_desc": "Create topic-based card news without a specific brand.",
     "profile_complete": "Setup complete",
     "general_title": "News/Trend Profile",
