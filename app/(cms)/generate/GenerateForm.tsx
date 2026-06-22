@@ -942,16 +942,16 @@ export default function GenerateForm({
     ]
 
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#FFFDF9] via-[#FAF7F2] to-[#FAF8F5] px-6 py-16 text-[#2C1E1A] relative overflow-hidden">
+      <div className="flex h-full flex-col items-center justify-center bg-white px-6 py-16 text-[#111111] relative overflow-hidden">
         {/* Glow ambient background bubbles */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[#E8DCCB]/20 blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[#C2A794]/15 blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-transparent blur-[100px] pointer-events-none" />
 
         <motion.div
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={smoothTransition}
-          className="w-full max-w-lg bg-white/80 backdrop-blur-md border border-[#EFEAE2] rounded-[32px] p-8 shadow-[0_24px_60px_rgba(158,125,104,0.08),_0_4px_12px_rgba(158,125,104,0.02)] relative z-10"
+          className="w-full max-w-lg bg-white border border-[#e5e7eb] rounded-2xl p-8 shadow-md relative z-10"
         >
           <div className="text-center mb-8">
             <motion.div 
@@ -959,12 +959,12 @@ export default function GenerateForm({
               transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
               className="mb-4 inline-flex"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#9E7D68]/10 to-[#C4A38E]/20 border border-[#9E7D68]/20 shadow-[0_8px_24px_rgba(158,125,104,0.06)]">
-                <Sparkles className="h-5 w-5 text-[#9E7D68]" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1e293b] border border-[#e5e7eb] shadow-sm">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
             </motion.div>
-            <h2 className="text-2xl font-black tracking-[-0.03em] text-[#2C1E1A]">{t('building_title')}</h2>
-            <p className="mt-2 text-xs text-[#C2B5AA] font-bold">{t('wait_msg')}</p>
+            <h2 className="text-2xl font-black tracking-[-0.03em] text-[#111111]">{t('building_title')}</h2>
+            <p className="mt-2 text-xs text-[#9ca3af] font-bold">{t('wait_msg')}</p>
           </div>
 
           {/* Timeline Blocks */}
@@ -983,16 +983,16 @@ export default function GenerateForm({
                     isCompleted
                       ? 'bg-emerald-50/40 border-emerald-100/70 text-emerald-800'
                       : isCurrent
-                      ? 'bg-white border-2 border-[#9E7D68] shadow-[0_12px_24px_rgba(158,125,104,0.06)] text-[#2C1E1A]'
-                      : 'bg-[#FCFBF9]/30 border-[#EFEAE2]/60 text-gray-400 opacity-55'
+                      ? 'bg-white border-2 border-[#3b82f6] shadow-sm text-[#111111]'
+                      : 'bg-white border-[#e5e7eb] text-gray-400 opacity-55'
                   }`}
                 >
                   {/* Timeline Connector Line */}
                   {idx < LOADING_STEPS.length - 1 && (
                     <div 
                       className={`absolute left-7 top-14 w-[2px] h-[34px] -translate-x-1/2 z-0 transition-colors duration-500 ${
-                        isCompleted ? 'bg-emerald-400' : 'bg-[#EFEAE2]'
-                      }`} 
+                        isCompleted ? 'bg-emerald-400' : 'bg-[#e5e7eb]'
+                      }`}
                     />
                   )}
 
@@ -1003,7 +1003,7 @@ export default function GenerateForm({
                         <Check className="h-3.5 w-3.5 stroke-[3]" />
                       </div>
                     ) : isCurrent ? (
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#9E7D68] text-white shadow-[0_2px_8px_rgba(158,125,104,0.2)]">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3b82f6] text-white shadow-sm">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       </div>
                     ) : (
@@ -1016,12 +1016,12 @@ export default function GenerateForm({
                   {/* Step Description */}
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-sm font-black tracking-[-0.02em] ${
-                      isCompleted ? 'text-emerald-900' : isCurrent ? 'text-[#2C1E1A]' : 'text-gray-400'
+                      isCompleted ? 'text-emerald-900' : isCurrent ? 'text-[#111111]' : 'text-gray-400'
                     }`}>
                       {LOADING_STEP_TITLES[idx]}
                     </h4>
                     <p className={`mt-1.5 text-xs leading-5 font-semibold ${
-                      isCompleted ? 'text-emerald-700/80' : isCurrent ? 'text-[#8C7E7A]' : 'text-gray-400/70'
+                      isCompleted ? 'text-emerald-700/80' : isCurrent ? 'text-[#6b7280]' : 'text-gray-400/70'
                     }`}>
                       {stepDesc}
                     </p>
@@ -1041,7 +1041,7 @@ export default function GenerateForm({
       variants={formContainerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full overflow-hidden bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#FAF5EE]"
+      className="flex h-full overflow-hidden bg-white"
     >
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {
@@ -1052,27 +1052,27 @@ export default function GenerateForm({
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #E5DDD3;
+          background: #e5e7eb;
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #C4BCAE;
+          background: #d1d5db;
         }
       ` }} />
 
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="flex min-w-0 flex-1 flex-col bg-[#FFFDFB]/80 backdrop-blur-sm border-r border-[#EFEAE2]"
+        className="flex min-w-0 flex-1 flex-col bg-[#fafaf9] border-r border-[#e5e7eb]"
       >
         {/* Header containing Brand chip & Mode Label */}
-        <div className="shrink-0 border-b border-[#EFEAE2] px-5 py-3.5 bg-[#FCFBF9]/60 flex items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#E5DDD3] bg-white px-3 py-1.5 text-xs font-bold text-[#5C4E4B] shadow-[0_2px_8px_rgba(158,125,104,0.04)]">
-            <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#9E7D68' }} />
+        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3.5 bg-white flex items-center justify-between gap-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-bold text-[#374151] shadow-sm">
+            <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
             {brand.name}
           </div>
-          
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5DDD3] bg-[#F2EAE1] px-3.5 py-1.5 text-xs font-black text-[#5C4E4B] shadow-sm">
+
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-[#f3f4f6] px-3.5 py-1.5 text-xs font-black text-[#374151] shadow-sm">
             {generationMode === 'general' ? t('mode_general') : t('mode_brand')}
           </div>
         </div>
@@ -1083,12 +1083,12 @@ export default function GenerateForm({
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#9E7D68] to-[#C4A38E] text-[10px] font-black text-white shadow-sm ring-1 ring-white/20">S</div>
-                <div className="rounded-2xl rounded-tl-sm bg-[#FDFBF7] border border-[#E6DFD5] px-4 py-2.5 shadow-[0_4px_18px_rgba(212,197,185,0.08)]">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
+                <div className="rounded-2xl rounded-tl-sm bg-white border border-[#e5e7eb] px-4 py-2.5 shadow-sm">
                   <div className="flex gap-1.5 py-1">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '0ms' }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '120ms' }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '240ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '0ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '120ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '240ms' }} />
                   </div>
                 </div>
               </div>
@@ -1107,20 +1107,20 @@ export default function GenerateForm({
               >
                 <div className={`flex max-w-[85%] flex-col gap-2.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.role === 'ai' && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#9E7D68] to-[#C4A38E] text-[10px] font-black text-white shadow-sm ring-1 ring-white/20">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">
                       S
                     </div>
                   )}
                   <div
                     className={`rounded-2xl px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line ${
                       msg.role === 'user'
-                        ? 'rounded-tr-sm bg-gradient-to-br from-[#6B5D57] to-[#5C4E4B] text-white shadow-[0_4px_16px_rgba(94,82,77,0.12)]'
-                        : 'rounded-tl-sm bg-[#FDFBF7] text-[#2C1E1A] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)]'
+                        ? 'rounded-tr-sm bg-[#1e293b] text-white shadow-sm'
+                        : 'rounded-tl-sm bg-white text-[#111111] border border-[#e5e7eb] shadow-sm'
                     }`}
                   >
                     {msg.role === 'ai' ? msg.revealedContent : msg.content}
                     {msg.role === 'ai' && msg.isTyping && (
-                      <span className="ml-0.5 inline-block h-[1em] w-px align-middle bg-[#B88E76] animate-pulse" />
+                      <span className="ml-0.5 inline-block h-[1em] w-px align-middle bg-[#9ca3af] animate-pulse" />
                     )}
                   </div>
                   {msg.role === 'ai' && msg.clarification && !msg.isTyping && (
@@ -1128,10 +1128,10 @@ export default function GenerateForm({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-                      className="w-full rounded-2xl border border-[#E0D7CC] bg-white/95 p-3.5 shadow-[0_10px_30px_rgba(158,125,104,0.08)]"
+                      className="w-full rounded-2xl border border-[#e5e7eb] bg-white p-3.5 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-black leading-6 text-[#2C1E1A]">{msg.clarification.question}</p>
+                        <p className="text-sm font-black leading-6 text-[#111111]">{msg.clarification.question}</p>
                         <button
                           type="button"
                           onClick={() => (
@@ -1140,7 +1140,7 @@ export default function GenerateForm({
                               : handleClarificationSelect(null)
                           )}
                           disabled={isWaiting || isRevealingMessage}
-                          className="shrink-0 rounded-full p-1 text-[#8C7E7A] transition-colors hover:bg-[#F2EAE1] disabled:opacity-40"
+                          className="shrink-0 rounded-full p-1 text-[#6b7280] transition-colors hover:bg-[#f3f4f6] disabled:opacity-40"
                           aria-label={locale === 'en' ? 'Close options' : '선택지 닫기'}
                         >
                           <X className="h-4 w-4" />
@@ -1153,13 +1153,13 @@ export default function GenerateForm({
                             type="button"
                             onClick={() => handleClarificationSelect(option)}
                             disabled={isWaiting || isRevealingMessage}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-transparent bg-[#F7F4EF] px-3 py-3 text-left transition-all hover:border-[#C9B29F] hover:bg-[#FFFDFB] disabled:opacity-50"
+                            className="group flex w-full items-center gap-3 rounded-xl border border-transparent bg-[#f9fafb] px-3 py-3 text-left transition-all hover:border-[#e5e7eb] hover:bg-white disabled:opacity-50"
                           >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#8C7E7A] shadow-sm group-hover:text-[#9E7D68]">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#6b7280] shadow-sm group-hover:text-[#3b82f6]">
                               {index + 1}
                             </span>
-                            <span title={option.label} className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-[#3B302C]">{option.label}</span>
-                            <ArrowRight className="h-4 w-4 shrink-0 text-[#A69282] opacity-0 transition-opacity group-hover:opacity-100" />
+                            <span title={option.label} className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-[#374151]">{option.label}</span>
+                            <ArrowRight className="h-4 w-4 shrink-0 text-[#9ca3af] opacity-0 transition-opacity group-hover:opacity-100" />
                           </button>
                         ))}
                       </div>
@@ -1169,12 +1169,12 @@ export default function GenerateForm({
                         </p>
                       )}
                       {msg.clarification.variant === 'refinement' && (
-                        <div className="mt-3 flex flex-col gap-2 border-t border-[#EFEAE2] pt-3 sm:flex-row">
+                        <div className="mt-3 flex flex-col gap-2 border-t border-[#e5e7eb] pt-3 sm:flex-row">
                           <button
                             type="button"
                             onClick={handleCopyPreview}
                             disabled={isWaiting || isRevealingMessage || previewLoading}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#2C1E1A] px-3 py-2.5 text-xs font-black text-[#FFFDF8] transition hover:bg-[#3A2A24] disabled:opacity-40"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#111827] px-3 py-2.5 text-xs font-black text-white transition hover:bg-[#1f2937] disabled:opacity-40"
                           >
                             {previewLoading ? (
                               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -1190,7 +1190,7 @@ export default function GenerateForm({
                               value: NEW_TOPIC_OPTION_VALUE,
                             })}
                             disabled={isWaiting || isRevealingMessage}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#D8CEC1] bg-white px-3 py-2.5 text-xs font-black text-[#5C4E4B] transition hover:border-[#9E7D68] hover:bg-[#FFF8F1] disabled:opacity-40"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-white px-3 py-2.5 text-xs font-black text-[#374151] transition hover:border-[#3b82f6] hover:bg-[#f9fafb] disabled:opacity-40"
                           >
                             {locale === 'en' ? 'Try another topic' : '다른 주제로 만들기'}
                           </button>
@@ -1201,7 +1201,7 @@ export default function GenerateForm({
                           type="button"
                           onClick={() => handleClarificationSelect(null)}
                           disabled={isWaiting || isRevealingMessage}
-                          className="mt-3 rounded-xl border border-[#D8CEC1] bg-white px-3 py-2 text-xs font-black text-[#5C4E4B] transition hover:border-[#9E7D68] disabled:opacity-40"
+                          className="mt-3 rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-black text-[#374151] transition hover:border-[#3b82f6] disabled:opacity-40"
                         >
                           {msg.clarification.skipLabel}
                         </button>
@@ -1222,7 +1222,7 @@ export default function GenerateForm({
               className="flex justify-start"
             >
               <div className="flex flex-col gap-2.5 items-start">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#9E7D68] to-[#C4A38E] text-[10px] font-black text-white shadow-sm ring-1 ring-white/20">S</div>
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e293b] text-[10px] font-black text-white shadow-sm">S</div>
                 <ThinkingBubble steps={thinkingSteps} />
               </div>
             </motion.div>
@@ -1242,30 +1242,30 @@ export default function GenerateForm({
                     {error}
                   </div>
                 )}
-                <div className="rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB] p-4.5 space-y-3.5 shadow-[0_6px_24px_rgba(158,125,104,0.04)]" onPaste={handlePaste}>
+                <div className="rounded-2xl border border-[#e5e7eb] bg-[#fafaf9] p-4.5 space-y-3.5 shadow-sm" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold text-[#2C1E1A]">{t('attach_image')}</p>
-                      <p className="text-[10px] text-[#8C7E7A] mt-0.5 font-semibold">{t('attach_image_desc')}</p>
+                      <p className="text-xs font-bold text-[#111111]">{t('attach_image')}</p>
+                      <p className="text-[10px] text-[#6b7280] mt-0.5 font-semibold">{t('attach_image_desc')}</p>
                     </div>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-bold text-[#2C1E1A] transition-all hover:border-[#9E7D68] hover:bg-[#FFFDFB] shadow-sm active:scale-98">
-                      <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-white px-3.5 py-2.5 text-xs font-bold text-[#111111] transition-all hover:border-[#3b82f6] hover:bg-[#fafaf9] shadow-sm active:scale-98">
+                      <ImagePlus className="h-3.5 w-3.5 text-[#3b82f6]" />
                       {t('select_file')}
                       <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
                     </label>
                   </div>
                   {referenceFiles.length === 0 && (
-                    <p className="text-[10px] text-[#B8AEA4] text-center py-1">{t('paste_hint')}</p>
+                    <p className="text-[10px] text-[#9ca3af] text-center py-1">{t('paste_hint')}</p>
                   )}
                   {referenceFiles.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {referenceFiles.map((file) => (
-                        <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs text-[#5C4E4B] bg-[#FDFBF7] border border-[#EBE2D9] rounded-xl px-3 py-1.5 shadow-sm">
+                        <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs text-[#374151] bg-white border border-[#e5e7eb] rounded-xl px-3 py-1.5 shadow-sm">
                           <span className="truncate font-bold">{file.name}</span>
                           <button
                             type="button"
                             onClick={() => setReferenceFiles(current => current.filter(item => item !== file))}
-                            className="rounded-full p-1 text-[#8C7E7A] hover:bg-[#EBE2D9]/50 transition-colors"
+                            className="rounded-full p-1 text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
                             aria-label={`${file.name} 제거`}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -1279,7 +1279,7 @@ export default function GenerateForm({
                   type="button"
                   onClick={handleCopyPreview}
                   disabled={previewLoading}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] hover:to-[#7E5E4A] py-4 text-sm font-black text-white transition-all hover:shadow-[0_8px_24px_rgba(158,125,104,0.25)] active:scale-[0.99] disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-[#111827] hover:bg-[#1f2937] py-4 text-sm font-black text-white transition-all hover:shadow-md active:scale-[0.99] disabled:opacity-60"
                 >
                   {previewLoading ? (
                     <>
@@ -1288,7 +1288,7 @@ export default function GenerateForm({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4 text-[#FFFDF8]" />
+                      <Sparkles className="h-4 w-4 text-white" />
                       {t('copy_preview_cta')}
                       <ArrowRight className="h-4 w-4" />
                     </>
@@ -1302,7 +1302,7 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-[#EFEAE2] bg-[#FCFBF9]/80 backdrop-blur-md px-4 py-3.5">
+        <div className="shrink-0 border-t border-[#e5e7eb] bg-white px-4 py-3.5">
           <form onSubmit={handleSend} className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -1315,14 +1315,14 @@ export default function GenerateForm({
                   : readyParams ? t('feedback_placeholder') : t('input_placeholder')
               }
               disabled={isWaiting || isRevealingMessage}
-              className="h-12 flex-1 rounded-2xl border border-[#E6DFD5] bg-white px-4 text-sm text-[#2C1E1A] placeholder-[#C2B5AA] outline-none focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/5 disabled:opacity-50 font-bold transition-all"
+              className="h-12 flex-1 rounded-2xl border border-[#e5e7eb] bg-white px-4 text-sm text-[#111111] placeholder-[#9ca3af] outline-none focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/10 disabled:opacity-50 font-bold transition-all"
               autoFocus
             />
             {isWaiting && (
               <button
                 type="button"
                 onClick={handleCancelAgent}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#E6DFD5] bg-white text-[#8C7E7A] transition-all hover:border-red-300 hover:text-red-500 active:scale-95"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#e5e7eb] bg-white text-[#6b7280] transition-all hover:border-red-300 hover:text-red-500 active:scale-95"
                 title={locale === 'en' ? 'Cancel' : '취소'}
               >
                 <X className="h-4 w-4" />
@@ -1331,7 +1331,7 @@ export default function GenerateForm({
             <button
               type="submit"
               disabled={!input.trim() || isWaiting || isRevealingMessage}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#9E7D68] to-[#8C6B56] text-white transition-all hover:to-[#7E5E4A] hover:shadow-[0_4px_12px_rgba(158,125,104,0.2)] disabled:opacity-30 active:scale-95 shadow-sm"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#111827] text-white transition-all hover:bg-[#1f2937] hover:shadow-md disabled:opacity-30 active:scale-95 shadow-sm"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -1342,15 +1342,15 @@ export default function GenerateForm({
       {/* AI Strategy Director Panel (hidden on mobile) */}
       <motion.div
         variants={formItemVariants}
-        className="hidden w-[390px] shrink-0 flex-col bg-gradient-to-b from-[#FCFBF9] to-[#F5F1E9] text-[#2C1E1A] border-l border-[#EFEAE2] overflow-y-auto xl:flex custom-scrollbar"
+        className="hidden w-[390px] shrink-0 flex-col bg-white text-[#111111] border-l border-[#e5e7eb] overflow-y-auto xl:flex custom-scrollbar"
       >
-        <div className="border-b border-[#EFEAE2] px-5 py-5 bg-[#FCFBF9]/90 backdrop-blur-md sticky top-0 z-10">
+        <div className="border-b border-[#e5e7eb] px-5 py-5 bg-white sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#B88E76] flex items-center gap-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] flex items-center gap-1">
                 <Sparkle className="h-3 w-3 fill-current" /> AI Content Director
               </p>
-              <h3 className="mt-1 text-base font-black tracking-tight text-[#2C1E1A]">{t('director_title')}</h3>
+              <h3 className="mt-1 text-base font-black tracking-tight text-[#111111]">{t('director_title')}</h3>
             </div>
             {readyParams ? (
               <span className="flex items-center gap-1.5 rounded-full bg-[#EDF7F2] px-2.5 py-1 text-[10px] font-bold text-[#2F7E53] border border-[#C6EBCE]/50 shadow-sm">
@@ -1376,29 +1376,29 @@ export default function GenerateForm({
             {/* 1. Core Summary Card */}
             <motion.div 
               variants={itemVariants}
-              className="rounded-2xl border border-[#EFEAE2] bg-white/80 backdrop-blur-sm p-4.5 space-y-3.5 shadow-[0_4px_20px_rgba(158,125,104,0.03)]"
+              className="rounded-2xl border border-[#e5e7eb] bg-white p-4.5 space-y-3.5 shadow-sm"
             >
-              <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('topic_label')}</span>
-                <span className="text-xs font-black text-[#2C1E1A] truncate max-w-[200px]">{readyParams.topic}</span>
+              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
+                <span className="text-[11px] text-[#6b7280] font-bold">{t('topic_label')}</span>
+                <span className="text-xs font-black text-[#111111] truncate max-w-[200px]">{readyParams.topic}</span>
               </div>
-              <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('visual_label')}</span>
-                <span className="rounded bg-[#9E7D68]/10 border border-[#9E7D68]/20 px-2 py-0.5 text-[10px] font-black text-[#9E7D68]">
+              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
+                <span className="text-[11px] text-[#6b7280] font-bold">{t('visual_label')}</span>
+                <span className="rounded bg-[#3b82f6]/10 border border-[#3b82f6]/20 px-2 py-0.5 text-[10px] font-black text-[#3b82f6]">
                   {readyParams.visualHint}
                 </span>
               </div>
-              <div className="flex justify-between border-b border-[#F5EFE6] pb-2.5">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('content_type_label')}</span>
-                <span className="text-xs font-bold text-[#5C4E4B]">{readyParams.contentType}</span>
+              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
+                <span className="text-[11px] text-[#6b7280] font-bold">{t('content_type_label')}</span>
+                <span className="text-xs font-bold text-[#374151]">{readyParams.contentType}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[11px] text-[#8C7E7A] font-bold">{t('slide_count_label')}</span>
-                <span className="text-xs font-bold text-[#5C4E4B]">{t('slide_count_value', { count: readyParams.slideCount })}</span>
+                <span className="text-[11px] text-[#6b7280] font-bold">{t('slide_count_label')}</span>
+                <span className="text-xs font-bold text-[#374151]">{t('slide_count_value', { count: readyParams.slideCount })}</span>
               </div>
-              <div className="rounded-xl bg-[#F8F4EE] px-3 py-3">
-                <span className="block text-[10px] font-bold text-[#A69282] mb-1">{t('objective_label')}</span>
-                <p className="text-xs font-semibold leading-5 text-[#5C4E4B]">{readyParams.objective}</p>
+              <div className="rounded-xl bg-[#f9fafb] px-3 py-3">
+                <span className="block text-[10px] font-bold text-[#9ca3af] mb-1">{t('objective_label')}</span>
+                <p className="text-xs font-semibold leading-5 text-[#374151]">{readyParams.objective}</p>
               </div>
             </motion.div>
 
@@ -1410,20 +1410,20 @@ export default function GenerateForm({
                   transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
                   className="space-y-4"
                 >
-                  <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-[#B88E76]" /> {t('hook_section')}
+                  <h4 className="text-xs font-black uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-[#6b7280]" /> {t('hook_section')}
                   </h4>
-                  <div className="bg-white/80 backdrop-blur-sm border border-[#EFEAE2] rounded-2xl p-4 space-y-3 shadow-[0_4px_16px_rgba(158,125,104,0.02)]">
+                  <div className="bg-white border border-[#e5e7eb] rounded-2xl p-4 space-y-3 shadow-sm">
                     {readyParams.hookDirection && (
                       <div>
-                        <span className="block text-[9px] font-bold text-[#A69282]">{t('hook_label')}</span>
-                        <p className="text-xs font-bold text-[#2C1E1A] mt-1 leading-5">{readyParams.hookDirection}</p>
+                        <span className="block text-[9px] font-bold text-[#9ca3af]">{t('hook_label')}</span>
+                        <p className="text-xs font-bold text-[#111111] mt-1 leading-5">{readyParams.hookDirection}</p>
                       </div>
                     )}
                     {readyParams.recommendedCta && (
-                      <div className="border-t border-[#F5EFE6] pt-3">
-                        <span className="block text-[9px] font-bold text-[#A69282]">{t('cta_label')}</span>
-                        <p className="text-xs font-bold text-[#C68D6A] mt-1">{readyParams.recommendedCta}</p>
+                      <div className="border-t border-[#e5e7eb] pt-3">
+                        <span className="block text-[9px] font-bold text-[#9ca3af]">{t('cta_label')}</span>
+                        <p className="text-xs font-bold text-[#3b82f6] mt-1">{readyParams.recommendedCta}</p>
                       </div>
                     )}
                   </div>
@@ -1441,8 +1441,8 @@ export default function GenerateForm({
                 transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
                 className="space-y-4 pt-2"
               >
-                <h4 className="text-xs font-black uppercase tracking-wider text-[#A69282] flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[#B88E76]" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-[#6b7280]" />
                   {readyParams.draftSlides && readyParams.draftSlides.length > 0 ? (locale === 'en' ? 'Draft Copy & Strategy' : '기획 및 카피 초안') : t('flow_section')}
                 </h4>
                 
@@ -1454,24 +1454,24 @@ export default function GenerateForm({
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1], delay: idx * 0.05 }}
-                        className="relative bg-white/90 border border-[#EFEAE2] rounded-2xl p-4.5 shadow-[0_3px_12px_rgba(158,125,104,0.03)] space-y-2.5 hover:border-[#C4A38E] transition-all"
+                        className="relative bg-white border border-[#e5e7eb] rounded-2xl p-4.5 shadow-sm space-y-2.5 hover:border-[#9ca3af] transition-all"
                       >
-                        <div className="flex items-center justify-between border-b border-[#F5EFE6] pb-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#2C1E1A] text-[10px] font-black text-[#FFFDF8] shadow-sm">
+                        <div className="flex items-center justify-between border-b border-[#e5e7eb] pb-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#111827] text-[10px] font-black text-white shadow-sm">
                             {slide.slideNumber}
                           </span>
-                          <span className="rounded-full border border-[#E8DCCB] bg-[#F8F4EE] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#9E7D68]">
+                          <span className="rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#374151]">
                             {slide.role}
                           </span>
                         </div>
                         <div className="space-y-1.5">
-                          <p className="text-xs font-black leading-5 text-[#2C1E1A]">{slide.headline}</p>
-                          <p className="text-[11px] font-medium leading-relaxed text-[#5C4E4B]">{slide.body}</p>
+                          <p className="text-xs font-black leading-5 text-[#111111]">{slide.headline}</p>
+                          <p className="text-[11px] font-medium leading-relaxed text-[#374151]">{slide.body}</p>
                         </div>
                         {slide.reasoning && (
-                          <div className="border-t border-[#F5EFE6] pt-2 mt-1">
-                            <span className="block text-[8px] font-black text-[#B88E76] uppercase tracking-[0.12em]">{locale === 'en' ? 'Reasoning' : '디렉터 기획 의도'}</span>
-                            <p className="text-[10px] text-[#8C7E7A] leading-relaxed mt-0.5 font-semibold">{slide.reasoning}</p>
+                          <div className="border-t border-[#e5e7eb] pt-2 mt-1">
+                            <span className="block text-[8px] font-black text-[#6b7280] uppercase tracking-[0.12em]">{locale === 'en' ? 'Reasoning' : '디렉터 기획 의도'}</span>
+                            <p className="text-[10px] text-[#6b7280] leading-relaxed mt-0.5 font-semibold">{slide.reasoning}</p>
                           </div>
                         )}
                       </motion.div>
@@ -1479,7 +1479,7 @@ export default function GenerateForm({
                   </div>
                 ) : (
                   <>
-                    <div className="relative border-l border-dashed border-[#E5DDD3] pl-5 ml-2.5 space-y-5">
+                    <div className="relative border-l border-dashed border-[#e5e7eb] pl-5 ml-2.5 space-y-5">
                       {compactSlidePreview(readyParams.structurePreview!).map((slide, idx) => (
                         <motion.div 
                           key={slide.slideNumber}
@@ -1488,18 +1488,18 @@ export default function GenerateForm({
                           transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1], delay: idx * 0.08 + 0.3 }}
                           className="relative"
                         >
-                          <span className="absolute -left-[30px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FAF8F5] border-2 border-[#9E7D68] text-[10px] font-black text-[#9E7D68] shadow-[0_2px_4px_rgba(158,125,104,0.1)]">
+                          <span className="absolute -left-[30px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white border-2 border-[#3b82f6] text-[10px] font-black text-[#3b82f6] shadow-sm">
                             {slide.slideNumber}
                           </span>
                           <div className="space-y-0.5">
-                            <span className="text-[9px] font-black tracking-wider uppercase text-[#B88E76]">{slide.role}</span>
-                            <p className="text-xs font-semibold text-[#5C4E4B] leading-5">{slide.description}</p>
+                            <span className="text-[9px] font-black tracking-wider uppercase text-[#6b7280]">{slide.role}</span>
+                            <p className="text-xs font-semibold text-[#374151] leading-5">{slide.description}</p>
                           </div>
                         </motion.div>
                       ))}
                     </div>
                     {readyParams.structurePreview!.length > 4 && (
-                      <p className="pl-2 text-[10px] font-bold text-[#A69282]">
+                      <p className="pl-2 text-[10px] font-bold text-[#9ca3af]">
                         {t('flow_note', { count: readyParams.structurePreview!.length - 4 })}
                       </p>
                     )}
@@ -1510,25 +1510,25 @@ export default function GenerateForm({
           </motion.div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-5 relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-[#E8DCCB]/25 blur-[60px] pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-transparent blur-[60px] pointer-events-none" />
             <motion.div
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#E6DFD5] shadow-[0_8px_24px_rgba(158,125,104,0.06)]"
+              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#e5e7eb] shadow-sm"
             >
-              <Compass className="h-6 w-6 text-[#B88E76] animate-[spin_12s_linear_infinite]" />
+              <Compass className="h-6 w-6 text-[#6b7280] animate-[spin_12s_linear_infinite]" />
             </motion.div>
             <div className="relative z-10 space-y-2">
-              <p className="text-sm font-black text-[#2C1E1A]">{t('director_waiting')}</p>
-              <p className="text-xs leading-5 text-[#8C7E7A] font-semibold max-w-[240px] mx-auto">
+              <p className="text-sm font-black text-[#111111]">{t('director_waiting')}</p>
+              <p className="text-xs leading-5 text-[#6b7280] font-semibold max-w-[240px] mx-auto">
                 {t('director_waiting_desc')}
               </p>
             </div>
           </div>
         )}
 
-        <div className="border-t border-[#EFEAE2] px-5 py-4 bg-[#FCFBF9] text-center shrink-0">
-          <p className="text-[10px] text-[#A69282] leading-relaxed font-semibold">
+        <div className="border-t border-[#e5e7eb] px-5 py-4 bg-white text-center shrink-0">
+          <p className="text-[10px] text-[#9ca3af] leading-relaxed font-semibold">
             Shuffla AI Content Strategy Engine v2.0
           </p>
         </div>
@@ -1569,22 +1569,22 @@ function CopyPreviewPanel({
   const totalCharacters = editedSlides.reduce((sum, slide) => sum + slide.headline.length + slide.body.length, 0)
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-br from-[#FFFDFB] via-[#FAF7F2] to-[#F5F1E9] text-[#2C1E1A]">
+    <div className="flex h-full flex-col bg-white text-[#111111]">
       {/* Header */}
-      <div className="shrink-0 border-b border-[#EFEAE2] bg-[#FFFDFB]/88 px-5 py-4 backdrop-blur-xl">
+      <div className="shrink-0 border-b border-[#e5e7eb] bg-white px-5 py-4">
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#E5DDD3] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#9E7D68] shadow-[0_3px_12px_rgba(158,125,104,0.05)]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#374151] shadow-sm">
               <Sparkle className="h-3 w-3" />
               Copy Desk
             </div>
-            <h2 className="mt-2 text-lg font-black tracking-[-0.02em] text-[#2C1E1A]">{t('copy_preview_title')}</h2>
-            <p className="mt-1 truncate text-xs font-semibold text-[#8C7E7A]">{t('copy_preview_desc')}</p>
+            <h2 className="mt-2 text-lg font-black tracking-[-0.02em] text-[#111111]">{t('copy_preview_title')}</h2>
+            <p className="mt-1 truncate text-xs font-semibold text-[#6b7280]">{t('copy_preview_desc')}</p>
           </div>
           <button
             type="button"
             onClick={onBack}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#E5DDD3] bg-white px-3 py-2 text-xs font-black text-[#5C4E4B] shadow-sm transition-all hover:border-[#C9B29F] hover:bg-[#FFF8F1]"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-black text-[#374151] shadow-sm transition-all hover:border-[#9ca3af] hover:bg-[#f9fafb]"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             {t('copy_preview_back')}
@@ -1607,46 +1607,46 @@ function CopyPreviewPanel({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1], delay: idx * 0.04 }}
-              className="group rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB]/92 p-4 shadow-[0_8px_28px_rgba(158,125,104,0.05)] transition-all focus-within:border-[#B88E76] focus-within:bg-white hover:border-[#D7C7B8] hover:bg-white"
+              className="group rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-sm transition-all focus-within:border-[#3b82f6] focus-within:bg-white hover:border-[#d1d5db] hover:bg-white"
             >
               <div className="grid gap-4 sm:grid-cols-[92px_minmax(0,1fr)]">
                 <div className="flex items-center gap-2 sm:block">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2C1E1A] text-xs font-black text-[#FFFDF8] shadow-[0_8px_18px_rgba(44,30,26,0.12)]">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#111827] text-xs font-black text-white shadow-sm">
                     {String(slide.slideNumber).padStart(2, '0')}
                   </span>
                   <div className="min-w-0 sm:mt-3">
-                    <span className="inline-flex max-w-full rounded-full border border-[#E8DCCB] bg-[#F8F4EE] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#9E7D68]">
+                    <span className="inline-flex max-w-full rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#374151]">
                       <span className="truncate">{slide.role}</span>
                     </span>
                   </div>
                 </div>
                 <div className="min-w-0">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#A69282]">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9ca3af]">
                       {locale === 'en' ? 'Headline' : '제목'}
                     </span>
-                    <span className="text-[10px] font-bold text-[#C2B5AA]">{slide.headline.length}</span>
+                    <span className="text-[10px] font-bold text-[#9ca3af]">{slide.headline.length}</span>
                   </div>
                   <input
                     type="text"
                     value={slide.headline}
                     onChange={(e) => updateSlide(slide.slideNumber, 'headline', e.target.value)}
                     placeholder={locale === 'en' ? 'Headline' : '제목'}
-                    className="h-11 w-full rounded-xl border border-[#E6DFD5] bg-white px-3 text-base font-black tracking-[-0.01em] text-[#2C1E1A] outline-none transition-all placeholder:text-[#C2B5AA] focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/8"
+                    className="h-11 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-base font-black tracking-[-0.01em] text-[#111111] outline-none transition-all placeholder:text-[#9ca3af] focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/10"
                   />
                   <div className="mt-2">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#A69282]">
+                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9ca3af]">
                         {locale === 'en' ? 'Body copy' : '본문'}
                       </span>
-                      <span className="text-[10px] font-bold text-[#C2B5AA]">{slide.body.length}</span>
+                      <span className="text-[10px] font-bold text-[#9ca3af]">{slide.body.length}</span>
                     </div>
                     <textarea
                       value={slide.body}
                       onChange={(e) => updateSlide(slide.slideNumber, 'body', e.target.value)}
                       placeholder={locale === 'en' ? 'Body copy' : '본문'}
                       rows={3}
-                      className="min-h-[96px] w-full resize-y rounded-xl border border-[#E6DFD5] bg-white px-3 py-2.5 text-sm font-semibold leading-6 text-[#5C4E4B] outline-none transition-all placeholder:text-[#C2B5AA] focus:border-[#9E7D68] focus:ring-2 focus:ring-[#9E7D68]/8"
+                      className="min-h-[96px] w-full resize-y rounded-xl border border-[#e5e7eb] bg-white px-3 py-2.5 text-sm font-semibold leading-6 text-[#374151] outline-none transition-all placeholder:text-[#9ca3af] focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/10"
                     />
                   </div>
                 </div>
@@ -1656,14 +1656,14 @@ function CopyPreviewPanel({
         </div>
 
         {/* Image attach */}
-        <div className="mx-auto mt-4 max-w-4xl rounded-2xl border border-[#E6DFD5] bg-[#FFFDFB]/92 p-4 shadow-[0_8px_28px_rgba(158,125,104,0.05)]">
+        <div className="mx-auto mt-4 max-w-4xl rounded-2xl border border-[#e5e7eb] bg-[#fafaf9] p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black text-[#2C1E1A]">{t('attach_image')}</p>
-              <p className="mt-0.5 text-[10px] font-semibold text-[#8C7E7A]">{t('attach_image_desc')}</p>
+              <p className="text-xs font-black text-[#111111]">{t('attach_image')}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-[#6b7280]">{t('attach_image_desc')}</p>
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#E6DFD5] bg-white px-3.5 py-2.5 text-xs font-black text-[#2C1E1A] shadow-sm transition-all hover:border-[#9E7D68] hover:bg-[#FFF8F1]">
-              <ImagePlus className="h-3.5 w-3.5 text-[#9E7D68]" />
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#e5e7eb] bg-white px-3.5 py-2.5 text-xs font-black text-[#111111] shadow-sm transition-all hover:border-[#3b82f6] hover:bg-[#f9fafb]">
+              <ImagePlus className="h-3.5 w-3.5 text-[#3b82f6]" />
               {t('select_file')}
               <input
                 type="file"
@@ -1684,12 +1684,12 @@ function CopyPreviewPanel({
           {referenceFiles.length > 0 && (
             <div className="mt-3 space-y-1.5">
               {referenceFiles.map((file) => (
-                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded-xl border border-[#EBE2D9] bg-[#FDFBF7] px-3 py-1.5 text-xs text-[#5C4E4B]">
+                <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs text-[#374151]">
                   <span className="truncate font-medium">{file.name}</span>
                   <button
                     type="button"
                     onClick={() => setReferenceFiles(prev => prev.filter(f => f !== file))}
-                    className="rounded-full p-1 text-[#8C7E7A] transition-colors hover:bg-[#EBE2D9]/70"
+                    className="rounded-full p-1 text-[#6b7280] transition-colors hover:bg-[#f3f4f6]"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1703,18 +1703,18 @@ function CopyPreviewPanel({
       </div>
 
       {/* Sticky bottom bar */}
-      <div className="shrink-0 border-t border-[#EFEAE2] bg-[#FFFDFB]/90 px-5 py-3.5 backdrop-blur-xl">
+      <div className="shrink-0 border-t border-[#e5e7eb] bg-white px-5 py-3.5">
         <div className="mx-auto flex max-w-4xl items-center gap-4">
           <div className="hidden min-w-0 flex-1 sm:block">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#A69282]">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9ca3af]">
               {editedSlides.length} slides · {totalCharacters} chars
             </p>
-            <p className="mt-0.5 truncate text-xs font-semibold text-[#5C4E4B]">{t('copy_preview_desc')}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-[#374151]">{t('copy_preview_desc')}</p>
           </div>
           <button
             type="button"
             onClick={() => onConfirm(editedSlides)}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#2C1E1A] px-5 py-3 text-sm font-black text-[#FFFDF8] shadow-[0_14px_34px_rgba(44,30,26,0.18)] transition-all hover:bg-[#3B302C] active:scale-[0.99] sm:w-auto sm:min-w-[220px]"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111827] px-5 py-3 text-sm font-black text-white shadow-md transition-all hover:bg-[#1f2937] active:scale-[0.99] sm:w-auto sm:min-w-[220px]"
           >
             <Sparkles className="h-4 w-4" />
             {t('copy_preview_confirm')}
@@ -1816,7 +1816,7 @@ function PromoPaymentModal({
                 }`}
               >
                 <span>{plan === 'PRO' ? 'Creator' : 'Studio'}</span>
-                <span className={`ml-1 text-[10px] font-bold ${selectedPlan === plan ? 'text-[#9E7D68]' : 'text-white/25'}`}>
+                <span className={`ml-1 text-[10px] font-bold ${selectedPlan === plan ? 'text-[#3b82f6]' : 'text-white/25'}`}>
                   {plan === 'PRO' ? '25,000원' : '39,000원'}
                 </span>
               </button>
@@ -1876,24 +1876,24 @@ function ThinkingBubble({ steps }: { steps: Array<{ step: string; text: string }
     <button
       type="button"
       onClick={() => setExpanded(v => !v)}
-      className="group max-w-xs rounded-2xl rounded-tl-sm bg-[#FDFBF7] border border-[#E6DFD5] shadow-[0_4px_18px_rgba(212,197,185,0.08)] text-left transition-all hover:border-[#C4A38E]/50"
+      className="group max-w-xs rounded-2xl rounded-tl-sm bg-white border border-[#e5e7eb] shadow-sm text-left transition-all hover:border-[#9ca3af]/50"
     >
       <div className="flex items-center gap-2.5 px-4 py-3">
         <div className="flex gap-1 shrink-0">
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '0ms' }} />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '120ms' }} />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#C4A38E]" style={{ animationDelay: '240ms' }} />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '0ms' }} />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '120ms' }} />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '240ms' }} />
         </div>
-        <span className="text-[11px] font-semibold text-[#9E8B7D] line-clamp-1">{currentLabel}</span>
-        <span className="ml-auto shrink-0 text-[10px] text-[#B8A99A] group-hover:text-[#9E8B7D] transition-colors">
+        <span className="text-[11px] font-semibold text-[#6b7280] line-clamp-1">{currentLabel}</span>
+        <span className="ml-auto shrink-0 text-[10px] text-[#9ca3af] group-hover:text-[#6b7280] transition-colors">
           {expanded ? '▲' : '▼'}
         </span>
       </div>
       {expanded && steps.length > 0 && (
-        <div className="border-t border-[#EDE6DE] px-4 pb-3 pt-2.5 max-h-48 overflow-y-auto">
+        <div className="border-t border-[#e5e7eb] px-4 pb-3 pt-2.5 max-h-48 overflow-y-auto">
           <div className="space-y-2">
             {steps.map((s, i) => (
-              <div key={i} className={`text-[11px] leading-5 ${i === steps.length - 1 ? 'text-[#7A6A5E]' : 'text-[#B0A096]'}`}>
+              <div key={i} className={`text-[11px] leading-5 ${i === steps.length - 1 ? 'text-[#374151]' : 'text-[#9ca3af]'}`}>
                 <div className="flex items-start gap-1.5">
                   <span className="shrink-0 mt-0.5">{i === steps.length - 1 ? '→' : '✓'}</span>
                   <span className="whitespace-pre-wrap">{i === steps.length - 1 ? <strong>{s.text}</strong> : s.text}</span>
