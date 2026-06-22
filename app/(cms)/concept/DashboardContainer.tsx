@@ -217,13 +217,16 @@ export default function DashboardContainer({
       )}
 
       <div className={activeTab === 'video' ? 'h-full' : 'hidden'}>
-        <VideoCardNewsForm
-          brand={brandToPass}
-          userId={userId}
-          userEmail={userEmail}
-          userName={userName}
-          isGuest={isGuest}
-        />
+        {brandToPass ? (
+          <VideoCardNewsForm
+            brand={brandToPass}
+            hasApiKey={hasVideoApiKey}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center p-12 text-sm text-[#71717a]">
+            브랜드 프로필을 먼저 설정해주세요.
+          </div>
+        )}
       </div>
 
       <div className={activeTab === 'works' ? 'h-full' : 'hidden'}>
