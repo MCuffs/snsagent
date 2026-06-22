@@ -10,7 +10,7 @@ import VideoCardNewsForm from '../video-cardnews/VideoCardNewsForm'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn } from 'lucide-react'
+import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn, Plus } from 'lucide-react'
 import Link from 'next/link'
 
 interface BrandProfileData {
@@ -99,6 +99,8 @@ export default function DashboardContainer({
   })
 
   const activeTab = tab
+  const urlProfile = existingBrand && Boolean(existingBrand.websiteUrl) ? existingBrand : null
+  const hasAnyProfile = Boolean(urlProfile || generalProfile)
 
   const handleGeneralProfileSaved = (profile: BrandProfileData) => {
     setGeneralProfile(profile)
@@ -125,18 +127,28 @@ export default function DashboardContainer({
     window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`)
   }
 
-  let brandToPass = existingBrand
+  const handleCreateProfile = (type: 'brand' | 'general') => {
+    if (handleGuestAction()) return
+    setSubProfile(type)
+    const params = new URLSearchParams(window.location.search)
+    params.delete('brandId')
+    const query = params.toString()
+    window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname)
+    setActiveTab('concept')
+  }
+
+  let brandToPass = urlProfile
   const activeBrandId = selectedBrandId || urlBrandId
   if (activeBrandId) {
     if (generalProfile && activeBrandId === generalProfile.id) {
       brandToPass = generalProfile
-    } else if (existingBrand && activeBrandId === existingBrand.id) {
-      brandToPass = existingBrand
+    } else if (urlProfile && activeBrandId === urlProfile.id) {
+      brandToPass = urlProfile
     } else {
-      brandToPass = existingBrand || generalProfile
+      brandToPass = urlProfile || generalProfile
     }
   } else {
-    brandToPass = existingBrand || generalProfile
+    brandToPass = urlProfile || generalProfile
   }
 
   return (
@@ -202,51 +214,91 @@ export default function DashboardContainer({
         </div>
       </div>
 
-      {brandToPass && (
-        <div className={activeTab === 'generate' ? 'flex h-full flex-col' : 'hidden'}>
-          <div className="flex shrink-0 items-center gap-3 border-b border-[#e5e7eb] bg-white px-5 py-2.5">
-            <span className="text-xs font-semibold text-[#71717a]">{t('generate_profile_label')}</span>
-            <div className="flex items-center gap-1 rounded-lg bg-[#f4f4f5] p-1">
-              {existingBrand && Boolean(existingBrand.websiteUrl) && (
+      <div className={activeTab === 'generate' ? 'flex h-full flex-col' : 'hidden'}>
+          {hasAnyProfile && <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[#e5e7eb] bg-white px-5 py-2.5">
+            <span className="shrink-0 text-xs font-semibold text-[#71717a]">{t('generate_profile_label')}</span>
+            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-[#f4f4f5] p-1">
+              {urlProfile ? (
                 <GenerateProfileButton
-                  active={brandToPass.id === existingBrand.id}
+                  active={brandToPass?.id === urlProfile.id}
                   icon={Globe}
                   label={t('select_url_title')}
-                  onClick={() => handleGenerateProfileChange(existingBrand)}
+                  onClick={() => handleGenerateProfileChange(urlProfile)}
+                />
+              ) : (
+                <CreateProfileButton
+                  icon={Globe}
+                  label={t('select_url_title')}
+                  createLabel={t('create_profile')}
+                  onClick={() => handleCreateProfile('brand')}
                 />
               )}
-              {generalProfile && (
+              {generalProfile ? (
                 <GenerateProfileButton
-                  active={brandToPass.id === generalProfile.id}
+                  active={brandToPass?.id === generalProfile.id}
                   icon={TrendingUp}
                   label={t('select_general_title')}
                   onClick={() => handleGenerateProfileChange(generalProfile)}
                 />
+              ) : (
+                <CreateProfileButton
+                  icon={TrendingUp}
+                  label={t('select_general_title')}
+                  createLabel={t('create_profile')}
+                  onClick={() => handleCreateProfile('general')}
+                />
               )}
             </div>
-          </div>
+          </div>}
           <div className="min-h-0 flex-1">
-            <GenerateForm
-              key={brandToPass.id}
-              brand={{
-                id: brandToPass.id,
-                name: brandToPass.name,
-                industry: brandToPass.industry,
-                targetAudience: brandToPass.targetAudience,
-                toneOfVoice: brandToPass.toneOfVoice,
-                mainColor: brandToPass.mainColor,
-                forbiddenWords: brandToPass.forbiddenWords,
-                ctaStyle: brandToPass.ctaStyle,
-                brandDna: brandToPass.brandDna || null,
-                websiteUrl: brandToPass.websiteUrl || null,
-              }}
-              userId={userId}
-              userEmail={userEmail}
-              userName={userName}
-            />
+            {brandToPass ? (
+              <GenerateForm
+                key={brandToPass.id}
+                brand={{
+                  id: brandToPass.id,
+                  name: brandToPass.name,
+                  industry: brandToPass.industry,
+                  targetAudience: brandToPass.targetAudience,
+                  toneOfVoice: brandToPass.toneOfVoice,
+                  mainColor: brandToPass.mainColor,
+                  forbiddenWords: brandToPass.forbiddenWords,
+                  ctaStyle: brandToPass.ctaStyle,
+                  brandDna: brandToPass.brandDna || null,
+                  websiteUrl: brandToPass.websiteUrl || null,
+                }}
+                userId={userId}
+                userEmail={userEmail}
+                userName={userName}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 py-10 text-center">
+                <div className="w-full max-w-xl">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#f4f4f5]">
+                    <Plus className="h-5 w-5 text-[#52525b]" />
+                  </div>
+                  <h2 className="mt-4 text-base font-bold text-[#111111]">{t('generate_empty_title')}</h2>
+                  <p className="mt-2 text-sm leading-6 text-[#71717a]">{t('generate_empty_desc')}</p>
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    <EmptyProfileChoice
+                      icon={Globe}
+                      title={t('select_url_title')}
+                      description={t('select_url_desc')}
+                      actionLabel={t('create_profile')}
+                      onClick={() => handleCreateProfile('brand')}
+                    />
+                    <EmptyProfileChoice
+                      icon={TrendingUp}
+                      title={t('select_general_title')}
+                      description={t('select_general_desc')}
+                      actionLabel={t('create_profile')}
+                      onClick={() => handleCreateProfile('general')}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
 
       <div className={activeTab === 'video' ? 'h-full' : 'hidden'}>
         {brandToPass ? (
@@ -313,6 +365,65 @@ function GenerateProfileButton({
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
+    </button>
+  )
+}
+
+function CreateProfileButton({
+  icon: Icon,
+  label,
+  createLabel,
+  onClick,
+}: {
+  icon: typeof Globe
+  label: string
+  createLabel: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-[#d4d4d8] bg-white/60 px-3 py-1.5 text-xs font-semibold text-[#71717a] transition-colors hover:border-[#a1a1aa] hover:text-[#111111]"
+    >
+      <Icon className="h-3.5 w-3.5" />
+      <span>{label}</span>
+      <span className="inline-flex items-center gap-0.5 text-[#2563eb]">
+        <Plus className="h-3 w-3" />
+        {createLabel}
+      </span>
+    </button>
+  )
+}
+
+function EmptyProfileChoice({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  onClick,
+}: {
+  icon: typeof Globe
+  title: string
+  description: string
+  actionLabel: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group rounded-xl border border-[#e4e4e7] bg-white p-5 text-left transition-all hover:border-[#a1a1aa] hover:shadow-sm"
+    >
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f4f4f5] transition-colors group-hover:bg-[#111111]">
+        <Icon className="h-4 w-4 text-[#71717a] transition-colors group-hover:text-white" />
+      </div>
+      <p className="mt-4 text-sm font-bold text-[#111111]">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-[#71717a]">{description}</p>
+      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#2563eb]">
+        <Plus className="h-3.5 w-3.5" />
+        {actionLabel}
+      </span>
     </button>
   )
 }
