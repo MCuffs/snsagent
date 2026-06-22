@@ -131,6 +131,7 @@ export class QwenLLMClient implements LLMClient {
 
   async generateJson<T>(stepName: string, prompt: string, fallback: () => T, options?: LLMRequestOptions): Promise<T> {
     const model = options?.model || getQwenModel()
+    const openAiOptions = { ...options, model: getCopywritingModel() }
     logAiDiagnostic({
       status: 'start', stepName, provider: 'qwen' as never, model,
       baseURL: this.baseURL, keyFingerprint: this.keyPrefix + '...',
@@ -168,7 +169,7 @@ export class QwenLLMClient implements LLMClient {
           status: 'fallback', stepName, provider: 'qwen' as never, model,
           baseURL: this.baseURL, errorMessage: 'empty response',
         })
-        return new OpenAILLMClient().generateJson(stepName, prompt, fallback, options)
+        return new OpenAILLMClient().generateJson(stepName, prompt, fallback, openAiOptions)
       }
 
       // Strip <think>...</think> blocks, then extract JSON
@@ -177,7 +178,7 @@ export class QwenLLMClient implements LLMClient {
       if (!jsonMatch) {
         console.warn(`[QwenClient] ${stepName}: no JSON found in response, falling back to GPT. raw:`, stripped.slice(0, 200))
         logAiDiagnostic({ status: 'fallback', stepName, provider: 'qwen' as never, model, baseURL: this.baseURL, errorMessage: 'no JSON in response' })
-        return new OpenAILLMClient().generateJson(stepName, prompt, fallback, options)
+        return new OpenAILLMClient().generateJson(stepName, prompt, fallback, openAiOptions)
       }
 
       logAiDiagnostic({
@@ -198,7 +199,7 @@ export class QwenLLMClient implements LLMClient {
         baseURL: this.baseURL, ...readOpenAIError(error),
       })
       // Graceful fallback to GPT
-      return new OpenAILLMClient().generateJson(stepName, prompt, fallback, options)
+      return new OpenAILLMClient().generateJson(stepName, prompt, fallback, openAiOptions)
     }
   }
 }

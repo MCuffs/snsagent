@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -92,6 +92,23 @@ interface GenerateParams {
   refinementOptions?: ClarificationOption[]
 }
 
+async function readJsonResponse<T>(response: Response): Promise<T | null> {
+  const text = await response.text()
+  if (!text.trim()) return null
+
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    console.warn('[GenerateForm] Non-JSON response received', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      preview: text.slice(0, 180),
+      error,
+    })
+    return null
+  }
+}
+
 interface CopyPreviewSlide {
   slideNumber: number
   role: string
@@ -163,6 +180,11 @@ function aiDisplay(content: string, clarification?: ClarificationPrompt): Displa
 
 function userDisplay(content: string): DisplayMessage {
   return { id: mkId(), role: 'user', content, revealedContent: content, isTyping: false }
+}
+
+function getUserDisplayTextFromHistory(content: string, locale: string) {
+  const newTopicPrefix = locale === 'en' ? 'New topic: ' : '새 주제로 전환: '
+  return content.startsWith(newTopicPrefix) ? content.slice(newTopicPrefix.length) : content
 }
 
 function compactSlidePreview(slides: NonNullable<GenerateParams['structurePreview']>) {
@@ -292,6 +314,18 @@ export default function GenerateForm({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [displayMessages])
+
+  useEffect(() => {
+    const displayedUserCount = displayMessages.filter(message => message.role === 'user').length
+    const historyUserMessages = chatHistory.filter(message => message.role === 'user')
+    if (historyUserMessages.length <= displayedUserCount) return
+
+    const missingMessages = historyUserMessages
+      .slice(displayedUserCount)
+      .map(message => userDisplay(getUserDisplayTextFromHistory(message.content, locale)))
+
+    setDisplayMessages(prev => [...prev, ...missingMessages])
+  }, [chatHistory, displayMessages, locale])
 
   useEffect(() => {
     if (!generating) return
@@ -518,8 +552,8 @@ export default function GenerateForm({
 
       } else {
         // Fallback: plain JSON response (e.g. greeting)
-        const data2 = await res.json() as { message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }
-        if (data2.error) {
+        const data2 = await readJsonResponse<{ message?: string; ready?: boolean; params?: GenerateParams; clarification?: ClarificationPrompt; error?: string }>(res)
+        if (!res.ok || !data2 || data2.error) {
           appendAiMessage(locale === 'en' ? 'An error occurred while processing your request. Please try again.' : '요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
           return
         }
@@ -551,9 +585,9 @@ export default function GenerateForm({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: [], brandId: brand.id, language, generationMode }),
         })
-        const data = await res.json() as { message?: string; error?: string }
+        const data = await readJsonResponse<{ message?: string; error?: string }>(res)
         if (!active) return
-        const msg = data.error ? (locale === 'en' ? 'An error occurred. Please try again.' : '오류가 발생했습니다. 다시 시도해주세요.') : (data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.'))
+        const msg = (!res.ok || !data || data.error) ? (locale === 'en' ? 'An error occurred. Please try again.' : '오류가 발생했습니다. 다시 시도해주세요.') : (data.message || (locale === 'en' ? 'Please try again.' : '다시 시도해주세요.'))
         appendAiMessage(msg)
         setChatHistory([{ role: 'assistant', content: msg }])
       } catch {
@@ -614,7 +648,10 @@ export default function GenerateForm({
       : chatHistory
     const newHistory = [...baseHistory, userMsg]
 
-    setDisplayMessages(prev => [...prev, userDisplay(text)])
+    flushSync(() => {
+      setDisplayMessages(prev => [...prev, userDisplay(text)])
+    })
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     setChatHistory(newHistory)
     analytics.generateAgentMessageSend({
       brandId: brand.id,
@@ -641,14 +678,17 @@ export default function GenerateForm({
         ? 'Okay. Type the new topic below and I will research it from scratch.'
         : '좋아요. 아래 입력창에 새 주제를 입력하면 이전 초안과 분리해서 다시 조사할게요.'
 
-      setDisplayMessages(prev => [
-        ...prev.map(message => (
-          message.clarification?.variant === 'refinement'
-            ? { ...message, clarification: undefined }
-            : message
-        )),
-        userDisplay(userLabel),
-      ])
+      flushSync(() => {
+        setDisplayMessages(prev => [
+          ...prev.map(message => (
+            message.clarification?.variant === 'refinement'
+              ? { ...message, clarification: undefined }
+              : message
+          )),
+          userDisplay(userLabel),
+        ])
+      })
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
       appendAiMessage(prompt)
       setChatHistory([{ role: 'assistant', content: prompt }])
       setReadyParams(null)
@@ -669,7 +709,10 @@ export default function GenerateForm({
     const userMsg: ChatMessage = { role: 'user', content: text }
     const newHistory = [...chatHistory, userMsg]
 
-    setDisplayMessages(prev => [...prev, userDisplay(userLabel)])
+    flushSync(() => {
+      setDisplayMessages(prev => [...prev, userDisplay(userLabel)])
+    })
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     setChatHistory(newHistory)
     analytics.generateAgentMessageSend({
       brandId: brand.id,
