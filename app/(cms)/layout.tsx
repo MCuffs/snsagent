@@ -25,11 +25,11 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         userPlan={user?.plan ?? undefined}
         userName={user?.name ?? undefined}
       />
-      <div className="flex h-screen overflow-hidden bg-white text-[#111111]">
+      <div className="flex h-screen overflow-hidden bg-[#f9fafb] text-[#111111]">
         {/* Sidebar */}
-        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e4e4e7] bg-[#fafafa] lg:flex">
+        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e5e7eb] bg-white lg:flex">
           {/* Logo */}
-          <div className="flex h-[60px] items-center border-b border-[#e4e4e7] px-5">
+          <div className="flex h-[60px] items-center border-b border-[#e5e7eb] px-5">
             <Link href="/concept" className="flex items-center gap-2.5">
               <Image src="/shuffla-logo-mark.png" width={27} height={27} alt={t('logo_alt')} />
               <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
@@ -40,18 +40,18 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           <SidebarNav hasCompleteBrand={hasCompleteBrand} />
 
         {/* User + Plan */}
-        <div className="border-t border-[#e4e4e7] p-3 space-y-1.5">
+        <div className="border-t border-[#e5e7eb] p-3 space-y-1.5">
           {user ? (
             <>
               <Link
                 href="/billing"
-                className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#71717a] hover:bg-[#f0f0f0] transition-colors"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
               >
                 <span className="flex items-center gap-1.5">
                   <CreditCard className="h-3.5 w-3.5" />
                   <span className="font-medium uppercase tracking-wide">{user.plan}</span>
                 </span>
-                <span className="text-[#0066ff] font-semibold">{t('plan_link')}</span>
+                <span className="text-[#3b82f6] font-semibold">{t('plan_link')}</span>
               </Link>
 
               <UserProfileDrawer
@@ -65,13 +65,13 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-[#0066ff] hover:bg-[#eff6ff] transition-colors"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-[#3b82f6] hover:bg-[#eff6ff] transition-colors"
             >
               <LogIn className="h-3.5 w-3.5" />
               로그인
             </Link>
           )}
-          <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
+          <p className="px-3 pb-1 text-[10px] text-[#d1d5db]">CMS v2 · a8f0d32</p>
         </div>
       </aside>
 
@@ -82,18 +82,18 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col h-full justify-between pb-4">
             <SidebarNav hasCompleteBrand={hasCompleteBrand} />
 
-            <div className="border-t border-[#e4e4e7] p-3 space-y-1.5 mt-auto">
+            <div className="border-t border-[#e5e7eb] p-3 space-y-1.5 mt-auto">
               {user ? (
                 <>
                   <Link
                     href="/billing"
-                    className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#71717a] hover:bg-[#f0f0f0] transition-colors"
+                    className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
                   >
                     <span className="flex items-center gap-1.5">
                       <CreditCard className="h-3.5 w-3.5" />
                       <span className="font-medium uppercase tracking-wide">{user.plan}</span>
                     </span>
-                    <span className="text-[#0066ff] font-semibold">{t('plan_link')}</span>
+                    <span className="text-[#3b82f6] font-semibold">{t('plan_link')}</span>
                   </Link>
 
                   <UserProfileDrawer
@@ -107,18 +107,18 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
               ) : (
                 <Link
                   href="/login"
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-[#0066ff] hover:bg-[#eff6ff] transition-colors"
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-[#3b82f6] hover:bg-[#eff6ff] transition-colors"
                 >
                   <LogIn className="h-3.5 w-3.5" />
                   로그인
                 </Link>
               )}
-              <p className="px-3 pb-1 text-[10px] text-[#d4d4d8]">CMS v2 · a8f0d32</p>
+              <p className="px-3 pb-1 text-[10px] text-[#d1d5db]">CMS v2 · a8f0d32</p>
             </div>
           </div>
         </MobileHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f9fafb]">
           {children}
         </div>
       </main>

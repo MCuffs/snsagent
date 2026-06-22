@@ -70,7 +70,7 @@ export default async function LoginPage({
   return (
     <main
       className="min-h-screen"
-      style={{ backgroundColor: '#f5f3ef' }}
+      style={{ backgroundColor: '#f9fafb' }}
     >
       {/* 상단 로고 */}
       <header className="flex h-14 items-center justify-between px-6 md:px-10">
@@ -80,7 +80,7 @@ export default async function LoginPage({
         </Link>
         <Link
           href={`/${locale}`}
-          className="flex items-center gap-1.5 text-sm text-[#6b6560] hover:text-[#1a1a1a] transition-colors"
+          className="flex items-center gap-1.5 text-sm text-[#6b7280] hover:text-[#111111] transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           {isEn ? 'Back' : '홈으로'}
@@ -92,21 +92,21 @@ export default async function LoginPage({
 
         {/* 좌측: 타이틀 + 폼 */}
         <div className="flex flex-col">
-          <h1 className="mb-8 text-[38px] font-bold leading-[1.15] tracking-[-0.03em] text-[#1a1a1a] md:text-[44px]">
+          <h1 className="mb-8 text-[38px] font-bold leading-[1.15] tracking-[-0.03em] text-[#111111] md:text-[44px]">
             {isEn ? (
               <>Think fast,<br />build faster</>
             ) : (
               <>빠르게 생각하고,<br />더 빠르게 구축하세요</>
             )}
           </h1>
-          <p className="mb-8 text-[15px] text-[#6b6560]">
+          <p className="mb-8 text-[15px] text-[#6b7280]">
             {isEn
               ? 'AI card news, instantly. No design skills needed.'
               : 'AI로 카드뉴스를 즉시 생성하세요. 디자인 없이도 완성됩니다.'}
           </p>
 
           {/* 폼 카드 */}
-          <div className="rounded-2xl bg-white p-7 shadow-[0_2px_20px_rgba(0,0,0,0.08)]">
+          <div className="rounded-xl bg-white p-7 border border-[#e5e7eb] shadow-sm">
             {errorMessage && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {errorMessage}
@@ -117,7 +117,7 @@ export default async function LoginPage({
             <Link
               href="/api/auth/google/start"
               prefetch={false}
-              className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#e0dbd5] bg-white text-[15px] font-medium text-[#1a1a1a] transition hover:bg-[#faf8f5] hover:border-[#ccc7c1]"
+              className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-[#e5e7eb] bg-white text-[14px] font-medium text-[#111111] transition hover:bg-[#f9fafb] hover:border-[#d1d5db]"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>

@@ -150,10 +150,10 @@ function PricingGrid({
           return (
             <article
               key={planKey}
-              className={`group relative overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
+              className={`group relative overflow-hidden rounded-xl border bg-white transition-all duration-200 ${
                 isCurrentPlan
-                  ? 'border-slate-900 shadow-xl ring-2 ring-slate-900/10'
-                  : 'border-slate-200 hover:border-slate-400 hover:shadow-lg'
+                  ? 'border-[#111827] shadow-md ring-1 ring-[#111827]/10'
+                  : 'border-[#e5e7eb] hover:border-[#d1d5db] hover:shadow-sm'
               }`}
             >
               <div className="p-8">
@@ -164,7 +164,7 @@ function PricingGrid({
                       <p className="mt-2 text-sm leading-relaxed text-slate-600">{planDescription}</p>
                     </div>
                     {isCurrentPlan && (
-                      <span className="shrink-0 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                      <span className="shrink-0 rounded-md bg-[#111827] px-2.5 py-1 text-xs font-semibold text-white">
                         {t('current_plan')}
                       </span>
                     )}
@@ -255,7 +255,7 @@ function PolarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+      className="w-full rounded-lg bg-[#111827] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       <span className="relative flex items-center justify-center gap-2">

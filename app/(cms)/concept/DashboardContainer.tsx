@@ -307,7 +307,7 @@ function ProfileSelectScreen({
               key={key}
               type="button"
               onClick={() => onSelect(key)}
-              className="group relative flex flex-col items-start gap-4 rounded-2xl border border-[#e4e4e7] bg-white p-6 text-left shadow-sm transition-all hover:border-[#111111] hover:shadow-md active:scale-[0.98]"
+              className="group relative flex flex-col items-start gap-4 rounded-xl border border-[#e5e7eb] bg-white p-6 text-left transition-all hover:border-[#d1d5db] hover:shadow-sm active:scale-[0.99]"
             >
               {complete && (
                 <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
@@ -315,7 +315,7 @@ function ProfileSelectScreen({
                   {t('profile_complete')}
                 </span>
               )}
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f4f4f5] transition-colors group-hover:bg-[#111111]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f3f4f6] transition-colors group-hover:bg-[#111827]">
                 <Icon className="h-5 w-5 text-[#71717a] transition-colors group-hover:text-white" />
               </div>
               <div>

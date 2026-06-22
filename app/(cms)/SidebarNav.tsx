@@ -69,7 +69,7 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
               <Icon className="h-4 w-4 shrink-0" />
               <div>
                 <p className="font-medium leading-none">{item.label}</p>
-                <p className="mt-0.5 text-[11px] text-[#71717a]">{t(item.descKey as Parameters<typeof t>[0])}</p>
+                <p className="mt-0.5 text-[11px] text-[#9ca3af]">{t(item.descKey as Parameters<typeof t>[0])}</p>
               </div>
             </span>
           )
@@ -82,8 +82,8 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             onClick={(e) => handleNavClick(e, item)}
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150 ${
               isActive
-                ? 'bg-[#111111] text-white font-medium'
-                : 'text-[#52525b] hover:bg-[#f0f0f0] hover:text-[#111111]'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#374151] hover:bg-[#f3f4f6] hover:text-[#111111]'
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
@@ -94,7 +94,7 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{item.badge}</span>
                 )}
               </div>
-              <p className={`mt-0.5 text-[11px] ${isActive ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
+              <p className={`mt-0.5 text-[11px] ${isActive ? 'text-white/60' : 'text-[#9ca3af]'}`}>
                 {t(item.descKey as Parameters<typeof t>[0])}
               </p>
             </div>

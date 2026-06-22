@@ -50,7 +50,7 @@ function Rule({ ok, label }: { ok: boolean; label: string }) {
   )
 }
 
-const inputClass = "w-full rounded-xl border border-[#e0dbd5] bg-[#faf8f5] px-4 py-3 text-[15px] text-[#1a1a1a] placeholder:text-[#b0a89f] outline-none focus:border-[#1a1a1a] focus:bg-white transition"
+const inputClass = "w-full rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5 text-[14px] text-[#111111] placeholder:text-[#9ca3af] outline-none focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/10 transition"
 
 export default function LoginForm({ locale, defaultTab, loginAction, registerAction }: Props) {
   const [tab, setTab] = useState<'login' | 'signup'>(defaultTab)
@@ -89,12 +89,12 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
   return (
     <div>
       {/* 탭 */}
-      <div className="mb-5 flex rounded-xl border border-[#e8e3de] bg-[#f5f2ee] p-1">
+      <div className="mb-5 flex rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] p-1">
         <button
           type="button"
           onClick={() => { setTab('login'); setClientError('') }}
-          className={`flex-1 rounded-lg py-2.5 text-[14px] font-semibold transition ${
-            tab === 'login' ? 'bg-white text-[#1a1a1a] shadow-sm' : 'text-[#8a837c] hover:text-[#1a1a1a]'
+          className={`flex-1 rounded-md py-2 text-[13px] font-semibold transition ${
+            tab === 'login' ? 'bg-white text-[#111111] shadow-sm' : 'text-[#6b7280] hover:text-[#111111]'
           }`}
         >
           {isEn ? 'Log in' : '로그인'}
@@ -102,8 +102,8 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
         <button
           type="button"
           onClick={() => { setTab('signup'); setClientError('') }}
-          className={`flex-1 rounded-lg py-2.5 text-[14px] font-semibold transition ${
-            tab === 'signup' ? 'bg-white text-[#1a1a1a] shadow-sm' : 'text-[#8a837c] hover:text-[#1a1a1a]'
+          className={`flex-1 rounded-md py-2 text-[13px] font-semibold transition ${
+            tab === 'signup' ? 'bg-white text-[#111111] shadow-sm' : 'text-[#6b7280] hover:text-[#111111]'
           }`}
         >
           {isEn ? 'Sign up' : '신규 가입'}
@@ -143,7 +143,7 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
           <button
             type="submit"
             disabled={isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1a1a1a] py-3 text-[15px] font-semibold text-white transition hover:bg-[#333] disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#111827] py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#1f2937] disabled:opacity-60"
           >
             {isPending
               ? (isEn ? 'Logging in…' : '로그인 중…')

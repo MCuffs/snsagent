@@ -22,7 +22,7 @@ export async function MarketingFooter({ authenticated = false, locale }: Marketi
   const showKoreanBusinessInfo = locale === 'ko'
 
   return (
-    <footer className="border-t border-slate-200 bg-[#f8fafc] pb-10 pt-16 text-[#171714]">
+    <footer className="border-t border-[#e5e7eb] bg-[#f9fafb] pb-10 pt-16 text-[#111111]">
       <div className="mx-auto max-w-[1300px] px-5 md:px-8">
         <div className="grid gap-12 md:grid-cols-[1.5fr_0.7fr_0.7fr_0.9fr]">
           <div>

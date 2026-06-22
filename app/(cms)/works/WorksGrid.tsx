@@ -212,7 +212,7 @@ export default function WorksGrid({
                   })
                   setOpeningId(item.id)
                 }}
-                className="group block overflow-hidden rounded-xl border border-[#e4e4e7] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#a1a1aa] hover:shadow-md"
+                className="group block overflow-hidden rounded-xl border border-[#e5e7eb] bg-white transition-all duration-200 hover:border-[#d1d5db] hover:shadow-sm"
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#f4f4f5]">
