@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight } from 'lucide-react'
+import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight, RotateCcw } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Brand {
@@ -45,13 +45,53 @@ interface UserChatMessage {
 
 interface AiChatMessage {
   id: string
-  type: 'progress' | 'result' | 'error'
+  type: 'clarify' | 'confirm' | 'progress' | 'result' | 'error'
+  text?: string
+  confirmInfo?: CollectedInfo
   stageLabel?: string
   slideProgress?: SlideProgress[]
   slides?: VideoSlide[]
   errorText?: string
   partialFailures?: number
 }
+
+// ── 대화형 흐름 상태 ──────────────────────────────────────────────
+
+type ChatPhase = 'idle' | 'clarifying_1' | 'clarifying_2' | 'confirming' | 'generating' | 'done'
+
+interface CollectedInfo {
+  rawTopic: string
+  targetAndMessage?: string  // 1차 답변 전체 (타겟 + 핵심 메시지)
+  mood?: string              // 2차 답변 (분위기)
+  refinedTopic: string       // API에 전송할 최종 topic
+}
+
+function buildRefinedTopic(info: Omit<CollectedInfo, 'refinedTopic'>): string {
+  const parts = [info.rawTopic]
+  if (info.targetAndMessage) parts.push(`독자와 메시지: ${info.targetAndMessage}`)
+  if (info.mood) parts.push(`분위기: ${info.mood}`)
+  return parts.join('\n')
+}
+
+const CLARIFY_Q1 = `주제를 잘 이해했어요!
+
+조금 더 알면 훨씬 완성도 높은 영상을 만들 수 있어요. 두 가지만 알려주세요.
+
+• 이 영상을 보게 될 주요 독자층은 누구인가요?
+  (예: 마케터, 20대 여성, 소상공인, IT 종사자...)
+
+• 영상을 통해 전달하고 싶은 핵심 메시지는 무엇인가요?
+  (예: "복잡하지 않아도 된다", "지금 당장 바꿔야 한다"...)
+
+편하게 이어서 적어주세요.`
+
+const CLARIFY_Q2 = `좋아요! 마지막으로 하나만요.
+
+영상의 전반적인 분위기·톤은 어떻게 할까요?
+
+① 감성적·따뜻한  ② 정보 전달형  ③ 역동적·강렬한  ④ 미니멀·세련된
+
+번호로 답하거나 직접 설명해도 됩니다.`
 
 // 각 단계별 사용자 친화적 안내 문구
 const STAGE_LABELS: Record<string, string> = {
@@ -76,6 +116,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const [slideCount, setSlideCount] = useState<3 | 5 | 7>(5)
   const [generating, setGenerating] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
+
+  // 대화형 흐름 상태
+  const [phase, setPhase] = useState<ChatPhase>('idle')
+  const [collectedInfo, setCollectedInfo] = useState<Partial<CollectedInfo>>({})
+
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -129,17 +174,14 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setAiMessages(prev => prev.map(m => m.id === id ? updater(m) : m))
   }
 
-  const handleGenerate = async () => {
-    if (!topic.trim() || generating) return
-    const currentTopic = topic.trim()
+  // ── 실제 영상 생성 호출 ──────────────────────────────────────────
 
-    flushSync(() => {
-      setUserMessages(prev => [...prev, { id: `u-${Date.now()}`, content: currentTopic }])
-    })
+  const runGenerate = async (refinedTopic: string) => {
+    setPhase('generating')
+    setGenerating(true)
 
-    const msgId = `ai-${Date.now()}`
+    const msgId = `ai-gen-${Date.now()}`
     activeMsgIdRef.current = msgId
-
     flushSync(() => {
       setAiMessages(prev => [...prev, {
         id: msgId,
@@ -148,10 +190,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         slideProgress: [],
       }])
     })
-
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    setGenerating(true)
-    setTopic('')
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8 * 60 * 1000)
@@ -162,7 +201,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          topic: currentTopic,
+          topic: refinedTopic,
           brandId: brand.id,
           slideCount,
           durationSeconds: 5,
@@ -202,59 +241,42 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           } else if (stage === 'video') {
             updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.video_start }))
           }
-
         } else if (eventName === 'copy_done') {
           const copySlides = (data.slides as Array<{ slideNumber: number; role: string; headline: string }>) ?? []
           updateActiveMsg(m => ({
             ...m,
             stageLabel: `${STAGE_LABELS.copy_done_prefix}${copySlides.length}개 슬라이드`,
-            slideProgress: copySlides.map(s => ({
-              slideNumber: s.slideNumber,
-              status: 'waiting' as const,
-            })),
+            slideProgress: copySlides.map(s => ({ slideNumber: s.slideNumber, status: 'waiting' as const })),
           }))
-
         } else if (eventName === 'slide_start') {
           updateActiveMsg(m => ({
             ...m,
             stageLabel: `◎ 슬라이드 ${data.slideNumber}/${data.total} 영상 렌더링 중...`,
             slideProgress: (m.slideProgress ?? []).map(sp =>
-              sp.slideNumber === data.slideNumber
-                ? { ...sp, status: 'generating' as const }
-                : sp,
+              sp.slideNumber === data.slideNumber ? { ...sp, status: 'generating' as const } : sp,
             ),
           }))
-
         } else if (eventName === 'slide_polling') {
           updateActiveMsg(m => ({
             ...m,
             slideProgress: (m.slideProgress ?? []).map(sp =>
-              sp.slideNumber === data.slideNumber
-                ? { ...sp, status: 'generating' as const, elapsed: data.elapsed as number }
-                : sp,
+              sp.slideNumber === data.slideNumber ? { ...sp, status: 'generating' as const, elapsed: data.elapsed as number } : sp,
             ),
           }))
-
         } else if (eventName === 'slide_done') {
           updateActiveMsg(m => ({
             ...m,
             slideProgress: (m.slideProgress ?? []).map(sp =>
-              sp.slideNumber === data.slideNumber
-                ? { ...sp, status: 'done' as const }
-                : sp,
+              sp.slideNumber === data.slideNumber ? { ...sp, status: 'done' as const } : sp,
             ),
           }))
-
         } else if (eventName === 'slide_error') {
           updateActiveMsg(m => ({
             ...m,
             slideProgress: (m.slideProgress ?? []).map(sp =>
-              sp.slideNumber === data.slideNumber
-                ? { ...sp, status: 'error' as const, error: data.error as string }
-                : sp,
+              sp.slideNumber === data.slideNumber ? { ...sp, status: 'error' as const, error: data.error as string } : sp,
             ),
           }))
-
         } else if (eventName === 'done') {
           const resultSlides = (data.slides as VideoSlide[]) ?? []
           const campaignId = data.campaignId as string | undefined
@@ -268,16 +290,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           }))
           if (campaignId) {
             setRedirecting(true)
+            setPhase('done')
             const path = locale === 'en' ? `/en/campaign/${campaignId}` : `/ko/campaign/${campaignId}`
             setTimeout(() => router.push(path), 1400)
           }
-
         } else if (eventName === 'error') {
-          updateActiveMsg(m => ({
-            ...m,
-            type: 'error',
-            errorText: data.error as string,
-          }))
+          updateActiveMsg(m => ({ ...m, type: 'error', errorText: data.error as string }))
         }
       }
 
@@ -285,10 +303,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         const { done, value } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-
         const parts = buffer.split('\n\n')
         buffer = parts.pop() ?? ''
-
         for (const part of parts) {
           const eventMatch = part.match(/^event: (\S+)\ndata: ([\s\S]+)$/)
           if (eventMatch) processEvent(eventMatch[1], eventMatch[2])
@@ -307,11 +323,113 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
   }
 
+  // ── 대화형 흐름 핸들러 ──────────────────────────────────────────
+
+  const handleSend = async () => {
+    const input = topic.trim()
+    if (!input || generating) return
+    setTopic('')
+
+    // 유저 메시지 표시
+    const userMsg: UserChatMessage = { id: `u-${Date.now()}`, content: input }
+    flushSync(() => setUserMessages(prev => [...prev, userMsg]))
+
+    if (phase === 'idle') {
+      // 1단계: 주제 입력 받음 → 1차 명확화 질문
+      const newInfo = { rawTopic: input }
+      setCollectedInfo(newInfo)
+      setTimeout(() => {
+        const aiId = `ai-clarify1-${Date.now()}`
+        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'clarify', text: CLARIFY_Q1 }]))
+        setPhase('clarifying_1')
+      }, 400)
+
+    } else if (phase === 'clarifying_1') {
+      // 2단계: 타겟/메시지 받음 → 2차 질문(분위기)
+      setCollectedInfo(prev => ({ ...prev, targetAndMessage: input }))
+      setTimeout(() => {
+        const aiId = `ai-clarify2-${Date.now()}`
+        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'clarify', text: CLARIFY_Q2 }]))
+        setPhase('clarifying_2')
+      }, 400)
+
+    } else if (phase === 'clarifying_2') {
+      // 3단계: 분위기 받음 → 확인 카드 표시
+      const moodMap: Record<string, string> = {
+        '①': '감성적·따뜻한', '1': '감성적·따뜻한',
+        '②': '정보 전달형', '2': '정보 전달형',
+        '③': '역동적·강렬한', '3': '역동적·강렬한',
+        '④': '미니멀·세련된', '4': '미니멀·세련된',
+      }
+      const moodValue = moodMap[input.trim()] ?? input
+      const finalInfo: CollectedInfo = {
+        rawTopic: collectedInfo.rawTopic ?? '',
+        targetAndMessage: collectedInfo.targetAndMessage,
+        mood: moodValue,
+        refinedTopic: buildRefinedTopic({
+          rawTopic: collectedInfo.rawTopic ?? '',
+          targetAndMessage: collectedInfo.targetAndMessage,
+          mood: moodValue,
+        }),
+      }
+      setCollectedInfo(finalInfo)
+      setTimeout(() => {
+        const aiId = `ai-confirm-${Date.now()}`
+        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'confirm', confirmInfo: finalInfo }]))
+        setPhase('confirming')
+      }, 400)
+
+    } else if (phase === 'confirming') {
+      // 수정 요청 처리 — "수정" / "다시" 키워드 감지
+      const isRedo = /수정|다시|바꿔|처음/.test(input)
+      if (isRedo) {
+        setCollectedInfo({})
+        setTimeout(() => {
+          const aiId = `ai-restart-${Date.now()}`
+          flushSync(() => setAiMessages(prev => [...prev, {
+            id: aiId, type: 'clarify',
+            text: '알겠습니다! 주제부터 다시 알려주세요.',
+          }]))
+          setPhase('idle')
+        }, 300)
+      }
+      // 그 외 입력은 확인 단계에서 무시 (버튼으로만 진행)
+    }
+  }
+
+  const handleConfirmGenerate = () => {
+    if (!collectedInfo.refinedTopic) return
+    const confirmMsgId = `ai-confirm-start-${Date.now()}`
+    flushSync(() => {
+      setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
+      setAiMessages(prev => [...prev, { id: confirmMsgId, type: 'progress', stageLabel: STAGE_LABELS.copy_thinking, slideProgress: [] }])
+    })
+    activeMsgIdRef.current = confirmMsgId
+    void runGenerate(collectedInfo.refinedTopic)
+  }
+
+  const handleReset = () => {
+    setPhase('idle')
+    setCollectedInfo({})
+    setUserMessages([])
+    setAiMessages([])
+    setTopic('')
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      void handleGenerate()
+      void handleSend()
     }
+  }
+
+  const inputDisabled = generating || phase === 'confirming' || phase === 'generating' || phase === 'done'
+  const getPlaceholder = () => {
+    if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
+    if (phase === 'clarifying_1') return '독자층과 핵심 메시지를 알려주세요...'
+    if (phase === 'clarifying_2') return '분위기를 선택하거나 직접 입력하세요...'
+    if (phase === 'confirming') return '"수정할게요" 또는 [지금 만들기] 버튼을 눌러주세요'
+    return '생성 중...'
   }
 
   // 편집 화면 전환 오버레이
@@ -320,7 +438,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex h-full flex-col items-center justify-center bg-[#fafaf9]"
+        className="flex h-full flex-col items-center justify-center bg-[#f7f7f7]"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.94 }}
@@ -347,6 +465,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     <div className="flex h-full overflow-hidden bg-[#f7f7f7]">
       {/* Left: Chat */}
       <div className="flex min-w-0 flex-1 flex-col border-r border-[#e5e7eb] bg-[#f7f7f7]">
+
         {/* Header */}
         <div className="shrink-0 border-b border-[#e5e7eb] bg-[#f7f7f7] px-5 py-3 flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
@@ -354,122 +473,134 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             영상 카드뉴스
             <span className="rounded-full bg-[#111827] px-1.5 py-0.5 text-[9px] font-black text-white tracking-wide">BETA</span>
           </div>
-          <div className="text-xs text-[#9ca3af]">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
-            {brand.name}
+          <div className="flex items-center gap-3">
+            {(phase !== 'idle' && phase !== 'generating' && phase !== 'done') && (
+              <button type="button" onClick={handleReset}
+                className="flex items-center gap-1 text-[11px] text-[#9ca3af] hover:text-[#6b7280] transition-colors">
+                <RotateCcw className="h-3 w-3" />
+                처음부터
+              </button>
+            )}
+            <div className="text-xs text-[#9ca3af]">
+              {brand.name}
+            </div>
           </div>
         </div>
 
         {/* Chat */}
         <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
-        {/* Greeting */}
-        <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
-          <div className="flex flex-col gap-2.5 items-start max-w-md">
-            <AiBubbleAvatar />
-            <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111]">
-              안녕하세요! <span className="font-bold text-[#3b82f6]">영상 카드뉴스</span>를 만들어드릴게요.
-              <br /><br />
-              어떤 주제로 만들고 싶으신가요? 주제를 입력하면 AI가 슬라이드 구성부터 영상 생성까지 자동으로 진행합니다.
-              <br /><br />
-              <span className="text-[11px] text-[#9ca3af] font-semibold">✦ 슬라이드당 약 1~2분 · 9:16 세로 영상 · 텍스트 자동 합성</span>
+
+          {/* Greeting */}
+          <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
+            <div className="flex flex-col gap-2.5 items-start max-w-md">
+              <AiBubbleAvatar />
+              <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111]">
+                안녕하세요! <span className="font-bold">영상 카드뉴스</span>를 만들어드릴게요.
+                <br /><br />
+                어떤 주제로 만들고 싶으신가요?
+                <br />
+                <span className="text-[11px] text-[#9ca3af] font-semibold">✦ 슬라이드당 약 1~2분 · 9:16 세로 영상 · 텍스트 자동 합성</span>
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        {/* Interleaved messages */}
-        <AnimatePresence initial={false}>
-          {userMessages.map((umsg, idx) => (
-            <motion.div key={umsg.id}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              transition={smoothEase} className="contents"
-            >
-              <div className="flex justify-end">
-                <div className="max-w-[78%] rounded-xl rounded-tr-sm bg-white px-4 py-3 text-sm font-medium leading-6 text-[#111111] whitespace-pre-wrap">
-                  {umsg.content}
+          {/* Interleaved messages */}
+          <AnimatePresence initial={false}>
+            {userMessages.map((umsg, idx) => (
+              <motion.div key={umsg.id}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={smoothEase} className="contents"
+              >
+                <div className="flex justify-end">
+                  <div className="max-w-[78%] rounded-xl rounded-tr-sm bg-white px-4 py-3 text-sm font-medium leading-6 text-[#111111] whitespace-pre-wrap">
+                    {umsg.content}
+                  </div>
                 </div>
-              </div>
-              {aiMessages[idx] && (
-                <AiProgressMessage msg={aiMessages[idx]} />
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                {aiMessages[idx] && (
+                  <AiMessage
+                    msg={aiMessages[idx]}
+                    onConfirmGenerate={handleConfirmGenerate}
+                    onReset={handleReset}
+                  />
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
-        <div ref={chatBottomRef} />
-      </div>
+          <div ref={chatBottomRef} />
+        </div>
 
-      {/* Input bar */}
-      <div
-        ref={dropZoneRef}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3 space-y-2.5"
-      >
-        {isDragging && (
-          <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
-            이미지를 여기에 놓으세요
-          </div>
-        )}
+        {/* Input bar */}
+        <div
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3 space-y-2.5"
+        >
+          {isDragging && (
+            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
+              이미지를 여기에 놓으세요
+            </div>
+          )}
 
-        {attachedImages.length > 0 && (
-          <div className="flex gap-2">
-            {attachedImages.map((img, i) => (
-              <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.preview} alt="" className="h-full w-full object-cover" />
-                <button type="button" onClick={() => removeImage(i)}
-                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </div>
+          {attachedImages.length > 0 && (
+            <div className="flex gap-2">
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.preview} alt="" className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => removeImage(i)}
+                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Slide count selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#9ca3af] font-semibold">슬라이드</span>
+            {([3, 5, 7] as const).map(n => (
+              <button
+                key={n}
+                type="button"
+                disabled={generating || phase === 'generating'}
+                onClick={() => setSlideCount(n)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                  slideCount === n
+                    ? 'bg-[#111111] text-white'
+                    : 'bg-[#eeeeee] text-[#374151] hover:bg-[#e5e7eb]'
+                } disabled:opacity-50`}
+              >
+                {n}장
+              </button>
             ))}
           </div>
-        )}
 
-        {/* Slide count selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[#9ca3af] font-semibold">슬라이드</span>
-          {([3, 5, 7] as const).map(n => (
-            <button
-              key={n}
-              type="button"
-              disabled={generating}
-              onClick={() => setSlideCount(n)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                slideCount === n
-                  ? 'bg-[#111111] text-white'
-                  : 'bg-[#eeeeee] text-[#374151] hover:bg-[#e5e7eb]'
-              } disabled:opacity-50`}
-            >
-              {n}장
+          <div className={`flex items-center gap-2 bg-white rounded-2xl border shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2 ${isDragging ? 'border-[#3b82f6]' : 'border-[#e5e7eb]'}`}>
+            <button type="button" disabled={generating || attachedImages.length >= 3}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
+              <ImagePlus className="h-4 w-4" />
             </button>
-          ))}
+            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }} />
+
+            <textarea ref={inputRef} rows={2} value={topic}
+              onChange={e => setTopic(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={getPlaceholder()}
+              disabled={inputDisabled}
+              className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
+
+            <button type="button" onClick={handleSend} disabled={inputDisabled || !topic.trim()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#111827] text-white hover:bg-[#1f2937] disabled:opacity-30 transition-colors">
+              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
-
-        <div className={`flex items-center gap-2 bg-white rounded-2xl border shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2 ${isDragging ? 'border-[#3b82f6]' : 'border-[#e5e7eb]'}`}>
-          <button type="button" disabled={generating || attachedImages.length >= 3}
-            onClick={() => fileInputRef.current?.click()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
-            <ImagePlus className="h-4 w-4" />
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
-            onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }} />
-
-          <textarea ref={inputRef} rows={2} value={topic}
-            onChange={e => setTopic(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="만들 영상의 주제나 키워드를 입력하세요..."
-            disabled={generating}
-            className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
-
-          <button type="button" onClick={handleGenerate} disabled={generating || !topic.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#111827] text-white hover:bg-[#1f2937] disabled:opacity-30 transition-colors">
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-      {/* End left panel */}
       </div>
 
       {/* Right: Script panel */}
@@ -486,6 +617,99 @@ function AiBubbleAvatar() {
   )
 }
 
+function AiMessage({
+  msg,
+  onConfirmGenerate,
+  onReset,
+}: {
+  msg: AiChatMessage
+  onConfirmGenerate: () => void
+  onReset: () => void
+}) {
+  if (msg.type === 'clarify') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
+        className="flex justify-start"
+      >
+        <div className="flex flex-col gap-2.5 items-start max-w-md">
+          <AiBubbleAvatar />
+          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] whitespace-pre-line">
+            {msg.text}
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  if (msg.type === 'confirm' && msg.confirmInfo) {
+    const info = msg.confirmInfo
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
+        className="flex justify-start"
+      >
+        <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
+          <AiBubbleAvatar />
+          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-4 w-full space-y-4">
+            <p className="text-sm font-bold text-[#111111]">완벽해요! 이렇게 만들게요.</p>
+
+            <div className="space-y-2.5 text-sm">
+              <div className="flex gap-2.5">
+                <span className="text-base leading-5">📌</span>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#9ca3af]">주제</span>
+                  <p className="text-[#111111] leading-5 mt-0.5">{info.rawTopic}</p>
+                </div>
+              </div>
+              {info.targetAndMessage && (
+                <div className="flex gap-2.5">
+                  <span className="text-base leading-5">👥</span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#9ca3af]">독자 & 메시지</span>
+                    <p className="text-[#111111] leading-5 mt-0.5">{info.targetAndMessage}</p>
+                  </div>
+                </div>
+              )}
+              {info.mood && (
+                <div className="flex gap-2.5">
+                  <span className="text-base leading-5">🎬</span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#9ca3af]">분위기</span>
+                    <p className="text-[#111111] leading-5 mt-0.5">{info.mood}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1 border-t border-[#f3f4f6]">
+              <button
+                type="button"
+                onClick={onConfirmGenerate}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#111827] py-2.5 text-sm font-semibold text-white hover:bg-[#1f2937] transition-colors"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                지금 만들기
+              </button>
+              <button
+                type="button"
+                onClick={onReset}
+                className="rounded-lg border border-[#e5e7eb] px-3 py-2.5 text-xs text-[#6b7280] hover:bg-[#f9fafb] transition-colors"
+              >
+                처음부터
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return <AiProgressMessage msg={msg} />
+}
+
 function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
   return (
     <motion.div
@@ -498,7 +722,8 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
 
         {/* Error */}
         {msg.type === 'error' && (
-          <motion.div {...fadeIn} transition={smoothEase}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3.5 text-sm text-red-700 max-w-md shadow-sm">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <div>
@@ -510,9 +735,8 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
         )}
 
         {/* Progress / result */}
-        {msg.type !== 'error' && (
+        {msg.type !== 'error' && msg.type !== 'clarify' && msg.type !== 'confirm' && (
           <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 w-full space-y-3">
-            {/* Stage label */}
             <div className="flex items-center gap-2">
               {msg.type === 'progress' && (
                 <Loader2 className="h-3.5 w-3.5 text-[#3b82f6] animate-spin shrink-0" />
@@ -527,7 +751,6 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
               </span>
             </div>
 
-            {/* Slide progress */}
             {(msg.slideProgress?.length ?? 0) > 0 && (
               <div className="space-y-1.5 border-t border-[#e5e7eb] pt-2.5">
                 {(msg.slideProgress ?? []).map(sp => (
@@ -536,7 +759,6 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
               </div>
             )}
 
-            {/* Result: completion summary */}
             {msg.type === 'result' && msg.slides && (
               <motion.div
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
@@ -610,7 +832,6 @@ function SlideProgressRow({ sp }: { sp: SlideProgress }) {
         {sp.status === 'done' && <span className="ml-auto text-[10px] text-emerald-500 font-bold">완료</span>}
         {sp.status === 'error' && <span className="ml-auto text-[9px] text-red-400 truncate max-w-[140px]">{sp.error}</span>}
       </div>
-      {/* Progress bar */}
       <div className="h-0.5 w-full rounded-full bg-[#e5e7eb] overflow-hidden">
         <motion.div
           className={`h-full rounded-full ${barColor}`}
@@ -636,14 +857,12 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
-  // Get the latest progress from the most recent AI message
-  const latest = aiMessages[aiMessages.length - 1]
+  const latest = aiMessages.filter(m => m.type === 'progress' || m.type === 'result').pop()
   const slideProgress = latest?.slideProgress ?? []
   const resultSlides = latest?.slides
 
   return (
     <div className="hidden w-[340px] shrink-0 flex-col xl:flex bg-white border-l border-[#e5e7eb]">
-      {/* Panel header */}
       <div className="shrink-0 border-b border-[#e5e7eb] bg-white px-5 py-4">
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6b7280] mb-1 flex items-center gap-1.5">
           <Sparkles className="h-3 w-3" /> 슬라이드 스크립트
@@ -669,7 +888,6 @@ function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
             </motion.div>
           )}
 
-          {/* During generation: show slide progress as script cards */}
           {slideProgress.length > 0 && !resultSlides && slideProgress.map((sp, i) => (
             <motion.div
               key={`sp-${sp.slideNumber}`}
@@ -699,7 +917,6 @@ function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
             </motion.div>
           ))}
 
-          {/* After completion: show full script */}
           {resultSlides && resultSlides.map((slide, i) => (
             <motion.div
               key={`slide-${slide.slideNumber}`}
