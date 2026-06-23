@@ -703,6 +703,26 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleConfirmGenerateWithPing = async () => {
     if (!collectedInfo.rawTopic || startingGenerationRef.current || generating) return
+    const fallbackVideoPlan = buildEditableVideoPlan({
+      rawTopic: collectedInfo.rawTopic,
+      targetAndMessage: collectedInfo.targetAndMessage,
+      mood: collectedInfo.mood,
+    }, slideCount, brand)
+    if (!collectedInfo.videoPlan?.length) {
+      setCollectedInfo(prev => ({ ...prev, videoPlan: fallbackVideoPlan }))
+      setAiMessages(prev => prev.map(message => {
+        if (message.type !== 'confirm' || !message.confirmInfo) return message
+        return {
+          ...message,
+          confirmInfo: {
+            ...message.confirmInfo,
+            videoPlan: fallbackVideoPlan,
+          },
+        }
+      }))
+      return
+    }
+
     const infoForGeneration: CollectedInfo = {
       rawTopic: collectedInfo.rawTopic,
       targetAndMessage: collectedInfo.targetAndMessage,
@@ -712,13 +732,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         targetAndMessage: collectedInfo.targetAndMessage ?? '',
         mood: collectedInfo.mood ?? '',
       }),
-      videoPlan: collectedInfo.videoPlan?.length
-        ? collectedInfo.videoPlan
-        : buildEditableVideoPlan({
-          rawTopic: collectedInfo.rawTopic,
-          targetAndMessage: collectedInfo.targetAndMessage,
-          mood: collectedInfo.mood,
-        }, slideCount, brand),
+      videoPlan: collectedInfo.videoPlan,
     }
     stopRequestedRef.current = false
     startingGenerationRef.current = true
@@ -1171,6 +1185,7 @@ function AiMessage({
 
   if (msg.type === 'confirm' && msg.confirmInfo) {
     const info = msg.confirmInfo
+    const hasConfirmedVideoPlan = Boolean(info.videoPlan?.length)
     const videoPlan = info.videoPlan?.length
       ? info.videoPlan
       : buildEditableVideoPlan(info, slideCount, brand)
@@ -1244,7 +1259,7 @@ function AiMessage({
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#111827] py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_32px_rgba(15,23,42,0.2)] disabled:opacity-40"
                 >
                   {confirmBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {confirmBusy ? '확인 중...' : '지금 만들기'}
+                  {confirmBusy ? '확인 중...' : hasConfirmedVideoPlan ? '지금 만들기' : '프롬프트 확정하기'}
                 </button>
                 <button
                   type="button"
