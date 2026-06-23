@@ -26,6 +26,43 @@ function tomorrowAt20() {
   return date
 }
 
+function cleanCaptionLine(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/[#*_`~]/g, '')
+    .trim()
+}
+
+function truncateCaption(text: string, maxLength = 700) {
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+function buildVideoCardSummaryCaption(
+  topic: string,
+  slides: Array<{ headline: string; body: string; role: string; videoUrl: string | null }>,
+  language: 'ko' | 'en',
+) {
+  const summarySlides = slides.filter(slide => slide.videoUrl && slide.role !== 'save-cta')
+  const sourceSlides = summarySlides.length > 0 ? summarySlides : slides.filter(slide => slide.videoUrl)
+  const lines = sourceSlides
+    .map(slide => cleanCaptionLine(`${slide.headline}. ${slide.body}`))
+    .filter(Boolean)
+    .slice(0, 4)
+
+  if (language === 'en') {
+    return truncateCaption([
+      `${topic} is summarized as a video card news story.`,
+      ...lines,
+    ].join('\n\n'))
+  }
+
+  return truncateCaption([
+    `${topic}에 대한 핵심 내용을 영상 카드뉴스로 요약했습니다.`,
+    ...lines,
+  ].join('\n\n'))
+}
+
 export async function POST(request: NextRequest) {
   const user = await getSessionUser()
   if (!user) {
@@ -64,6 +101,7 @@ export async function POST(request: NextRequest) {
     domainLabel?: string
     brandTone?: string
     language?: 'ko' | 'en'
+    referenceImageUrls?: string[]
   }
   try {
     body = await request.json()
@@ -82,6 +120,9 @@ export async function POST(request: NextRequest) {
   const resolvedDomain: ContentDomain = inferContentDomain(topic, body.domainLabel, targetAndMessage)
   const domainLabel = resolvedDomain === 'general' ? (body.domainLabel ?? 'general') : resolvedDomain
   console.log(`[VideoCardNews] domain resolution: industry="${body.domainLabel}" → domain="${resolvedDomain}"`)
+  const referenceImageUrls = Array.isArray(body.referenceImageUrls)
+    ? body.referenceImageUrls.filter(url => typeof url === 'string' && /^https?:\/\//.test(url)).slice(0, 3)
+    : []
 
   if (!topic?.trim()) {
     return new Response(JSON.stringify({ error: '주제를 입력해주세요.' }), {
@@ -168,7 +209,12 @@ export async function POST(request: NextRequest) {
         }
 
         sse(controller, 'copy_done', {
-          slides: slides.map(s => ({ slideNumber: s.slideNumber, role: s.role, headline: s.headline })),
+          slides: slides.map(s => ({
+            slideNumber: s.slideNumber,
+            role: s.role,
+            headline: s.headline,
+            body: s.body,
+          })),
         })
 
         // Stage 2: Video generation
@@ -186,6 +232,7 @@ export async function POST(request: NextRequest) {
           domainLabel,
           brandTone: body.brandTone,
           durationSeconds,
+          referenceImageUrls,
           onProgress: (event) => {
             if (event.type === 'video_start') {
               sse(controller, 'slide_start', {
@@ -311,7 +358,7 @@ export async function POST(request: NextRequest) {
         await dbService.updateCampaignStatus(campaign.id, 'pending_approval')
 
         const post = await dbService.createPost(user.id, brandId, campaign.id, {
-          caption: `${summarizedTitle} 영상 카드뉴스`,
+          caption: buildVideoCardSummaryCaption(topic, durableSlides, language),
           hashtags: '#카드뉴스 #영상카드뉴스 #숏폼',
           scheduledAt: tomorrowAt20(),
         })

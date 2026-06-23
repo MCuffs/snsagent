@@ -1,7 +1,5 @@
 import type { EditorialDocument, EditorialLayer, FontPreset } from '../../../../../src/lib/editor/types'
 
-// renderer.ts는 서버 전용(resvg/sharp/fs) — 클라이언트 번들에서 import 불가
-// fontFamilyForPreset만 인라인으로 복사
 function fontFamilyForPreset(preset?: FontPreset | null) {
   switch (preset) {
     case 'serif':
@@ -24,7 +22,12 @@ export interface VideoExportParams {
   brandName?: string
 }
 
-// 텍스트 레이어를 canvas에 직접 그림 (서버 SVG 렌더 없이)
+export interface VideoExportResult {
+  blob: Blob
+  extension: 'mp4' | 'webm'
+  mimeType: string
+}
+
 function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EditorialLayer) {
   const text = layer.text || ''
   if (!text.trim()) return
@@ -48,7 +51,6 @@ function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingC
     ctx.lineJoin = 'round'
   }
 
-  // 텍스트 정렬
   const anchorX = layer.textAlign === 'center'
     ? layer.x + layer.width / 2
     : layer.textAlign === 'right'
@@ -59,14 +61,12 @@ function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingC
   else if (layer.textAlign === 'right') ctx.textAlign = 'right'
   else ctx.textAlign = 'left'
 
-  // 그림자
   if (layer.shadow) {
     ctx.shadowColor = 'rgba(0,0,0,0.5)'
     ctx.shadowBlur = 16
     ctx.shadowOffsetY = 8
   }
 
-  // 단순 줄바꿈 처리 (긴 텍스트 wordwrap)
   const words = text.split(' ')
   const lines: string[] = []
   let current = ''
@@ -80,9 +80,8 @@ function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingC
     }
   }
   if (current) lines.push(current)
-  // 명시적 줄바꿈도 처리
-  const finalLines = lines.flatMap(l => l.split('\n'))
 
+  const finalLines = lines.flatMap(l => l.split('\n'))
   let curY = layer.y
   for (const line of finalLines) {
     if (layer.stroke && layer.strokeColor) ctx.strokeText(line, anchorX, curY)
@@ -93,54 +92,12 @@ function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingC
   ctx.restore()
 }
 
-function drawOverlay(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  overlay: EditorialDocument['overlay'],
-  width: number,
-  height: number,
-  opacity: number,
-) {
-  ctx.save()
-  ctx.globalAlpha = opacity
-
-  // 어둠 그라디언트
-  const darkness = overlay.darkness / 100
-  const grad = ctx.createLinearGradient(0, 0, 0, height)
-  const colorFilter = overlay.colorFilter || '#000000'
-  grad.addColorStop(0, hexToRgba(colorFilter, darkness * 0.4))
-  grad.addColorStop(1, `rgba(5,5,8,${darkness})`)
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, width, height)
-
-  // 비네팅
-  if (overlay.vignette > 0) {
-    const vigAlpha = overlay.vignette / 100
-    const vig = ctx.createRadialGradient(width / 2, height / 2, height * 0.25, width / 2, height / 2, height * 0.7)
-    vig.addColorStop(0, 'rgba(0,0,0,0)')
-    vig.addColorStop(1, `rgba(0,0,0,${vigAlpha})`)
-    ctx.fillStyle = vig
-    ctx.fillRect(0, 0, width, height)
-  }
-
-  ctx.restore()
-}
-
-function hexToRgba(hex: string, alpha: number) {
-  const clean = hex.replace('#', '')
-  const r = parseInt(clean.slice(0, 2), 16) || 0
-  const g = parseInt(clean.slice(2, 4), 16) || 0
-  const b = parseInt(clean.slice(4, 6), 16) || 0
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
-export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blob> {
+export async function exportSlideAsVideo(params: VideoExportParams): Promise<VideoExportResult> {
   const { videoUrl, videoStartSec, videoDurationSec, document: doc } = params
   const W = 1080
   const H = 1350
   const FPS = 30
-  const totalFrames = Math.ceil(videoDurationSec * FPS)
 
-  // 1. 영상 로드
   let sourceResponse: Response
   try {
     sourceResponse = await fetch(videoUrl, { cache: 'no-store', credentials: 'same-origin' })
@@ -150,163 +107,190 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Blo
   if (!sourceResponse.ok) {
     throw new Error(`영상 파일을 불러오지 못했습니다. (HTTP ${sourceResponse.status})`)
   }
+
   const sourceBlob = await sourceResponse.blob()
   if (!sourceBlob.size) throw new Error('영상 파일이 비어 있습니다.')
-  const sourceObjectUrl = URL.createObjectURL(sourceBlob)
 
+  const sourceObjectUrl = URL.createObjectURL(sourceBlob)
   const video = window.document.createElement('video')
   video.src = sourceObjectUrl
   video.muted = true
   video.playsInline = true
+  video.preload = 'auto'
 
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve()
-    video.onerror = () => {
-      URL.revokeObjectURL(sourceObjectUrl)
-      reject(new Error('브라우저가 영상 코덱을 재생하지 못했습니다.'))
-    }
-    video.load()
-  })
-
-  // 2. canvas + MediaRecorder 설정
-  const canvas = document.createElement('canvas')
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-
-  // 지원 포맷 결정 (Chrome: webm/vp9, Safari: mp4/h264)
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-    ? 'video/webm;codecs=vp9'
-    : MediaRecorder.isTypeSupported('video/webm')
-      ? 'video/webm'
-      : MediaRecorder.isTypeSupported('video/mp4')
-        ? 'video/mp4'
-        : null
-
-  if (!mimeType) {
-    URL.revokeObjectURL(sourceObjectUrl)
-    throw new Error('이 브라우저는 영상 내보내기를 지원하지 않습니다.')
-  }
-
-  const stream = canvas.captureStream(FPS)
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
-  const chunks: Blob[] = []
-  let recorderStopped = false
-  
-  recorder.ondataavailable = e => {
-    if (e.data.size > 0 && !recorderStopped) chunks.push(e.data)
-  }
-  
-  recorder.onstop = () => {
-    recorderStopped = true
-  }
-
-  const overlayLayer = doc.layers.find((l: EditorialLayer) => l.type === 'overlay')
-  const overlayOpacity = (overlayLayer?.opacity ?? 100) / 100
-  const textLayers = doc.layers
-    .filter((l: EditorialLayer) => l.visible && ['title', 'subtitle', 'text', 'cta', 'watermark'].includes(l.type))
-    .sort((a: EditorialLayer, b: EditorialLayer) => a.zIndex - b.zIndex)
-  const bgLayer = doc.layers.find((l: EditorialLayer) => l.type === 'background')
-  const bgScale = bgLayer?.scale ?? 1
-  const bgX = bgLayer?.x ?? 0
-  const bgY = bgLayer?.y ?? 0
-  const bgOpacity = (bgLayer?.opacity ?? 100) / 100
-
-  // Helper: wait for video seek with timeout
-  const seekVideo = (targetTime: number): Promise<void> => {
-    return new Promise((resolve) => {
-      // Already at target time - no seek needed
-      if (Math.abs(video.currentTime - targetTime) < 0.04) {
-        resolve()
-        return
-      }
-      
-      video.currentTime = targetTime
-      
-      const timeout = setTimeout(() => {
-        video.removeEventListener('seeked', onSeeked)
-        resolve()
-      }, 2000)
-      
-      const onSeeked = () => {
-        clearTimeout(timeout)
-        video.removeEventListener('seeked', onSeeked)
-        resolve()
-      }
-      
-      video.addEventListener('seeked', onSeeked)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve()
+      video.onerror = () => reject(new Error('브라우저가 영상 코덱을 재생하지 못했습니다.'))
+      video.load()
     })
-  }
 
-  // 3. 프레임별 렌더링
-  await new Promise<void>((resolve, reject) => {
-    recorder.start()
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('영상 렌더링 캔버스를 만들지 못했습니다.')
 
-    let frameCount = 0
+    const format = MediaRecorder.isTypeSupported('video/mp4')
+      ? { mimeType: 'video/mp4', extension: 'mp4' as const }
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? { mimeType: 'video/webm;codecs=vp9', extension: 'webm' as const }
+        : MediaRecorder.isTypeSupported('video/webm')
+          ? { mimeType: 'video/webm', extension: 'webm' as const }
+          : null
 
-    const renderFrame = async () => {
-      if (frameCount >= totalFrames) {
-        recorder.stop()
-        // Wait for final ondataavailable event after stop()
-        await new Promise(r => setTimeout(r, 100))
-        resolve()
-        return
-      }
+    if (!format) {
+      throw new Error('이 브라우저는 영상 내보내기를 지원하지 않습니다.')
+    }
 
-      // 영상 시간 설정 (균등 분배)
-      const targetTime = videoStartSec + (frameCount / FPS)
-      await seekVideo(targetTime)
+    const textLayers = doc.layers
+      .filter((l: EditorialLayer) => l.visible && ['title', 'subtitle', 'text', 'cta', 'watermark'].includes(l.type))
+      .sort((a: EditorialLayer, b: EditorialLayer) => a.zIndex - b.zIndex)
+    const bgLayer = doc.layers.find((l: EditorialLayer) => l.type === 'background')
+    const bgScale = bgLayer?.scale ?? 1
+    const bgX = bgLayer?.x ?? 0
+    const bgY = bgLayer?.y ?? 0
+    const bgOpacity = (bgLayer?.opacity ?? 100) / 100
 
-      // 배경색
+    const drawFrame = () => {
       ctx.fillStyle = '#050508'
       ctx.fillRect(0, 0, W, H)
 
-      // 영상 배경 (상단 50%만, center-crop + transform)
       ctx.save()
       ctx.globalAlpha = bgOpacity
       ctx.translate(bgX, bgY)
       ctx.scale(bgScale, bgScale)
 
-      const videoHeight = H / 2 // 상단 50%만
+      const videoHeight = H / 2
       const vw = video.videoWidth || W
       const vh = video.videoHeight || H
       const targetRatio = W / videoHeight
       const srcRatio = vw / vh
-      let sx = 0, sy = 0, sw = vw, sh = vh
-      if (srcRatio > targetRatio) { sw = vh * targetRatio; sx = (vw - sw) / 2 }
-      else { sh = vw / targetRatio; sy = (vh - sh) / 2 }
+      let sx = 0
+      let sy = 0
+      let sw = vw
+      let sh = vh
+      if (srcRatio > targetRatio) {
+        sw = vh * targetRatio
+        sx = (vw - sw) / 2
+      } else {
+        sh = vw / targetRatio
+        sy = (vh - sh) / 2
+      }
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W / bgScale, videoHeight / bgScale)
-      
-      // 영상 하단 그라데이션 페이드
+
       const gradient = ctx.createLinearGradient(0, videoHeight * 0.4, 0, videoHeight)
       gradient.addColorStop(0, 'rgba(5,5,8,0)')
       gradient.addColorStop(0.55, 'rgba(5,5,8,0.55)')
       gradient.addColorStop(1, 'rgba(5,5,8,1)')
       ctx.fillStyle = gradient
       ctx.fillRect(0, 0, W / bgScale, videoHeight / bgScale)
-      
+
       ctx.restore()
 
-      // 오버레이 (영상 카드뉴스에서는 자체 그라데이션 사용, 표준 오버레이 생략)
-      // isVideoBackground always true here, so skip standard overlay
-
-      // 텍스트 레이어
       for (const layer of textLayers) {
         drawTextLayer(ctx, layer)
       }
-
-      frameCount++
-      requestAnimationFrame(() => { renderFrame().catch(reject) })
     }
 
-    renderFrame().catch(err => { recorder.stop(); reject(err) })
-  })
+    const seekVideo = (targetTime: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const maxTime = Number.isFinite(video.duration) ? video.duration : targetTime
+        const clampedTime = Math.max(0, Math.min(targetTime, maxTime))
+        if (Math.abs(video.currentTime - clampedTime) < 0.04) {
+          resolve()
+          return
+        }
 
-  URL.revokeObjectURL(sourceObjectUrl)
-  
-  if (chunks.length === 0) {
-    throw new Error('영상 녹화에 실패했습니다. 브라우저가 이 코덱을 지원하지 않을 수 있습니다.')
+        const timeout = window.setTimeout(() => {
+          cleanup()
+          resolve()
+        }, 2500)
+        const cleanup = () => {
+          window.clearTimeout(timeout)
+          video.removeEventListener('seeked', onSeeked)
+          video.removeEventListener('error', onError)
+        }
+        const onSeeked = () => {
+          cleanup()
+          resolve()
+        }
+        const onError = () => {
+          cleanup()
+          reject(new Error('브라우저가 영상 코덱을 재생하지 못했습니다.'))
+        }
+
+        video.addEventListener('seeked', onSeeked)
+        video.addEventListener('error', onError)
+        video.currentTime = clampedTime
+      })
+    }
+
+    const exportStartSec = Math.max(0, Math.min(videoStartSec, Number.isFinite(video.duration) ? video.duration : videoStartSec))
+    await seekVideo(exportStartSec)
+    drawFrame()
+
+    const stream = canvas.captureStream(FPS)
+    const recorder = new MediaRecorder(stream, { mimeType: format.mimeType, videoBitsPerSecond: 10_000_000 })
+    const chunks: Blob[] = []
+
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) chunks.push(e.data)
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let animationId = 0
+      let stopTimer = 0
+      let stopRequested = false
+
+      const stopRecording = () => {
+        if (stopRequested) return
+        stopRequested = true
+        window.cancelAnimationFrame(animationId)
+        window.clearTimeout(stopTimer)
+        video.pause()
+        if (recorder.state !== 'inactive') recorder.stop()
+      }
+
+      recorder.onerror = () => {
+        stopRecording()
+        reject(new Error('영상 녹화에 실패했습니다.'))
+      }
+      recorder.onstop = () => {
+        resolve()
+      }
+
+      const renderFrame = () => {
+        drawFrame()
+        animationId = window.requestAnimationFrame(renderFrame)
+      }
+
+      recorder.start(1000)
+      video.currentTime = exportStartSec
+      video.play()
+        .then(() => {
+          renderFrame()
+          stopTimer = window.setTimeout(stopRecording, Math.ceil(videoDurationSec * 1000))
+        })
+        .catch(error => {
+          stopRecording()
+          reject(error)
+        })
+    })
+
+    stream.getTracks().forEach(track => track.stop())
+
+    if (chunks.length === 0) {
+      throw new Error('영상 녹화에 실패했습니다. 브라우저가 이 코덱을 지원하지 않을 수 있습니다.')
+    }
+
+    return {
+      blob: new Blob(chunks, { type: format.mimeType }),
+      extension: format.extension,
+      mimeType: format.mimeType,
+    }
+  } finally {
+    video.pause()
+    URL.revokeObjectURL(sourceObjectUrl)
   }
-  
-  return new Blob(chunks, { type: mimeType })
 }

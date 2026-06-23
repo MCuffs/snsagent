@@ -25,6 +25,7 @@ export interface SeedanceVideoOptions {
   duration?: 3 | 5          // seconds
   aspectRatio?: '9:16' | '16:9' | '1:1'
   resolution?: '480p' | '720p' | '1080p'
+  referenceImageUrls?: string[]
 }
 
 export interface SeedanceVideoResult {
@@ -58,9 +59,9 @@ export class SeedanceVideoProvider {
     options: SeedanceVideoOptions,
     onProgress?: (event: SeedanceProgressEvent) => void,
   ): Promise<SeedanceVideoResult> {
-    const { prompt, duration = 5, aspectRatio = '9:16', resolution = '720p' } = options
+    const { prompt, duration = 5, aspectRatio = '9:16', resolution = '720p', referenceImageUrls = [] } = options
 
-    const taskId = await this.submitWithRetry({ prompt, duration, aspectRatio, resolution })
+    const taskId = await this.submitWithRetry({ prompt, duration, aspectRatio, resolution, referenceImageUrls })
     onProgress?.({ type: 'submit_ok', taskId })
 
     const videoUrl = await this.pollUntilDone(taskId, 270_000, 4_000, onProgress)
@@ -73,6 +74,7 @@ export class SeedanceVideoProvider {
     duration: number
     aspectRatio: string
     resolution: string
+    referenceImageUrls?: string[]
   }) {
     // BytePlus Seedance API accepts video parameters as inline flags appended
     // to the prompt text. Without these, the model uses defaults (which may
@@ -92,6 +94,11 @@ export class SeedanceVideoProvider {
           type: 'text',
           text: promptWithParams,
         },
+        ...(params.referenceImageUrls ?? []).slice(0, 3).map(url => ({
+          type: 'image_url',
+          image_url: { url },
+          role: 'reference_image',
+        })),
       ],
     }
   }
@@ -102,6 +109,7 @@ export class SeedanceVideoProvider {
       duration: number
       aspectRatio: string
       resolution: string
+      referenceImageUrls?: string[]
     },
   ): Promise<string> {
     let lastError: Error | null = null
@@ -115,7 +123,10 @@ export class SeedanceVideoProvider {
       }
 
       const reqBody = this.buildRequestBody(params)
-      console.log(`[Seedance] submit attempt ${attempt + 1} → ${submitUrl}`, JSON.stringify(reqBody).slice(0, 200))
+      console.log(
+        `[Seedance] submit attempt ${attempt + 1} → ${submitUrl} refs=${params.referenceImageUrls?.length ?? 0}`,
+        JSON.stringify(reqBody).slice(0, 300),
+      )
 
       let res: Response
       try {

@@ -20,6 +20,8 @@ export interface VideoPromptInput {
   totalSlides: number
   brandTone?: string
   domainLabel?: string  // e.g. "food", "finance", "fashion"
+  hasReferenceImages?: boolean
+  referenceImageCount?: number
 }
 
 export interface VideoPromptOutput {
@@ -174,6 +176,9 @@ export function buildVideoPrompt(input: VideoPromptInput): VideoPromptOutput {
     '',
     // Technical specs
     `Format: ${duration}, ${aspectNote}. No text, no UI elements, no watermarks, no logos, no readable signage anywhere in frame. Background photograph and motion only.`,
+    input.hasReferenceImages
+      ? buildReferenceImageInstruction(input.referenceImageCount ?? 1)
+      : '',
   ].join('\n').trim()
 
   const negativeHint = 'text, subtitles, watermark, logo, UI elements, readable signs, fast cuts, shaky cam, overexposed highlight clipping, distorted faces, artificial CGI look'
@@ -194,6 +199,27 @@ function buildSubjectFromHeadline(headline: string, topic: string, domain: strin
   // The topic is included as secondary context but the prompt is structured
   // so the model focuses on visual storytelling rather than translating text.
   return `Cinematic scene illustrating the concept of "${clean}" — ${style.subject}. The scene should visually evoke the theme without any text or readable elements`
+}
+
+function buildReferenceImageInstruction(count: number) {
+  const labels = Array.from({ length: Math.max(1, Math.min(3, count)) }, (_, index) => `image${index + 1}`)
+  const imageList = labels.join(', ')
+
+  if (labels.length === 1) {
+    return [
+      'Reference image priority:',
+      'Use image1 as the primary visual anchor and opening visual source.',
+      'Preserve its main product/object shape, composition, color palette, material texture, packaging cues, and brand mood.',
+      'Animate it with subtle natural motion; do not replace it with a generic stock scene.',
+    ].join(' ')
+  }
+
+  return [
+    `Reference image priority: the uploaded references are ordered as ${imageList}.`,
+    'Use image1 as the main visual anchor.',
+    'Use the remaining images for supporting product details, color palette, material texture, packaging cues, and brand mood.',
+    'Keep the referenced objects recognizable while adding subtle natural motion; do not replace them with generic stock scenes.',
+  ].join(' ')
 }
 
 function buildAtmosphere(role: EditorialSlideRole, brandTone?: string): string {
@@ -223,6 +249,7 @@ export function buildCarouselVideoPrompts(
   topic: string,
   domainLabel?: string,
   brandTone?: string,
+  referenceImageUrls: string[] = [],
 ): VideoPromptOutput[] {
   // Establish a "visual anchor" — shared subject context across all slides
   const anchorDomain = domainLabel || 'general'
@@ -235,6 +262,8 @@ export function buildCarouselVideoPrompts(
       totalSlides: slides.length,
       domainLabel,
       brandTone,
+      hasReferenceImages: referenceImageUrls.length > 0,
+      referenceImageCount: referenceImageUrls.length,
     })
 
     // Add coherence note to all slides after the first

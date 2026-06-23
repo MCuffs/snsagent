@@ -894,14 +894,14 @@ export default function CampaignResultView({
       if (isVideoSlide && activeDocument && bgLayer?.videoUrl) {
         // 영상 슬라이드 — 클라이언트 canvas 합성
         setMessage({ type: 'success', text: '영상 합성 중… 잠시 기다려주세요.' })
-        const blob = await exportSlideAsVideo({
+        const exportedVideo = await exportSlideAsVideo({
           videoUrl: bgLayer.videoUrl,
           videoStartSec: bgLayer.videoStartSec ?? 0,
           videoDurationSec: bgLayer.videoDurationSec ?? 3,
           document: activeDocument,
           brandName: brand.name,
         })
-        downloadBlob(blob, fileNameFor(campaign.title, activeSlide.slideNumber, 'mp4'))
+        downloadBlob(exportedVideo.blob, fileNameFor(campaign.title, activeSlide.slideNumber, exportedVideo.extension))
         setMessage({ type: 'success', text: '영상 다운로드가 완료됐습니다.' })
       } else if (activeDocument) {
         const result = await exportEditorialSlideAction(activeSlide.id, JSON.stringify(activeDocument), 'png', 1)
@@ -991,14 +991,14 @@ export default function CampaignResultView({
           const bgLayer = doc?.layers.find(l => l.type === 'background')
           // 영상 배경 슬라이드 — 클라이언트 canvas 합성
           if (bgLayer?.videoUrl && doc) {
-            const blob = await exportSlideAsVideo({
+            const exportedVideo = await exportSlideAsVideo({
               videoUrl: bgLayer.videoUrl,
               videoStartSec: bgLayer.videoStartSec ?? 0,
               videoDurationSec: bgLayer.videoDurationSec ?? 3,
               document: doc,
               brandName: brand.name,
             })
-            return { name: fileNameFor(campaign.title, slide.slideNumber, 'mp4'), blob }
+            return { name: fileNameFor(campaign.title, slide.slideNumber, exportedVideo.extension), blob: exportedVideo.blob }
           }
           // 이미지 슬라이드 — 기존 서버 PNG 렌더
           const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)

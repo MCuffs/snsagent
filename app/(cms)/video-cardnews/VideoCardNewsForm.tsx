@@ -44,6 +44,13 @@ interface UserChatMessage {
   images?: string[]
 }
 
+interface DraftVideoSlide {
+  slideNumber: number
+  role: string
+  headline: string
+  body: string
+}
+
 interface AiChatMessage {
   id: string
   type: 'clarify' | 'confirm' | 'progress' | 'result' | 'error'
@@ -51,6 +58,8 @@ interface AiChatMessage {
   confirmInfo?: CollectedInfo
   stageLabel?: string
   slideProgress?: SlideProgress[]
+  draftSlides?: DraftVideoSlide[]
+  referenceImagePreviews?: string[]
   slides?: VideoSlide[]
   errorText?: string
   partialFailures?: number
@@ -121,6 +130,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
   const activeMsgIdRef = useRef<string | null>(null)
+  const referenceImagesRef = useRef<Array<{ file: File; preview: string }>>([])
 
   const addImages = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -169,28 +179,52 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setAiMessages(prev => prev.map(m => m.id === id ? updater(m) : m))
   }
 
-  // ── 실제 영상 생성 호출 ──────────────────────────────────────────
-
   const runGenerate = async (info: CollectedInfo) => {
+    const currentImages = referenceImagesRef.current
     setPhase('generating')
     setGenerating(true)
-
     const msgId = `ai-gen-${Date.now()}`
     activeMsgIdRef.current = msgId
     flushSync(() => {
       setAiMessages(prev => [...prev, {
         id: msgId,
         type: 'progress',
-        stageLabel: STAGE_LABELS.copy_thinking,
+        stageLabel: currentImages.length > 0
+          ? `참고 이미지 ${currentImages.length}개를 업로드하고 있습니다...`
+          : STAGE_LABELS.copy_thinking,
         slideProgress: [],
+        referenceImagePreviews: currentImages.map(image => image.preview),
       }])
     })
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setTopic('')
+    setAttachedImages([])
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8 * 60 * 1000)
 
     try {
+      let referenceImageUrls: string[] = []
+      if (currentImages.length > 0) {
+        const formData = new FormData()
+        currentImages.forEach(image => formData.append('files', image.file))
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData, signal: controller.signal })
+        const uploadData = await uploadRes.json() as { urls?: string[]; error?: string }
+        if (!uploadRes.ok || !uploadData.urls?.length) {
+          updateActiveMsg(m => ({
+            ...m,
+            type: 'error',
+            errorText: uploadData.error || '참고 이미지를 업로드하지 못했습니다.',
+          }))
+          return
+        }
+        referenceImageUrls = uploadData.urls.slice(0, 3)
+        updateActiveMsg(m => ({
+          ...m,
+          stageLabel: `참고 이미지 ${referenceImageUrls.length}개를 반영해 장면과 카피를 기획하고 있습니다...`,
+        }))
+      }
+
       const res = await fetch('/api/video-cardnews/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,6 +239,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           domainLabel: brand.industry,
           brandTone: brand.toneOfVoice,
           language: 'ko',
+          referenceImageUrls,
         }),
       })
       clearTimeout(timeoutId)
@@ -239,11 +274,15 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.video_start }))
           }
         } else if (eventName === 'copy_done') {
-          const copySlides = (data.slides as Array<{ slideNumber: number; role: string; headline: string }>) ?? []
+          const copySlides = (data.slides as DraftVideoSlide[]) ?? []
           updateActiveMsg(m => ({
             ...m,
             stageLabel: `${STAGE_LABELS.copy_done_prefix}${copySlides.length}개 슬라이드`,
-            slideProgress: copySlides.map(s => ({ slideNumber: s.slideNumber, status: 'waiting' as const })),
+            draftSlides: copySlides,
+            slideProgress: copySlides.map(s => ({
+              slideNumber: s.slideNumber,
+              status: 'waiting' as const,
+            })),
           }))
         } else if (eventName === 'slide_start') {
           updateActiveMsg(m => ({
@@ -288,6 +327,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           if (campaignId) {
             setRedirecting(true)
             setPhase('done')
+            referenceImagesRef.current = []
             const path = locale === 'en' ? `/en/campaign/${campaignId}` : `/ko/campaign/${campaignId}`
             setTimeout(() => router.push(path), 1400)
           }
@@ -443,6 +483,9 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setTopic('')
 
     const imageUrls = attachedImages.map(img => img.preview)
+    if (attachedImages.length > 0) {
+      referenceImagesRef.current = attachedImages
+    }
     setAttachedImages([])
 
     // 유저 메시지 표시
@@ -501,6 +544,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setUserMessages([])
     setAiMessages([])
     setTopic('')
+    referenceImagesRef.current = []
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -865,6 +909,65 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
               </span>
             </div>
 
+            {(msg.referenceImagePreviews?.length ?? 0) > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
+                className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-2.5"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563eb]">Reference images</p>
+                  <span className="text-[10px] font-bold text-[#1d4ed8]">영상 장면에 반영</span>
+                </div>
+                <div className="flex gap-2">
+                  {msg.referenceImagePreviews!.map((preview, index) => (
+                    <div key={`${preview}-${index}`} className="relative h-14 w-14 overflow-hidden rounded-lg border border-white bg-white shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview} alt="" className="h-full w-full object-cover" />
+                      <span className="absolute left-1 top-1 rounded bg-black/65 px-1 text-[8px] font-black text-white">
+                        image{index + 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Draft card news mockups */}
+            {(msg.draftSlides?.length ?? 0) > 0 && msg.type === 'progress' && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
+                className="border-t border-[#e5e7eb] pt-3"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6b7280]">Draft storyboard</p>
+                  <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-bold text-[#2563eb]">
+                    {msg.draftSlides!.length} cards
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <AnimatePresence initial={false}>
+                    {msg.draftSlides!.map((slide, index) => (
+                      <DraftSlideMockup
+                        key={slide.slideNumber}
+                        slide={slide}
+                        index={index}
+                        referenceImagePreview={
+                          msg.referenceImagePreviews?.length
+                            ? msg.referenceImagePreviews[index % msg.referenceImagePreviews.length]
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Slide progress */}
             {(msg.slideProgress?.length ?? 0) > 0 && (
               <div className="space-y-1.5 border-t border-[#e5e7eb] pt-2.5">
                 {(msg.slideProgress ?? []).map(sp => (
@@ -899,6 +1002,54 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
             )}
           </div>
         )}
+      </div>
+    </motion.div>
+  )
+}
+
+function DraftSlideMockup({
+  slide,
+  index,
+  referenceImagePreview,
+}: {
+  slide: DraftVideoSlide
+  index: number
+  referenceImagePreview?: string
+}) {
+  const roleLabel = ROLE_LABEL[slide.role] ?? slide.role
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 14, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+      transition={{ duration: 0.42, delay: index * 0.06, ease: [0.19, 1, 0.22, 1] }}
+      className="overflow-hidden rounded-xl border border-[#dbe3f0] bg-[#f8fafc] shadow-sm"
+    >
+      <div className="aspect-[9/12] bg-[#111827] p-2.5">
+        <div className="flex h-full flex-col overflow-hidden rounded-lg bg-white">
+          <div className="relative h-[45%] bg-gradient-to-br from-[#dbeafe] via-[#fef3c7] to-[#fee2e2]">
+            {referenceImagePreview && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={referenceImagePreview} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
+              </>
+            )}
+            <div className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#334155]">
+              {roleLabel}
+            </div>
+            <div className="absolute inset-x-3 bottom-3 h-1.5 rounded-full bg-white/70" />
+            <div className="absolute bottom-5 left-3 h-1.5 w-1/2 rounded-full bg-white/45" />
+          </div>
+          <div className="flex flex-1 flex-col justify-between bg-[#0f172a] p-3 text-white">
+            <div>
+              <p className="text-[10px] font-black text-[#93c5fd]">CARD {slide.slideNumber}</p>
+              <p className="mt-1.5 text-sm font-black leading-5 text-white">{slide.headline}</p>
+            </div>
+            <p className="mt-2 text-[11px] leading-5 text-[#cbd5e1]">{slide.body}</p>
+          </div>
+        </div>
       </div>
     </motion.div>
   )

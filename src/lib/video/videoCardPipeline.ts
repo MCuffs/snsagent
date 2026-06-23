@@ -8,7 +8,7 @@
 
 import { SeedanceVideoProvider, canUseSeedance } from '../ai/providers/seedanceVideoProvider'
 import { buildCarouselVideoPrompts } from './videoPromptEngine'
-import { getLLMClient, getLightClient, getCopywritingModel, getQwenModel } from '../ai/llmClient'
+import { getLightClient, getQwenModel } from '../ai/llmClient'
 import type { EditorialSlideRole } from '../editorial/editorialDirector'
 
 export interface VideoCardSlideInput {
@@ -26,11 +26,12 @@ export interface VideoCardPipelineInput {
   domainLabel?: string
   brandTone?: string
   durationSeconds?: 3 | 5
+  referenceImageUrls?: string[]
   onProgress?: (event: VideoCardProgressEvent) => void
 }
 
 export type VideoCardProgressEvent =
-  | { type: 'copy_done'; slides: Array<{ slideNumber: number; role: string; headline: string }> }
+  | { type: 'copy_done'; slides: Array<{ slideNumber: number; role: string; headline: string; body: string }> }
   | { type: 'video_start'; slideNumber: number; total: number }
   | { type: 'video_polling'; slideNumber: number; elapsed: number }
   | { type: 'video_done'; slideNumber: number }
@@ -75,6 +76,7 @@ export async function generateVideoCardNews(
     input.topic,
     input.domainLabel,
     input.brandTone,
+    input.referenceImageUrls,
   )
 
   // Diagnostic: log pipeline inputs and first prompt for debugging
@@ -93,7 +95,7 @@ export async function generateVideoCardNews(
 
     try {
       const videoResult = await provider.generateVideo(
-        { prompt, duration, aspectRatio: '9:16', resolution: '720p' },
+        { prompt, duration, aspectRatio: '9:16', resolution: '720p', referenceImageUrls: input.referenceImageUrls },
         (event) => {
           if (event.type === 'poll') {
             onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed: event.elapsed })
