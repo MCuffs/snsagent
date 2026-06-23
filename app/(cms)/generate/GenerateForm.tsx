@@ -1104,15 +1104,46 @@ export default function GenerateForm({
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #d1d5db;
         }
+        .shuffla-ambient-gradient {
+          background:
+            radial-gradient(circle at 18% 18%, rgba(207, 216, 255, 0.58), transparent 34%),
+            radial-gradient(circle at 76% 12%, rgba(245, 248, 255, 0.92), transparent 36%),
+            radial-gradient(circle at 52% 42%, rgba(215, 238, 255, 0.62), transparent 34%),
+            radial-gradient(circle at 82% 74%, rgba(196, 224, 255, 0.68), transparent 38%),
+            radial-gradient(circle at 20% 88%, rgba(188, 205, 255, 0.52), transparent 42%),
+            linear-gradient(180deg, #f7f9ff 0%, #eef7ff 52%, #dceaff 100%);
+          background-size: 135% 135%;
+          animation: shufflaAmbientDrift 26s ease-in-out infinite alternate;
+        }
+        .shuffla-ambient-gradient::after {
+          content: "";
+          position: absolute;
+          inset: -18%;
+          background:
+            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.34), transparent 18%),
+            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.32), transparent 28%);
+          filter: blur(28px);
+          animation: shufflaAmbientFloat 34s ease-in-out infinite alternate;
+        }
+        @keyframes shufflaAmbientDrift {
+          0% { background-position: 0% 0%; transform: scale(1); }
+          50% { background-position: 58% 38%; transform: scale(1.025); }
+          100% { background-position: 100% 84%; transform: scale(1.045); }
+        }
+        @keyframes shufflaAmbientFloat {
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.78; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.96; }
+        }
       ` }} />
 
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="flex min-w-0 flex-1 flex-col border-r border-[#edf1f5] bg-white"
+        className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#dbe8ff] bg-[#f7fbff]"
       >
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-ambient-gradient" />
         {/* Header containing Brand chip & Mode Label */}
-        <div className="shrink-0 border-b border-[#edf1f5] bg-white/95 px-5 py-3 backdrop-blur flex items-center justify-between gap-4">
+        <div className="relative z-10 shrink-0 border-b border-white/60 bg-white/55 px-5 py-3 backdrop-blur-xl flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
             {brand.name}
@@ -1124,13 +1155,13 @@ export default function GenerateForm({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-white px-6 py-8 space-y-7 custom-scrollbar" aria-live="polite">
+        <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 space-y-7 custom-scrollbar" aria-live="polite">
           {/* Initial loading skeleton */}
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
               <div className="flex flex-col gap-2.5 items-start">
                 <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
-                <div className="rounded-xl rounded-tl-sm bg-white px-4 py-2.5">
+                <div className="rounded-xl rounded-tl-sm border border-white/65 bg-white/70 px-4 py-2.5 shadow-[0_14px_36px_rgba(87,119,185,0.10)] backdrop-blur-xl">
                   <div className="flex gap-1.5 py-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '0ms' }} />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9ca3af]" style={{ animationDelay: '120ms' }} />
@@ -1156,10 +1187,10 @@ export default function GenerateForm({
                     <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
                   )}
                   <div
-                    className={`rounded-[20px] border px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] ${
+                    className={`rounded-[20px] border px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line backdrop-blur-xl shadow-[0_16px_38px_rgba(87,119,185,0.12)] ${
                       msg.role === 'user'
-                        ? 'rounded-tr-md border-[#111827] bg-[#111827] text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)]'
-                        : 'rounded-tl-md border-[#edf1f5] bg-white text-[#111111]'
+                        ? 'rounded-tr-md border-[#c8d8ff] bg-white/62 text-[#26334a]'
+                        : 'rounded-tl-md border-white/70 bg-white/72 text-[#111111]'
                     }`}
                   >
                     {msg.role === 'ai' ? msg.revealedContent : msg.content}
@@ -1172,7 +1203,7 @@ export default function GenerateForm({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-                      className="w-full rounded-[20px] border border-[#edf1f5] bg-white p-3 shadow-[0_14px_36px_rgba(15,23,42,0.06)]"
+                      className="w-full rounded-[20px] border border-white/70 bg-white/68 p-3 shadow-[0_14px_36px_rgba(87,119,185,0.12)] backdrop-blur-xl"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-black leading-6 text-[#111111]">{msg.clarification.question}</p>
@@ -1197,7 +1228,7 @@ export default function GenerateForm({
                             type="button"
                             onClick={() => handleClarificationSelect(option)}
                             disabled={isWaiting || isRevealingMessage}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-[#edf1f5] bg-[#fbfcfd] hover:bg-white px-3 py-2.5 text-left transition-all hover:shadow-[0_10px_24px_rgba(15,23,42,0.06)] disabled:opacity-50"
+                            className="group flex w-full items-center gap-3 rounded-xl border border-white/70 bg-white/45 hover:bg-white/70 px-3 py-2.5 text-left transition-all hover:shadow-[0_10px_24px_rgba(87,119,185,0.10)] disabled:opacity-50"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#6b7280] shadow-sm group-hover:text-[#3b82f6]">
                               {index + 1}
@@ -1286,7 +1317,7 @@ export default function GenerateForm({
                     {error}
                   </div>
                 )}
-                <div className="rounded-[20px] border border-[#edf1f5] bg-white p-4.5 space-y-3.5 shadow-[0_18px_44px_rgba(15,23,42,0.07)]" onPaste={handlePaste}>
+                <div className="rounded-[20px] border border-white/70 bg-white/62 p-4.5 space-y-3.5 shadow-[0_18px_44px_rgba(87,119,185,0.13)] backdrop-blur-xl" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-[#111111]">{t('attach_image')}</p>
@@ -1346,9 +1377,9 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 border-t border-[#edf1f5] bg-white px-4 pb-5 pt-3">
+        <div className="relative z-10 shrink-0 border-t border-white/60 bg-white/45 px-4 pb-5 pt-3 backdrop-blur-xl">
           <form onSubmit={handleSend}>
-            <div className="flex items-center gap-2 rounded-[22px] border border-[#e5eaf0] bg-white px-3 py-2 shadow-[0_18px_42px_rgba(15,23,42,0.08)] transition-all focus-within:border-[#cbd5e1] focus-within:shadow-[0_22px_54px_rgba(15,23,42,0.11)]">
+            <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white/72 px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] backdrop-blur-xl transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)]">
               <input
                 ref={inputRef}
                 type="text"

@@ -628,11 +628,44 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   return (
     <div className="flex h-full overflow-hidden bg-white">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .shuffla-video-ambient {
+          background:
+            radial-gradient(circle at 16% 16%, rgba(207, 216, 255, 0.58), transparent 34%),
+            radial-gradient(circle at 78% 10%, rgba(247, 250, 255, 0.94), transparent 36%),
+            radial-gradient(circle at 54% 42%, rgba(214, 238, 255, 0.64), transparent 34%),
+            radial-gradient(circle at 84% 74%, rgba(194, 224, 255, 0.68), transparent 38%),
+            radial-gradient(circle at 22% 88%, rgba(188, 205, 255, 0.52), transparent 42%),
+            linear-gradient(180deg, #f7f9ff 0%, #eef7ff 52%, #dceaff 100%);
+          background-size: 135% 135%;
+          animation: shufflaVideoAmbientDrift 26s ease-in-out infinite alternate;
+        }
+        .shuffla-video-ambient::after {
+          content: "";
+          position: absolute;
+          inset: -18%;
+          background:
+            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.34), transparent 18%),
+            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.32), transparent 28%);
+          filter: blur(28px);
+          animation: shufflaVideoAmbientFloat 34s ease-in-out infinite alternate;
+        }
+        @keyframes shufflaVideoAmbientDrift {
+          0% { background-position: 0% 0%; transform: scale(1); }
+          50% { background-position: 58% 38%; transform: scale(1.025); }
+          100% { background-position: 100% 84%; transform: scale(1.045); }
+        }
+        @keyframes shufflaVideoAmbientFloat {
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.78; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.96; }
+        }
+      ` }} />
       {/* Left: Chat */}
-      <div className="flex min-w-0 flex-1 flex-col border-r border-[#edf1f5] bg-white">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#dbe8ff] bg-[#f7fbff]">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-video-ambient" />
 
         {/* Header */}
-        <div className="shrink-0 border-b border-[#edf1f5] bg-white/95 px-5 py-3 backdrop-blur flex items-center justify-between gap-4">
+        <div className="relative z-10 shrink-0 border-b border-white/60 bg-white/55 px-5 py-3 backdrop-blur-xl flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <Clapperboard className="h-3.5 w-3.5" />
             영상 카드뉴스
@@ -653,13 +686,13 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         </div>
 
         {/* Chat */}
-        <div className="flex-1 overflow-y-auto bg-white px-6 py-8 space-y-7">
+        <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 space-y-7">
 
           {/* Greeting */}
           <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
             <div className="flex flex-col gap-2.5 items-start max-w-md">
               <AiBubbleAvatar />
-              <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+              <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl">
                 <span className="font-bold">영상 카드뉴스</span>로 만들 주제를 알려주세요.
                 <br />
                 타깃, 분위기, 꼭 담을 메시지를 같이 적어주면 더 정확하게 기획할 수 있어요.
@@ -676,7 +709,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                         setTopic(example)
                         inputRef.current?.focus()
                       }}
-                      className="block w-full rounded-xl border border-[#edf1f5] bg-[#fbfcfd] px-3 py-2 text-left text-xs font-semibold leading-5 text-[#374151] transition-all hover:border-[#cbd5e1] hover:bg-white hover:shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+                      className="block w-full rounded-xl border border-white/70 bg-white/46 px-3 py-2 text-left text-xs font-semibold leading-5 text-[#334155] transition-all hover:border-[#bdd0ff] hover:bg-white/72 hover:shadow-[0_10px_24px_rgba(87,119,185,0.10)]"
                     >
                       {example}
                     </button>
@@ -698,7 +731,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 transition={smoothEase} className="contents"
               >
                 <div className="flex justify-end">
-                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#d4d4d8] bg-[#f4f4f5] px-4 py-3 text-sm font-medium leading-6 text-[#18181b] shadow-[0_14px_34px_rgba(24,24,27,0.08)] whitespace-pre-wrap flex flex-col gap-2">
+                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#c8d8ff] bg-white/62 px-4 py-3 text-sm font-medium leading-6 text-[#26334a] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl whitespace-pre-wrap flex flex-col gap-2">
                     {umsg.images && umsg.images.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 justify-end">
                         {umsg.images.map((img, i) => (
@@ -734,7 +767,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className="shrink-0 border-t border-[#edf1f5] bg-white px-4 pb-5 pt-3 space-y-2.5"
+          className="relative z-10 shrink-0 border-t border-white/60 bg-white/45 px-4 pb-5 pt-3 space-y-2.5 backdrop-blur-xl"
         >
           {isDragging && (
             <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
@@ -777,7 +810,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             ))}
           </div>
 
-          <div className={`flex items-center gap-2 rounded-[22px] border bg-white px-3 py-2 shadow-[0_18px_42px_rgba(15,23,42,0.08)] transition-all focus-within:shadow-[0_22px_54px_rgba(15,23,42,0.11)] ${isDragging ? 'border-[#3b82f6]' : 'border-[#e5eaf0]'}`}>
+          <div className={`flex items-center gap-2 rounded-[22px] border bg-white/72 px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] backdrop-blur-xl transition-all focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)] ${isDragging ? 'border-[#93b8ff]' : 'border-white/75'}`}>
             <button type="button" disabled={generating || attachedImages.length >= 3}
               onClick={() => fileInputRef.current?.click()}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
@@ -845,7 +878,7 @@ function AiMessage({
       >
         <div className="flex flex-col gap-2.5 items-start max-w-md">
           <AiBubbleAvatar />
-          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_14px_36px_rgba(15,23,42,0.06)] whitespace-pre-line flex flex-col gap-3 w-full">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl whitespace-pre-line flex flex-col gap-3 w-full">
             <div>{msg.text}</div>
             
             {msg.clarification && msg.clarification.options && onClarificationSelect && (
@@ -855,7 +888,7 @@ function AiMessage({
                     key={oIdx}
                     type="button"
                     onClick={() => onClarificationSelect(opt)}
-                    className="rounded-xl border border-[#edf1f5] bg-white px-2.5 py-1.5 text-xs text-[#374151] shadow-sm transition-all hover:border-[#cbd5e1] hover:bg-[#fbfcfd] hover:text-[#111111] active:scale-[0.98]"
+                    className="rounded-xl border border-white/70 bg-white/48 px-2.5 py-1.5 text-xs text-[#374151] shadow-sm transition-all hover:border-[#bdd0ff] hover:bg-white/72 hover:text-[#111111] active:scale-[0.98]"
                   >
                     {opt.label}
                   </button>
@@ -878,7 +911,7 @@ function AiMessage({
       >
         <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
           <AiBubbleAvatar />
-          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-4 w-full space-y-4 shadow-[0_16px_42px_rgba(15,23,42,0.07)]">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 w-full space-y-4 shadow-[0_16px_42px_rgba(87,119,185,0.13)] backdrop-blur-xl">
             <p className="text-sm font-bold text-[#111111]">완벽해요! 이렇게 만들게요.</p>
 
             <div className="space-y-2.5 text-sm">
@@ -961,7 +994,7 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
 
         {/* Progress / result */}
         {msg.type !== 'error' && msg.type !== 'clarify' && msg.type !== 'confirm' && (
-          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 w-full space-y-3 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 w-full space-y-3 shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl">
             <div className="flex items-center gap-2">
               {msg.type === 'progress' && (
                 <Loader2 className="h-3.5 w-3.5 text-[#3b82f6] animate-spin shrink-0" />
@@ -994,7 +1027,7 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
-                className="rounded-[18px] border border-[#dbeafe] bg-[#f8fbff] p-2.5 shadow-[0_10px_24px_rgba(37,99,235,0.06)]"
+                className="rounded-[18px] border border-white/70 bg-white/46 p-2.5 shadow-[0_10px_24px_rgba(87,119,185,0.10)] backdrop-blur-xl"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563eb]">Reference images</p>
