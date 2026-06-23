@@ -353,11 +353,18 @@ function normalizeBaseUrl(value: string) {
 }
 
 function normalizeKlingModel(value: string | undefined) {
-  return sanitizeEnvValue(value) || 'kling-3.0-turbo'
+  const clean = sanitizeEnvValue(value) || 'kling-v3-0-turbo'
+  const aliases: Record<string, string> = {
+    'kling-3.0': 'kling-v3-0',
+    'kling-v3.0': 'kling-v3-0',
+    'kling-3.0-turbo': 'kling-v3-0-turbo',
+    'kling-v3.0-turbo': 'kling-v3-0-turbo',
+  }
+  return aliases[clean.toLowerCase()] ?? clean
 }
 
 function isKlingTurboModel(model: string) {
-  return model.toLowerCase() === 'kling-3.0-turbo'
+  return ['kling-3.0-turbo', 'kling-v3-0-turbo', 'kling-v3.0-turbo'].includes(model.toLowerCase())
 }
 
 function base64Url(input: string | Buffer) {
