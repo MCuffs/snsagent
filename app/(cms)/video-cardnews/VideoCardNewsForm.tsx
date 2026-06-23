@@ -176,7 +176,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   useEffect(() => {
-    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
+    if (userMessages.length === 0 && aiMessages.length === 0) return
+    const timer = window.setTimeout(() => {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }, 80)
+    return () => window.clearTimeout(timer)
   }, [aiMessages, generating, userMessages])
 
   const updateActiveMsg = (updater: (msg: AiChatMessage) => AiChatMessage) => {
@@ -767,7 +771,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className="relative z-10 shrink-0 border-t border-white/60 bg-white/45 px-4 pb-5 pt-3 space-y-2.5 backdrop-blur-xl"
+          className="relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3 space-y-2.5"
         >
           {isDragging && (
             <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
@@ -810,7 +814,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             ))}
           </div>
 
-          <div className={`flex items-center gap-2 rounded-[22px] border bg-white/72 px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] backdrop-blur-xl transition-all focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)] ${isDragging ? 'border-[#93b8ff]' : 'border-white/75'}`}>
+          <div className={`flex items-center gap-2 rounded-[22px] border bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] transition-all focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)] ${isDragging ? 'border-[#93b8ff]' : 'border-white/75'}`}>
             <button type="button" disabled={generating || attachedImages.length >= 3}
               onClick={() => fileInputRef.current?.click()}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
