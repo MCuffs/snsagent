@@ -147,30 +147,51 @@ function buildEditableVideoPlan(
   const cleanTopic = info.rawTopic.trim()
   const audience = info.targetAndMessage?.trim() || `${brand.targetAudience || '핵심 고객'}에게 메시지를 명확하게 전달`
   const mood = info.mood?.trim() || `${brand.toneOfVoice || '깔끔하고 신뢰감 있는'} 톤`
+  const requestedBrandText = extractRequestedBrandText(`${cleanTopic} ${audience} ${mood}`)
 
   return roles.map((role, index) => {
     const slideNumber = index + 1
     const label = roleLabel(role)
-    const headline = buildDraftHeadline(role, cleanTopic, slideNumber)
-    const body = buildDraftBody(role, cleanTopic, audience)
+    const headline = buildDraftHeadline(role, cleanTopic, slideNumber, requestedBrandText)
+    const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText)
     return {
       slideNumber,
       role,
       headline,
       body,
-      videoPrompt: [
-        `Wide 16:9 cinematic video for the upper media panel of a vertical card news layout.`,
-        `Slide ${slideNumber} role: ${label}. Topic: ${cleanTopic}.`,
-        `Scene intent: visually express "${headline}" without any readable text.`,
-        `Audience and message: ${audience}.`,
-        `Mood: ${mood}. Brand: ${brand.name}.`,
-        `Keep the main subject centered with generous headroom and side margins. Natural subtle motion, premium realistic lighting, no UI, no logo, no watermark, no subtitles.`,
-      ].join(' '),
+      videoPrompt: buildSceneVideoPrompt({
+        slideNumber,
+        role,
+        label,
+        topic: cleanTopic,
+        headline,
+        audience,
+        mood,
+        brandName: brand.name,
+        requestedBrandText,
+      }),
     }
   })
 }
 
-function buildDraftHeadline(role: string, topic: string, slideNumber: number) {
+function extractRequestedBrandText(text: string) {
+  const urlMatch = text.match(/\b[a-z0-9-]+\.(?:io|com|co\.kr|kr|net|ai)\b/i)
+  if (urlMatch) return normalizeBrandText(urlMatch[0])
+  if (/shuffla/i.test(text)) return 'Shuffla.io'
+  return ''
+}
+
+function normalizeBrandText(text: string) {
+  if (/^shuffla\.io$/i.test(text)) return 'Shuffla.io'
+  return text
+}
+
+function buildDraftHeadline(role: string, topic: string, slideNumber: number, requestedBrandText = '') {
+  if (requestedBrandText) {
+    if (role === 'hook') return `${requestedBrandText}가 보이는 순간`
+    if (role === 'key-point') return `작업 흐름 속 ${requestedBrandText}`
+    if (role === 'save-cta') return `${requestedBrandText} 클로즈업`
+  }
   if (role === 'hook') return topic.length > 18 ? topic.slice(0, 18).trimEnd() : topic
   if (role === 'context') return '왜 지금 중요할까'
   if (role === 'key-point') return '핵심은 더 쉽게'
@@ -179,13 +200,64 @@ function buildDraftHeadline(role: string, topic: string, slideNumber: number) {
   return `포인트 ${slideNumber}`
 }
 
-function buildDraftBody(role: string, topic: string, audience: string) {
+function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '') {
+  if (requestedBrandText) {
+    if (role === 'hook') return `작업 중인 인물과 모니터가 자연스럽게 보이며 ${requestedBrandText} 노출을 예고합니다.`
+    if (role === 'key-point') return `모니터 화면 안에서 ${requestedBrandText}가 또렷하게 등장해 서비스 인지를 만듭니다.`
+    if (role === 'save-cta') return `카메라가 모니터 쪽으로 다가가 ${requestedBrandText}를 크게 각인합니다.`
+  }
   if (role === 'hook') return `${topic}의 핵심 장면을 첫 화면에서 직관적으로 보여줍니다.`
   if (role === 'context') return `${audience} 관점에서 문제 상황과 필요성을 자연스럽게 보여줍니다.`
   if (role === 'key-point') return `복잡한 내용을 짧은 장면과 명확한 메시지로 이해시키는 구간입니다.`
   if (role === 'summary') return `앞선 메시지를 하나의 결론으로 묶어 기억하기 쉽게 정리합니다.`
   if (role === 'save-cta') return `사용자가 다음 행동을 떠올릴 수 있도록 차분하게 마무리합니다.`
   return `${topic}에 대한 구체적인 장면을 보여주며 메시지를 보강합니다.`
+}
+
+function buildSceneVideoPrompt(params: {
+  slideNumber: number
+  role: string
+  label: string
+  topic: string
+  headline: string
+  audience: string
+  mood: string
+  brandName: string
+  requestedBrandText: string
+}) {
+  const scene = buildSceneDirection(params)
+  const textRule = params.requestedBrandText
+    ? `Readable text rule: the only readable text allowed is exactly "${params.requestedBrandText}" on the computer monitor or final close-up. Do not add any other words, subtitles, UI labels, menus, watermarks, or random logos.`
+    : 'No readable text, no subtitles, no UI labels, no logo, no watermark.'
+
+  return [
+    'Wide 16:9 cinematic video for the upper media panel of a vertical card news layout.',
+    `Scene ${params.slideNumber} (${params.label}).`,
+    scene,
+    `Topic: ${params.topic}. Message: ${params.audience}. Mood: ${params.mood}. Brand context: ${params.brandName}.`,
+    textRule,
+    'Keep the main subject centered with generous headroom and side margins. Natural subtle motion, realistic office lighting, clean premium composition.',
+  ].join(' ')
+}
+
+function buildSceneDirection(params: {
+  role: string
+  headline: string
+  requestedBrandText: string
+}) {
+  const brandText = params.requestedBrandText
+  if (brandText) {
+    if (params.role === 'hook') {
+      return `Opening shot: a woman works at a computer in a calm office setting, similar to the reference image if provided. The monitor is visible but ${brandText} is only subtly present or just beginning to appear. Camera makes a slow natural push-in.`
+    }
+    if (params.role === 'key-point') {
+      return `Middle shot: over-the-shoulder view of the woman using the computer. The monitor clearly and naturally displays "${brandText}" as the focus of attention while her hand or posture suggests active work.`
+    }
+    if (params.role === 'save-cta') {
+      return `Final shot: the camera smoothly zooms toward the monitor until "${brandText}" becomes large, centered, and clearly readable as the final brand memory.`
+    }
+  }
+  return `Scene intent: visually express "${params.headline}" through cinematic action and environment, not through written text.`
 }
 
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
@@ -1196,7 +1268,7 @@ function AiMessage({
           transition={smoothEase}
           className="flex justify-start"
         >
-          <div className="flex w-full max-w-md flex-col items-start gap-2.5">
+          <div className="flex w-full max-w-[920px] flex-col items-start gap-2.5">
             <AiBubbleAvatar />
             <div className="w-full space-y-4 rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 shadow-[0_16px_42px_rgba(87,119,185,0.13)] backdrop-blur-xl">
               <div className="space-y-1">
@@ -1238,7 +1310,7 @@ function AiMessage({
                       각 카드의 장면, 제목, 본문, Kling 프롬프트입니다. 수정한 내용이 실제 생성에 사용됩니다.
                     </p>
                   </div>
-                  <div className="flex gap-3 overflow-x-auto pb-1">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {videoPlan.map(slide => (
                       <EditableVideoPromptCard
                         key={slide.slideNumber}
@@ -1380,7 +1452,7 @@ function EditableVideoPromptCard({
   onChange: (patch: Partial<VideoPlanSlide>) => void
 }) {
   return (
-    <div className="w-[300px] shrink-0 rounded-2xl border border-[#e5e7eb] bg-white/78 p-3 shadow-[0_12px_28px_rgba(87,119,185,0.10)]">
+    <div className="min-w-0 rounded-2xl border border-[#e5e7eb] bg-white/78 p-3 shadow-[0_12px_28px_rgba(87,119,185,0.10)]">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] font-bold text-white">
           Card {slide.slideNumber}
