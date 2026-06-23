@@ -629,11 +629,31 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             <div className="flex flex-col gap-2.5 items-start max-w-md">
               <AiBubbleAvatar />
               <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-                안녕하세요! <span className="font-bold">영상 카드뉴스</span>를 만들어드릴게요.
-                <br /><br />
-                어떤 주제로 만들고 싶으신가요?
+                <span className="font-bold">영상 카드뉴스</span>로 만들 주제를 알려주세요.
                 <br />
-                <span className="text-[11px] text-[#9ca3af] font-semibold">✦ 슬라이드당 약 1~2분 · 9:16 세로 영상 · 텍스트 자동 합성</span>
+                타깃, 분위기, 꼭 담을 메시지를 같이 적어주면 더 정확하게 기획할 수 있어요.
+                <div className="mt-3 space-y-2">
+                  {[
+                    '20대 직장인을 대상으로, 월요일 아침 루틴을 바꾸는 커피 브랜드 영상 카드뉴스',
+                    '신제품 선크림 출시 소식을 여름 휴가 분위기로 보여주는 5장 영상 카드뉴스',
+                    '동네 병원의 독감 예방접종 안내를 신뢰감 있게 설명하는 짧은 카드뉴스',
+                  ].map(example => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => {
+                        setTopic(example)
+                        inputRef.current?.focus()
+                      }}
+                      className="block w-full rounded-xl border border-[#edf1f5] bg-[#fbfcfd] px-3 py-2 text-left text-xs font-semibold leading-5 text-[#374151] transition-all hover:border-[#cbd5e1] hover:bg-white hover:shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] font-semibold leading-5 text-[#9ca3af]">
+                  ✦ 9:16 세로 영상 · 장면/제목/본문 초안 먼저 확인 · 텍스트 자동 합성
+                </p>
               </div>
             </div>
           </motion.div>
