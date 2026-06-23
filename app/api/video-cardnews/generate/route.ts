@@ -9,6 +9,7 @@ import { persistGeneratedVideo } from '../../../../lib/video-storage'
 import { checkVideoCardNewsLimit } from '../../../../lib/limits'
 import { inferContentDomain } from '../../../../src/lib/content/domainProfile'
 import type { ContentDomain } from '../../../../src/lib/content/domainProfile'
+import { getLightClient, getQwenModel } from '../../../../src/lib/ai/llmClient'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
@@ -261,12 +262,29 @@ export async function POST(request: NextRequest) {
         // Stage 3: Save to DB and redirect to campaign editor
         sse(controller, 'stage', { stage: 'saving', message: '캠페인 저장 중...' })
 
+        // Summarize the topic into a short title (max 20 chars)
+        let summarizedTitle = topic
+        try {
+          const client = getLightClient()
+          const titleRes = await client.generateJson<{ title: string }>(
+            'video-card-title-summary',
+            `주제: "${topic}"\n\n이 주제를 15자 내외의 직관적이고 깔끔한 제목(한글 명사형 종결 추천)으로 요약해 주세요. JSON으로 반환해 주세요. 예시: { "title": "식물성 에센스 소개" }`,
+            () => ({ title: topic.slice(0, 20) }),
+            { model: getQwenModel(), temperature: 0.1 }
+          )
+          if (titleRes?.title) {
+            summarizedTitle = titleRes.title.replace(/["']/g, '').trim()
+          }
+        } catch (err) {
+          console.warn('[VideoCardNews] Failed to summarize title:', err)
+        }
+
         const campaign = await dbService.createCampaign(
           user.id,
           brandId,
           {
-            title: `${topic} 영상 카드뉴스`,
-            productName: topic,
+            title: `${summarizedTitle} 영상 카드뉴스`,
+            productName: summarizedTitle,
             productDescription: topic,
             keyBenefits: '영상 카드뉴스',
             objective: '영상 카드뉴스',
@@ -293,7 +311,7 @@ export async function POST(request: NextRequest) {
         await dbService.updateCampaignStatus(campaign.id, 'pending_approval')
 
         const post = await dbService.createPost(user.id, brandId, campaign.id, {
-          caption: `${topic} 영상 카드뉴스`,
+          caption: `${summarizedTitle} 영상 카드뉴스`,
           hashtags: '#카드뉴스 #영상카드뉴스 #숏폼',
           scheduledAt: tomorrowAt20(),
         })
