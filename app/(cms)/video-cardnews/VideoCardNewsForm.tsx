@@ -431,11 +431,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         }),
       })
 
-      if (!res.ok) {
-        throw new Error('API request failed')
-      }
-
-      const data = await res.json() as {
+      const data = await res.json().catch(() => null) as {
         message: string
         ready: boolean
         params?: {
@@ -444,6 +440,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           mood?: string
         }
         clarification?: ClarificationPrompt
+        error?: string
+      } | null
+
+      if (!res.ok || !data) {
+        throw new Error(data?.error || `디렉터 API 호출에 실패했습니다. (${res.status})`)
       }
 
       setAiMessages(prev => {
@@ -498,13 +499,16 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
     } catch (err) {
       console.error(err)
+      const errorText = err instanceof Error
+        ? err.message
+        : '디렉터와의 연결 중 오류가 발생했습니다. 다시 시도해 주세요.'
       setAiMessages(prev => {
         const next = [...prev]
         const tempIdx = next.findIndex(m => m.id.startsWith('ai-temp-'))
         const errMsg: AiChatMessage = {
           id: `ai-err-${Date.now()}`,
           type: 'error',
-          errorText: '디렉터와의 연결 중 오류가 발생했습니다. 다시 시도해 주세요.',
+          errorText,
         }
         if (tempIdx !== -1) {
           next[tempIdx] = errMsg

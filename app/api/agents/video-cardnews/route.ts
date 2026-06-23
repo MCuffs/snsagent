@@ -169,6 +169,49 @@ function getOpenAIUserFacingError(error: unknown) {
   }
 }
 
+function getLastUserMessage(messages: ChatMessage[]) {
+  return [...messages].reverse().find(message => message.role === 'user')?.content.trim() || ''
+}
+
+function buildFallbackResponse(messages: ChatMessage[], language?: 'ko' | 'en'): VideoCardAgentResponse {
+  const topic = getLastUserMessage(messages)
+  if (language === 'en') {
+    return {
+      message: 'I prepared an editable brief from your request. Please review it before generation.',
+      ready: true,
+      params: {
+        topic: topic || 'Video card news topic',
+        targetAndMessage: 'People who need a short, clear vertical video card news flow. Show the main idea in a simple and persuasive way.',
+        mood: 'Clean, bright, polished short-form tone with smooth motion and readable text.',
+      },
+    }
+  }
+
+  return {
+    message: '입력 내용을 바탕으로 수정 가능한 기획안을 준비했습니다. 생성 전에 확인해주세요.',
+    ready: true,
+    params: {
+      topic: topic || '영상 카드뉴스 주제',
+      targetAndMessage: '짧고 명확한 영상 카드뉴스가 필요한 사용자에게 핵심 메시지를 쉽고 설득력 있게 전달합니다.',
+      mood: '깔끔하고 밝은 숏폼 톤, 부드러운 움직임, 읽기 쉬운 텍스트 중심',
+    },
+  }
+}
+
+function parseAgentResponse(content: string): VideoCardAgentResponse | null {
+  try {
+    return JSON.parse(content) as VideoCardAgentResponse
+  } catch {
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return null
+    try {
+      return JSON.parse(jsonMatch[0]) as VideoCardAgentResponse
+    } catch {
+      return null
+    }
+  }
+}
+
 export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
@@ -199,7 +242,7 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey || apiKey.length < 10) {
-      return NextResponse.json({ error: 'OpenAI API 키 설정이 확인되지 않습니다.' }, { status: 500 })
+      return NextResponse.json(buildFallbackResponse(messages, language))
     }
 
     const openai = new OpenAI({ apiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
@@ -218,7 +261,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '기획 전략을 수립하는 데 실패했습니다.' }, { status: 500 })
     }
 
-    const parsed = JSON.parse(content) as VideoCardAgentResponse
+    const parsed = parseAgentResponse(content)
+    if (!parsed) {
+      console.error('[VideoCardAgent] Invalid JSON response:', content.slice(0, 500))
+      return NextResponse.json(buildFallbackResponse(messages, language))
+    }
     return NextResponse.json(parsed)
 
   } catch (error) {
