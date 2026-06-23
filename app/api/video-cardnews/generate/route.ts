@@ -38,6 +38,50 @@ function truncateCaption(text: string, maxLength = 700) {
   return `${text.slice(0, maxLength - 1).trimEnd()}…`
 }
 
+function shouldUseNewsResearch(input: {
+  topic: string
+  targetAndMessage?: string
+  mood?: string
+  domainLabel?: string
+}) {
+  const text = [
+    input.topic,
+    input.targetAndMessage ?? '',
+    input.mood ?? '',
+    input.domainLabel ?? '',
+  ].join(' ')
+    .replace(/영상\s*카드뉴스|카드\s*뉴스|카드뉴스|video\s*card\s*news|card\s*news/gi, ' ')
+    .toLowerCase()
+
+  const explicitNewsSignals = [
+    /최신|최근|요즘|오늘|어제|이번\s*(주|달|분기|해|년도)|\b202[0-9]\b/u,
+    /뉴스|이슈|속보|논란|쟁점|동향|트렌드|시장|정책|정부|국회|대통령|선거|법원|검찰|경찰/u,
+    /발표|공시|보고서|통계|자료|연구|조사|리서치|랭킹|순위|비교|전망/u,
+    /\b(news|latest|recent|today|trend|issue|market|policy|report|survey|research|statistics|ranking|forecast)\b/i,
+  ]
+  const internalBriefSignals = [
+    /사용법|방법|가이드|튜토리얼|온보딩|안내|소개|홍보|브랜딩|브랜드|제품|서비스|메뉴|이벤트|캠페인/u,
+    /쉽게|빠르게|만드는 법|활용법|시작하기|예약|접수|구매|혜택|쿠폰|프로모션/u,
+    /\b(how to|guide|tutorial|onboarding|intro|promotion|brand|product|service|campaign|event)\b/i,
+  ]
+
+  const hasExplicitNewsSignal = explicitNewsSignals.some(pattern => pattern.test(text))
+  if (hasExplicitNewsSignal) {
+    return { useNews: true, reason: 'explicit-current-or-factual-signal' }
+  }
+
+  if ((input.domainLabel ?? '').toLowerCase() === 'news') {
+    return { useNews: true, reason: 'news-domain' }
+  }
+
+  const looksLikeInternalBrief = internalBriefSignals.some(pattern => pattern.test(text))
+  if (looksLikeInternalBrief) {
+    return { useNews: false, reason: 'internal-brief-or-how-to' }
+  }
+
+  return { useNews: false, reason: 'no-current-context-needed' }
+}
+
 function buildVideoCardSummaryCaption(
   topic: string,
   slides: Array<{ headline: string; body: string; role: string; videoUrl: string | null }>,
@@ -146,44 +190,49 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Stage 1: Research & RSS context gathering
-        sse(controller, 'stage', { stage: 'research', message: '최신 뉴스와 정보를 수집하는 중...' })
-
         let researchContext = ''
-        try {
-          const researchBrief = await buildCarouselResearchBrief({
-            topic,
-            category: domainLabel,
-            keyContent: topic,
-            slideCount,
-            language,
-          })
-          researchContext = formatResearchBriefForPrompt(researchBrief, language)
-          if (researchContext) {
-            console.log(`[VideoCardNews:Research] ${researchBrief?.verifiedFacts.length ?? 0} facts, ${researchBrief?.sources.length ?? 0} sources for "${topic}"`)
-          }
-        } catch (err) {
-          console.warn('[VideoCardNews:Research] Research brief failed, continuing without it:', err)
-        }
+        const newsDecision = shouldUseNewsResearch({ topic, targetAndMessage, mood, domainLabel })
+        console.log(`[VideoCardNews:ResearchDecision] useNews=${newsDecision.useNews} reason=${newsDecision.reason} topic="${topic.slice(0, 120)}"`)
 
-        // RSS fallback if research returned nothing
-        if (!researchContext) {
+        if (newsDecision.useNews) {
+          // Stage 1: Research & RSS context gathering
+          sse(controller, 'stage', { stage: 'research', message: '최신 뉴스와 정보를 수집하는 중...' })
+
           try {
-            const keywords = extractGenerationKeywords(topic, [domainLabel])
-            const rssResult = await fetchRssForGeneration({
-              category: inferRssCategory(topic, domainLabel),
-              keywords,
+            const researchBrief = await buildCarouselResearchBrief({
               topic,
-              limit: 5,
+              category: domainLabel,
+              keyContent: topic,
+              slideCount,
               language,
             })
-            const rssCtx = buildRssContext(rssResult, language)
-            if (rssCtx) {
-              researchContext = rssCtx
-              console.log(`[VideoCardNews:RSS] Injected ${rssResult.articles.length} articles for "${topic}"`)
+            researchContext = formatResearchBriefForPrompt(researchBrief, language)
+            if (researchContext) {
+              console.log(`[VideoCardNews:Research] ${researchBrief?.verifiedFacts.length ?? 0} facts, ${researchBrief?.sources.length ?? 0} sources for "${topic}"`)
             }
           } catch (err) {
-            console.warn('[VideoCardNews:RSS] RSS fetch failed, continuing without it:', err)
+            console.warn('[VideoCardNews:Research] Research brief failed, continuing without it:', err)
+          }
+
+          // RSS fallback if research returned nothing
+          if (!researchContext) {
+            try {
+              const keywords = extractGenerationKeywords(topic, [domainLabel])
+              const rssResult = await fetchRssForGeneration({
+                category: inferRssCategory(topic, domainLabel),
+                keywords,
+                topic,
+                limit: 5,
+                language,
+              })
+              const rssCtx = buildRssContext(rssResult, language)
+              if (rssCtx) {
+                researchContext = rssCtx
+                console.log(`[VideoCardNews:RSS] Injected ${rssResult.articles.length} articles for "${topic}"`)
+              }
+            } catch (err) {
+              console.warn('[VideoCardNews:RSS] RSS fetch failed, continuing without it:', err)
+            }
           }
         }
 
