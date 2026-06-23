@@ -192,14 +192,24 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
                 onLoadedMetadata={e => {
                   const v = e.currentTarget
                   const start = background.videoStartSec ?? 0
+                  const dur = background.videoDurationSec ?? 3
+                  const isFullLength = start <= 0.1 && (v.duration ? Math.abs(dur - v.duration) < 0.5 || dur >= v.duration : true)
+                  if (isFullLength) {
+                    v.loop = true
+                  } else {
+                    v.loop = false
+                  }
                   v.currentTime = start
                   v.play().catch(() => null)
                 }}
                 onTimeUpdate={e => {
                   const v = e.currentTarget
+                  if (v.loop) return
                   const start = background.videoStartSec ?? 0
                   const dur = background.videoDurationSec ?? 3
-                  if (v.currentTime >= start + dur) v.currentTime = start
+                  if (v.currentTime >= start + dur) {
+                    v.currentTime = start
+                  }
                 }}
               />
               {/* Gradient fade bottom of video → black */}
