@@ -54,11 +54,24 @@ interface AiChatMessage {
   slides?: VideoSlide[]
   errorText?: string
   partialFailures?: number
+  clarification?: ClarificationPrompt
+}
+
+interface ClarificationOption {
+  label: string
+  value: string
+}
+
+interface ClarificationPrompt {
+  question: string
+  options: ClarificationOption[]
+  allowCustom?: boolean
+  skipLabel?: string
 }
 
 // ── 대화형 흐름 상태 ──────────────────────────────────────────────
 
-type ChatPhase = 'idle' | 'clarifying_1' | 'clarifying_2' | 'confirming' | 'generating' | 'done'
+type ChatPhase = 'idle' | 'clarifying' | 'confirming' | 'generating' | 'done'
 
 interface CollectedInfo {
   rawTopic: string
@@ -73,26 +86,6 @@ function buildRefinedTopic(info: Omit<CollectedInfo, 'refinedTopic'>): string {
   if (info.mood) parts.push(`분위기: ${info.mood}`)
   return parts.join('\n')
 }
-
-const CLARIFY_Q1 = `주제를 잘 이해했어요!
-
-조금 더 알면 훨씬 완성도 높은 영상을 만들 수 있어요. 두 가지만 알려주세요.
-
-• 이 영상을 보게 될 주요 독자층은 누구인가요?
-  (예: 마케터, 20대 여성, 소상공인, IT 종사자...)
-
-• 영상을 통해 전달하고 싶은 핵심 메시지는 무엇인가요?
-  (예: "복잡하지 않아도 된다", "지금 당장 바꿔야 한다"...)
-
-편하게 이어서 적어주세요.`
-
-const CLARIFY_Q2 = `좋아요! 마지막으로 하나만요.
-
-영상의 전반적인 분위기·톤은 어떻게 할까요?
-
-① 감성적·따뜻한  ② 정보 전달형  ③ 역동적·강렬한  ④ 미니멀·세련된
-
-번호로 답하거나 직접 설명해도 됩니다.`
 
 // 각 단계별 사용자 친화적 안내 문구
 const STAGE_LABELS: Record<string, string> = {
@@ -121,6 +114,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   // 대화형 흐름 상태
   const [phase, setPhase] = useState<ChatPhase>('idle')
   const [collectedInfo, setCollectedInfo] = useState<Partial<CollectedInfo>>({})
+  const [isWaiting, setIsWaiting] = useState(false)
 
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -326,11 +320,126 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
   }
 
+  const callAgent = async (userResponseContent: string) => {
+    setIsWaiting(true)
+    const history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+    
+    for (let i = 0; i < userMessages.length; i++) {
+      const u = userMessages[i]
+      history.push({ role: 'user', content: u.content })
+      
+      const a = aiMessages[i]
+      if (a && !a.id.startsWith('ai-temp-')) {
+        if (a.type === 'clarify' && a.text) {
+          history.push({ role: 'assistant', content: a.text })
+        }
+      }
+    }
+    history.push({ role: 'user', content: userResponseContent })
+
+    try {
+      const res = await fetch('/api/agents/video-cardnews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history,
+          brandId: brand.id,
+          language: locale === 'en' ? 'en' : 'ko',
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error('API request failed')
+      }
+
+      const data = await res.json() as {
+        message: string
+        ready: boolean
+        params?: {
+          topic: string
+          targetAndMessage?: string
+          mood?: string
+        }
+        clarification?: ClarificationPrompt
+      }
+
+      setAiMessages(prev => {
+        const next = [...prev]
+        const tempIdx = next.findIndex(m => m.id.startsWith('ai-temp-'))
+        const updatedMsg: AiChatMessage = data.ready && data.params
+          ? {
+              id: `ai-confirm-${Date.now()}`,
+              type: 'confirm',
+              text: data.message,
+              confirmInfo: {
+                rawTopic: data.params.topic,
+                targetAndMessage: data.params.targetAndMessage,
+                mood: data.params.mood,
+                refinedTopic: buildRefinedTopic({
+                  rawTopic: data.params.topic,
+                  targetAndMessage: data.params.targetAndMessage ?? '',
+                  mood: data.params.mood ?? '',
+                })
+              }
+            }
+          : {
+              id: `ai-clarify-${Date.now()}`,
+              type: 'clarify',
+              text: data.message,
+              clarification: data.clarification,
+            }
+        
+        if (tempIdx !== -1) {
+          next[tempIdx] = updatedMsg
+        } else {
+          next.push(updatedMsg)
+        }
+        return next
+      })
+
+      if (data.ready && data.params) {
+        setCollectedInfo({
+          rawTopic: data.params.topic,
+          targetAndMessage: data.params.targetAndMessage,
+          mood: data.params.mood,
+          refinedTopic: buildRefinedTopic({
+            rawTopic: data.params.topic,
+            targetAndMessage: data.params.targetAndMessage ?? '',
+            mood: data.params.mood ?? '',
+          })
+        })
+        setPhase('confirming')
+      } else {
+        setPhase('clarifying')
+      }
+
+    } catch (err) {
+      console.error(err)
+      setAiMessages(prev => {
+        const next = [...prev]
+        const tempIdx = next.findIndex(m => m.id.startsWith('ai-temp-'))
+        const errMsg: AiChatMessage = {
+          id: `ai-err-${Date.now()}`,
+          type: 'error',
+          errorText: '디렉터와의 연결 중 오류가 발생했습니다. 다시 시도해 주세요.',
+        }
+        if (tempIdx !== -1) {
+          next[tempIdx] = errMsg
+        } else {
+          next.push(errMsg)
+        }
+        return next
+      })
+    } finally {
+      setIsWaiting(false)
+    }
+  }
+
   // ── 대화형 흐름 핸들러 ──────────────────────────────────────────
 
   const handleSend = async () => {
     const input = topic.trim()
-    if ((!input && attachedImages.length === 0) || generating) return
+    if ((!input && attachedImages.length === 0) || generating || isWaiting) return
     setTopic('')
 
     const imageUrls = attachedImages.map(img => img.preview)
@@ -344,67 +453,38 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
     flushSync(() => setUserMessages(prev => [...prev, userMsg]))
 
-    if (phase === 'idle') {
-      // 1단계: 주제 입력 받음 → 1차 명확화 질문
-      const newInfo = { rawTopic: input }
-      setCollectedInfo(newInfo)
-      setTimeout(() => {
-        const aiId = `ai-clarify1-${Date.now()}`
-        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'clarify', text: CLARIFY_Q1 }]))
-        setPhase('clarifying_1')
-      }, 400)
+    const tempAiId = `ai-temp-${Date.now()}`
+    flushSync(() => {
+      setAiMessages(prev => [...prev, {
+        id: tempAiId,
+        type: 'progress',
+        stageLabel: '✦ AI 디렉터가 입력 내용을 분석하고 있습니다...',
+      }])
+    })
 
-    } else if (phase === 'clarifying_1') {
-      // 2단계: 타겟/메시지 받음 → 2차 질문(분위기)
-      setCollectedInfo(prev => ({ ...prev, targetAndMessage: input }))
-      setTimeout(() => {
-        const aiId = `ai-clarify2-${Date.now()}`
-        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'clarify', text: CLARIFY_Q2 }]))
-        setPhase('clarifying_2')
-      }, 400)
+    await callAgent(input)
+  }
 
-    } else if (phase === 'clarifying_2') {
-      // 3단계: 분위기 받음 → 확인 카드 표시
-      const moodMap: Record<string, string> = {
-        '①': '감성적·따뜻한', '1': '감성적·따뜻한',
-        '②': '정보 전달형', '2': '정보 전달형',
-        '③': '역동적·강렬한', '3': '역동적·강렬한',
-        '④': '미니멀·세련된', '4': '미니멀·세련된',
-      }
-      const moodValue = moodMap[input.trim()] ?? input
-      const finalInfo: CollectedInfo = {
-        rawTopic: collectedInfo.rawTopic ?? '',
-        targetAndMessage: collectedInfo.targetAndMessage,
-        mood: moodValue,
-        refinedTopic: buildRefinedTopic({
-          rawTopic: collectedInfo.rawTopic ?? '',
-          targetAndMessage: collectedInfo.targetAndMessage,
-          mood: moodValue,
-        }),
-      }
-      setCollectedInfo(finalInfo)
-      setTimeout(() => {
-        const aiId = `ai-confirm-${Date.now()}`
-        flushSync(() => setAiMessages(prev => [...prev, { id: aiId, type: 'confirm', confirmInfo: finalInfo }]))
-        setPhase('confirming')
-      }, 400)
+  const handleClarificationSelect = async (option: ClarificationOption) => {
+    if (generating || isWaiting || phase === 'confirming') return
+    const text = option.value
+    const userLabel = option.label
 
-    } else if (phase === 'confirming') {
-      // 수정 요청 처리 — "수정" / "다시" 키워드 감지
-      const isRedo = /수정|다시|바꿔|처음/.test(input)
-      if (isRedo) {
-        setCollectedInfo({})
-        setTimeout(() => {
-          const aiId = `ai-restart-${Date.now()}`
-          flushSync(() => setAiMessages(prev => [...prev, {
-            id: aiId, type: 'clarify',
-            text: '알겠습니다! 주제부터 다시 알려주세요.',
-          }]))
-          setPhase('idle')
-        }, 300)
-      }
-      // 그 외 입력은 확인 단계에서 무시 (버튼으로만 진행)
-    }
+    const userMsg: UserChatMessage = { id: `u-${Date.now()}`, content: userLabel }
+    flushSync(() => {
+      setUserMessages(prev => [...prev, userMsg])
+    })
+
+    const tempAiId = `ai-temp-${Date.now()}`
+    flushSync(() => {
+      setAiMessages(prev => [...prev, {
+        id: tempAiId,
+        type: 'progress',
+        stageLabel: '✦ AI 디렉터가 선택하신 답변을 반영하고 있습니다...',
+      }])
+    })
+
+    await callAgent(text)
   }
 
   const handleConfirmGenerate = () => {
@@ -430,11 +510,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
   }
 
-  const inputDisabled = generating || phase === 'confirming' || phase === 'generating' || phase === 'done'
+  const inputDisabled = generating || isWaiting || phase === 'confirming' || phase === 'generating' || phase === 'done'
   const getPlaceholder = () => {
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
-    if (phase === 'clarifying_1') return '독자층과 핵심 메시지를 알려주세요...'
-    if (phase === 'clarifying_2') return '분위기를 선택하거나 직접 입력하세요...'
+    if (phase === 'clarifying') return 'AI 디렉터의 질문에 답해 주세요...'
     if (phase === 'confirming') return '[지금 만들기] 또는 [처음부터] 버튼을 눌러주세요'
     return '생성 중...'
   }
@@ -538,6 +617,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     msg={aiMessages[idx]}
                     onConfirmGenerate={handleConfirmGenerate}
                     onReset={handleReset}
+                    onClarificationSelect={handleClarificationSelect}
                   />
                 )}
               </motion.div>
@@ -638,10 +718,12 @@ function AiMessage({
   msg,
   onConfirmGenerate,
   onReset,
+  onClarificationSelect,
 }: {
   msg: AiChatMessage
   onConfirmGenerate: () => void
   onReset: () => void
+  onClarificationSelect?: (option: ClarificationOption) => void
 }) {
   if (msg.type === 'clarify') {
     return (
@@ -652,8 +734,23 @@ function AiMessage({
       >
         <div className="flex flex-col gap-2.5 items-start max-w-md">
           <AiBubbleAvatar />
-          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] whitespace-pre-line">
-            {msg.text}
+          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] whitespace-pre-line flex flex-col gap-3 w-full">
+            <div>{msg.text}</div>
+            
+            {msg.clarification && msg.clarification.options && onClarificationSelect && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-[#f3f4f6]">
+                {msg.clarification.options.map((opt, oIdx) => (
+                  <button
+                    key={oIdx}
+                    type="button"
+                    onClick={() => onClarificationSelect(opt)}
+                    className="rounded-lg border border-[#e5e7eb] bg-white px-2.5 py-1.5 text-xs text-[#374151] hover:bg-[#f9fafb] hover:text-[#111111] transition-all active:scale-[0.98]"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
