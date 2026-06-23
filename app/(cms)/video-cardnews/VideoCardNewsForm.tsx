@@ -41,6 +41,7 @@ interface VideoCardNewsFormProps {
 interface UserChatMessage {
   id: string
   content: string
+  images?: string[]
 }
 
 interface AiChatMessage {
@@ -329,11 +330,18 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleSend = async () => {
     const input = topic.trim()
-    if (!input || generating) return
+    if ((!input && attachedImages.length === 0) || generating) return
     setTopic('')
 
+    const imageUrls = attachedImages.map(img => img.preview)
+    setAttachedImages([])
+
     // 유저 메시지 표시
-    const userMsg: UserChatMessage = { id: `u-${Date.now()}`, content: input }
+    const userMsg: UserChatMessage = {
+      id: `u-${Date.now()}`,
+      content: input,
+      images: imageUrls,
+    }
     flushSync(() => setUserMessages(prev => [...prev, userMsg]))
 
     if (phase === 'idle') {
@@ -511,8 +519,18 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 transition={smoothEase} className="contents"
               >
                 <div className="flex justify-end">
-                  <div className="max-w-[78%] rounded-xl rounded-tr-sm bg-white px-4 py-3 text-sm font-medium leading-6 text-[#111111] whitespace-pre-wrap">
-                    {umsg.content}
+                  <div className="max-w-[78%] rounded-xl rounded-tr-sm bg-white px-4 py-3 text-sm font-medium leading-6 text-[#111111] whitespace-pre-wrap flex flex-col gap-2">
+                    {umsg.images && umsg.images.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 justify-end">
+                        {umsg.images.map((img, i) => (
+                          <div key={i} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={img} alt="" className="h-full w-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {umsg.content && <div>{umsg.content}</div>}
                   </div>
                 </div>
                 {aiMessages[idx] && (
@@ -594,7 +612,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               disabled={inputDisabled}
               className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
 
-            <button type="button" onClick={handleSend} disabled={inputDisabled || !topic.trim()}
+            <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#111827] text-white hover:bg-[#1f2937] disabled:opacity-30 transition-colors">
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
