@@ -2,7 +2,7 @@ import { createHmac } from 'crypto'
 
 const DEFAULT_KLING_BASE = 'https://api-singapore.klingai.com'
 const KLING_BASE = normalizeBaseUrl(process.env.KLINGAI_BASE_URL || DEFAULT_KLING_BASE)
-const KLING_MODEL = process.env.KLINGAI_VIDEO_MODEL || 'kling-3.0-turbo'
+const KLING_MODEL = normalizeKlingModel(process.env.KLINGAI_VIDEO_MODEL)
 
 export interface KlingVideoOptions {
   prompt: string
@@ -312,6 +312,10 @@ export function canUseKling(): boolean {
   return Boolean((apiKey && apiKey.length > 8) || (accessKey && secretKey && accessKey.length > 8 && secretKey.length > 8))
 }
 
+export function getKlingVideoModel(): string {
+  return KLING_MODEL
+}
+
 function extractVideoUrl(task: KlingTaskData) {
   return (
     task.task_result?.videos?.[0]?.url ||
@@ -346,6 +350,17 @@ function sanitizeEnvValue(val: string | undefined): string | undefined {
 function normalizeBaseUrl(value: string) {
   const clean = sanitizeEnvValue(value) || ''
   return clean.replace(/\/+$/, '')
+}
+
+function normalizeKlingModel(value: string | undefined) {
+  const clean = sanitizeEnvValue(value) || 'kling-v3'
+  const aliases: Record<string, string> = {
+    'kling-3.0': 'kling-v3',
+    'kling-3.0-turbo': 'kling-v3',
+    'kling-v3-0': 'kling-v3',
+    'kling-v3-0-turbo': 'kling-v3',
+  }
+  return aliases[clean.toLowerCase()] ?? clean
 }
 
 function base64Url(input: string | Buffer) {

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getSessionUser } from '../../../actions/auth'
 import { generateVideoCardCopy, generateVideoCardNews } from '../../../../src/lib/video/videoCardPipeline'
-import { canUseKling } from '../../../../src/lib/ai/providers/klingVideoProvider'
+import { canUseKling, getKlingVideoModel } from '../../../../src/lib/ai/providers/klingVideoProvider'
 import { dbService } from '../../../../lib/db-service'
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
             keyBenefits: '영상 카드뉴스',
             objective: '영상 카드뉴스',
             slideCount: durableSlides.length,
-            imageModel: 'kling-3.0-turbo',
+            imageModel: getKlingVideoModel(),
             initialImageCount: successSlides.length,
             mediaType: 'video',
           },
