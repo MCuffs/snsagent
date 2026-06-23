@@ -635,12 +635,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       <style dangerouslySetInnerHTML={{ __html: `
         .shuffla-video-ambient {
           background:
-            radial-gradient(circle at 16% 16%, rgba(207, 216, 255, 0.58), transparent 34%),
-            radial-gradient(circle at 78% 10%, rgba(247, 250, 255, 0.94), transparent 36%),
-            radial-gradient(circle at 54% 42%, rgba(214, 238, 255, 0.64), transparent 34%),
-            radial-gradient(circle at 84% 74%, rgba(194, 224, 255, 0.68), transparent 38%),
-            radial-gradient(circle at 22% 88%, rgba(188, 205, 255, 0.52), transparent 42%),
-            linear-gradient(180deg, #f7f9ff 0%, #eef7ff 52%, #dceaff 100%);
+            radial-gradient(circle at 16% 16%, rgba(207, 216, 255, 0.22), transparent 36%),
+            radial-gradient(circle at 78% 10%, rgba(247, 250, 255, 0.64), transparent 38%),
+            radial-gradient(circle at 54% 42%, rgba(214, 238, 255, 0.24), transparent 36%),
+            radial-gradient(circle at 84% 74%, rgba(194, 224, 255, 0.22), transparent 40%),
+            radial-gradient(circle at 22% 88%, rgba(188, 205, 255, 0.18), transparent 44%),
+            linear-gradient(180deg, #fbfdff 0%, #f8fbff 56%, #f4f8ff 100%);
           background-size: 135% 135%;
           animation: shufflaVideoAmbientDrift 26s ease-in-out infinite alternate;
         }
@@ -649,9 +649,9 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           position: absolute;
           inset: -18%;
           background:
-            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.34), transparent 18%),
-            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.32), transparent 28%);
-          filter: blur(28px);
+            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.22), transparent 20%),
+            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.14), transparent 30%);
+          filter: blur(34px);
           animation: shufflaVideoAmbientFloat 34s ease-in-out infinite alternate;
         }
         @keyframes shufflaVideoAmbientDrift {
@@ -660,12 +660,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           100% { background-position: 100% 84%; transform: scale(1.045); }
         }
         @keyframes shufflaVideoAmbientFloat {
-          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.78; }
-          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.96; }
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.42; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.58; }
         }
       ` }} />
       {/* Left: Chat */}
-      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#dbe8ff] bg-[#f7fbff]">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#e8f0ff] bg-[#fbfdff]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-video-ambient" />
 
         {/* Header */}

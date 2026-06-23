@@ -312,7 +312,11 @@ export default function GenerateForm({
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!displayMessages.some(message => message.role === 'user')) return
+    const timer = window.setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }, 80)
+    return () => window.clearTimeout(timer)
   }, [displayMessages])
 
   useEffect(() => {
@@ -1106,12 +1110,12 @@ export default function GenerateForm({
         }
         .shuffla-ambient-gradient {
           background:
-            radial-gradient(circle at 18% 18%, rgba(207, 216, 255, 0.58), transparent 34%),
-            radial-gradient(circle at 76% 12%, rgba(245, 248, 255, 0.92), transparent 36%),
-            radial-gradient(circle at 52% 42%, rgba(215, 238, 255, 0.62), transparent 34%),
-            radial-gradient(circle at 82% 74%, rgba(196, 224, 255, 0.68), transparent 38%),
-            radial-gradient(circle at 20% 88%, rgba(188, 205, 255, 0.52), transparent 42%),
-            linear-gradient(180deg, #f7f9ff 0%, #eef7ff 52%, #dceaff 100%);
+            radial-gradient(circle at 18% 18%, rgba(207, 216, 255, 0.22), transparent 36%),
+            radial-gradient(circle at 76% 12%, rgba(245, 248, 255, 0.62), transparent 38%),
+            radial-gradient(circle at 52% 42%, rgba(215, 238, 255, 0.24), transparent 36%),
+            radial-gradient(circle at 82% 74%, rgba(196, 224, 255, 0.22), transparent 40%),
+            radial-gradient(circle at 20% 88%, rgba(188, 205, 255, 0.18), transparent 44%),
+            linear-gradient(180deg, #fbfdff 0%, #f8fbff 56%, #f4f8ff 100%);
           background-size: 135% 135%;
           animation: shufflaAmbientDrift 26s ease-in-out infinite alternate;
         }
@@ -1120,9 +1124,9 @@ export default function GenerateForm({
           position: absolute;
           inset: -18%;
           background:
-            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.34), transparent 18%),
-            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.32), transparent 28%);
-          filter: blur(28px);
+            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.22), transparent 20%),
+            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.14), transparent 30%);
+          filter: blur(34px);
           animation: shufflaAmbientFloat 34s ease-in-out infinite alternate;
         }
         @keyframes shufflaAmbientDrift {
@@ -1131,15 +1135,15 @@ export default function GenerateForm({
           100% { background-position: 100% 84%; transform: scale(1.045); }
         }
         @keyframes shufflaAmbientFloat {
-          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.78; }
-          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.96; }
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.42; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.58; }
         }
       ` }} />
 
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#dbe8ff] bg-[#f7fbff]"
+        className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#e8f0ff] bg-[#fbfdff]"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-ambient-gradient" />
         {/* Header containing Brand chip & Mode Label */}
@@ -1377,9 +1381,9 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="relative z-10 shrink-0 border-t border-white/60 bg-white/45 px-4 pb-5 pt-3 backdrop-blur-xl">
+        <div className="relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3">
           <form onSubmit={handleSend}>
-            <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white/72 px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] backdrop-blur-xl transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)]">
+            <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.12)] transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.16)]">
               <input
                 ref={inputRef}
                 type="text"
