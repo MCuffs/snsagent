@@ -3,7 +3,6 @@ import { createHmac } from 'crypto'
 const DEFAULT_KLING_BASE = 'https://api-singapore.klingai.com'
 const KLING_BASE = normalizeBaseUrl(process.env.KLINGAI_BASE_URL || DEFAULT_KLING_BASE)
 const KLING_MODEL = normalizeKlingModel(process.env.KLINGAI_VIDEO_MODEL)
-const KLING_MODE = sanitizeEnvValue(process.env.KLINGAI_VIDEO_MODE)
 
 export interface KlingVideoOptions {
   prompt: string
@@ -66,8 +65,8 @@ export class KlingVideoProvider {
   private async submitWithRetry(options: KlingVideoOptions): Promise<KlingSubmittedTask> {
     let lastError: Error | null = null
     const endpoint = options.referenceImageUrls?.length
-      ? '/v1/videos/image2video'
-      : '/v1/videos/text2video'
+      ? `/image-to-video/${KLING_MODEL}`
+      : `/text-to-video/${KLING_MODEL}`
     const submitUrl = `${KLING_BASE}${endpoint}`
 
     for (let attempt = 0; attempt < MAX_SUBMIT_ATTEMPTS; attempt++) {
@@ -120,34 +119,47 @@ export class KlingVideoProvider {
       }
 
       const taskId = data.data?.task_id || data.task_id || data.id
+        || data.data?.id
       if (!taskId) {
         lastError = new Error(`Kling submit returned no task ID. Response: ${text.slice(0, 240)}`)
         continue
       }
-      return { taskId, pollPath: `${endpoint}/${taskId}` }
+      return { taskId }
     }
 
     throw lastError ?? new Error('Kling: submit failed after retries')
   }
 
   private buildRequestBody(options: KlingVideoOptions) {
-    const duration = String(options.duration ?? 5)
+    const duration = options.duration ?? 5
     const aspectRatio = options.aspectRatio ?? '9:16'
-    const base = {
-      model_name: KLING_MODEL,
-      prompt: options.prompt,
-      duration,
-      aspect_ratio: aspectRatio,
-      ...(KLING_MODE ? { mode: KLING_MODE } : {}),
-      ...(!isKlingTurboModel(KLING_MODEL) ? { cfg_scale: 0.5 } : {}),
+    const firstReference = options.referenceImageUrls?.[0]
+    if (!firstReference) {
+      return {
+        prompt: options.prompt.slice(0, 3072),
+        settings: {
+          duration,
+          resolution: '720p',
+          aspect_ratio: aspectRatio,
+        },
+        options: {
+          watermark_info: { enabled: false },
+        },
+      }
     }
 
-    const firstReference = options.referenceImageUrls?.[0]
-    if (!firstReference) return base
-
     return {
-      ...base,
-      image: firstReference,
+      contents: [
+        { type: 'prompt', text: options.prompt.slice(0, 2500) },
+        { type: 'first_frame', url: firstReference },
+      ],
+      settings: {
+        duration,
+        resolution: '720p',
+      },
+      options: {
+        watermark_info: { enabled: false },
+      },
     }
   }
 
@@ -192,7 +204,7 @@ export class KlingVideoProvider {
   }
 
   private async pollOnce(submitted: KlingSubmittedTask, signal?: AbortSignal): Promise<KlingPollResult> {
-    const pollUrl = `${KLING_BASE}${submitted.pollPath}`
+    const pollUrl = `${KLING_BASE}/tasks?task_ids=${encodeURIComponent(submitted.taskId)}`
     const res = await fetch(pollUrl, {
       headers: { 'Authorization': `Bearer ${this.getAuthToken()}` },
       signal,
@@ -218,7 +230,7 @@ export class KlingVideoProvider {
       return { done: false, terminalError: data.message ?? data.error_message ?? 'Kling task query failed' }
     }
 
-    const task = (data.data ?? data) as KlingTaskData
+    const task = normalizeTaskData(data)
     const status = String(task.task_status ?? task.status ?? '').toLowerCase()
     const videoUrl = extractVideoUrl(task)
 
@@ -261,14 +273,13 @@ interface KlingCreateTaskResponse {
   message?: string
   error_code?: string | number
   error_message?: string
-  data?: { task_id?: string }
+  data?: { task_id?: string; id?: string }
   task_id?: string
   id?: string
 }
 
 interface KlingSubmittedTask {
   taskId: string
-  pollPath: string
 }
 
 interface KlingQueryTaskResponse {
@@ -276,10 +287,11 @@ interface KlingQueryTaskResponse {
   message?: string
   error_code?: string | number
   error_message?: string
-  data?: KlingTaskData
+  data?: KlingTaskData | KlingTaskData[] | { result?: KlingTaskData[] }
   task_status?: string
   status?: string
   task_result?: KlingTaskData['task_result']
+  outputs?: KlingTaskOutput[]
 }
 
 interface KlingTaskData {
@@ -293,9 +305,18 @@ interface KlingTaskData {
     url?: string
     video_url?: string
   }
+  outputs?: KlingTaskOutput[]
   videos?: Array<{ url?: string; video_url?: string }>
   video_url?: string
   url?: string
+}
+
+interface KlingTaskOutput {
+  type?: string
+  url?: string
+  video_url?: string
+  watermark_url?: string
+  duration?: string
 }
 
 interface KlingPollResult {
@@ -316,8 +337,17 @@ export function getKlingVideoModel(): string {
   return KLING_MODEL
 }
 
+function normalizeTaskData(response: KlingQueryTaskResponse): KlingTaskData {
+  const data = response.data
+  if (Array.isArray(data)) return data[0] ?? {}
+  if (data && 'result' in data && Array.isArray(data.result)) return data.result[0] ?? {}
+  return (data ?? response) as KlingTaskData
+}
+
 function extractVideoUrl(task: KlingTaskData) {
   return (
+    task.outputs?.find(output => output.type === 'video')?.url ||
+    task.outputs?.find(output => output.type === 'video')?.video_url ||
     task.task_result?.videos?.[0]?.url ||
     task.task_result?.videos?.[0]?.video_url ||
     task.task_result?.video?.url ||
@@ -353,18 +383,14 @@ function normalizeBaseUrl(value: string) {
 }
 
 function normalizeKlingModel(value: string | undefined) {
-  const clean = sanitizeEnvValue(value) || 'kling-v3-0-turbo'
+  const clean = sanitizeEnvValue(value) || 'kling-3.0-turbo'
   const aliases: Record<string, string> = {
-    'kling-3.0': 'kling-v3-0',
-    'kling-v3.0': 'kling-v3-0',
-    'kling-3.0-turbo': 'kling-v3-0-turbo',
-    'kling-v3.0-turbo': 'kling-v3-0-turbo',
+    'kling-v3-0': 'kling-3.0',
+    'kling-v3.0': 'kling-3.0',
+    'kling-v3-0-turbo': 'kling-3.0-turbo',
+    'kling-v3.0-turbo': 'kling-3.0-turbo',
   }
   return aliases[clean.toLowerCase()] ?? clean
-}
-
-function isKlingTurboModel(model: string) {
-  return ['kling-3.0-turbo', 'kling-v3-0-turbo', 'kling-v3.0-turbo'].includes(model.toLowerCase())
 }
 
 function base64Url(input: string | Buffer) {
