@@ -137,6 +137,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const activeMsgIdRef = useRef<string | null>(null)
   const referenceImagesRef = useRef<Array<{ file: File; preview: string }>>([])
   const generationAbortRef = useRef<AbortController | null>(null)
+  const pingAbortRef = useRef<AbortController | null>(null)
   const stopRequestedRef = useRef(false)
   const startingGenerationRef = useRef(false)
 
@@ -392,15 +393,28 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   const handleStopGenerate = () => {
-    if (!generationAbortRef.current || !generating) return
+    if (!generationAbortRef.current && !pingAbortRef.current && !isStartingGeneration && phase !== 'generating') return
     startingGenerationRef.current = false
     setIsStartingGeneration(false)
     stopRequestedRef.current = true
-    generationAbortRef.current.abort()
-    updateActiveMsg(m => ({
-      ...m,
-      stageLabel: '생성을 중단하는 중입니다...',
-    }))
+    pingAbortRef.current?.abort()
+    pingAbortRef.current = null
+
+    if (generationAbortRef.current) {
+      generationAbortRef.current.abort()
+      updateActiveMsg(m => ({
+        ...m,
+        stageLabel: '생성을 중단하는 중입니다...',
+      }))
+      return
+    }
+
+    setPhase(collectedInfo.rawTopic ? 'confirming' : 'idle')
+    setAiMessages(prev => [...prev, {
+      id: `ai-cancel-${Date.now()}`,
+      type: 'cancelled',
+      stageLabel: '생성 시작을 중단했습니다.',
+    }])
   }
 
   const callAgent = async (userResponseContent: string) => {
@@ -585,10 +599,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     void runGenerate(collectedInfo as CollectedInfo)
   }
 
-  const pingKlingProvider = async () => {
+  const pingKlingProvider = async (signal?: AbortSignal) => {
     const res = await fetch('/api/video-cardnews/ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal,
     })
     const data = await res.json().catch(() => null) as { ok?: boolean; error?: string } | null
     if (!res.ok || !data?.ok) {
@@ -598,13 +613,21 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleConfirmGenerateWithPing = async () => {
     if (!collectedInfo.rawTopic || startingGenerationRef.current || generating) return
+    stopRequestedRef.current = false
     startingGenerationRef.current = true
     setIsStartingGeneration(true)
+    const pingController = new AbortController()
+    pingAbortRef.current = pingController
     try {
-      await pingKlingProvider()
+      await pingKlingProvider(pingController.signal)
     } catch (error) {
       startingGenerationRef.current = false
       setIsStartingGeneration(false)
+      pingAbortRef.current = null
+      if (pingController.signal.aborted && stopRequestedRef.current) {
+        setPhase(collectedInfo.rawTopic ? 'confirming' : 'idle')
+        return
+      }
       const message = error instanceof Error ? error.message : 'Kling API 연결 확인에 실패했습니다.'
       setAiMessages(prev => [...prev, {
         id: `ai-ping-error-${Date.now()}`,
@@ -612,6 +635,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         errorText: message,
       }])
       return
+    } finally {
+      if (pingAbortRef.current === pingController) {
+        pingAbortRef.current = null
+      }
     }
     flushSync(() => {
       setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
@@ -666,7 +693,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
   }
 
-  const inputDisabled = generating || isWaiting || isStartingGeneration || phase === 'confirming' || phase === 'generating' || phase === 'done'
+  const generationBusy = generating || isStartingGeneration || phase === 'generating'
+  const inputDisabled = generationBusy || isWaiting || phase === 'confirming' || phase === 'done'
   const getPlaceholder = () => {
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
     if (phase === 'clarifying') return 'AI 디렉터의 질문에 답해 주세요...'
@@ -905,11 +933,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               disabled={inputDisabled}
               className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
 
-            {generating ? (
+            {generationBusy ? (
               <button type="button" onClick={handleStopGenerate}
-                className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-3 text-xs font-bold text-white transition-colors hover:bg-[#27272a]">
+                className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-4 text-xs font-bold text-white shadow-[0_10px_22px_rgba(39,39,42,0.18)] transition-colors hover:bg-[#27272a]">
                 <Square className="h-3.5 w-3.5 fill-current" />
-                중단
+                중단하기
               </button>
             ) : (
               <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
