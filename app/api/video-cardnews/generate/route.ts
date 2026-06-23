@@ -269,55 +269,74 @@ export async function POST(request: NextRequest) {
         // Stage 2: Video generation
         sse(controller, 'stage', {
           stage: 'video',
-          message: `${slides.length}개 영상 동시 생성 시작 (슬라이드당 약 1~4분)...`,
+          message: `${slides.length}개 영상을 순차 생성합니다. 실패 시 즉시 중단됩니다.`,
           total: slides.length,
         })
 
-        const result = await generateVideoCardNews({
-          userId: user.id,
-          brandId,
-          topic,
-          slides,
-          domainLabel,
-          brandTone: body.brandTone,
-          durationSeconds,
-          referenceImageUrls,
-          signal: request.signal,
-          onProgress: (event) => {
-            if (event.type === 'video_start') {
-              sse(controller, 'slide_start', {
-                slideNumber: event.slideNumber,
-                total: event.total,
-                message: `슬라이드 ${event.slideNumber}/${event.total} 영상 생성 시작...`,
-              })
-            } else if (event.type === 'video_polling') {
-              sse(controller, 'slide_polling', {
-                slideNumber: event.slideNumber,
-                elapsed: event.elapsed,
-                message: `슬라이드 ${event.slideNumber} 렌더링 중... (${event.elapsed}초)`,
-              })
-            } else if (event.type === 'video_done') {
-              sse(controller, 'slide_done', {
-                slideNumber: event.slideNumber,
-                message: `슬라이드 ${event.slideNumber} 완료 ✓`,
-              })
-            } else if (event.type === 'video_error') {
-              sse(controller, 'slide_error', {
-                slideNumber: event.slideNumber,
-                error: event.error,
-                message: `슬라이드 ${event.slideNumber} 실패: ${event.error}`,
-              })
-            }
-          },
-        })
+        let result: Awaited<ReturnType<typeof generateVideoCardNews>>
+        try {
+          result = await generateVideoCardNews({
+            userId: user.id,
+            brandId,
+            topic,
+            slides,
+            domainLabel,
+            brandTone: body.brandTone,
+            durationSeconds,
+            referenceImageUrls,
+            signal: request.signal,
+            onProgress: (event) => {
+              if (event.type === 'video_start') {
+                sse(controller, 'slide_start', {
+                  slideNumber: event.slideNumber,
+                  total: event.total,
+                  message: `슬라이드 ${event.slideNumber}/${event.total} 영상 생성 시작...`,
+                })
+              } else if (event.type === 'video_polling') {
+                sse(controller, 'slide_polling', {
+                  slideNumber: event.slideNumber,
+                  elapsed: event.elapsed,
+                  message: `슬라이드 ${event.slideNumber} 렌더링 중... (${event.elapsed}초)`,
+                })
+              } else if (event.type === 'video_done') {
+                sse(controller, 'slide_done', {
+                  slideNumber: event.slideNumber,
+                  message: `슬라이드 ${event.slideNumber} 완료 ✓`,
+                })
+              } else if (event.type === 'video_error') {
+                sse(controller, 'slide_error', {
+                  slideNumber: event.slideNumber,
+                  error: event.error,
+                  message: `슬라이드 ${event.slideNumber} 실패: ${event.error}`,
+                })
+              }
+            },
+          })
+        } catch (error) {
+          if (request.signal.aborted) return
+          const message = error instanceof Error ? error.message : '영상 생성 중 오류가 발생했습니다.'
+          sse(controller, 'error', {
+            stage: 'video',
+            error: message,
+            message: '영상 렌더링이 실패해 생성을 중단했습니다.',
+          })
+          controller.close()
+          return
+        }
 
         // Provider URLs may expire. Persist each successful result before saving the campaign.
         sse(controller, 'stage', { stage: 'saving', message: '생성 영상을 영구 저장소로 옮기는 중...' })
         const durableSlides: typeof result.slides = []
         for (const slide of result.slides) {
           if (!slide.videoUrl) {
-            durableSlides.push(slide)
-            continue
+            const message = slide.error || `슬라이드 ${slide.slideNumber} 영상 URL이 없습니다.`
+            sse(controller, 'error', {
+              stage: 'video',
+              error: message,
+              message: '영상 결과가 완전하지 않아 생성을 중단했습니다.',
+            })
+            controller.close()
+            return
           }
           try {
             const durableUrl = await persistGeneratedVideo({
@@ -329,31 +348,30 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             const message = error instanceof Error ? error.message : '영상 영구 저장 실패'
             console.error(`[VideoCardNews] Slide ${slide.slideNumber} persistence failed:`, message)
-            durableSlides.push({ ...slide, videoUrl: null, error: message })
             sse(controller, 'slide_error', {
               slideNumber: slide.slideNumber,
               error: message,
               message: `슬라이드 ${slide.slideNumber} 저장 실패: ${message}`,
             })
+            sse(controller, 'error', {
+              stage: 'saving',
+              error: `슬라이드 ${slide.slideNumber} 저장 실패: ${message}`,
+              message: '영상 저장이 실패해 생성을 중단했습니다.',
+            })
+            controller.close()
+            return
           }
         }
 
         const successSlides = durableSlides.filter(s => s.videoUrl)
-        const failedSlides = durableSlides.filter(s => !s.videoUrl)
 
         if (successSlides.length === 0) {
-          const firstError = failedSlides[0]?.error ?? '알 수 없는 오류'
-          console.error('[VideoCardNews] All slides failed:', failedSlides.map(s => s.error))
           sse(controller, 'error', {
             stage: 'video',
-            error: `모든 영상 생성에 실패했습니다: ${firstError}`,
+            error: '저장 가능한 영상이 없습니다.',
           })
           controller.close()
           return
-        }
-
-        if (failedSlides.length > 0) {
-          console.warn(`[VideoCardNews] Partial failures: ${failedSlides.length}/${result.totalSlides}`)
         }
 
         // Stage 3: Save to DB and redirect to campaign editor
@@ -419,7 +437,7 @@ export async function POST(request: NextRequest) {
           campaignId: campaign.id,
           topic: result.topic,
           totalSlides: durableSlides.length,
-          partialFailures: failedSlides.length,
+          partialFailures: 0,
           slides: durableSlides.map(s => ({
             slideNumber: s.slideNumber,
             headline: s.headline,

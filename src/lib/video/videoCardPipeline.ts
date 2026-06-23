@@ -53,7 +53,6 @@ export interface VideoCardPipelineResult {
   slides: VideoCardSlideResult[]
   topic: string
   totalSlides: number
-  partialFailures: number
 }
 
 interface VideoProviderFallbackInput {
@@ -161,47 +160,20 @@ export async function generateVideoCardNews(
       const msg = err instanceof Error ? err.message : 'Unknown video generation error'
       console.error(`[VideoCardPipeline] Slide ${slide.slideNumber} failed:`, msg)
       onProgress?.({ type: 'video_error', slideNumber: slide.slideNumber, error: msg })
-      return {
-        slideNumber: slide.slideNumber,
-        headline: slide.headline,
-        body: slide.body,
-        role: slide.role,
-        videoUrl: null,
-        videoPrompt: prompt,
-        durationSeconds: duration,
-        error: msg,
-      }
+      throw new Error(`슬라이드 ${slide.slideNumber} 영상 생성 실패: ${msg}`)
     }
   }
 
-  // Process slides with a concurrency limit to avoid BytePlus API rate limits (429).
-  // Each slide has its own 270s timeout; we allow at most 3 concurrent submissions.
-  const MAX_CONCURRENCY = 3
-  const results: VideoCardSlideResult[] = new Array(input.slides.length)
-
-  let nextIndex = 0
-  const worker = async () => {
-    while (true) {
-      input.signal?.throwIfAborted()
-      const i = nextIndex++
-      if (i >= input.slides.length) break
-      results[i] = await generateOne(input.slides[i], i)
-    }
+  const results: VideoCardSlideResult[] = []
+  for (let i = 0; i < input.slides.length; i += 1) {
+    input.signal?.throwIfAborted()
+    results.push(await generateOne(input.slides[i], i))
   }
-
-  const workers = Array.from(
-    { length: Math.min(MAX_CONCURRENCY, input.slides.length) },
-    () => worker(),
-  )
-  await Promise.all(workers)
-
-  const partialFailures = results.filter(r => !r.videoUrl).length
 
   return {
     slides: results,
     topic: input.topic,
     totalSlides: input.slides.length,
-    partialFailures,
   }
 }
 
