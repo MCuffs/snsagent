@@ -27,6 +27,7 @@ export interface VideoCardPipelineInput {
   brandTone?: string
   durationSeconds?: 3 | 5
   referenceImageUrls?: string[]
+  signal?: AbortSignal
   onProgress?: (event: VideoCardProgressEvent) => void
 }
 
@@ -90,12 +91,13 @@ export async function generateVideoCardNews(
   })
 
   const generateOne = async (slide: VideoCardSlideInput, index: number): Promise<VideoCardSlideResult> => {
+    input.signal?.throwIfAborted()
     const { prompt } = prompts[index]
     onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
 
     try {
       const videoResult = await provider.generateVideo(
-        { prompt, duration, aspectRatio: '9:16', resolution: '720p', referenceImageUrls: input.referenceImageUrls },
+        { prompt, duration, aspectRatio: '9:16', resolution: '720p', referenceImageUrls: input.referenceImageUrls, signal: input.signal },
         (event) => {
           if (event.type === 'poll') {
             onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed: event.elapsed })
@@ -137,6 +139,7 @@ export async function generateVideoCardNews(
   let nextIndex = 0
   const worker = async () => {
     while (true) {
+      input.signal?.throwIfAborted()
       const i = nextIndex++
       if (i >= input.slides.length) break
       results[i] = await generateOne(input.slides[i], i)

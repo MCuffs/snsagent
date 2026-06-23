@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight, RotateCcw } from 'lucide-react'
+import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight, RotateCcw, Square } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Brand {
@@ -53,7 +53,7 @@ interface DraftVideoSlide {
 
 interface AiChatMessage {
   id: string
-  type: 'clarify' | 'confirm' | 'progress' | 'result' | 'error'
+  type: 'clarify' | 'confirm' | 'progress' | 'result' | 'error' | 'cancelled'
   text?: string
   confirmInfo?: CollectedInfo
   stageLabel?: string
@@ -135,6 +135,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const dropZoneRef = useRef<HTMLDivElement>(null)
   const activeMsgIdRef = useRef<string | null>(null)
   const referenceImagesRef = useRef<Array<{ file: File; preview: string }>>([])
+  const generationAbortRef = useRef<AbortController | null>(null)
+  const stopRequestedRef = useRef(false)
 
   const addImages = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -187,6 +189,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     const currentImages = referenceImagesRef.current
     setPhase('generating')
     setGenerating(true)
+    stopRequestedRef.current = false
     const msgId = `ai-gen-${Date.now()}`
     activeMsgIdRef.current = msgId
     flushSync(() => {
@@ -205,6 +208,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setAttachedImages([])
 
     const controller = new AbortController()
+    generationAbortRef.current = controller
     const timeoutId = setTimeout(() => controller.abort(), 8 * 60 * 1000)
 
     try {
@@ -354,6 +358,20 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
     } catch (err) {
       clearTimeout(timeoutId)
+      if (controller.signal.aborted && stopRequestedRef.current) {
+        updateActiveMsg(m => ({
+          ...m,
+          type: 'cancelled',
+          stageLabel: '생성을 중단했습니다. 완료되지 않은 슬라이드는 저장되지 않았습니다.',
+          slideProgress: (m.slideProgress ?? []).map(sp =>
+            sp.status === 'generating' || sp.status === 'waiting'
+              ? { ...sp, status: 'error' as const, error: '중단됨' }
+              : sp,
+          ),
+        }))
+        setPhase('idle')
+        return
+      }
       const msg = err instanceof Error
         ? (err.name === 'AbortError' ? '요청 시간이 초과되었습니다. 슬라이드 수를 줄이거나 다시 시도해주세요.' : err.message)
         : '서버 오류가 발생했습니다.'
@@ -361,7 +379,20 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     } finally {
       setGenerating(false)
       activeMsgIdRef.current = null
+      if (generationAbortRef.current === controller) {
+        generationAbortRef.current = null
+      }
     }
+  }
+
+  const handleStopGenerate = () => {
+    if (!generationAbortRef.current || !generating) return
+    stopRequestedRef.current = true
+    generationAbortRef.current.abort()
+    updateActiveMsg(m => ({
+      ...m,
+      stageLabel: '생성을 중단하는 중입니다...',
+    }))
   }
 
   const callAgent = async (userResponseContent: string) => {
@@ -667,7 +698,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 transition={smoothEase} className="contents"
               >
                 <div className="flex justify-end">
-                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#111827] bg-[#111827] px-4 py-3 text-sm font-medium leading-6 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] whitespace-pre-wrap flex flex-col gap-2">
+                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#d4d4d8] bg-[#f4f4f5] px-4 py-3 text-sm font-medium leading-6 text-[#18181b] shadow-[0_14px_34px_rgba(24,24,27,0.08)] whitespace-pre-wrap flex flex-col gap-2">
                     {umsg.images && umsg.images.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 justify-end">
                         {umsg.images.map((img, i) => (
@@ -687,6 +718,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     onConfirmGenerate={handleConfirmGenerate}
                     onReset={handleReset}
                     onClarificationSelect={handleClarificationSelect}
+                    onStopGenerate={handleStopGenerate}
                   />
                 )}
               </motion.div>
@@ -761,10 +793,18 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               disabled={inputDisabled}
               className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
 
-            <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#111827] text-white hover:bg-[#1f2937] disabled:opacity-30 transition-colors">
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
+            {generating ? (
+              <button type="button" onClick={handleStopGenerate}
+                className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-3 text-xs font-bold text-white transition-colors hover:bg-[#27272a]">
+                <Square className="h-3.5 w-3.5 fill-current" />
+                중단
+              </button>
+            ) : (
+              <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#27272a] text-white hover:bg-[#18181b] disabled:opacity-30 transition-colors">
+                <Send className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -788,11 +828,13 @@ function AiMessage({
   onConfirmGenerate,
   onReset,
   onClarificationSelect,
+  onStopGenerate,
 }: {
   msg: AiChatMessage
   onConfirmGenerate: () => void
   onReset: () => void
   onClarificationSelect?: (option: ClarificationOption) => void
+  onStopGenerate?: () => void
 }) {
   if (msg.type === 'clarify') {
     return (
@@ -890,17 +932,17 @@ function AiMessage({
     )
   }
 
-  return <AiProgressMessage msg={msg} />
+  return <AiProgressMessage msg={msg} onStopGenerate={onStopGenerate} />
 }
 
-function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
+function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStopGenerate?: () => void }) {
   return (
     <motion.div
       {...fadeIn}
       transition={smoothEase}
       className="flex justify-start"
     >
-      <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
+      <div className="flex w-full max-w-2xl flex-col items-start gap-2.5">
         <AiBubbleAvatar />
 
         {/* Error */}
@@ -927,11 +969,24 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
               {msg.type === 'result' && (
                 <Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
               )}
+              {msg.type === 'cancelled' && (
+                <Square className="h-3.5 w-3.5 text-[#71717a] shrink-0" />
+              )}
               <span className={`text-xs font-semibold leading-5 ${
-                msg.type === 'result' ? 'text-emerald-700' : 'text-[#111111]'
+                msg.type === 'result' ? 'text-emerald-700' : msg.type === 'cancelled' ? 'text-[#52525b]' : 'text-[#111111]'
               }`}>
                 {msg.stageLabel}
               </span>
+              {msg.type === 'progress' && onStopGenerate && (
+                <button
+                  type="button"
+                  onClick={onStopGenerate}
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#d4d4d8] bg-[#fafafa] px-2 py-1 text-[10px] font-bold text-[#52525b] transition-colors hover:bg-[#f4f4f5] hover:text-[#18181b]"
+                >
+                  <Square className="h-2.5 w-2.5 fill-current" />
+                  중단
+                </button>
+              )}
             </div>
 
             {(msg.referenceImagePreviews?.length ?? 0) > 0 && (
@@ -973,20 +1028,23 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
                     {msg.draftSlides!.length} cards
                   </span>
                 </div>
-                <div className="space-y-2">
+                <div className="overflow-x-auto pb-1">
                   <AnimatePresence initial={false}>
-                    {msg.draftSlides!.map((slide, index) => (
-                      <DraftSlideMockup
-                        key={slide.slideNumber}
-                        slide={slide}
-                        index={index}
-                        referenceImagePreview={
-                          msg.referenceImagePreviews?.length
-                            ? msg.referenceImagePreviews[index % msg.referenceImagePreviews.length]
-                            : undefined
-                        }
-                      />
-                    ))}
+                    <div className="flex min-w-0 gap-2.5">
+                      {msg.draftSlides!.map((slide, index) => (
+                        <DraftSlideMockup
+                          key={slide.slideNumber}
+                          slide={slide}
+                          index={index}
+                          total={msg.draftSlides!.length}
+                          referenceImagePreview={
+                            msg.referenceImagePreviews?.length
+                              ? msg.referenceImagePreviews[index % msg.referenceImagePreviews.length]
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
                   </AnimatePresence>
                 </div>
               </motion.div>
@@ -1035,13 +1093,16 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
 function DraftSlideMockup({
   slide,
   index,
+  total,
   referenceImagePreview,
 }: {
   slide: DraftVideoSlide
   index: number
+  total: number
   referenceImagePreview?: string
 }) {
   const roleLabel = ROLE_LABEL[slide.role] ?? slide.role
+  const basis = total <= 3 ? '30%' : total <= 5 ? '22%' : '17%'
   return (
     <motion.div
       layout
@@ -1049,30 +1110,31 @@ function DraftSlideMockup({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ duration: 0.42, delay: index * 0.06, ease: [0.19, 1, 0.22, 1] }}
-      className="overflow-hidden rounded-[18px] border border-[#e5eaf0] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+      style={{ flex: `0 0 ${basis}`, minWidth: total <= 3 ? 132 : 112 }}
+      className="overflow-hidden rounded-[18px] border border-[#d4d4d8] bg-white shadow-[0_14px_34px_rgba(24,24,27,0.08)]"
     >
-      <div className="aspect-[9/12] bg-[#111827] p-2.5">
+      <div className="aspect-[9/12] bg-[#27272a] p-2">
         <div className="flex h-full flex-col overflow-hidden rounded-lg bg-white">
-          <div className="relative h-[45%] bg-gradient-to-br from-[#dbeafe] via-[#fef3c7] to-[#fee2e2]">
+          <div className="relative h-[45%] bg-gradient-to-br from-[#f4f4f5] via-[#e4e4e7] to-[#a1a1aa]">
             {referenceImagePreview && (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={referenceImagePreview} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
+                <img src={referenceImagePreview} alt="" className="absolute inset-0 h-full w-full object-cover grayscale" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-white/10" />
               </>
             )}
-            <div className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#334155]">
+            <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-[#3f3f46]">
               {roleLabel}
             </div>
             <div className="absolute inset-x-3 bottom-3 h-1.5 rounded-full bg-white/70" />
             <div className="absolute bottom-5 left-3 h-1.5 w-1/2 rounded-full bg-white/45" />
           </div>
-          <div className="flex flex-1 flex-col justify-between bg-[#0f172a] p-3 text-white">
+          <div className="flex flex-1 flex-col justify-between bg-[#18181b] p-2.5 text-white">
             <div>
-              <p className="text-[10px] font-black text-[#93c5fd]">CARD {slide.slideNumber}</p>
-              <p className="mt-1.5 text-sm font-black leading-5 text-white">{slide.headline}</p>
+              <p className="text-[9px] font-black text-[#a1a1aa]">CARD {slide.slideNumber}</p>
+              <p className="mt-1.5 text-[12px] font-black leading-4 text-white line-clamp-2">{slide.headline}</p>
             </div>
-            <p className="mt-2 text-[11px] leading-5 text-[#cbd5e1]">{slide.body}</p>
+            <p className="mt-2 text-[10px] leading-4 text-[#d4d4d8] line-clamp-3">{slide.body}</p>
           </div>
         </div>
       </div>

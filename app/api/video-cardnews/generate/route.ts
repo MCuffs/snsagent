@@ -233,6 +233,7 @@ export async function POST(request: NextRequest) {
           brandTone: body.brandTone,
           durationSeconds,
           referenceImageUrls,
+          signal: request.signal,
           onProgress: (event) => {
             if (event.type === 'video_start') {
               sse(controller, 'slide_start', {
@@ -382,6 +383,10 @@ export async function POST(request: NextRequest) {
         })
 
       } catch (error) {
+        if (request.signal.aborted) {
+          console.log('[VideoCardNews] generation aborted by client')
+          return
+        }
         const msg = error instanceof Error ? error.message : '영상 생성 중 오류가 발생했습니다.'
         console.error('[VideoCardNews] Unhandled error:', error)
         sse(controller, 'error', { stage: 'unknown', error: msg })

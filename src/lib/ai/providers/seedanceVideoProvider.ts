@@ -26,6 +26,7 @@ export interface SeedanceVideoOptions {
   aspectRatio?: '9:16' | '16:9' | '1:1'
   resolution?: '480p' | '720p' | '1080p'
   referenceImageUrls?: string[]
+  signal?: AbortSignal
 }
 
 export interface SeedanceVideoResult {
@@ -59,12 +60,12 @@ export class SeedanceVideoProvider {
     options: SeedanceVideoOptions,
     onProgress?: (event: SeedanceProgressEvent) => void,
   ): Promise<SeedanceVideoResult> {
-    const { prompt, duration = 5, aspectRatio = '9:16', resolution = '720p', referenceImageUrls = [] } = options
+    const { prompt, duration = 5, aspectRatio = '9:16', resolution = '720p', referenceImageUrls = [], signal } = options
 
-    const taskId = await this.submitWithRetry({ prompt, duration, aspectRatio, resolution, referenceImageUrls })
+    const taskId = await this.submitWithRetry({ prompt, duration, aspectRatio, resolution, referenceImageUrls, signal })
     onProgress?.({ type: 'submit_ok', taskId })
 
-    const videoUrl = await this.pollUntilDone(taskId, 270_000, 4_000, onProgress)
+    const videoUrl = await this.pollUntilDone(taskId, 270_000, 4_000, onProgress, signal)
     onProgress?.({ type: 'done', videoUrl })
     return { taskId, videoUrl, durationSeconds: duration }
   }
@@ -110,6 +111,7 @@ export class SeedanceVideoProvider {
       aspectRatio: string
       resolution: string
       referenceImageUrls?: string[]
+      signal?: AbortSignal
     },
   ): Promise<string> {
     let lastError: Error | null = null
@@ -118,8 +120,9 @@ export class SeedanceVideoProvider {
     const submitUrl = `${ARK_BASE}/contents/generations/tasks`
 
     for (let attempt = 0; attempt < MAX_SUBMIT_ATTEMPTS; attempt++) {
+      params.signal?.throwIfAborted()
       if (attempt > 0) {
-        await sleep(1000 * Math.pow(2, attempt - 1))
+        await sleep(1000 * Math.pow(2, attempt - 1), params.signal)
       }
 
       const reqBody = this.buildRequestBody(params)
@@ -137,6 +140,7 @@ export class SeedanceVideoProvider {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(reqBody),
+          signal: params.signal,
         })
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err))
@@ -196,22 +200,25 @@ export class SeedanceVideoProvider {
     timeoutMs: number,
     intervalMs: number,
     onProgress?: (event: SeedanceProgressEvent) => void,
+    signal?: AbortSignal,
   ): Promise<string> {
     const startAt = Date.now()
     const deadline = startAt + timeoutMs
     let transientErrorCount = 0
 
-    const firstResult = await this.pollOnce(taskId)
+    signal?.throwIfAborted()
+    const firstResult = await this.pollOnce(taskId, signal)
     if (firstResult.done) return firstResult.videoUrl!
     if (firstResult.terminalError) throw new Error(firstResult.terminalError)
     onProgress?.({ type: 'poll', status: firstResult.status ?? 'pending', elapsed: 0 })
 
     while (Date.now() < deadline) {
-      await sleep(intervalMs)
+      await sleep(intervalMs, signal)
 
       let result: PollResult
       try {
-        result = await this.pollOnce(taskId)
+        signal?.throwIfAborted()
+        result = await this.pollOnce(taskId, signal)
       } catch (err) {
         transientErrorCount++
         const msg = err instanceof Error ? err.message : String(err)
@@ -233,11 +240,12 @@ export class SeedanceVideoProvider {
     throw new Error(`Seedance: task ${taskId} timed out after ${timeoutMs / 1000}s`)
   }
 
-  private async pollOnce(taskId: string): Promise<PollResult> {
+  private async pollOnce(taskId: string, signal?: AbortSignal): Promise<PollResult> {
     // Correct BytePlus path: /contents/generations/tasks/{id}
     const pollUrl = `${ARK_BASE}/contents/generations/tasks/${taskId}`
     const res = await fetch(pollUrl, {
       headers: { 'Authorization': `Bearer ${this.apiKey}` },
+      signal,
     })
 
     if (!res.ok) {
@@ -322,6 +330,20 @@ function normalizeBaseUrl(value: string) {
   return clean.replace(/\/+$/, '')
 }
 
-function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(timeout)
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
