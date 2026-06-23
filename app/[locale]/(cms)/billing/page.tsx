@@ -20,8 +20,8 @@ export default async function PricingPage({
 
   const t = await getTranslations('billing')
   const sp = searchParams ? await searchParams : {}
-  const hasSubscription = Boolean(user.polarSubscriptionId)
-  const paymentProvider = user.polarSubscriptionId ? 'polar' : null
+  const hasSubscription = Boolean(user.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
+  const paymentProvider = hasSubscription ? 'polar' : null
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8">

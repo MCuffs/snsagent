@@ -16,8 +16,8 @@ export default async function PricingPage({
   if (!user) redirect('/login')
 
   const params = searchParams ? await searchParams : {}
-  const hasSubscription = Boolean(user.polarSubscriptionId)
-  const paymentProvider = user.polarSubscriptionId ? 'polar' : null
+  const hasSubscription = Boolean(user.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
+  const paymentProvider = hasSubscription ? 'polar' : null
   const t = await getTranslations('billing')
 
   return (

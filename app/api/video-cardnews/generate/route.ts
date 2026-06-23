@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   const videoUsage = await checkVideoCardNewsLimit(user.id)
   if (!videoUsage.allowed) {
     const msg = videoUsage.period === 'lifetime'
-      ? `무료 플랜은 영상 카드뉴스를 ${videoUsage.limit}회만 생성할 수 있습니다. Creator 플랜으로 업그레이드하면 월 ${videoUsage.limit}회 이상 이용 가능합니다.`
+      ? `무료 플랜은 영상 카드뉴스를 ${videoUsage.limit}회만 생성할 수 있습니다. 계속 생성하려면 Creator 플랜을 선택해 주세요.`
       : `이번 달 영상 카드뉴스 생성 횟수(${videoUsage.limit}회)를 초과했습니다. (${videoUsage.current}/${videoUsage.limit})`
     return new Response(JSON.stringify({ error: msg }), {
       status: 429,

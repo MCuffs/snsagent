@@ -420,7 +420,7 @@
   "errors": {
     "login_required": "Login required.",
     "brand_not_found": "Brand not found.",
-    "generation_limit_day": "The free plan allows 1 card news per day. Try again tomorrow or upgrade to Creator.",
+    "generation_limit_day": "The Free plan includes 2 card news generations in total. Upgrade to Creator to keep generating.",
     "generation_limit_month": "You have exceeded your monthly card news limit."
   },
   "global_error": {

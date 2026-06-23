@@ -6,7 +6,7 @@ import { getSessionUser } from '../../lib/auth/user'
 
 export const metadata = {
     title: '요금제 — Shuffla',
-    description: '무료 하루 1회 생성부터, 운영 규모에 맞는 Shuffla 카드뉴스 생성 플랜을 선택하세요.',
+    description: '무료 최초 2회 생성부터, 운영 규모에 맞는 Shuffla 카드뉴스 생성 플랜을 선택하세요.',
 }
 
 const plans = [
@@ -17,7 +17,7 @@ const plans = [
         period: '',
         desc: PRICING_PLANS.FREE.description,
         cta: '무료로 시작하기',
-        features: ['최초 2회 카드뉴스 생성', '영상 카드뉴스 1회 체험', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
+        features: ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
     },
     {
@@ -29,7 +29,6 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 20회 카드뉴스 생성',
-            '월 10회 영상 카드뉴스 생성',
             '작업 히스토리 90일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
@@ -48,7 +47,6 @@ const plans = [
         cta: 'Google Login',
         features: [
             '월 30회 카드뉴스 생성',
-            '월 25회 영상 카드뉴스 생성',
             '작업 히스토리 365일 보관',
             '브랜드 URL 분석',
             '상품 참고 이미지 최대 4장',
@@ -79,11 +77,11 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '무료 사용자는 하루 1회 생성과 30일 보관을 이용합니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.',
+        a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
-        a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 하루 한 번 카드뉴스를 생성할 수 있습니다.',
+        a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다.',
     },
     {
         q: '플랜은 언제든지 변경할 수 있나요?',
@@ -97,7 +95,6 @@ const faqs = [
 
 const compareFeatures = [
     { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
-    { feature: '영상 카드뉴스 생성 수', free: '1회 체험', creator: '월 10회', studio: '월 25회' },
     { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
     { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
     { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
@@ -124,7 +121,7 @@ export default async function PricingPage() {
                             필요한 만큼 선택하고<br />카드뉴스를 제작하세요
                         </h1>
                         <p className="mt-7 text-[17px] text-[#525252] max-w-md mx-auto">
-                            무료로 하루 한 장을 만들고,<br />운영이 필요해지면 Creator로 확장하세요.
+                            무료로 최초 2회를 만들고,<br />운영이 필요해지면 Creator로 확장하세요.
                         </p>
                     </div>
                 </section>

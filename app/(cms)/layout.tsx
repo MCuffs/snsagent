@@ -14,7 +14,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
 
   const brands = user ? await getCachedBrands(user.id) : []
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
-  const hasSubscription = Boolean(user?.polarSubscriptionId)
+  const hasSubscription = Boolean(user?.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
   const t = await getTranslations('cms_layout')
 
   return (

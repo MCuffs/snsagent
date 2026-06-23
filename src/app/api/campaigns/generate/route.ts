@@ -77,11 +77,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
 
-    const requestedBrand = await dbService.getBrand(body.brandId!)
-    const brand = requestedBrand?.userId === user.id
-      ? requestedBrand
-      : (await dbService.getBrands(user.id))[0]
-    if (!brand) {
+    const brand = await dbService.getBrand(body.brandId!)
+    if (!brand || brand.userId !== user.id) {
       return NextResponse.json({ error: '브랜드를 찾을 수 없습니다.' }, { status: 404 })
     }
 

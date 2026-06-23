@@ -1,6 +1,6 @@
 import { MarketingNav } from '../../components/MarketingNav'
 import { MarketingFooter } from '../../components/MarketingFooter'
-import { Check, ArrowRight, Mail } from 'lucide-react'
+import { Check, Mail } from 'lucide-react'
 import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
@@ -57,7 +57,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const accessHref = authenticated ? `/${locale}/billing` : '/api/auth/google/start'
   const t = await getTranslations('pricing')
   const isEn = locale === 'en'
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 
   const faqJsonLd = {
     '@context': 'https://schema.org',
@@ -76,8 +75,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       price: isEn ? '$0' : '₩0',
       priceNote: isEn ? 'Free for everyone' : '무료로 시작',
       features: isEn
-        ? ['2 card news in total', '1 video card news trial', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results']
-        : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 1회 체험', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
+        ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results']
+        : ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '무료로 시작하기',
       highlight: false,
     },
@@ -87,8 +86,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       price: isEn ? PRICING_PLANS.PRO.price_en : PRICING_PLANS.PRO.price,
       priceNote: isEn ? 'per month' : '/ 월',
       features: isEn
-        ? ['20 card news per month', '10 video card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
-        : ['월 20회 카드뉴스 생성', '월 10회 영상 카드뉴스 생성', '작업 히스토리 90일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
+        ? ['20 card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
+        : ['월 20회 카드뉴스 생성', '작업 히스토리 90일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '시작하기',
       highlight: true,
       badge: isEn ? 'Most Popular' : '가장 인기',
@@ -99,8 +98,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       price: isEn ? PRICING_PLANS.UNLIMITED.price_en : PRICING_PLANS.UNLIMITED.price,
       priceNote: isEn ? 'per month' : '/ 월',
       features: isEn
-        ? ['30 card news per month', '25 video card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
-        : ['월 30회 카드뉴스 생성', '월 25회 영상 카드뉴스 생성', '작업 히스토리 365일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
+        ? ['30 card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
+        : ['월 30회 카드뉴스 생성', '작업 히스토리 365일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '시작하기',
       highlight: false,
     },
