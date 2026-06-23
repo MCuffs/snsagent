@@ -3,6 +3,7 @@ import { createHmac } from 'crypto'
 const DEFAULT_KLING_BASE = 'https://api-singapore.klingai.com'
 const KLING_BASE = normalizeBaseUrl(process.env.KLINGAI_BASE_URL || DEFAULT_KLING_BASE)
 const KLING_MODEL = normalizeKlingModel(process.env.KLINGAI_VIDEO_MODEL)
+const KLING_MODE = sanitizeEnvValue(process.env.KLINGAI_VIDEO_MODE)
 
 export interface KlingVideoOptions {
   prompt: string
@@ -137,8 +138,8 @@ export class KlingVideoProvider {
       prompt: options.prompt,
       duration,
       aspect_ratio: aspectRatio,
-      mode: process.env.KLINGAI_VIDEO_MODE || 'std',
-      cfg_scale: 0.5,
+      ...(KLING_MODE ? { mode: KLING_MODE } : {}),
+      ...(!isKlingTurboModel(KLING_MODEL) ? { cfg_scale: 0.5 } : {}),
     }
 
     const firstReference = options.referenceImageUrls?.[0]
@@ -147,7 +148,6 @@ export class KlingVideoProvider {
     return {
       ...base,
       image: firstReference,
-      image_url: firstReference,
     }
   }
 
@@ -353,14 +353,11 @@ function normalizeBaseUrl(value: string) {
 }
 
 function normalizeKlingModel(value: string | undefined) {
-  const clean = sanitizeEnvValue(value) || 'kling-v3'
-  const aliases: Record<string, string> = {
-    'kling-3.0': 'kling-v3',
-    'kling-3.0-turbo': 'kling-v3',
-    'kling-v3-0': 'kling-v3',
-    'kling-v3-0-turbo': 'kling-v3',
-  }
-  return aliases[clean.toLowerCase()] ?? clean
+  return sanitizeEnvValue(value) || 'kling-3.0-turbo'
+}
+
+function isKlingTurboModel(model: string) {
+  return model.toLowerCase() === 'kling-3.0-turbo'
 }
 
 function base64Url(input: string | Buffer) {
