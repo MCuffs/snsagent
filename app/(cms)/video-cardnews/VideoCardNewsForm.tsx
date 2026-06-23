@@ -703,6 +703,23 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleConfirmGenerateWithPing = async () => {
     if (!collectedInfo.rawTopic || startingGenerationRef.current || generating) return
+    const infoForGeneration: CollectedInfo = {
+      rawTopic: collectedInfo.rawTopic,
+      targetAndMessage: collectedInfo.targetAndMessage,
+      mood: collectedInfo.mood,
+      refinedTopic: collectedInfo.refinedTopic ?? buildRefinedTopic({
+        rawTopic: collectedInfo.rawTopic,
+        targetAndMessage: collectedInfo.targetAndMessage ?? '',
+        mood: collectedInfo.mood ?? '',
+      }),
+      videoPlan: collectedInfo.videoPlan?.length
+        ? collectedInfo.videoPlan
+        : buildEditableVideoPlan({
+          rawTopic: collectedInfo.rawTopic,
+          targetAndMessage: collectedInfo.targetAndMessage,
+          mood: collectedInfo.mood,
+        }, slideCount, brand),
+    }
     stopRequestedRef.current = false
     startingGenerationRef.current = true
     setIsStartingGeneration(true)
@@ -734,7 +751,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
     })
     try {
-      await runGenerate(collectedInfo as CollectedInfo)
+      await runGenerate(infoForGeneration)
     } finally {
       startingGenerationRef.current = false
       setIsStartingGeneration(false)
@@ -987,6 +1004,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     onConfirmGenerate={handleConfirmGenerateWithPing}
                     onConfirmInfoChange={handleConfirmInfoChange}
                     onVideoPlanChange={handleVideoPlanChange}
+                    slideCount={slideCount}
+                    brand={brand}
                     confirmBusy={isStartingGeneration || generating || phase === 'generating'}
                     onReset={handleReset}
                     onClarificationSelect={handleClarificationSelect}
@@ -1100,6 +1119,8 @@ function AiMessage({
   onConfirmGenerate,
   onConfirmInfoChange,
   onVideoPlanChange,
+  slideCount,
+  brand,
   confirmBusy = false,
   onReset,
   onClarificationSelect,
@@ -1109,6 +1130,8 @@ function AiMessage({
   onConfirmGenerate: () => void
   onConfirmInfoChange?: (patch: Partial<CollectedInfo>) => void
   onVideoPlanChange?: (slideNumber: number, patch: Partial<VideoPlanSlide>) => void
+  slideCount: number
+  brand: Brand
   confirmBusy?: boolean
   onReset: () => void
   onClarificationSelect?: (option: ClarificationOption) => void
@@ -1148,7 +1171,9 @@ function AiMessage({
 
   if (msg.type === 'confirm' && msg.confirmInfo) {
     const info = msg.confirmInfo
-    const videoPlan = info.videoPlan ?? []
+    const videoPlan = info.videoPlan?.length
+      ? info.videoPlan
+      : buildEditableVideoPlan(info, slideCount, brand)
     if (onConfirmInfoChange) {
       return (
         <motion.div
