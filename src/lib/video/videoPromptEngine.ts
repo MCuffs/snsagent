@@ -155,7 +155,7 @@ export function buildVideoPrompt(input: VideoPromptInput): VideoPromptOutput {
   const camera = ROLE_CAMERA[input.role] || ROLE_CAMERA['detail']
 
   const duration = '4-second cinematic loop'
-  const aspectNote = 'vertical 9:16 frame, upper half of the screen (portrait orientation)'
+  const aspectNote = 'wide 16:9 video made for the upper media panel of a vertical card news layout'
 
   // Build the subject line based on headline
   const subjectContext = buildSubjectFromHeadline(input.headline, input.topic, domain)
@@ -175,7 +175,7 @@ export function buildVideoPrompt(input: VideoPromptInput): VideoPromptOutput {
     `Visual atmosphere: ${buildAtmosphere(input.role, input.brandTone)}.`,
     '',
     // Technical specs
-    `Format: ${duration}, ${aspectNote}. No text, no UI elements, no watermarks, no logos, no readable signage anywhere in frame. Background photograph and motion only.`,
+    `Format: ${duration}, ${aspectNote}. Keep the main subject centered with generous headroom and side margins so it remains intact when placed above text. No text, no UI elements, no watermarks, no logos, no readable signage anywhere in frame. Background photograph and motion only.`,
     input.hasReferenceImages
       ? buildReferenceImageInstruction(input.referenceImageCount ?? 1)
       : '',

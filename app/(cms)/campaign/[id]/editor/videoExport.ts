@@ -166,18 +166,18 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Vid
       const vh = video.videoHeight || H
       const targetRatio = W / videoHeight
       const srcRatio = vw / vh
-      let sx = 0
-      let sy = 0
-      let sw = vw
-      let sh = vh
+      let drawWidth = W
+      let drawHeight = videoHeight
+      let dx = 0
+      let dy = 0
       if (srcRatio > targetRatio) {
-        sw = vh * targetRatio
-        sx = (vw - sw) / 2
+        drawHeight = W / srcRatio
+        dy = (videoHeight - drawHeight) / 2
       } else {
-        sh = vw / targetRatio
-        sy = (vh - sh) / 2
+        drawWidth = videoHeight * srcRatio
+        dx = (W - drawWidth) / 2
       }
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W / bgScale, videoHeight / bgScale)
+      ctx.drawImage(video, 0, 0, vw, vh, dx / bgScale, dy / bgScale, drawWidth / bgScale, drawHeight / bgScale)
 
       const gradient = ctx.createLinearGradient(0, videoHeight * 0.4, 0, videoHeight)
       gradient.addColorStop(0, 'rgba(5,5,8,0)')

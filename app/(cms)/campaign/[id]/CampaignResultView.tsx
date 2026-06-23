@@ -184,7 +184,7 @@ function SlideDocumentThumbnail({ document, fallbackImageUrl, alt }: { document?
                 autoPlay
                 muted
                 playsInline
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-contain"
                 style={{
                   opacity: background.opacity / 100,
                   filter: `blur(${overlay.blur * scale}px) contrast(${overlay.contrast}%)`,

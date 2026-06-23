@@ -442,7 +442,7 @@ export function EditorialCanvas({ slideId, fallbackImageUrl }: { slideId: string
                   autoPlay
                   muted
                   playsInline
-                  className="absolute inset-0 h-full w-full select-none object-cover"
+                  className="absolute inset-0 h-full w-full select-none object-contain"
                   style={{
                     opacity: background.opacity / 100,
                     filter: `blur(${overlay.blur * SCALE}px) contrast(${overlay.contrast}%)`,

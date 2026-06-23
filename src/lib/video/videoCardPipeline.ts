@@ -78,7 +78,7 @@ async function generateWithProviderFallback(input: VideoProviderFallbackInput): 
   const options = {
     prompt: input.prompt,
     duration: input.duration,
-    aspectRatio: '9:16' as const,
+    aspectRatio: '16:9' as const,
     referenceImageUrls: input.referenceImageUrls,
     signal: input.signal,
   }
