@@ -308,7 +308,7 @@ export default function DashboardContainer({
           />
         ) : (
           <div className="flex h-full items-center justify-center p-12 text-sm text-[#71717a]">
-            브랜드 프로필을 먼저 설정해주세요.
+            {t('setup_brand_first')}
           </div>
         )}
       </div>
@@ -500,24 +500,23 @@ function ProfileSelectScreen({
         <div className="mt-8 rounded-xl border border-[#e4e4e7] bg-gradient-to-br from-[#faf8ff] to-[#f5f3ff] p-5">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-[#8b5cf6]" />
-            <p className="text-xs font-bold uppercase tracking-wide text-[#8b5cf6]">AI 학습 리포트</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#8b5cf6]">{t('report_title')}</p>
           </div>
           {hasPreference ? (
             <>
               <p className="mt-1 text-sm font-semibold text-[#111111]">
-                AI가 학습한 사용자님의 콘텐츠 흐름입니다
+                {t('report_desc')}
               </p>
               <p className="mt-2 text-sm leading-6 text-[#52525b]">{summarizedPreference!.summary}</p>
-              <p className="mt-3 text-[11px] text-[#a1a1aa]">카드뉴스를 더 생성할수록 취향이 정교하게 반영됩니다.</p>
+              <p className="mt-3 text-[11px] text-[#a1a1aa]">{t('report_footer')}</p>
             </>
           ) : (
             <>
               <p className="mt-1 text-sm font-semibold text-[#111111]">
-                아직 학습된 내용이 없어요
+                {t('report_empty_title')}
               </p>
               <p className="mt-2 text-sm leading-6 text-[#71717a]">
-                카드뉴스를 생성하고 편집할수록 AI가 사용자님의 콘텐츠 스타일과 취향을 파악해
-                다음 생성에 자동으로 반영합니다.
+                {t('report_empty_desc')}
               </p>
             </>
           )}
@@ -528,6 +527,7 @@ function ProfileSelectScreen({
 }
 
 function GuestLoginOverlay({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('concept')
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
@@ -540,23 +540,23 @@ function GuestLoginOverlay({ onClose }: { onClose: () => void }) {
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#eff6ff]">
           <LogIn className="h-6 w-6 text-[#0066ff]" />
         </div>
-        <h2 className="text-lg font-bold text-[#111111]">로그인이 필요해요</h2>
+        <h2 className="text-lg font-bold text-[#111111]">{t('guest_login_title')}</h2>
         <p className="mt-2 text-sm text-[#71717a]">
-          카드뉴스를 만들려면 먼저 로그인해 주세요.
+          {t('guest_login_desc')}
         </p>
         <div className="mt-6 flex flex-col gap-3">
           <Link
             href="/login"
             className="w-full rounded-xl bg-[#111111] py-3 text-sm font-semibold text-white hover:bg-[#333] transition-colors"
           >
-            로그인 / 회원가입
+            {t('guest_login_btn')}
           </Link>
           <button
             type="button"
             onClick={onClose}
             className="text-sm text-[#71717a] hover:text-[#111111] transition-colors"
           >
-            나중에
+            {t('guest_login_later')}
           </button>
         </div>
       </div>

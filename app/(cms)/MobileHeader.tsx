@@ -21,14 +21,14 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
       {/* Mobile Top Header */}
       <header className="flex h-[60px] items-center justify-between border-b border-[#e4e4e7] bg-[#fafafa] px-5 lg:hidden shrink-0">
         <Link href={`${prefix}/concept`} className="flex items-center gap-2.5">
-          <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla 로고" />
+          <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla logo" />
           <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
         </Link>
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           className="rounded-lg p-2 text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors"
-          aria-label="메뉴 열기"
+          aria-label={locale === 'en' ? 'Open menu' : '메뉴 열기'}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -56,12 +56,12 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
             >
               {/* Close Button */}
               <div className="flex h-[60px] items-center justify-between border-b border-[#e4e4e7] px-5">
-                <span className="text-[14px] font-bold text-[#111111]">메뉴</span>
+                <span className="text-[14px] font-bold text-[#111111]">{locale === 'en' ? 'Menu' : '메뉴'}</span>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
                   className="rounded-lg p-2 text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors"
-                  aria-label="메뉴 닫기"
+                  aria-label={locale === 'en' ? 'Close menu' : '메뉴 닫기'}
                 >
                   <X className="h-5 w-5" />
                 </button>

@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl'
 interface NavItem {
   key: string
   label: string
+  labelKey: string
   icon: LucideIcon
   descKey: string
   href: string
@@ -17,10 +18,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { key: 'concept', label: 'Concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
-  { key: 'generate', label: 'Generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
-  { key: 'video-cardnews', label: '영상 카드뉴스', icon: Clapperboard, descKey: 'nav_video_cardnews_desc', href: '/concept?tab=video-cardnews', badge: 'Beta' },
-  { key: 'works', label: 'Works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
+  { key: 'concept', label: 'Concept', labelKey: 'nav_concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
+  { key: 'generate', label: 'Generate', labelKey: 'nav_generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
+  { key: 'video-cardnews', label: '영상 카드뉴스', labelKey: 'nav_video', icon: Clapperboard, descKey: 'nav_video_cardnews_desc', href: '/concept?tab=video-cardnews', badge: 'Beta' },
+  { key: 'works', label: 'Works', labelKey: 'nav_works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
 ]
 
 interface SidebarNavProps {
@@ -68,7 +69,7 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             >
               <Icon className="h-4 w-4 shrink-0" />
               <div>
-                <p className="font-medium leading-none">{item.label}</p>
+                <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
                 <p className="mt-0.5 text-[11px] text-[#9ca3af]">{t(item.descKey as Parameters<typeof t>[0])}</p>
               </div>
             </span>
@@ -89,7 +90,7 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             <Icon className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <p className="font-medium leading-none">{item.label}</p>
+                <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
                 {item.badge && (
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{item.badge}</span>
                 )}

@@ -256,7 +256,17 @@
     "mood_dark_editorial": "무게감 있는 에디토리얼",
     "mood_warm_lifestyle": "따뜻하고 감성적인",
     "mood_bold_commerce": "강렬한 커머스 중심",
-    "mood_clean_pro": "신뢰감 있는 전문적"
+    "mood_clean_pro": "신뢰감 있는 전문적",
+    "report_title": "AI 학습 리포트",
+    "report_desc": "AI가 학습한 사용자님의 콘텐츠 흐름입니다",
+    "report_footer": "카드뉴스 더 생성할수록 취향이 정교하게 반영됩니다.",
+    "report_empty_title": "아직 학습된 내용이 없어요",
+    "report_empty_desc": "카드뉴스 생성하고 편집할수록 AI가 사용자님의 콘텐츠 스타일과 취향을 파악해 다음 생성에 자동으로 반영합니다.",
+    "guest_login_title": "로그인이 필요해요",
+    "guest_login_desc": "카드뉴스를 만들려면 먼저 로그인해 주세요.",
+    "guest_login_btn": "로그인 / 회원가입",
+    "guest_login_later": "나중에",
+    "setup_brand_first": "브랜드 프로필을 먼저 설정해주세요."
   },
   "generate": {
     "loading_step1": "AI 콘텐츠 디렉터가 브랜드를 분석하고 카드뉴스 콘셉트를 도출하고 있습니다.",
@@ -349,7 +359,11 @@
     "foreign_divider": "해외 고객",
     "paypal_label": "PayPal 해외 결제",
     "paypal_error": "PayPal 결제 중 오류가 발생했습니다.",
-    "paypal_activate_failed": "PayPal 구독 활성화에 실패했습니다."
+    "paypal_activate_failed": "PayPal 구독 활성화에 실패했습니다.",
+    "company_name": "파랑버섯 스튜디오",
+    "company_info_1": "대표자: 정민수 · 사업자등록번호: 354-14-0333 · 통신판매업 신고번호: 2026-서울영등포-1320호",
+    "company_info_2": "주소: 서울특별시 영등포구 · 고객센터: admin@shuffla.io",
+    "company_info_3": "부가세 포함 가격 · 구독 취소 시 잔여 기간 부분 환불 미제공"
   },
   "works": {
     "eyebrow": "Works",
@@ -528,7 +542,16 @@
     "template_slide_label": "{number}번 카드",
     "template_apply": "적용",
     "template_delete": "템플릿 삭제",
-    "loading_campaign": "작업물을 불러오는 중입니다."
+    "loading_campaign": "작업물을 불러오는 중입니다.",
+    "trim_title": "영상 구간 선택",
+    "trim_start": "시작",
+    "trim_end": "종료",
+    "trim_seconds": "{duration}초",
+    "trim_start_point": "시작 지점",
+    "trim_duration": "재생 길이 (3~5초)",
+    "trim_too_short": "영상이 3초보다 짧습니다. 3초 이상의 영상을 사용해 주세요.",
+    "trim_cancel": "취소",
+    "trim_apply": "이 구간으로 적용"
   },
   "hero": {
     "title_line1": "카드뉴스를",

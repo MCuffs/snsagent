@@ -256,7 +256,17 @@
     "mood_dark_editorial": "Bold editorial tone",
     "mood_warm_lifestyle": "Warm and emotive",
     "mood_bold_commerce": "High-impact commerce",
-    "mood_clean_pro": "Trustworthy professional"
+    "mood_clean_pro": "Trustworthy professional",
+    "report_title": "AI Learning Report",
+    "report_desc": "This is your content flow learned by AI",
+    "report_footer": "The more card news you create, the more precisely your preferences will be reflected.",
+    "report_empty_title": "No learned content yet",
+    "report_empty_desc": "The more you create and edit card news, the more AI understands your content style and preferences, automatically applying them to the next generation.",
+    "guest_login_title": "Login Required",
+    "guest_login_desc": "Please log in first to create card news.",
+    "guest_login_btn": "Log in / Sign up",
+    "guest_login_later": "Later",
+    "setup_brand_first": "Please set up your brand profile first."
   },
   "generate": {
     "loading_step1": "The AI Content Director is analyzing your brand and developing the concept.",
@@ -349,7 +359,11 @@
     "paypal_label": "PayPal international",
     "paypal_error": "An error occurred during PayPal payment.",
     "paypal_activate_failed": "Failed to activate PayPal subscription.",
-    "payment_canceled_msg": "Payment was canceled."
+    "payment_canceled_msg": "Payment was canceled.",
+    "company_name": "Blue Mushroom Studio",
+    "company_info_1": "CEO: Minsu Jeong · Business Registration: 354-14-0333 · Mail Order Business Report: No. 2026-Seoul Yeongdeungpo-1320",
+    "company_info_2": "Address: Yeongdeungpo-gu, Seoul, South Korea · Support: admin@shuffla.io",
+    "company_info_3": "VAT included · No partial refunds are provided for the remaining period upon subscription cancellation"
   },
   "works": {
     "eyebrow": "Works",
@@ -528,7 +542,16 @@
     "template_slide_label": "Card {number}",
     "template_apply": "Apply",
     "template_delete": "Delete template",
-    "loading_campaign": "Loading your work…"
+    "loading_campaign": "Loading your work…",
+    "trim_title": "Select video segment",
+    "trim_start": "Start",
+    "trim_end": "End",
+    "trim_seconds": "{duration}s",
+    "trim_start_point": "Start point",
+    "trim_duration": "Duration (3–5s)",
+    "trim_too_short": "Video is shorter than 3 seconds. Please use a video of 3 seconds or longer.",
+    "trim_cancel": "Cancel",
+    "trim_apply": "Apply segment"
   },
   "hero": {
     "title_line1": "Card news,",

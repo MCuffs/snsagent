@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Play, Pause, Check } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface VideoTrimResult {
   file: File
@@ -22,6 +23,7 @@ function fmt(sec: number) {
 }
 
 export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
+  const t = useTranslations('campaign')
   const videoRef = useRef<HTMLVideoElement>(null)
   const [duration, setDuration] = useState(0)
   const [startSec, setStartSec] = useState(0)
@@ -83,7 +85,7 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
       <div className="w-full max-w-sm rounded-2xl bg-[#1a1a1e] border border-white/10 shadow-2xl overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          <p className="text-sm font-bold text-white">영상 구간 선택</p>
+          <p className="text-sm font-bold text-white">{t('trim_title')}</p>
           <button type="button" onClick={onCancel} className="text-white/50 hover:text-white transition-colors">
             <X className="h-4 w-4" />
           </button>
@@ -124,17 +126,17 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
         <div className="px-5 py-4 space-y-4">
           {/* 구간 표시 */}
           <div className="flex items-center justify-between text-xs font-semibold text-white/50">
-            <span>시작 <span className="text-white font-bold">{fmt(startSec)}</span></span>
+            <span>{t('trim_start')} <span className="text-white font-bold">{fmt(startSec)}</span></span>
             <span className="text-white/30">→</span>
-            <span>종료 <span className="text-white font-bold">{fmt(endSec)}</span></span>
+            <span>{t('trim_end')} <span className="text-white font-bold">{fmt(endSec)}</span></span>
             <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/70">
-              {durationSec}초
+              {t('trim_seconds', { duration: durationSec })}
             </span>
           </div>
 
           {/* 시작점 슬라이더 */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold text-white/40 uppercase tracking-widest">시작 지점</label>
+            <label className="mb-1.5 block text-[11px] font-bold text-white/40 uppercase tracking-widest">{t('trim_start_point')}</label>
             <input
               type="range"
               min={0}
@@ -149,7 +151,7 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
 
           {/* 재생 길이 슬라이더 3~5초 */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold text-white/40 uppercase tracking-widest">재생 길이 (3~5초)</label>
+            <label className="mb-1.5 block text-[11px] font-bold text-white/40 uppercase tracking-widest">{t('trim_duration')}</label>
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -172,7 +174,7 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
 
           {duration > 0 && duration < 3 && (
             <p className="rounded-lg bg-red-500/15 px-3 py-2 text-[11px] font-bold text-red-400">
-              영상이 3초보다 짧습니다. 3초 이상의 영상을 사용해 주세요.
+              {t('trim_too_short')}
             </p>
           )}
 
@@ -183,7 +185,7 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
               onClick={onCancel}
               className="flex-1 rounded-xl border border-white/10 py-2.5 text-xs font-bold text-white/60 hover:text-white hover:border-white/20 transition-colors"
             >
-              취소
+              {t('trim_cancel')}
             </button>
             <button
               type="button"
@@ -192,7 +194,7 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0066ff] py-2.5 text-xs font-bold text-white hover:bg-[#0052cc] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Check className="h-3.5 w-3.5" />
-              이 구간으로 적용
+              {t('trim_apply')}
             </button>
           </div>
         </div>

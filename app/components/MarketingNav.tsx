@@ -39,7 +39,7 @@ export async function MarketingNav({ authenticated = false, locale }: MarketingN
     <NavScrollWrapper>
       <div className="mx-auto flex h-[68px] max-w-[1380px] items-center justify-between px-5 md:px-8">
         <Link href={`${prefix}/`} className="flex items-center gap-2.5 text-[19px] font-semibold tracking-[-0.05em] transition-opacity hover:opacity-70">
-          <Image src="/shuffla-logo-mark.png" width={30} height={30} alt="Shuffla 로고" />
+          <Image src="/shuffla-logo-mark.png" width={30} height={30} alt="Shuffla logo" />
           <span>Shuffla</span>
         </Link>
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 text-sm md:flex">

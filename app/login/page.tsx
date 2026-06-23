@@ -42,7 +42,7 @@ export default async function LoginPage({
     <main className="app-shell min-h-screen text-[#1f1512]">
       <header className="flex h-[76px] items-center justify-between border-b border-[#ece2d6] bg-[#fffdf8]/88 px-6 backdrop-blur-xl lg:px-12">
         <Link href="/" className="flex items-center gap-2 text-2xl font-black tracking-[-0.05em]">
-          <Image src="/shuffla-logo-mark.png" width={34} height={34} alt="Shuffla 로고" />
+          <Image src="/shuffla-logo-mark.png" width={34} height={34} alt="Shuffla logo" />
           Shuffla
         </Link>
         <Link href="/" className="flex items-center gap-2 text-sm font-black text-[#1f1512]">

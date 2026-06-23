@@ -122,7 +122,7 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
             name="email"
             type="email"
             autoComplete="email"
-            placeholder={isEn ? '이메일을 입력하세요' : '이메일을 입력하세요'}
+            placeholder={isEn ? 'Enter your email' : '이메일을 입력하세요'}
             required
             className={inputClass}
           />

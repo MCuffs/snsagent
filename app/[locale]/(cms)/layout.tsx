@@ -40,7 +40,7 @@ export default async function CmsLayout({
           {/* Logo */}
           <div className="flex h-[60px] items-center border-b border-[#e5e7eb] px-5">
             <Link href={`/${locale}/concept`} className="flex items-center gap-2.5">
-              <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla 로고" />
+              <Image src="/shuffla-logo-mark.png" width={27} height={27} alt="Shuffla logo" />
               <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
             </Link>
           </div>
