@@ -128,6 +128,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const [phase, setPhase] = useState<ChatPhase>('idle')
   const [collectedInfo, setCollectedInfo] = useState<Partial<CollectedInfo>>({})
   const [isWaiting, setIsWaiting] = useState(false)
+  const [isStartingGeneration, setIsStartingGeneration] = useState(false)
 
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -137,6 +138,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const referenceImagesRef = useRef<Array<{ file: File; preview: string }>>([])
   const generationAbortRef = useRef<AbortController | null>(null)
   const stopRequestedRef = useRef(false)
+  const startingGenerationRef = useRef(false)
 
   const addImages = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
@@ -391,6 +393,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleStopGenerate = () => {
     if (!generationAbortRef.current || !generating) return
+    startingGenerationRef.current = false
+    setIsStartingGeneration(false)
     stopRequestedRef.current = true
     generationAbortRef.current.abort()
     updateActiveMsg(m => ({
@@ -518,7 +522,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const handleSend = async () => {
     const input = topic.trim()
-    if ((!input && attachedImages.length === 0) || generating || isWaiting) return
+    if ((!input && attachedImages.length === 0) || generating || isWaiting || isStartingGeneration) return
     setTopic('')
 
     const imageUrls = attachedImages.map(img => img.preview)
@@ -548,7 +552,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   const handleClarificationSelect = async (option: ClarificationOption) => {
-    if (generating || isWaiting || phase === 'confirming') return
+    if (generating || isWaiting || isStartingGeneration || phase === 'confirming') return
     const text = option.value
     const userLabel = option.label
 
@@ -589,10 +593,14 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   const handleConfirmGenerateWithPing = async () => {
-    if (!collectedInfo.rawTopic) return
+    if (!collectedInfo.rawTopic || startingGenerationRef.current || generating) return
+    startingGenerationRef.current = true
+    setIsStartingGeneration(true)
     try {
       await pingKlingProvider()
     } catch (error) {
+      startingGenerationRef.current = false
+      setIsStartingGeneration(false)
       const message = error instanceof Error ? error.message : 'Kling API 연결 확인에 실패했습니다.'
       setAiMessages(prev => [...prev, {
         id: `ai-ping-error-${Date.now()}`,
@@ -604,7 +612,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     flushSync(() => {
       setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
     })
-    void runGenerate(collectedInfo as CollectedInfo)
+    try {
+      await runGenerate(collectedInfo as CollectedInfo)
+    } finally {
+      startingGenerationRef.current = false
+      setIsStartingGeneration(false)
+    }
   }
 
   const handleConfirmInfoChange = (patch: Partial<CollectedInfo>) => {
@@ -637,6 +650,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setUserMessages([])
     setAiMessages([])
     setTopic('')
+    setIsStartingGeneration(false)
+    startingGenerationRef.current = false
     referenceImagesRef.current = []
   }
 
@@ -647,7 +662,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     }
   }
 
-  const inputDisabled = generating || isWaiting || phase === 'confirming' || phase === 'generating' || phase === 'done'
+  const inputDisabled = generating || isWaiting || isStartingGeneration || phase === 'confirming' || phase === 'generating' || phase === 'done'
   const getPlaceholder = () => {
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
     if (phase === 'clarifying') return 'AI 디렉터의 질문에 답해 주세요...'
@@ -808,6 +823,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     msg={aiMessages[idx]}
                     onConfirmGenerate={handleConfirmGenerateWithPing}
                     onConfirmInfoChange={handleConfirmInfoChange}
+                    confirmBusy={isStartingGeneration || generating || phase === 'generating'}
                     onReset={handleReset}
                     onClarificationSelect={handleClarificationSelect}
                     onStopGenerate={handleStopGenerate}
@@ -856,7 +872,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               <button
                 key={n}
                 type="button"
-                disabled={generating || phase === 'generating'}
+                disabled={generating || isStartingGeneration || phase === 'generating'}
                 onClick={() => setSlideCount(n)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                   slideCount === n
@@ -870,7 +886,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           </div>
 
           <div className={`flex items-center gap-2 rounded-[22px] border bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] transition-all focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)] ${isDragging ? 'border-[#93b8ff]' : 'border-white/75'}`}>
-            <button type="button" disabled={generating || attachedImages.length >= 3}
+            <button type="button" disabled={generating || isStartingGeneration || attachedImages.length >= 3}
               onClick={() => fileInputRef.current?.click()}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
               <ImagePlus className="h-4 w-4" />
@@ -919,6 +935,7 @@ function AiMessage({
   msg,
   onConfirmGenerate,
   onConfirmInfoChange,
+  confirmBusy = false,
   onReset,
   onClarificationSelect,
   onStopGenerate,
@@ -926,6 +943,7 @@ function AiMessage({
   msg: AiChatMessage
   onConfirmGenerate: () => void
   onConfirmInfoChange?: (patch: Partial<CollectedInfo>) => void
+  confirmBusy?: boolean
   onReset: () => void
   onClarificationSelect?: (option: ClarificationOption) => void
   onStopGenerate?: () => void
@@ -984,6 +1002,7 @@ function AiMessage({
                   label="주제"
                   value={info.rawTopic}
                   rows={2}
+                  disabled={confirmBusy}
                   onChange={value => onConfirmInfoChange({ rawTopic: value })}
                 />
                 <EditablePlanField
@@ -991,6 +1010,7 @@ function AiMessage({
                   value={info.targetAndMessage ?? ''}
                   rows={4}
                   placeholder="누구에게 어떤 메시지를 전달할지 입력하세요."
+                  disabled={confirmBusy}
                   onChange={value => onConfirmInfoChange({ targetAndMessage: value })}
                 />
                 <EditablePlanField
@@ -998,6 +1018,7 @@ function AiMessage({
                   value={info.mood ?? ''}
                   rows={3}
                   placeholder="영상의 톤, 색감, 장면 분위기를 입력하세요."
+                  disabled={confirmBusy}
                   onChange={value => onConfirmInfoChange({ mood: value })}
                 />
               </div>
@@ -1006,15 +1027,16 @@ function AiMessage({
                 <button
                   type="button"
                   onClick={onConfirmGenerate}
-                  disabled={!info.rawTopic.trim()}
+                  disabled={confirmBusy || !info.rawTopic.trim()}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#111827] py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_32px_rgba(15,23,42,0.2)] disabled:opacity-40"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  지금 만들기
+                  {confirmBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {confirmBusy ? '확인 중...' : '지금 만들기'}
                 </button>
                 <button
                   type="button"
                   onClick={onReset}
+                  disabled={confirmBusy}
                   className="rounded-lg border border-[#e5e7eb] px-3 py-2.5 text-xs text-[#6b7280] transition-colors hover:bg-[#f9fafb]"
                 >
                   처음부터
@@ -1095,12 +1117,14 @@ function EditablePlanField({
   value,
   rows,
   placeholder,
+  disabled = false,
   onChange,
 }: {
   label: string
   value: string
   rows: number
   placeholder?: string
+  disabled?: boolean
   onChange: (value: string) => void
 }) {
   return (
@@ -1110,8 +1134,9 @@ function EditablePlanField({
         value={value}
         rows={rows}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#aebfdd] focus:shadow-[0_10px_24px_rgba(87,119,185,0.10)]"
+        className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#aebfdd] focus:shadow-[0_10px_24px_rgba(87,119,185,0.10)] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
       />
     </label>
   )
