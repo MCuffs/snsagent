@@ -7,6 +7,7 @@
  */
 
 import { SeedanceVideoProvider, canUseSeedance } from '../ai/providers/seedanceVideoProvider'
+import { KlingVideoProvider, canUseKling } from '../ai/providers/klingVideoProvider'
 import { buildCarouselVideoPrompts } from './videoPromptEngine'
 import { getLightClient, getQwenModel } from '../ai/llmClient'
 import type { EditorialSlideRole } from '../editorial/editorialDirector'
@@ -56,19 +57,78 @@ export interface VideoCardPipelineResult {
   partialFailures: number
 }
 
+interface VideoProviderFallbackInput {
+  prompt: string
+  duration: 3 | 5
+  referenceImageUrls?: string[]
+  signal?: AbortSignal
+  klingProvider: KlingVideoProvider | null
+  seedanceProvider: SeedanceVideoProvider | null
+  onPoll: (elapsed: number) => void
+}
+
+interface UnifiedVideoResult {
+  videoUrl: string
+  durationSeconds: number
+}
+
 const HEADLINE_MAX_KO = 20
 const HEADLINE_MAX_EN = 30
 const BODY_MAX_KO = 100
 const BODY_MAX_EN = 150
 
+async function generateWithProviderFallback(input: VideoProviderFallbackInput): Promise<UnifiedVideoResult> {
+  const options = {
+    prompt: input.prompt,
+    duration: input.duration,
+    aspectRatio: '9:16' as const,
+    referenceImageUrls: input.referenceImageUrls,
+    signal: input.signal,
+  }
+
+  if (input.klingProvider) {
+    try {
+      console.log('[VideoCardPipeline] Trying Kling 3.0 video provider first')
+      return await input.klingProvider.generateVideo(options, (event) => {
+        if (event.type === 'poll') input.onPoll(event.elapsed)
+      })
+    } catch (error) {
+      if (input.signal?.aborted) throw error
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn('[VideoCardPipeline] Kling generation failed; falling back to Seedance:', message)
+      if (!input.seedanceProvider) {
+        throw new Error(`Kling generation failed and Seedance is not configured: ${message}`)
+      }
+    }
+  }
+
+  if (!input.seedanceProvider) {
+    throw new Error('Seedance is not configured.')
+  }
+
+  const seedanceResult = await input.seedanceProvider.generateVideo(
+    {
+      ...options,
+      resolution: '720p',
+    },
+    (event) => {
+      if (event.type === 'poll') input.onPoll(event.elapsed)
+    },
+  )
+  return seedanceResult
+}
+
 export async function generateVideoCardNews(
   input: VideoCardPipelineInput,
 ): Promise<VideoCardPipelineResult> {
-  if (!canUseSeedance()) {
-    throw new Error('BYTEDANCE_API_KEY is not configured. Add it to environment variables.')
+  const useKling = canUseKling()
+  const useSeedance = canUseSeedance()
+  if (!useKling && !useSeedance) {
+    throw new Error('No video provider is configured. Add KLINGAI_ACCESS_KEY/KLINGAI_SECRET_KEY or BYTEDANCE_API_KEY.')
   }
 
-  const provider = new SeedanceVideoProvider()
+  const klingProvider = useKling ? new KlingVideoProvider() : null
+  const seedanceProvider = useSeedance ? new SeedanceVideoProvider() : null
   const duration = input.durationSeconds ?? 5
   const onProgress = input.onProgress
 
@@ -96,14 +156,17 @@ export async function generateVideoCardNews(
     onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
 
     try {
-      const videoResult = await provider.generateVideo(
-        { prompt, duration, aspectRatio: '9:16', resolution: '720p', referenceImageUrls: input.referenceImageUrls, signal: input.signal },
-        (event) => {
-          if (event.type === 'poll') {
-            onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed: event.elapsed })
-          }
+      const videoResult = await generateWithProviderFallback({
+        prompt,
+        duration,
+        referenceImageUrls: input.referenceImageUrls,
+        signal: input.signal,
+        klingProvider,
+        seedanceProvider,
+        onPoll: (elapsed) => {
+          onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed })
         },
-      )
+      })
       onProgress?.({ type: 'video_done', slideNumber: slide.slideNumber })
       return {
         slideNumber: slide.slideNumber,

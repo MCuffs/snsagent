@@ -116,7 +116,11 @@ async function DashboardDataLoader() {
       userId={user.id}
       userName={user.name}
       summarizedPreference={summarizedPreference}
-      hasVideoApiKey={Boolean(process.env.BYTEDANCE_API_KEY && process.env.BYTEDANCE_API_KEY.length > 10)}
+      hasVideoApiKey={Boolean(
+        (process.env.KLINGAI_ACCESS_KEY && process.env.KLINGAI_SECRET_KEY) ||
+        (process.env.BYTEDANCE_API_KEY && process.env.BYTEDANCE_API_KEY.length > 10) ||
+        (process.env.ARK_API_KEY && process.env.ARK_API_KEY.length > 10),
+      )}
     />
   )
 }
