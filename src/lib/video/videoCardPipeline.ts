@@ -6,7 +6,6 @@
  *   - Bottom half (1080×960): Black background + headline + body text
  */
 
-import { SeedanceVideoProvider, canUseSeedance } from '../ai/providers/seedanceVideoProvider'
 import { KlingVideoProvider, canUseKling } from '../ai/providers/klingVideoProvider'
 import { buildCarouselVideoPrompts } from './videoPromptEngine'
 import { getLightClient, getQwenModel } from '../ai/llmClient'
@@ -63,7 +62,6 @@ interface VideoProviderFallbackInput {
   referenceImageUrls?: string[]
   signal?: AbortSignal
   klingProvider: KlingVideoProvider | null
-  seedanceProvider: SeedanceVideoProvider | null
   onPoll: (elapsed: number) => void
 }
 
@@ -95,40 +93,23 @@ async function generateWithProviderFallback(input: VideoProviderFallbackInput): 
     } catch (error) {
       if (input.signal?.aborted) throw error
       const message = error instanceof Error ? error.message : String(error)
-      console.warn('[VideoCardPipeline] Kling generation failed; falling back to Seedance:', message)
-      if (!input.seedanceProvider) {
-        throw new Error(`Kling generation failed and Seedance is not configured: ${message}`)
-      }
+      console.warn('[VideoCardPipeline] Kling generation failed; Seedance fallback is disabled:', message)
+      throw new Error(`Kling generation failed: ${message}`)
     }
   }
 
-  if (!input.seedanceProvider) {
-    throw new Error('Seedance is not configured.')
-  }
-
-  const seedanceResult = await input.seedanceProvider.generateVideo(
-    {
-      ...options,
-      resolution: '720p',
-    },
-    (event) => {
-      if (event.type === 'poll') input.onPoll(event.elapsed)
-    },
-  )
-  return seedanceResult
+  throw new Error('Kling is not configured. Seedance fallback is currently disabled.')
 }
 
 export async function generateVideoCardNews(
   input: VideoCardPipelineInput,
 ): Promise<VideoCardPipelineResult> {
   const useKling = canUseKling()
-  const useSeedance = canUseSeedance()
-  if (!useKling && !useSeedance) {
-    throw new Error('No video provider is configured. Add KLINGAI_ACCESS_KEY/KLINGAI_SECRET_KEY or BYTEDANCE_API_KEY.')
+  if (!useKling) {
+    throw new Error('Kling video provider is not configured. Add KLINGAI_API_KEY or KLINGAI_ACCESS_KEY/KLINGAI_SECRET_KEY.')
   }
 
   const klingProvider = useKling ? new KlingVideoProvider() : null
-  const seedanceProvider = useSeedance ? new SeedanceVideoProvider() : null
   const duration = input.durationSeconds ?? 5
   const onProgress = input.onProgress
 
@@ -162,7 +143,6 @@ export async function generateVideoCardNews(
         referenceImageUrls: input.referenceImageUrls,
         signal: input.signal,
         klingProvider,
-        seedanceProvider,
         onPoll: (elapsed) => {
           onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed })
         },

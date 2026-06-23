@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getSessionUser } from '../../../actions/auth'
 import { generateVideoCardCopy, generateVideoCardNews } from '../../../../src/lib/video/videoCardPipeline'
-import { canUseSeedance } from '../../../../src/lib/ai/providers/seedanceVideoProvider'
+import { canUseKling } from '../../../../src/lib/ai/providers/klingVideoProvider'
 import { dbService } from '../../../../lib/db-service'
 import { buildCarouselResearchBrief, formatResearchBriefForPrompt } from '../../../../src/lib/research/carouselResearch'
 import { buildRssContext, extractGenerationKeywords, fetchRssForGeneration, inferRssCategory } from '../../../../src/lib/rss/rssFetcher'
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  if (!canUseSeedance()) {
+  if (!canUseKling()) {
     return new Response(
       JSON.stringify({ error: '영상 생성 API가 준비되지 않았습니다. 관리자에게 문의하세요.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
             keyBenefits: '영상 카드뉴스',
             objective: '영상 카드뉴스',
             slideCount: durableSlides.length,
-            imageModel: 'seedance-1-5-pro-251215',
+            imageModel: 'kling-3.0-turbo',
             initialImageCount: successSlides.length,
             mediaType: 'video',
           },

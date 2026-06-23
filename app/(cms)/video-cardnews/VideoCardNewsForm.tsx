@@ -189,12 +189,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     setAiMessages(prev => prev.map(m => m.id === id ? updater(m) : m))
   }
 
-  const runGenerate = async (info: CollectedInfo) => {
+  const runGenerate = async (info: CollectedInfo, existingMsgId?: string) => {
     const currentImages = referenceImagesRef.current
     setPhase('generating')
     setGenerating(true)
     stopRequestedRef.current = false
-    const msgId = `ai-gen-${Date.now()}`
+    const msgId = existingMsgId ?? `ai-gen-${Date.now()}`
     activeMsgIdRef.current = msgId
     flushSync(() => {
       setAiMessages(prev => [...prev, {
@@ -569,12 +569,66 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     await callAgent(text)
   }
 
-  const handleConfirmGenerate = () => {
+  const _handleConfirmGenerate = () => {
     if (!collectedInfo.rawTopic) return
     flushSync(() => {
       setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
     })
     void runGenerate(collectedInfo as CollectedInfo)
+  }
+
+  const pingKlingProvider = async () => {
+    const res = await fetch('/api/video-cardnews/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const data = await res.json().catch(() => null) as { ok?: boolean; error?: string } | null
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || 'Kling API 연결 확인에 실패했습니다.')
+    }
+  }
+
+  const handleConfirmGenerateWithPing = async () => {
+    if (!collectedInfo.rawTopic) return
+    try {
+      await pingKlingProvider()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kling API 연결 확인에 실패했습니다.'
+      setAiMessages(prev => [...prev, {
+        id: `ai-ping-error-${Date.now()}`,
+        type: 'error',
+        errorText: message,
+      }])
+      return
+    }
+    flushSync(() => {
+      setUserMessages(prev => [...prev, { id: `u-confirm-${Date.now()}`, content: '지금 만들기' }])
+    })
+    void runGenerate(collectedInfo as CollectedInfo)
+  }
+
+  const handleConfirmInfoChange = (patch: Partial<CollectedInfo>) => {
+    setCollectedInfo(prev => {
+      const next = { ...prev, ...patch }
+      if (next.rawTopic) {
+        next.refinedTopic = buildRefinedTopic({
+          rawTopic: next.rawTopic,
+          targetAndMessage: next.targetAndMessage ?? '',
+          mood: next.mood ?? '',
+        })
+      }
+      return next
+    })
+    setAiMessages(prev => prev.map(message => {
+      if (message.type !== 'confirm' || !message.confirmInfo) return message
+      const nextInfo = { ...message.confirmInfo, ...patch }
+      nextInfo.refinedTopic = buildRefinedTopic({
+        rawTopic: nextInfo.rawTopic,
+        targetAndMessage: nextInfo.targetAndMessage ?? '',
+        mood: nextInfo.mood ?? '',
+      })
+      return { ...message, confirmInfo: nextInfo }
+    }))
   }
 
   const handleReset = () => {
@@ -752,7 +806,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 {aiMessages[idx] && (
                   <AiMessage
                     msg={aiMessages[idx]}
-                    onConfirmGenerate={handleConfirmGenerate}
+                    onConfirmGenerate={handleConfirmGenerateWithPing}
+                    onConfirmInfoChange={handleConfirmInfoChange}
                     onReset={handleReset}
                     onClarificationSelect={handleClarificationSelect}
                     onStopGenerate={handleStopGenerate}
@@ -863,12 +918,14 @@ function AiBubbleAvatar() {
 function AiMessage({
   msg,
   onConfirmGenerate,
+  onConfirmInfoChange,
   onReset,
   onClarificationSelect,
   onStopGenerate,
 }: {
   msg: AiChatMessage
   onConfirmGenerate: () => void
+  onConfirmInfoChange?: (patch: Partial<CollectedInfo>) => void
   onReset: () => void
   onClarificationSelect?: (option: ClarificationOption) => void
   onStopGenerate?: () => void
@@ -907,6 +964,67 @@ function AiMessage({
 
   if (msg.type === 'confirm' && msg.confirmInfo) {
     const info = msg.confirmInfo
+    if (onConfirmInfoChange) {
+      return (
+        <motion.div
+          {...fadeIn}
+          transition={smoothEase}
+          className="flex justify-start"
+        >
+          <div className="flex w-full max-w-md flex-col items-start gap-2.5">
+            <AiBubbleAvatar />
+            <div className="w-full space-y-4 rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 shadow-[0_16px_42px_rgba(87,119,185,0.13)] backdrop-blur-xl">
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-[#111111]">생성 전에 기획안을 확인해주세요.</p>
+                <p className="text-xs font-medium leading-5 text-[#6b7280]">필요한 내용을 직접 수정한 뒤 생성할 수 있습니다.</p>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <EditablePlanField
+                  label="주제"
+                  value={info.rawTopic}
+                  rows={2}
+                  onChange={value => onConfirmInfoChange({ rawTopic: value })}
+                />
+                <EditablePlanField
+                  label="독자 및 메시지"
+                  value={info.targetAndMessage ?? ''}
+                  rows={4}
+                  placeholder="누구에게 어떤 메시지를 전달할지 입력하세요."
+                  onChange={value => onConfirmInfoChange({ targetAndMessage: value })}
+                />
+                <EditablePlanField
+                  label="분위기"
+                  value={info.mood ?? ''}
+                  rows={3}
+                  placeholder="영상의 톤, 색감, 장면 분위기를 입력하세요."
+                  onChange={value => onConfirmInfoChange({ mood: value })}
+                />
+              </div>
+
+              <div className="flex gap-2 border-t border-[#f3f4f6] pt-1">
+                <button
+                  type="button"
+                  onClick={onConfirmGenerate}
+                  disabled={!info.rawTopic.trim()}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#111827] py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_32px_rgba(15,23,42,0.2)] disabled:opacity-40"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  지금 만들기
+                </button>
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="rounded-lg border border-[#e5e7eb] px-3 py-2.5 text-xs text-[#6b7280] transition-colors hover:bg-[#f9fafb]"
+                >
+                  처음부터
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )
+    }
     return (
       <motion.div
         {...fadeIn}
@@ -972,6 +1090,33 @@ function AiMessage({
   return <AiProgressMessage msg={msg} onStopGenerate={onStopGenerate} />
 }
 
+function EditablePlanField({
+  label,
+  value,
+  rows,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  value: string
+  rows: number
+  placeholder?: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9ca3af]">{label}</span>
+      <textarea
+        value={value}
+        rows={rows}
+        placeholder={placeholder}
+        onChange={event => onChange(event.target.value)}
+        className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#aebfdd] focus:shadow-[0_10px_24px_rgba(87,119,185,0.10)]"
+      />
+    </label>
+  )
+}
+
 function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStopGenerate?: () => void }) {
   return (
     <motion.div
@@ -1014,7 +1159,7 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
               }`}>
                 {msg.stageLabel}
               </span>
-              {msg.type === 'progress' && onStopGenerate && (
+              {false && (
                 <button
                   type="button"
                   onClick={onStopGenerate}
