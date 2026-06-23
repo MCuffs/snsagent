@@ -28,18 +28,22 @@ const MAX_POLL_TRANSIENT_ERRORS = 4
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 export class KlingVideoProvider {
-  private accessKey: string
-  private secretKey: string
+  private apiKey?: string
+  private accessKey?: string
+  private secretKey?: string
 
   constructor(
     accessKey = process.env.KLINGAI_ACCESS_KEY,
     secretKey = process.env.KLINGAI_SECRET_KEY,
+    apiKey = process.env.KLINGAI_API_KEY,
   ) {
+    const cleanApiKey = sanitizeEnvValue(apiKey)
     const cleanAccessKey = sanitizeEnvValue(accessKey)
     const cleanSecretKey = sanitizeEnvValue(secretKey)
-    if (!cleanAccessKey || !cleanSecretKey) {
-      throw new Error('KLINGAI_ACCESS_KEY and KLINGAI_SECRET_KEY are not set.')
+    if (!cleanApiKey && (!cleanAccessKey || !cleanSecretKey)) {
+      throw new Error('KLINGAI_API_KEY or KLINGAI_ACCESS_KEY/KLINGAI_SECRET_KEY is not set.')
     }
+    this.apiKey = cleanApiKey
     this.accessKey = cleanAccessKey
     this.secretKey = cleanSecretKey
   }
@@ -82,7 +86,7 @@ export class KlingVideoProvider {
         res = await fetch(submitUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.createJwt()}`,
+            'Authorization': `Bearer ${this.getAuthToken()}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(reqBody),
@@ -190,7 +194,7 @@ export class KlingVideoProvider {
   private async pollOnce(submitted: KlingSubmittedTask, signal?: AbortSignal): Promise<KlingPollResult> {
     const pollUrl = `${KLING_BASE}${submitted.pollPath}`
     const res = await fetch(pollUrl, {
-      headers: { 'Authorization': `Bearer ${this.createJwt()}` },
+      headers: { 'Authorization': `Bearer ${this.getAuthToken()}` },
       signal,
     })
 
@@ -231,7 +235,14 @@ export class KlingVideoProvider {
     return { done: false, status: status || 'running' }
   }
 
+  private getAuthToken() {
+    return this.apiKey ?? this.createJwt()
+  }
+
   private createJwt() {
+    if (!this.accessKey || !this.secretKey) {
+      throw new Error('KLINGAI_ACCESS_KEY and KLINGAI_SECRET_KEY are required for JWT auth.')
+    }
     const now = Math.floor(Date.now() / 1000)
     const header = { alg: 'HS256', typ: 'JWT' }
     const payload = {
@@ -295,9 +306,10 @@ interface KlingPollResult {
 }
 
 export function canUseKling(): boolean {
+  const apiKey = sanitizeEnvValue(process.env.KLINGAI_API_KEY)
   const accessKey = sanitizeEnvValue(process.env.KLINGAI_ACCESS_KEY)
   const secretKey = sanitizeEnvValue(process.env.KLINGAI_SECRET_KEY)
-  return Boolean(accessKey && secretKey && accessKey.length > 8 && secretKey.length > 8)
+  return Boolean((apiKey && apiKey.length > 8) || (accessKey && secretKey && accessKey.length > 8 && secretKey.length > 8))
 }
 
 function extractVideoUrl(task: KlingTaskData) {
