@@ -16,6 +16,7 @@ export interface VideoCardSlideInput {
   role: EditorialSlideRole
   headline: string
   body: string
+  videoPrompt?: string
 }
 
 export interface VideoCardPipelineInput {
@@ -132,7 +133,7 @@ export async function generateVideoCardNews(
 
   const generateOne = async (slide: VideoCardSlideInput, index: number): Promise<VideoCardSlideResult> => {
     input.signal?.throwIfAborted()
-    const { prompt } = prompts[index]
+    const prompt = slide.videoPrompt?.trim() || prompts[index].prompt
     onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
 
     try {

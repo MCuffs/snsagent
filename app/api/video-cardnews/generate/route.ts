@@ -10,9 +10,10 @@ import { checkVideoCardNewsLimit } from '../../../../lib/limits'
 import { inferContentDomain } from '../../../../src/lib/content/domainProfile'
 import type { ContentDomain } from '../../../../src/lib/content/domainProfile'
 import { getLightClient, getQwenModel } from '../../../../src/lib/ai/llmClient'
+import type { EditorialSlideRole } from '../../../../src/lib/editorial/editorialDirector'
 
 export const runtime = 'nodejs'
-export const maxDuration = 600  // 10 minutes — all slides generate in parallel, each up to 270s
+export const maxDuration = 600  // 10 minutes — slides generate sequentially and stop on first failure
 
 function sse(controller: ReadableStreamDefaultController, event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
@@ -107,6 +108,39 @@ function buildVideoCardSummaryCaption(
   ].join('\n\n'))
 }
 
+type PlannedVideoSlide = {
+  slideNumber: number
+  role: string
+  headline: string
+  body: string
+  videoPrompt: string
+}
+
+function sanitizePlannedSlides(value: unknown, slideCount: number) {
+  if (!Array.isArray(value)) return null
+  const slides = value
+    .slice(0, slideCount)
+    .map((slide, index) => {
+      const candidate = slide as Partial<PlannedVideoSlide>
+      return {
+        slideNumber: Number(candidate.slideNumber) || index + 1,
+        role: sanitizeRole(candidate.role),
+        headline: String(candidate.headline ?? '').trim().slice(0, 80),
+        body: String(candidate.body ?? '').trim().slice(0, 320),
+        videoPrompt: String(candidate.videoPrompt ?? '').trim().slice(0, 2500),
+      }
+    })
+  if (slides.length !== slideCount) return null
+  if (slides.some(slide => !slide.headline || !slide.body || !slide.videoPrompt)) return null
+  return slides
+}
+
+function sanitizeRole(value: unknown): EditorialSlideRole {
+  const role = String(value ?? 'detail')
+  const valid = new Set(['hook', 'context', 'key-point', 'detail', 'stat', 'summary', 'save-cta'])
+  return (valid.has(role) ? role : 'detail') as EditorialSlideRole
+}
+
 export async function POST(request: NextRequest) {
   const user = await getSessionUser()
   if (!user) {
@@ -146,6 +180,7 @@ export async function POST(request: NextRequest) {
     brandTone?: string
     language?: 'ko' | 'en'
     referenceImageUrls?: string[]
+    plannedSlides?: PlannedVideoSlide[]
   }
   try {
     body = await request.json()
@@ -239,22 +274,27 @@ export async function POST(request: NextRequest) {
         // Stage 2: Copy generation
         sse(controller, 'stage', { stage: 'copy', message: '슬라이드 카피 기획 중...' })
 
+        const plannedSlides = sanitizePlannedSlides(body.plannedSlides, slideCount)
         let slides: Awaited<ReturnType<typeof generateVideoCardCopy>>
-        try {
-          slides = await generateVideoCardCopy({
-            topic,
-            targetAndMessage,
-            mood,
-            slideCount,
-            brandTone: body.brandTone,
-            language,
-            researchContext: researchContext || undefined,
-          })
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          sse(controller, 'error', { stage: 'copy', error: `카피 생성 실패: ${msg}` })
-          controller.close()
-          return
+        if (plannedSlides) {
+          slides = plannedSlides
+        } else {
+          try {
+            slides = await generateVideoCardCopy({
+              topic,
+              targetAndMessage,
+              mood,
+              slideCount,
+              brandTone: body.brandTone,
+              language,
+              researchContext: researchContext || undefined,
+            })
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            sse(controller, 'error', { stage: 'copy', error: `카피 생성 실패: ${msg}` })
+            controller.close()
+            return
+          }
         }
 
         sse(controller, 'copy_done', {
@@ -263,6 +303,7 @@ export async function POST(request: NextRequest) {
             role: s.role,
             headline: s.headline,
             body: s.body,
+            videoPrompt: 'videoPrompt' in s ? s.videoPrompt : undefined,
           })),
         })
 

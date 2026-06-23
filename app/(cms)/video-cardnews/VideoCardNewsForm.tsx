@@ -51,6 +51,10 @@ interface DraftVideoSlide {
   body: string
 }
 
+interface VideoPlanSlide extends DraftVideoSlide {
+  videoPrompt: string
+}
+
 interface AiChatMessage {
   id: string
   type: 'clarify' | 'confirm' | 'progress' | 'result' | 'error' | 'cancelled'
@@ -87,6 +91,7 @@ interface CollectedInfo {
   targetAndMessage?: string  // 1차 답변 전체 (타겟 + 핵심 메시지)
   mood?: string              // 2차 답변 (분위기)
   refinedTopic: string       // API에 전송할 최종 topic
+  videoPlan?: VideoPlanSlide[]
 }
 
 function buildRefinedTopic(info: Omit<CollectedInfo, 'refinedTopic'>): string {
@@ -110,6 +115,77 @@ const fadeIn = {
   initial: { opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' },
   animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' },
   exit: { opacity: 0, y: -8, scale: 0.99 },
+}
+
+function getVideoRoleSequence(slideCount: number) {
+  const roleSequences: Record<number, string[]> = {
+    3: ['hook', 'key-point', 'save-cta'],
+    5: ['hook', 'context', 'key-point', 'detail', 'save-cta'],
+    7: ['hook', 'context', 'key-point', 'detail', 'detail', 'summary', 'save-cta'],
+  }
+  return roleSequences[slideCount] || ['hook', ...Array(Math.max(0, slideCount - 2)).fill('detail'), 'save-cta']
+}
+
+function roleLabel(role: string) {
+  const labels: Record<string, string> = {
+    hook: '첫 장면',
+    context: '문제 상황',
+    'key-point': '핵심 장면',
+    detail: '설명 장면',
+    summary: '정리 장면',
+    'save-cta': '마무리 장면',
+  }
+  return labels[role] || '장면'
+}
+
+function buildEditableVideoPlan(
+  info: Pick<CollectedInfo, 'rawTopic' | 'targetAndMessage' | 'mood'>,
+  slideCount: number,
+  brand: Brand,
+): VideoPlanSlide[] {
+  const roles = getVideoRoleSequence(slideCount)
+  const cleanTopic = info.rawTopic.trim()
+  const audience = info.targetAndMessage?.trim() || `${brand.targetAudience || '핵심 고객'}에게 메시지를 명확하게 전달`
+  const mood = info.mood?.trim() || `${brand.toneOfVoice || '깔끔하고 신뢰감 있는'} 톤`
+
+  return roles.map((role, index) => {
+    const slideNumber = index + 1
+    const label = roleLabel(role)
+    const headline = buildDraftHeadline(role, cleanTopic, slideNumber)
+    const body = buildDraftBody(role, cleanTopic, audience)
+    return {
+      slideNumber,
+      role,
+      headline,
+      body,
+      videoPrompt: [
+        `Wide 16:9 cinematic video for the upper media panel of a vertical card news layout.`,
+        `Slide ${slideNumber} role: ${label}. Topic: ${cleanTopic}.`,
+        `Scene intent: visually express "${headline}" without any readable text.`,
+        `Audience and message: ${audience}.`,
+        `Mood: ${mood}. Brand: ${brand.name}.`,
+        `Keep the main subject centered with generous headroom and side margins. Natural subtle motion, premium realistic lighting, no UI, no logo, no watermark, no subtitles.`,
+      ].join(' '),
+    }
+  })
+}
+
+function buildDraftHeadline(role: string, topic: string, slideNumber: number) {
+  if (role === 'hook') return topic.length > 18 ? topic.slice(0, 18).trimEnd() : topic
+  if (role === 'context') return '왜 지금 중요할까'
+  if (role === 'key-point') return '핵심은 더 쉽게'
+  if (role === 'summary') return '한 번에 정리'
+  if (role === 'save-cta') return '지금 바로 시작'
+  return `포인트 ${slideNumber}`
+}
+
+function buildDraftBody(role: string, topic: string, audience: string) {
+  if (role === 'hook') return `${topic}의 핵심 장면을 첫 화면에서 직관적으로 보여줍니다.`
+  if (role === 'context') return `${audience} 관점에서 문제 상황과 필요성을 자연스럽게 보여줍니다.`
+  if (role === 'key-point') return `복잡한 내용을 짧은 장면과 명확한 메시지로 이해시키는 구간입니다.`
+  if (role === 'summary') return `앞선 메시지를 하나의 결론으로 묶어 기억하기 쉽게 정리합니다.`
+  if (role === 'save-cta') return `사용자가 다음 행동을 떠올릴 수 있도록 차분하게 마무리합니다.`
+  return `${topic}에 대한 구체적인 장면을 보여주며 메시지를 보강합니다.`
 }
 
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
@@ -255,6 +331,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           brandTone: brand.toneOfVoice,
           language: 'ko',
           referenceImageUrls,
+          plannedSlides: info.videoPlan,
         }),
       })
       clearTimeout(timeoutId)
@@ -464,21 +541,29 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       setAiMessages(prev => {
         const next = [...prev]
         const tempIdx = next.findIndex(m => m.id.startsWith('ai-temp-'))
+        const readyInfo = data.ready && data.params
+          ? {
+              rawTopic: data.params.topic,
+              targetAndMessage: data.params.targetAndMessage,
+              mood: data.params.mood,
+              refinedTopic: buildRefinedTopic({
+                rawTopic: data.params.topic,
+                targetAndMessage: data.params.targetAndMessage ?? '',
+                mood: data.params.mood ?? '',
+              }),
+              videoPlan: buildEditableVideoPlan({
+                rawTopic: data.params.topic,
+                targetAndMessage: data.params.targetAndMessage,
+                mood: data.params.mood,
+              }, slideCount, brand),
+            }
+          : null
         const updatedMsg: AiChatMessage = data.ready && data.params
           ? {
               id: `ai-confirm-${Date.now()}`,
               type: 'confirm',
               text: data.message,
-              confirmInfo: {
-                rawTopic: data.params.topic,
-                targetAndMessage: data.params.targetAndMessage,
-                mood: data.params.mood,
-                refinedTopic: buildRefinedTopic({
-                  rawTopic: data.params.topic,
-                  targetAndMessage: data.params.targetAndMessage ?? '',
-                  mood: data.params.mood ?? '',
-                })
-              }
+              confirmInfo: readyInfo ?? undefined,
             }
           : {
               id: `ai-clarify-${Date.now()}`,
@@ -504,7 +589,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             rawTopic: data.params.topic,
             targetAndMessage: data.params.targetAndMessage ?? '',
             mood: data.params.mood ?? '',
-          })
+          }),
+          videoPlan: buildEditableVideoPlan({
+            rawTopic: data.params.topic,
+            targetAndMessage: data.params.targetAndMessage,
+            mood: data.params.mood,
+          }, slideCount, brand),
         })
         setPhase('confirming')
       } else {
@@ -672,6 +762,47 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         mood: nextInfo.mood ?? '',
       })
       return { ...message, confirmInfo: nextInfo }
+    }))
+  }
+
+  const handleVideoPlanChange = (slideNumber: number, patch: Partial<VideoPlanSlide>) => {
+    const updatePlan = (plan?: VideoPlanSlide[]) =>
+      (plan ?? buildEditableVideoPlan({
+        rawTopic: collectedInfo.rawTopic ?? '',
+        targetAndMessage: collectedInfo.targetAndMessage,
+        mood: collectedInfo.mood,
+      }, slideCount, brand)).map(slide =>
+        slide.slideNumber === slideNumber ? { ...slide, ...patch } : slide,
+      )
+
+    setCollectedInfo(prev => ({
+      ...prev,
+      videoPlan: updatePlan(prev.videoPlan),
+    }))
+    setAiMessages(prev => prev.map(message => {
+      if (message.type !== 'confirm' || !message.confirmInfo) return message
+      return {
+        ...message,
+        confirmInfo: {
+          ...message.confirmInfo,
+          videoPlan: updatePlan(message.confirmInfo.videoPlan),
+        },
+      }
+    }))
+  }
+
+  const handleSlideCountChange = (nextCount: 3 | 5 | 7) => {
+    setSlideCount(nextCount)
+    if (phase !== 'confirming' || !collectedInfo.rawTopic) return
+    const nextPlan = buildEditableVideoPlan({
+      rawTopic: collectedInfo.rawTopic,
+      targetAndMessage: collectedInfo.targetAndMessage,
+      mood: collectedInfo.mood,
+    }, nextCount, brand)
+    setCollectedInfo(prev => ({ ...prev, videoPlan: nextPlan }))
+    setAiMessages(prev => prev.map(message => {
+      if (message.type !== 'confirm' || !message.confirmInfo) return message
+      return { ...message, confirmInfo: { ...message.confirmInfo, videoPlan: nextPlan } }
     }))
   }
 
@@ -855,6 +986,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     msg={aiMessages[idx]}
                     onConfirmGenerate={handleConfirmGenerateWithPing}
                     onConfirmInfoChange={handleConfirmInfoChange}
+                    onVideoPlanChange={handleVideoPlanChange}
                     confirmBusy={isStartingGeneration || generating || phase === 'generating'}
                     onReset={handleReset}
                     onClarificationSelect={handleClarificationSelect}
@@ -905,7 +1037,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 key={n}
                 type="button"
                 disabled={generating || isStartingGeneration || phase === 'generating'}
-                onClick={() => setSlideCount(n)}
+                onClick={() => handleSlideCountChange(n)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                   slideCount === n
                     ? 'bg-[#111111] text-white'
@@ -967,6 +1099,7 @@ function AiMessage({
   msg,
   onConfirmGenerate,
   onConfirmInfoChange,
+  onVideoPlanChange,
   confirmBusy = false,
   onReset,
   onClarificationSelect,
@@ -975,6 +1108,7 @@ function AiMessage({
   msg: AiChatMessage
   onConfirmGenerate: () => void
   onConfirmInfoChange?: (patch: Partial<CollectedInfo>) => void
+  onVideoPlanChange?: (slideNumber: number, patch: Partial<VideoPlanSlide>) => void
   confirmBusy?: boolean
   onReset: () => void
   onClarificationSelect?: (option: ClarificationOption) => void
@@ -1014,6 +1148,7 @@ function AiMessage({
 
   if (msg.type === 'confirm' && msg.confirmInfo) {
     const info = msg.confirmInfo
+    const videoPlan = info.videoPlan ?? []
     if (onConfirmInfoChange) {
       return (
         <motion.div
@@ -1054,6 +1189,27 @@ function AiMessage({
                   onChange={value => onConfirmInfoChange({ mood: value })}
                 />
               </div>
+
+              {videoPlan.length > 0 && onVideoPlanChange && (
+                <div className="space-y-3 border-t border-[#f3f4f6] pt-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-[#111111]">카드별 영상 생성 프롬프트</p>
+                    <p className="text-[11px] font-medium leading-5 text-[#6b7280]">
+                      각 카드의 장면, 제목, 본문, Kling 프롬프트입니다. 수정한 내용이 실제 생성에 사용됩니다.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {videoPlan.map(slide => (
+                      <EditableVideoPromptCard
+                        key={slide.slideNumber}
+                        slide={slide}
+                        disabled={confirmBusy}
+                        onChange={patch => onVideoPlanChange(slide.slideNumber, patch)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 border-t border-[#f3f4f6] pt-1">
                 <button
@@ -1171,6 +1327,50 @@ function EditablePlanField({
         className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#aebfdd] focus:shadow-[0_10px_24px_rgba(87,119,185,0.10)] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
       />
     </label>
+  )
+}
+
+function EditableVideoPromptCard({
+  slide,
+  disabled,
+  onChange,
+}: {
+  slide: VideoPlanSlide
+  disabled?: boolean
+  onChange: (patch: Partial<VideoPlanSlide>) => void
+}) {
+  return (
+    <div className="w-[300px] shrink-0 rounded-2xl border border-[#e5e7eb] bg-white/78 p-3 shadow-[0_12px_28px_rgba(87,119,185,0.10)]">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] font-bold text-white">
+          Card {slide.slideNumber}
+        </span>
+        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9ca3af]">{roleLabel(slide.role)}</span>
+      </div>
+      <div className="space-y-2">
+        <EditablePlanField
+          label="제목"
+          value={slide.headline}
+          rows={2}
+          disabled={disabled}
+          onChange={value => onChange({ headline: value })}
+        />
+        <EditablePlanField
+          label="본문"
+          value={slide.body}
+          rows={3}
+          disabled={disabled}
+          onChange={value => onChange({ body: value })}
+        />
+        <EditablePlanField
+          label="영상 프롬프트"
+          value={slide.videoPrompt}
+          rows={7}
+          disabled={disabled}
+          onChange={value => onChange({ videoPrompt: value })}
+        />
+      </div>
+    </div>
   )
 }
 
