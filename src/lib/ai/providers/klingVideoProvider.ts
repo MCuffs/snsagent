@@ -2,7 +2,7 @@ import { createHmac } from 'crypto'
 
 const DEFAULT_KLING_BASE = 'https://api-singapore.klingai.com'
 const KLING_BASE = normalizeBaseUrl(process.env.KLINGAI_BASE_URL || DEFAULT_KLING_BASE)
-const KLING_MODEL = process.env.KLINGAI_VIDEO_MODEL || 'kling-v3'
+const KLING_MODEL = process.env.KLINGAI_VIDEO_MODEL || 'kling-3.0-turbo'
 
 export interface KlingVideoOptions {
   prompt: string
