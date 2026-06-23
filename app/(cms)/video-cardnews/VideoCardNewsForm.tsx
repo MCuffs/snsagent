@@ -105,8 +105,12 @@ const STAGE_LABELS: Record<string, string> = {
   redirect: '→ 편집 화면으로 이동합니다...',
 }
 
-const smoothEase = { duration: 0.7, ease: [0.19, 1, 0.22, 1] as const }
-const fadeIn = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 } }
+const smoothEase = { duration: 0.72, ease: [0.19, 1, 0.22, 1] as const }
+const fadeIn = {
+  initial: { opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' },
+  animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' },
+  exit: { opacity: 0, y: -8, scale: 0.99 },
+}
 
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const router = useRouter()
@@ -568,7 +572,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex h-full flex-col items-center justify-center bg-[#f7f7f7]"
+        className="flex h-full flex-col items-center justify-center bg-white"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.94 }}
@@ -592,12 +596,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-[#f7f7f7]">
+    <div className="flex h-full overflow-hidden bg-white">
       {/* Left: Chat */}
-      <div className="flex min-w-0 flex-1 flex-col border-r border-[#e5e7eb] bg-[#f7f7f7]">
+      <div className="flex min-w-0 flex-1 flex-col border-r border-[#edf1f5] bg-white">
 
         {/* Header */}
-        <div className="shrink-0 border-b border-[#e5e7eb] bg-[#f7f7f7] px-5 py-3 flex items-center justify-between gap-4">
+        <div className="shrink-0 border-b border-[#edf1f5] bg-white/95 px-5 py-3 backdrop-blur flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <Clapperboard className="h-3.5 w-3.5" />
             영상 카드뉴스
@@ -618,13 +622,13 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         </div>
 
         {/* Chat */}
-        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+        <div className="flex-1 overflow-y-auto bg-white px-6 py-8 space-y-7">
 
           {/* Greeting */}
           <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
             <div className="flex flex-col gap-2.5 items-start max-w-md">
               <AiBubbleAvatar />
-              <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111]">
+              <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
                 안녕하세요! <span className="font-bold">영상 카드뉴스</span>를 만들어드릴게요.
                 <br /><br />
                 어떤 주제로 만들고 싶으신가요?
@@ -638,11 +642,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           <AnimatePresence initial={false}>
             {userMessages.map((umsg, idx) => (
               <motion.div key={umsg.id}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
                 transition={smoothEase} className="contents"
               >
                 <div className="flex justify-end">
-                  <div className="max-w-[78%] rounded-xl rounded-tr-sm bg-white px-4 py-3 text-sm font-medium leading-6 text-[#111111] whitespace-pre-wrap flex flex-col gap-2">
+                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#111827] bg-[#111827] px-4 py-3 text-sm font-medium leading-6 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] whitespace-pre-wrap flex flex-col gap-2">
                     {umsg.images && umsg.images.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 justify-end">
                         {umsg.images.map((img, i) => (
@@ -677,7 +682,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3 space-y-2.5"
+          className="shrink-0 border-t border-[#edf1f5] bg-white px-4 pb-5 pt-3 space-y-2.5"
         >
           {isDragging && (
             <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
@@ -720,7 +725,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             ))}
           </div>
 
-          <div className={`flex items-center gap-2 bg-white rounded-2xl border shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2 ${isDragging ? 'border-[#3b82f6]' : 'border-[#e5e7eb]'}`}>
+          <div className={`flex items-center gap-2 rounded-[22px] border bg-white px-3 py-2 shadow-[0_18px_42px_rgba(15,23,42,0.08)] transition-all focus-within:shadow-[0_22px_54px_rgba(15,23,42,0.11)] ${isDragging ? 'border-[#3b82f6]' : 'border-[#e5eaf0]'}`}>
             <button type="button" disabled={generating || attachedImages.length >= 3}
               onClick={() => fileInputRef.current?.click()}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
@@ -772,13 +777,13 @@ function AiMessage({
   if (msg.type === 'clarify') {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
+        {...fadeIn}
+        transition={smoothEase}
         className="flex justify-start"
       >
         <div className="flex flex-col gap-2.5 items-start max-w-md">
           <AiBubbleAvatar />
-          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] whitespace-pre-line flex flex-col gap-3 w-full">
+          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_14px_36px_rgba(15,23,42,0.06)] whitespace-pre-line flex flex-col gap-3 w-full">
             <div>{msg.text}</div>
             
             {msg.clarification && msg.clarification.options && onClarificationSelect && (
@@ -788,7 +793,7 @@ function AiMessage({
                     key={oIdx}
                     type="button"
                     onClick={() => onClarificationSelect(opt)}
-                    className="rounded-lg border border-[#e5e7eb] bg-white px-2.5 py-1.5 text-xs text-[#374151] hover:bg-[#f9fafb] hover:text-[#111111] transition-all active:scale-[0.98]"
+                    className="rounded-xl border border-[#edf1f5] bg-white px-2.5 py-1.5 text-xs text-[#374151] shadow-sm transition-all hover:border-[#cbd5e1] hover:bg-[#fbfcfd] hover:text-[#111111] active:scale-[0.98]"
                   >
                     {opt.label}
                   </button>
@@ -805,13 +810,13 @@ function AiMessage({
     const info = msg.confirmInfo
     return (
       <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
+        {...fadeIn}
+        transition={smoothEase}
         className="flex justify-start"
       >
         <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
           <AiBubbleAvatar />
-          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-4 w-full space-y-4">
+          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-4 w-full space-y-4 shadow-[0_16px_42px_rgba(15,23,42,0.07)]">
             <p className="text-sm font-bold text-[#111111]">완벽해요! 이렇게 만들게요.</p>
 
             <div className="space-y-2.5 text-sm">
@@ -846,7 +851,7 @@ function AiMessage({
               <button
                 type="button"
                 onClick={onConfirmGenerate}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#111827] py-2.5 text-sm font-semibold text-white hover:bg-[#1f2937] transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#111827] py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_32px_rgba(15,23,42,0.2)]"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 지금 만들기
@@ -871,8 +876,8 @@ function AiMessage({
 function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
+      {...fadeIn}
+      transition={smoothEase}
       className="flex justify-start"
     >
       <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
@@ -894,7 +899,7 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
 
         {/* Progress / result */}
         {msg.type !== 'error' && msg.type !== 'clarify' && msg.type !== 'confirm' && (
-          <div className="rounded-xl rounded-tl-sm bg-white px-4 py-3.5 w-full space-y-3">
+          <div className="rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white px-4 py-3.5 w-full space-y-3 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
             <div className="flex items-center gap-2">
               {msg.type === 'progress' && (
                 <Loader2 className="h-3.5 w-3.5 text-[#3b82f6] animate-spin shrink-0" />
@@ -914,7 +919,7 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
-                className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-2.5"
+                className="rounded-[18px] border border-[#dbeafe] bg-[#f8fbff] p-2.5 shadow-[0_10px_24px_rgba(37,99,235,0.06)]"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563eb]">Reference images</p>
@@ -940,7 +945,7 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-                className="border-t border-[#e5e7eb] pt-3"
+                className="border-t border-[#edf1f5] pt-3"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6b7280]">Draft storyboard</p>
@@ -980,7 +985,7 @@ function AiProgressMessage({ msg }: { msg: AiChatMessage }) {
               <motion.div
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
-                className="border-t border-[#e5e7eb] pt-2.5"
+                className="border-t border-[#edf1f5] pt-2.5"
               >
                 <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5">
                   <Check className="h-4 w-4 text-emerald-500 shrink-0" />
@@ -1024,7 +1029,7 @@ function DraftSlideMockup({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.98 }}
       transition={{ duration: 0.42, delay: index * 0.06, ease: [0.19, 1, 0.22, 1] }}
-      className="overflow-hidden rounded-xl border border-[#dbe3f0] bg-[#f8fafc] shadow-sm"
+      className="overflow-hidden rounded-[18px] border border-[#e5eaf0] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
     >
       <div className="aspect-[9/12] bg-[#111827] p-2.5">
         <div className="flex h-full flex-col overflow-hidden rounded-lg bg-white">

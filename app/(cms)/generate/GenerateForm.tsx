@@ -324,7 +324,10 @@ export default function GenerateForm({
       .slice(displayedUserCount)
       .map(message => userDisplay(getUserDisplayTextFromHistory(message.content, locale)))
 
-    setDisplayMessages(prev => [...prev, ...missingMessages])
+    const timer = window.setTimeout(() => {
+      setDisplayMessages(prev => [...prev, ...missingMessages])
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [chatHistory, displayMessages, locale])
 
   useEffect(() => {
@@ -1084,7 +1087,7 @@ export default function GenerateForm({
       variants={formContainerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full overflow-hidden bg-[#f7f7f7]"
+      className="flex h-full overflow-hidden bg-white"
     >
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar {
@@ -1106,10 +1109,10 @@ export default function GenerateForm({
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="flex min-w-0 flex-1 flex-col bg-[#f7f7f7] border-r border-[#e5e7eb]"
+        className="flex min-w-0 flex-1 flex-col border-r border-[#edf1f5] bg-white"
       >
         {/* Header containing Brand chip & Mode Label */}
-        <div className="shrink-0 border-b border-[#e5e7eb] px-5 py-3 bg-[#f7f7f7] flex items-center justify-between gap-4">
+        <div className="shrink-0 border-b border-[#edf1f5] bg-white/95 px-5 py-3 backdrop-blur flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
             {brand.name}
@@ -1121,7 +1124,7 @@ export default function GenerateForm({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6 custom-scrollbar" aria-live="polite">
+        <div className="flex-1 overflow-y-auto bg-white px-6 py-8 space-y-7 custom-scrollbar" aria-live="polite">
           {/* Initial loading skeleton */}
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
@@ -1142,10 +1145,10 @@ export default function GenerateForm({
             {displayMessages.map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
+                initial={{ opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: -8, scale: 0.99 }}
+                transition={{ duration: 0.64, ease: [0.19, 1, 0.22, 1] }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`flex max-w-[85%] flex-col gap-2.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -1153,10 +1156,10 @@ export default function GenerateForm({
                     <span className="text-[11px] font-semibold text-[#6b7280] tracking-wide">Shuffla</span>
                   )}
                   <div
-                    className={`rounded-xl px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line ${
+                    className={`rounded-[20px] border px-4 py-3 text-sm leading-6 font-medium whitespace-pre-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] ${
                       msg.role === 'user'
-                        ? 'rounded-tr-sm bg-white text-[#111111]'
-                        : 'rounded-tl-sm bg-white text-[#111111]'
+                        ? 'rounded-tr-md border-[#111827] bg-[#111827] text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)]'
+                        : 'rounded-tl-md border-[#edf1f5] bg-white text-[#111111]'
                     }`}
                   >
                     {msg.role === 'ai' ? msg.revealedContent : msg.content}
@@ -1169,7 +1172,7 @@ export default function GenerateForm({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-                      className="w-full rounded-xl bg-white p-3"
+                      className="w-full rounded-[20px] border border-[#edf1f5] bg-white p-3 shadow-[0_14px_36px_rgba(15,23,42,0.06)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-black leading-6 text-[#111111]">{msg.clarification.question}</p>
@@ -1194,7 +1197,7 @@ export default function GenerateForm({
                             type="button"
                             onClick={() => handleClarificationSelect(option)}
                             disabled={isWaiting || isRevealingMessage}
-                            className="group flex w-full items-center gap-3 rounded-lg bg-[#f7f7f7] hover:bg-[#efefef] px-3 py-2.5 text-left transition-colors disabled:opacity-50"
+                            className="group flex w-full items-center gap-3 rounded-xl border border-[#edf1f5] bg-[#fbfcfd] hover:bg-white px-3 py-2.5 text-left transition-all hover:shadow-[0_10px_24px_rgba(15,23,42,0.06)] disabled:opacity-50"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-black text-[#6b7280] shadow-sm group-hover:text-[#3b82f6]">
                               {index + 1}
@@ -1283,7 +1286,7 @@ export default function GenerateForm({
                     {error}
                   </div>
                 )}
-                <div className="rounded-xl border border-[#e5e7eb] bg-[#fafaf9] p-4.5 space-y-3.5 shadow-sm" onPaste={handlePaste}>
+                <div className="rounded-[20px] border border-[#edf1f5] bg-white p-4.5 space-y-3.5 shadow-[0_18px_44px_rgba(15,23,42,0.07)]" onPaste={handlePaste}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-bold text-[#111111]">{t('attach_image')}</p>
@@ -1343,9 +1346,9 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="shrink-0 bg-[#f7f7f7] px-4 pb-5 pt-3">
+        <div className="shrink-0 border-t border-[#edf1f5] bg-white px-4 pb-5 pt-3">
           <form onSubmit={handleSend}>
-            <div className="flex items-center gap-2 bg-white rounded-2xl border border-[#e5e7eb] shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-2">
+            <div className="flex items-center gap-2 rounded-[22px] border border-[#e5eaf0] bg-white px-3 py-2 shadow-[0_18px_42px_rgba(15,23,42,0.08)] transition-all focus-within:border-[#cbd5e1] focus-within:shadow-[0_22px_54px_rgba(15,23,42,0.11)]">
               <input
                 ref={inputRef}
                 type="text"
@@ -1912,14 +1915,16 @@ function ThinkingBubble({ steps }: { steps: Array<{ step: string; text: string }
 
   // Auto-expand when real steps arrive
   useEffect(() => {
-    if (steps.length > 0) setExpanded(true)
+    if (steps.length === 0) return
+    const timer = window.setTimeout(() => setExpanded(true), 0)
+    return () => window.clearTimeout(timer)
   }, [steps.length])
 
   return (
     <button
       type="button"
       onClick={() => setExpanded(v => !v)}
-      className="group max-w-xs rounded-xl rounded-tl-sm bg-white border border-[#e5e7eb] shadow-sm text-left transition-all hover:border-[#9ca3af]/50"
+      className="group max-w-xs rounded-[20px] rounded-tl-md border border-[#edf1f5] bg-white text-left shadow-[0_14px_36px_rgba(15,23,42,0.06)] transition-all hover:border-[#d8dee6] hover:shadow-[0_18px_46px_rgba(15,23,42,0.08)]"
     >
       <div className="flex items-center gap-2.5 px-4 py-3">
         <div className="flex gap-1 shrink-0">
