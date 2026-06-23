@@ -222,53 +222,32 @@ export async function generateVideoCardCopy(params: {
 
   const researchBlock = researchContext
     ? (isKo
-      ? `\n참고 자료 (최신 뉴스 및 리서치):\n${researchContext.slice(0, 2000)}\n`
-      : `\nReference material (latest news & research):\n${researchContext.slice(0, 2000)}\n`)
+      ? `\n참고: ${researchContext.slice(0, 1200)}\n`
+      : `\nReference: ${researchContext.slice(0, 1200)}\n`)
     : ''
 
-  // 구조화된 사용자 입력을 프롬프트에 명확하게 주입
   const audienceBlock = targetAndMessage
     ? (isKo
-      ? `\n타겟 독자 및 핵심 메시지: ${targetAndMessage}\n`
-      : `\nTarget audience & key message: ${targetAndMessage}\n`)
+      ? `\n타겟/메시지: ${targetAndMessage.slice(0, 500)}`
+      : `\nAudience/message: ${targetAndMessage.slice(0, 500)}`)
     : ''
   const moodBlock = mood
     ? (isKo
-      ? `\n영상 분위기: ${mood}\n`
-      : `\nVideo mood: ${mood}\n`)
+      ? `\n분위기: ${mood.slice(0, 300)}`
+      : `\nMood: ${mood.slice(0, 300)}`)
     : ''
 
   const prompt = isKo
-    ? `당신은 인스타그램 영상 카드뉴스 카피라이터입니다.
-주제: "${topic}"${audienceBlock}${moodBlock}${researchBlock}
-슬라이드 수: ${slideCount}장
-
-각 슬라이드에 어울리는 짧고 강렬한 카피를 작성하세요.
-- headline: 최대 ${HEADLINE_MAX_KO}자, 강렬하고 구체적
-- body: 50~90자, 2~3문장, 완성된 문장
-
-역할 순서: hook → context → key-point → detail → summary → save-cta (슬라이드 수에 맞게 조정)
-- 3장: hook, key-point, save-cta
-- 5장: hook, context, key-point, detail, save-cta
-- 7장: hook, context, key-point, detail, detail, summary, save-cta
-
-JSON으로만 응답:
-{ "slides": [{ "slideNumber": 1, "role": "hook", "headline": "...", "body": "..." }] }`
-    : `You are a vertical video card news copywriter for Instagram.
-Topic: "${topic}"${audienceBlock}${moodBlock}${researchBlock}
-Slides: ${slideCount}
-
-Write short, punchy copy for each slide.
-- headline: max ${HEADLINE_MAX_EN} chars, specific and bold
-- body: 60-120 chars, 2 complete sentences
-
-Role order: hook → context → key-point → detail → summary → save-cta (adjusted to slide count)
-- 3 slides: hook, key-point, save-cta
-- 5 slides: hook, context, key-point, detail, save-cta
-- 7 slides: hook, context, key-point, detail, detail, summary, save-cta
-
-Respond with JSON only:
-{ "slides": [{ "slideNumber": 1, "role": "hook", "headline": "...", "body": "..." }] }`
+    ? `영상 카드뉴스 카피 생성.
+입력: 주제="${topic.slice(0, 700)}"${audienceBlock}${moodBlock}${researchBlock}
+슬라이드=${slideCount}, 역할=${getRoleSequence(slideCount).join(',')}
+규칙: headline ${HEADLINE_MAX_KO}자 이하, body ${BODY_MAX_KO}자 이하의 완성문. 근거 없는 수치/사실 금지. 내부 기획 라벨 금지.
+JSON만: {"slides":[{"slideNumber":1,"role":"hook","headline":"...","body":"..."}]}`
+    : `Create vertical video card news copy.
+Input: topic="${topic.slice(0, 700)}"${audienceBlock}${moodBlock}${researchBlock}
+slides=${slideCount}, roles=${getRoleSequence(slideCount).join(',')}
+Rules: headline <=${HEADLINE_MAX_EN} chars, body <=${BODY_MAX_EN} chars, complete sentences. No unsupported facts or internal planning labels.
+JSON only: {"slides":[{"slideNumber":1,"role":"hook","headline":"...","body":"..."}]}`
 
   const result = await client.generateJson<{
     slides: Array<{ slideNumber: number; role: string; headline: string; body: string }>
@@ -278,7 +257,13 @@ Respond with JSON only:
     () => ({
       slides: buildFallbackSlides(slideCount, topic, isKo),
     }),
-    { model: getQwenModel(), temperature: 0.4 },
+    {
+      model: getQwenModel(),
+      temperature: 0.35,
+      systemPrompt: isKo
+        ? '짧은 한국어 SNS 영상 카드뉴스 카피라이터입니다. JSON만 반환하세요.'
+        : 'You write concise vertical video card news copy. Return JSON only.',
+    },
   )
 
   const rawSlides = (result && Array.isArray(result.slides))
@@ -298,18 +283,22 @@ Respond with JSON only:
 }
 
 function buildFallbackSlides(slideCount: number, topic: string, isKo: boolean) {
-  const roleSequences: Record<number, string[]> = {
-    3: ['hook', 'key-point', 'save-cta'],
-    5: ['hook', 'context', 'key-point', 'detail', 'save-cta'],
-    7: ['hook', 'context', 'key-point', 'detail', 'detail', 'summary', 'save-cta'],
-  }
-  const roles = roleSequences[slideCount] || ['hook', ...Array(slideCount - 2).fill('detail'), 'save-cta']
+  const roles = getRoleSequence(slideCount)
   return Array.from({ length: slideCount }, (_, i) => ({
     slideNumber: i + 1,
     role: roles[i] || 'detail',
     headline: isKo ? `슬라이드 ${i + 1}` : `Slide ${i + 1}`,
     body: topic,
   }))
+}
+
+function getRoleSequence(slideCount: number) {
+  const roleSequences: Record<number, string[]> = {
+    3: ['hook', 'key-point', 'save-cta'],
+    5: ['hook', 'context', 'key-point', 'detail', 'save-cta'],
+    7: ['hook', 'context', 'key-point', 'detail', 'detail', 'summary', 'save-cta'],
+  }
+  return roleSequences[slideCount] || ['hook', ...Array(Math.max(0, slideCount - 2)).fill('detail'), 'save-cta']
 }
 
 function truncate(text: string, maxLen: number): string {

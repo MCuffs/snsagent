@@ -40,6 +40,19 @@ interface VideoCardAgentResponse {
   clarification?: ClarificationPrompt
 }
 
+const MAX_DIRECTOR_MESSAGES = 6
+const MAX_DIRECTOR_MESSAGE_CHARS = 700
+
+function compactDirectorMessages(messages: ChatMessage[]) {
+  return messages
+    .slice(-MAX_DIRECTOR_MESSAGES)
+    .map(message => ({
+      role: message.role,
+      content: message.content.trim().slice(0, MAX_DIRECTOR_MESSAGE_CHARS),
+    }))
+    .filter(message => message.content.length > 0)
+}
+
 function buildSystemPrompt(brand: {
   name: string
   industry: string
@@ -47,88 +60,27 @@ function buildSystemPrompt(brand: {
   toneOfVoice: string
 }, language?: 'ko' | 'en') {
   const isEn = language === 'en'
+  const brandLine = isEn
+    ? `Brand: ${brand.name}; category: ${brand.industry || 'unknown'}; audience: ${brand.targetAudience || 'general'}; tone: ${brand.toneOfVoice || 'clear'}.`
+    : `브랜드: ${brand.name}; 업종: ${brand.industry || '미상'}; 타겟: ${brand.targetAudience || '일반'}; 톤: ${brand.toneOfVoice || '명확한 톤'}.`
 
   if (isEn) {
-    return `You are Shuffla's dynamic Video Card News Creative Director.
-The user wants to create a 9:16 vertical video card news post.
-Your goal is to guide the user in a natural, creative dialogue to collect or infer the following parameters:
-1. topic (Clear and refined video news topic)
-2. targetAndMessage (The target audience and the key message to deliver)
-3. mood (Visual mood and tone, e.g., "emotional & warm", "informative", "dynamic & bold", "minimal & sophisticated")
-
-## Guidelines:
-- **Do not ask robotic, dry templated questions** or repeat the same list of options over and over. Ask a topic-tailored, creative follow-up question.
-- Based on the user's input, suggest creative visual scene concepts or ideas rather than just asking for details.
-- Provide 2-3 topic-specific, creative options in the 'options' field to help them choose easily.
-- If you already have enough information from the user's initial or subsequent inputs, return ready: true with the extracted parameters in the 'params' field.
-
-## JSON Response Formats:
-When ready: false (need more detail):
-{
-  "message": "Friendly and creative conversational follow-up question.",
-  "ready": false,
-  "clarification": {
-    "question": "The specific question about the video direction.",
-    "allowCustom": true,
-    "skipLabel": "Use current info",
-    "options": [
-      { "label": "Short label for Option 1", "value": "Option 1 value/response text" },
-      { "label": "Short label for Option 2", "value": "Option 2 value/response text" }
-    ]
-  }
-}
-
-When ready: true (have enough info to generate):
-{
-  "message": "Strategic briefing summary of what we will create.",
-  "ready": true,
-  "params": {
-    "topic": "The refined and clean topic",
-    "targetAndMessage": "The target audience and key message",
-    "mood": "Selected visual mood/tone"
-  }
-}`
+    return `You are Shuffla's video card news director. ${brandLine}
+Collect only 3 fields: topic, targetAndMessage, mood.
+Decision: if topic plus either audience/message or mood is inferable, set ready=true. Ask at most one follow-up otherwise.
+Follow-up: one natural question, 2-3 concrete options, no long explanation.
+Output valid JSON only:
+ready=false -> {"message":"short follow-up","ready":false,"clarification":{"question":"one question","allowCustom":true,"skipLabel":"Use current info","options":[{"label":"short","value":"specific answer"}]}}
+ready=true -> {"message":"short editable brief","ready":true,"params":{"topic":"refined topic","targetAndMessage":"audience + key message","mood":"visual mood"}}`
   }
 
-  return `당신은 Shuffla의 인스타그램 영상 카드뉴스 크리에이티브 디렉터입니다.
-사용자는 인스타그램 릴스/숏폼용 9:16 세로 영상 카드뉴스를 제작하려고 합니다.
-당신의 역할은 사용자와의 창의적이고 자연스러운 대화를 통해 아래의 핵심 정보 3가지를 도출하거나 추론하는 것입니다.
-1. topic (영상 카드뉴스의 주제)
-2. targetAndMessage (이 영상을 보게 될 타겟 독자 및 전달하고자 하는 핵심 메시지)
-3. mood (영상의 전반적인 비주얼 분위기 및 톤, 예: "감성적·따뜻한", "정보 전달형", "역동적·강렬한", "미니멀·세련된")
-
-## 대화 및 질문 가이드:
-- **기계적이거나 룰베이스 챗봇 같은 하드코딩된 질문("독자가 누구인가요? 메시지가 무엇인가요?")을 반복하지 마세요.**
-- 사용자의 입력(주제)에 따라, 사용자가 비주얼을 쉽게 구상할 수 있도록 주제에 특화된 창의적인 아이디어나 비주얼 무드를 제안하며 자연스럽게 질문을 이어나가세요.
-- 사용자가 쉽게 응답할 수 있도록, 대화 맥락에 직접적으로 연관된 **구체적이고 매력적인 2~3개의 선택지(options)**를 함께 제공하세요.
-- 사용자가 보낸 첫 메시지나 대화 과정에서 이미 충분히 기획 방향이 도출되었다고 판단되면 즉시 ready: true를 반환하고 추출된 값들을 params에 담아주세요.
-
-## JSON 응답 형식:
-추가 정보가 필요할 때 (ready: false):
-{
-  "message": "사용자에게 보낼 부드럽고 친근한 맞춤형 대화문",
-  "ready": false,
-  "clarification": {
-    "question": "기획을 구체화하기 위해 사용자에게 던질 핵심 질문",
-    "allowCustom": true,
-    "skipLabel": "현재 정보로 진행",
-    "options": [
-      { "label": "옵션 1의 간단한 라벨", "value": "사용자가 이 옵션을 골랐을 때 전송될 답변 내용" },
-      { "label": "옵션 2의 간단한 라벨", "value": "사용자가 이 옵션을 골랐을 때 전송될 답변 내용" }
-    ]
-  }
-}
-
-준비가 완료되었을 때 (ready: true):
-{
-  "message": "기획안 요약과 생성 확인 메시지",
-  "ready": true,
-  "params": {
-    "topic": "정제된 구체적 주제",
-    "targetAndMessage": "분석된 타겟 독자 및 핵심 메시지",
-    "mood": "결정된 영상 분위기 및 톤"
-  }
-}`
+  return `당신은 Shuffla 영상 카드뉴스 디렉터입니다. ${brandLine}
+필요 필드는 3개뿐입니다: topic, targetAndMessage, mood.
+판단: 주제와 타겟/메시지 또는 분위기를 추론할 수 있으면 ready=true. 부족하면 질문은 1개만 합니다.
+질문: 짧고 자연스럽게, 선택지는 구체적인 2-3개, 장문 설명 금지.
+유효한 JSON만 반환:
+ready=false -> {"message":"짧은 후속 질문","ready":false,"clarification":{"question":"질문 1개","allowCustom":true,"skipLabel":"현재 정보로 진행","options":[{"label":"짧은 라벨","value":"구체 답변"}]}}
+ready=true -> {"message":"짧은 수정 가능 기획안","ready":true,"params":{"topic":"정제 주제","targetAndMessage":"타겟+핵심 메시지","mood":"영상 분위기"}}`
 }
 
 function getOpenAIUserFacingError(error: unknown) {
@@ -248,12 +200,13 @@ export async function POST(request: Request) {
     const openai = new OpenAI({ apiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
     const model = getCopywritingModel()
     const systemPrompt = buildSystemPrompt(brand, language)
+    const compactMessages = compactDirectorMessages(messages)
 
     const response = await openai.chat.completions.create({
       model,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      messages: [{ role: 'system', content: systemPrompt }, ...compactMessages],
       response_format: { type: 'json_object' },
-      max_completion_tokens: 1500,
+      max_completion_tokens: 700,
     })
 
     const content = response.choices[0]?.message?.content
