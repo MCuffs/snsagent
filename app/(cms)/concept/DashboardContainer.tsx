@@ -151,12 +151,19 @@ export default function DashboardContainer({
     brandToPass = urlProfile || generalProfile
   }
 
+  const tabPanelClass = (tabName: string, baseClass = 'h-full') =>
+    `${baseClass} absolute inset-0 transform-gpu transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+      activeTab === tabName
+        ? 'z-10 translate-y-0 scale-100 opacity-100 pointer-events-auto'
+        : 'z-0 translate-y-2 scale-[0.995] opacity-0 pointer-events-none'
+    }`
+
   return (
-    <div className="h-full">
+    <div className="relative h-full overflow-hidden">
       {showLoginPrompt && (
         <GuestLoginOverlay onClose={() => setShowLoginPrompt(false)} />
       )}
-      <div className={activeTab === 'concept' ? 'h-full' : 'hidden'}>
+      <div className={tabPanelClass('concept')} aria-hidden={activeTab !== 'concept'}>
         <div className="flex h-full flex-col">
           {subProfile !== null && (
             <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0">
@@ -214,7 +221,7 @@ export default function DashboardContainer({
         </div>
       </div>
 
-      <div className={activeTab === 'generate' ? 'flex h-full flex-col' : 'hidden'}>
+      <div className={tabPanelClass('generate', 'flex h-full flex-col')} aria-hidden={activeTab !== 'generate'}>
           {hasAnyProfile && <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[#e5e7eb] bg-white px-5 py-2.5">
             <span className="shrink-0 text-xs font-semibold text-[#71717a]">{t('generate_profile_label')}</span>
             <div className="flex shrink-0 items-center gap-1 rounded-lg bg-[#f4f4f5] p-1">
@@ -300,7 +307,7 @@ export default function DashboardContainer({
           </div>
         </div>
 
-      <div className={activeTab === 'video' ? 'h-full' : 'hidden'}>
+      <div className={tabPanelClass('video')} aria-hidden={activeTab !== 'video'}>
         {brandToPass ? (
           <VideoCardNewsForm
             brand={brandToPass}
@@ -313,7 +320,7 @@ export default function DashboardContainer({
         )}
       </div>
 
-      <div className={activeTab === 'works' ? 'h-full' : 'hidden'}>
+      <div className={tabPanelClass('works')} aria-hidden={activeTab !== 'works'}>
         <WorksGrid
           campaigns={campaigns}
           planName={planName}
@@ -322,8 +329,8 @@ export default function DashboardContainer({
         />
       </div>
 
-      {activeTab === 'video-cardnews' && brandToPass && (
-        <div className="h-full">
+      {brandToPass && (
+        <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
           <VideoCardNewsForm
             brand={{
               id: brandToPass.id,
