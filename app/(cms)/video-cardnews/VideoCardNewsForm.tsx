@@ -914,7 +914,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     void runGenerate(collectedInfo as CollectedInfo)
   }
 
-  const pingKlingProvider = async (signal?: AbortSignal) => {
+  const pingVideoProvider = async (signal?: AbortSignal) => {
     const res = await fetch('/api/video-cardnews/ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -922,7 +922,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     })
     const data = await res.json().catch(() => null) as { ok?: boolean; error?: string } | null
     if (!res.ok || !data?.ok) {
-      throw new Error(data?.error || 'Kling API 연결 확인에 실패했습니다.')
+      throw new Error(data?.error || '?? ?? API 연결 확인에 실패했습니다.')
     }
   }
 
@@ -980,7 +980,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     const pingController = new AbortController()
     pingAbortRef.current = pingController
     try {
-      await pingKlingProvider(pingController.signal)
+      await pingVideoProvider(pingController.signal)
     } catch (error) {
       startingGenerationRef.current = false
       setIsStartingGeneration(false)
@@ -989,7 +989,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         setPhase(collectedInfo.rawTopic ? 'confirming' : 'idle')
         return
       }
-      const message = error instanceof Error ? error.message : 'Kling API 연결 확인에 실패했습니다.'
+      const message = error instanceof Error ? error.message : '?? ?? API 연결 확인에 실패했습니다.'
       setAiMessages(prev => [...prev, {
         id: `ai-ping-error-${Date.now()}`,
         type: 'error',
@@ -1400,8 +1400,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               </h1>
               <p className="mt-3 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">
                 {isEn
-                  ? 'Enter a topic, target, and mood first. Shuffla will plan scenes, titles, body copy, and Kling prompts.'
-                  : '주제, 타깃, 분위기만 입력하면 장면 흐름과 제목, 본문, Kling 프롬프트를 먼저 기획합니다.'}
+                  ? 'Enter a topic, target, and mood first. Shuffla will plan scenes, titles, body copy, and video prompts.'
+                  : '주제, 타깃, 분위기만 입력하면 장면 흐름과 제목, 본문, ?? 프롬프트를 먼저 기획합니다.'}
               </p>
 
               <div className="mt-6 w-full">
@@ -1632,7 +1632,7 @@ function AiMessage({
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-[#111111]">카드별 영상 생성 프롬프트</p>
                     <p className="text-[11px] font-medium leading-5 text-[#6b7280]">
-                      각 카드의 장면, 제목, 본문, Kling 프롬프트입니다. 수정한 내용이 실제 생성에 사용됩니다.
+                      각 카드의 장면, 제목, 본문, ?? 프롬프트입니다. 수정한 내용이 실제 생성에 사용됩니다.
                     </p>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

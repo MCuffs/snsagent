@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getSessionUser } from '../../../actions/auth'
-import { canUseKling, getKlingVideoModel } from '../../../../src/lib/ai/providers/klingVideoProvider'
+import { canUseKling } from '../../../../src/lib/ai/providers/klingVideoProvider'
 
 export const runtime = 'nodejs'
 
@@ -14,9 +14,8 @@ export async function POST(_request: NextRequest) {
     return Response.json(
       {
         ok: false,
-        provider: 'kling',
-        model: getKlingVideoModel(),
-        error: 'Kling 영상 생성 API가 설정되지 않았습니다.',
+        provider: 'video',
+        error: '영상 생성 API가 설정되지 않았습니다.',
       },
       { status: 503 },
     )
@@ -24,7 +23,6 @@ export async function POST(_request: NextRequest) {
 
   return Response.json({
     ok: true,
-    provider: 'kling',
-    model: getKlingVideoModel(),
+    provider: 'video',
   })
 }
