@@ -182,7 +182,6 @@ function buildEditableVideoPlan(
 function extractRequestedBrandText(text: string) {
   const urlMatch = text.match(/\b[a-z0-9-]+\.(?:io|com|co\.kr|kr|net|ai)\b/i)
   if (urlMatch) return normalizeBrandText(urlMatch[0])
-  if (/shuffla/i.test(text)) return 'Shuffla.io'
   return ''
 }
 
@@ -193,9 +192,9 @@ function normalizeBrandText(text: string) {
 
 function buildDraftHeadline(role: string, topic: string, slideNumber: number, requestedBrandText = '') {
   if (requestedBrandText) {
-    if (role === 'hook') return `${requestedBrandText}가 보이는 순간`
-    if (role === 'key-point') return `작업 흐름 속 ${requestedBrandText}`
-    if (role === 'save-cta') return `${requestedBrandText} 클로즈업`
+    if (role === 'hook') return `${requestedBrandText}의 핵심 가치`
+    if (role === 'key-point') return `더 쉽게 전달하는 방법`
+    if (role === 'save-cta') return `지금 바로 시작`
   }
   if (role === 'hook') return topic.length > 18 ? topic.slice(0, 18).trimEnd() : topic
   if (role === 'context') return '왜 지금 중요할까'
@@ -207,16 +206,16 @@ function buildDraftHeadline(role: string, topic: string, slideNumber: number, re
 
 function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '') {
   if (requestedBrandText) {
-    if (role === 'hook') return `작업 중인 인물과 모니터가 자연스럽게 보이며 ${requestedBrandText} 노출을 예고합니다.`
-    if (role === 'key-point') return `모니터 화면 안에서 ${requestedBrandText}가 또렷하게 등장해 서비스 인지를 만듭니다.`
-    if (role === 'save-cta') return `카메라가 모니터 쪽으로 다가가 ${requestedBrandText}를 크게 각인합니다.`
+    if (role === 'hook') return `${requestedBrandText}가 제공하는 핵심 가치를 첫 장에서 명확하게 제시합니다.`
+    if (role === 'key-point') return `${audience}에게 필요한 흐름을 짧고 이해하기 쉬운 메시지로 정리합니다.`
+    if (role === 'save-cta') return `지금 필요한 다음 행동을 자연스럽게 떠올릴 수 있도록 마무리합니다.`
   }
-  if (role === 'hook') return `${topic}의 핵심 장면을 첫 화면에서 직관적으로 보여줍니다.`
-  if (role === 'context') return `${audience} 관점에서 문제 상황과 필요성을 자연스럽게 보여줍니다.`
-  if (role === 'key-point') return `복잡한 내용을 짧은 장면과 명확한 메시지로 이해시키는 구간입니다.`
+  if (role === 'hook') return `${topic}의 핵심 가치를 첫 화면에서 바로 이해할 수 있게 전달합니다.`
+  if (role === 'context') return `${audience} 관점에서 지금 이 메시지가 필요한 이유를 짚어줍니다.`
+  if (role === 'key-point') return `복잡한 내용을 짧고 명확한 흐름으로 정리해 이해를 돕습니다.`
   if (role === 'summary') return `앞선 메시지를 하나의 결론으로 묶어 기억하기 쉽게 정리합니다.`
   if (role === 'save-cta') return `사용자가 다음 행동을 떠올릴 수 있도록 차분하게 마무리합니다.`
-  return `${topic}에 대한 구체적인 장면을 보여주며 메시지를 보강합니다.`
+  return `${topic}에 대한 구체적인 장점을 쉬운 문장으로 보강합니다.`
 }
 
 function buildSceneVideoPrompt(params: {
@@ -234,9 +233,7 @@ function buildSceneVideoPrompt(params: {
   nextLabel: string | null
 }) {
   const scene = buildSceneDirection(params)
-  const textRule = params.requestedBrandText
-    ? `Readable text rule: the only readable text allowed is exactly "${params.requestedBrandText}" on the computer monitor or final close-up. Do not add any other words, subtitles, UI labels, menus, watermarks, or random logos.`
-    : 'No readable text, no subtitles, no UI labels, no logo, no watermark.'
+  const textRule = 'No readable text, no subtitles, no UI labels, no logo, no watermark. Any brand name, URL, headline, or CTA will be added later as a clean card overlay outside the generated video.'
   const continuity = buildEditableContinuityDirection(params)
 
   return [
@@ -275,13 +272,13 @@ function buildSceneDirection(params: {
   const brandText = params.requestedBrandText
   if (brandText) {
     if (params.role === 'hook') {
-      return `Opening shot: a woman works at a computer in a calm office setting, similar to the reference image if provided. The monitor is visible but ${brandText} is only subtly present or just beginning to appear. Camera makes a slow natural push-in.`
+      return `Opening shot: a person works at a computer in a calm office setting, similar to the reference image if provided. The monitor is visible but all on-screen content is abstract and unreadable. Camera makes a slow natural push-in.`
     }
     if (params.role === 'key-point') {
-      return `Middle shot: over-the-shoulder view of the woman using the computer. The monitor clearly and naturally displays "${brandText}" as the focus of attention while her hand or posture suggests active work.`
+      return `Middle shot: over-the-shoulder view of the same person using the computer. The interface appears clean and premium, but every screen element remains abstract and unreadable while the posture suggests active work.`
     }
     if (params.role === 'save-cta') {
-      return `Final shot: the camera smoothly zooms toward the monitor until "${brandText}" becomes large, centered, and clearly readable as the final brand memory.`
+      return `Final shot: the camera smoothly settles on the workspace as the task feels complete. The screen stays visually clean with no readable words, leaving room for the app overlay text.`
     }
   }
   return `Scene intent: visually express "${params.headline}" through cinematic action and environment, not through written text.`

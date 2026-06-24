@@ -1,9 +1,9 @@
 ﻿/**
  * Video card news pipeline
  *
- * Layout: 9:16 vertical (1080×1920)
- *   - Top half (1080×960):  Seedance video (3–5 sec loop)
- *   - Bottom half (1080×960): Black background + headline + body text
+ * Layout: 4:5 vertical card (1080×1350)
+ *   - Top half (1080×675):  Kling video (3–5 sec loop)
+ *   - Bottom half (1080×675): Black background + headline + body text
  */
 
 import { KlingVideoProvider, canUseKling } from '../ai/providers/klingVideoProvider'
@@ -278,4 +278,3 @@ function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text
   return text.slice(0, maxLen - 1).trimEnd() + '…'
 }
-

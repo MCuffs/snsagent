@@ -28,6 +28,28 @@ export interface VideoExportResult {
   mimeType: string
 }
 
+function even(value: number) {
+  const rounded = Math.ceil(value)
+  return rounded % 2 === 0 ? rounded : rounded + 1
+}
+
+function exportCanvasSize(doc: EditorialDocument) {
+  const viewportWidth: number = doc.viewport?.width ?? 1080
+  const viewportHeight: number = doc.viewport?.height ?? 1350
+  const bottom = doc.layers
+    .filter(layer => layer.visible && ['title', 'subtitle', 'text', 'cta', 'watermark', 'sticker'].includes(layer.type))
+    .reduce<number>((max, layer) => {
+      const scale = Number.isFinite(layer.scale) ? Math.max(layer.scale, 0.25) : 1
+      return Math.max(max, layer.y + layer.height * scale)
+    }, viewportHeight)
+
+  return {
+    width: even(viewportWidth),
+    height: even(Math.min(1920, Math.max(viewportHeight, bottom + 48))),
+    mediaHeight: viewportHeight / 2,
+  }
+}
+
 function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, layer: EditorialLayer) {
   const text = layer.text || ''
   if (!text.trim()) return
@@ -94,8 +116,7 @@ function drawTextLayer(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingC
 
 export async function exportSlideAsVideo(params: VideoExportParams): Promise<VideoExportResult> {
   const { videoUrl, videoStartSec, videoDurationSec, document: doc } = params
-  const W = 1080
-  const H = 1350
+  const { width: W, height: H, mediaHeight } = exportCanvasSize(doc)
   const FPS = 30
 
   let sourceResponse: Response
@@ -161,7 +182,7 @@ export async function exportSlideAsVideo(params: VideoExportParams): Promise<Vid
       ctx.translate(bgX, bgY)
       ctx.scale(bgScale, bgScale)
 
-      const videoHeight = H / 2
+      const videoHeight = mediaHeight
       const vw = video.videoWidth || W
       const vh = video.videoHeight || H
       const targetRatio = W / videoHeight

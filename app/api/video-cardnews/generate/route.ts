@@ -20,6 +20,16 @@ function sse(controller: ReadableStreamDefaultController, event: string, data: u
   controller.enqueue(new TextEncoder().encode(payload))
 }
 
+function buildVideoCampaignTitle(summary: string) {
+  const clean = summary
+    .replace(/["']/g, '')
+    .replace(/[.。]+$/g, '')
+    .trim()
+  if (!clean) return '영상 카드뉴스'
+  if (/영상\s*카드뉴스/i.test(clean)) return clean
+  return `${clean} 영상 카드뉴스`
+}
+
 function tomorrowAt20() {
   const date = new Date()
   date.setDate(date.getDate() + 1)
@@ -439,7 +449,7 @@ export async function POST(request: NextRequest) {
           user.id,
           brandId,
           {
-            title: `${summarizedTitle} 영상 카드뉴스`,
+            title: buildVideoCampaignTitle(summarizedTitle),
             productName: summarizedTitle,
             productDescription: topic,
             keyBenefits: '영상 카드뉴스',

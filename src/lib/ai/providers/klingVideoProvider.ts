@@ -156,6 +156,7 @@ export class KlingVideoProvider {
       settings: {
         duration,
         resolution: '720p',
+        aspect_ratio: aspectRatio,
       },
       options: {
         watermark_info: { enabled: false },
