@@ -25,7 +25,7 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
   FREE: {
     name: 'Free',
     monthlyCardLimit: 2,
-    monthlyVideoCardLimit: 1,
+    monthlyVideoCardLimit: 0,
     historyRetentionDays: 30,
     hasWatermark: true,
     description: '최초 2회 카드뉴스를 생성하는 무료 플랜',
@@ -34,13 +34,13 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
     price_en: 'Free',
     features: [
       '최초 2회 무료 카드뉴스 생성',
-      '영상 카드뉴스 1회 체험',
+      '영상 카드뉴스는 Creator 이상에서 제작',
       '30일 히스토리 보관',
       '기본 편집 기능',
     ],
     features_en: [
       '2 free card news to start',
-      '1 video card news trial',
+      'Video card news requires Creator or above',
       '30-day history retention',
       'Basic editing tools',
     ],

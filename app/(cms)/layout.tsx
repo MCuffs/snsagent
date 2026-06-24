@@ -11,6 +11,7 @@ import { UserProfileDrawer } from './UserProfileDrawer'
 import { SidebarUsageWidget } from './SidebarUsageWidget'
 import { isAdminEmail } from '../../lib/auth/admin-emails'
 import { getUsageSummaryForUser } from '../../lib/usage-summary'
+import { normalizePlan } from '../../lib/limits-types'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser()
@@ -20,6 +21,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
   const hasSubscription = Boolean(user?.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
   const isAdminUser = isAdminEmail(user?.email)
   const planLabel = isAdminUser ? 'ADMIN' : user?.plan
+  const navAccessPlan = isAdminUser ? 'ADMIN' : user ? normalizePlan(user.plan || 'FREE') : null
   const usageSummary = user ? await getUsageSummaryForUser(user) : null
   const t = await getTranslations('cms_layout')
 
@@ -43,7 +45,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Nav */}
-          <SidebarNav hasCompleteBrand={hasCompleteBrand} />
+          <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
 
         {/* User + Plan */}
         <div className="border-t border-[#e5e7eb] p-3 space-y-1.5">
@@ -88,7 +90,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         {/* Mobile Header Drawer */}
         <MobileHeader>
           <div className="flex flex-col h-full justify-between pb-4">
-            <SidebarNav hasCompleteBrand={hasCompleteBrand} />
+            <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
 
             <div className="border-t border-[#e5e7eb] p-3 space-y-1.5 mt-auto">
               {user ? (

@@ -18,6 +18,7 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
   const user = await dbService.getUser(userId)
   const plan = normalizePlan(user?.plan || 'FREE')
   const campaigns = await dbService.getCampaigns(userId)
+  const imageCampaigns = campaigns.filter(c => (c as { mediaType?: string }).mediaType !== 'video')
 
   if (isSuperUser(user?.email)) {
     return {
@@ -29,7 +30,7 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
   }
 
   if (plan === 'FREE') {
-    const current = campaigns.length
+    const current = imageCampaigns.length
     const limit = 2
     return {
       allowed: current < limit,
@@ -40,7 +41,7 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
   }
 
   const periodStart = getCampaignUsagePeriodStart(plan)
-  const currentCampaigns = campaigns.filter(
+  const currentCampaigns = imageCampaigns.filter(
     c => new Date(c.createdAt).getTime() >= periodStart.getTime()
   )
   const limit = PRICING_PLANS[plan].monthlyCardLimit
@@ -81,7 +82,7 @@ export async function checkBrandCountLimit(userId: string, isGeneral = false): P
 
 /**
  * Checks if user is allowed to generate a new video card news.
- * FREE: 1 lifetime, PRO: 10/month, UNLIMITED: 25/month
+ * FREE: unavailable, PRO: 10/month, UNLIMITED: 25/month
  */
 export async function checkVideoCardNewsLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'month' | 'lifetime' }> {
   const user = await dbService.getUser(userId)
@@ -95,7 +96,7 @@ export async function checkVideoCardNewsLimit(userId: string): Promise<{ allowed
   const videoCampaigns = allCampaigns.filter(c => (c as { mediaType?: string }).mediaType === 'video')
 
   if (plan === 'FREE') {
-    const limit = PRICING_PLANS.FREE.monthlyVideoCardLimit  // 1
+    const limit = PRICING_PLANS.FREE.monthlyVideoCardLimit
     return {
       allowed: videoCampaigns.length < limit,
       current: videoCampaigns.length,

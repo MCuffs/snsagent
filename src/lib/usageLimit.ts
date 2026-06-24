@@ -11,6 +11,7 @@ export async function checkCampaignUsage(userId: string) {
   const user = await dbService.getUser(userId)
   const plan = normalizePlan(user?.plan || 'FREE')
   const campaigns = await dbService.getCampaigns(userId)
+  const imageCampaigns = campaigns.filter(campaign => (campaign as { mediaType?: string }).mediaType !== 'video')
 
   if (isSuperUser(user?.email)) {
     return {
@@ -23,7 +24,7 @@ export async function checkCampaignUsage(userId: string) {
   }
 
   if (plan === 'FREE') {
-    const current = campaigns.length
+    const current = imageCampaigns.length
     const limit = 2
     return {
       allowed: current < limit,
@@ -35,7 +36,7 @@ export async function checkCampaignUsage(userId: string) {
   }
 
   const periodStart = getCampaignUsagePeriodStart(plan)
-  const current = campaigns.filter(campaign => campaign.createdAt >= periodStart).length
+  const current = imageCampaigns.filter(campaign => campaign.createdAt >= periodStart).length
   const limit = PRICING_PLANS[plan].monthlyCardLimit
 
   return {

@@ -5,6 +5,7 @@ import { getHistoryRetentionStatus } from '../../../lib/history-retention'
 import { normalizePlan, PRICING_PLANS } from '../../../lib/limits-types'
 import DashboardContainer from './DashboardContainer'
 import { Loader2 } from 'lucide-react'
+import { isAdminEmail } from '../../../lib/auth/admin-emails'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,11 +42,13 @@ async function DashboardDataLoader() {
         userName={null}
         summarizedPreference={null}
         isGuest={true}
+        userPlan={null}
       />
     )
   }
 
   const plan = normalizePlan(user.plan || 'FREE')
+  const accessPlan = isAdminEmail(user.email) ? 'ADMIN' : plan
   void dbService.deleteExpiredCampaignsForUser(user.id, plan)
 
   const [brands, campaigns] = await Promise.all([
@@ -116,6 +119,7 @@ async function DashboardDataLoader() {
       userId={user.id}
       userName={user.name}
       summarizedPreference={summarizedPreference}
+      userPlan={accessPlan}
       hasVideoApiKey={Boolean(
         process.env.KLINGAI_API_KEY ||
         (process.env.KLINGAI_ACCESS_KEY && process.env.KLINGAI_SECRET_KEY) ||

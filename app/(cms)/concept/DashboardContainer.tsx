@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
@@ -10,7 +10,7 @@ import VideoCardNewsForm from '../video-cardnews/VideoCardNewsForm'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn, Plus } from 'lucide-react'
+import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn, Plus, Lock, X } from 'lucide-react'
 import Link from 'next/link'
 
 interface BrandProfileData {
@@ -56,6 +56,7 @@ interface DashboardContainerProps {
   summarizedPreference?: SummarizedPreferenceData | null
   isGuest?: boolean
   hasVideoApiKey?: boolean
+  userPlan?: string | null
 }
 
 export default function DashboardContainer({
@@ -71,14 +72,32 @@ export default function DashboardContainer({
   summarizedPreference,
   isGuest = false,
   hasVideoApiKey = false,
+  userPlan,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
+  const activeTab = tab
   const t = useTranslations('concept')
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const urlBrandId = searchParams?.get('brandId') || null
   const [generalProfile, setGeneralProfile] = useState(existingGeneralProfile)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
+  const [dismissedVideoUpgradePrompt, setDismissedVideoUpgradePrompt] = useState(false)
+  const isFreePlan = userPlan === 'FREE'
+  const localePrefix = pathname?.startsWith('/ko/') || pathname === '/ko'
+    ? '/ko'
+    : pathname?.startsWith('/en/') || pathname === '/en'
+      ? '/en'
+      : ''
+  const pricingPath = `${localePrefix}/pricing`
+  const activeVideoTabBlocked = (activeTab === 'video-cardnews' || activeTab === 'video') && isFreePlan
+  const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeVideoTabBlocked && !dismissedVideoUpgradePrompt)
+  const closeVideoUpgradePrompt = () => {
+    setShowVideoUpgradePrompt(false)
+    setDismissedVideoUpgradePrompt(true)
+  }
 
   const handleGuestAction = () => {
     if (isGuest) {
@@ -97,8 +116,6 @@ export default function DashboardContainer({
     // 선택 화면 표시
     return null
   })
-
-  const activeTab = tab
   const urlProfile = existingBrand && Boolean(existingBrand.websiteUrl) ? existingBrand : null
   const hasAnyProfile = Boolean(urlProfile || generalProfile)
 
@@ -162,6 +179,9 @@ export default function DashboardContainer({
     <div className="relative h-full overflow-hidden">
       {showLoginPrompt && (
         <GuestLoginOverlay onClose={() => setShowLoginPrompt(false)} />
+      )}
+      {shouldShowVideoUpgradePrompt && (
+        <VideoUpgradeOverlay pricingPath={pricingPath} onClose={closeVideoUpgradePrompt} />
       )}
       <div className={tabPanelClass('concept')} aria-hidden={activeTab !== 'concept'}>
         <div className="flex h-full flex-col">
@@ -308,7 +328,9 @@ export default function DashboardContainer({
         </div>
 
       <div className={tabPanelClass('video')} aria-hidden={activeTab !== 'video'}>
-        {brandToPass ? (
+        {isFreePlan ? (
+          <VideoUpgradeEmptyState pricingPath={pricingPath} />
+        ) : brandToPass ? (
           <VideoCardNewsForm
             brand={brandToPass}
             hasApiKey={hasVideoApiKey}
@@ -331,17 +353,21 @@ export default function DashboardContainer({
 
       {brandToPass && (
         <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
-          <VideoCardNewsForm
-            brand={{
-              id: brandToPass.id,
-              name: brandToPass.name,
-              industry: brandToPass.industry,
-              targetAudience: brandToPass.targetAudience,
-              toneOfVoice: brandToPass.toneOfVoice,
-              mainColor: brandToPass.mainColor,
-            }}
-            hasApiKey={hasVideoApiKey}
-          />
+          {isFreePlan ? (
+            <VideoUpgradeEmptyState pricingPath={pricingPath} />
+          ) : (
+            <VideoCardNewsForm
+              brand={{
+                id: brandToPass.id,
+                name: brandToPass.name,
+                industry: brandToPass.industry,
+                targetAudience: brandToPass.targetAudience,
+                toneOfVoice: brandToPass.toneOfVoice,
+                mainColor: brandToPass.mainColor,
+              }}
+              hasApiKey={hasVideoApiKey}
+            />
+          )}
         </div>
       )}
     </div>
@@ -530,6 +556,75 @@ function ProfileSelectScreen({
         </div>
       </div>
     </motion.div>
+  )
+}
+
+function VideoUpgradeEmptyState({ pricingPath }: { pricingPath: string }) {
+  return (
+    <div className="flex h-full items-center justify-center px-6 py-12 text-center">
+      <div className="w-full max-w-md rounded-3xl border border-white/70 bg-white/78 p-8 shadow-[0_24px_80px_rgba(79,70,229,0.12)] backdrop-blur-xl">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
+          <Lock className="h-6 w-6" />
+        </div>
+        <h2 className="mt-5 text-lg font-black text-[#111827]">영상 카드뉴스는 유료 플랜에서 제작할 수 있습니다.</h2>
+        <p className="mt-3 text-sm font-medium leading-6 text-[#6b7280]">
+          Free 플랜에서는 카드뉴스 2회 생성만 제공됩니다. 영상 카드뉴스 제작은 Creator 플랜 이상에서 사용할 수 있습니다.
+        </p>
+        <Link
+          href={pricingPath}
+          className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#111827] px-5 text-sm font-bold text-white transition-colors hover:bg-[#1f2937]"
+        >
+          요금제 보기
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function VideoUpgradeOverlay({ pricingPath, onClose }: { pricingPath: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#9ca3af] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <h2 className="mt-5 text-lg font-black leading-7 text-[#111827]">Free 플랜에서는 영상 카드뉴스를 만들 수 없습니다.</h2>
+        <p className="mt-2 text-sm font-medium leading-6 text-[#6b7280]">
+          무료 플랜은 카드뉴스 2회 생성만 제공됩니다. 영상 카드뉴스를 제작하려면 Creator 플랜 이상으로 업그레이드해 주세요.
+        </p>
+        <div className="mt-6 flex gap-2">
+          <Link
+            href={pricingPath}
+            className="flex flex-1 items-center justify-center rounded-xl bg-[#111827] py-3 text-sm font-bold text-white transition-colors hover:bg-[#1f2937]"
+          >
+            요금제 보기
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-[#e5e7eb] px-4 py-3 text-sm font-bold text-[#6b7280] transition-colors hover:bg-[#f9fafb]"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

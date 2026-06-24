@@ -5,6 +5,7 @@ import { getHistoryRetentionStatus } from '../../../../lib/history-retention'
 import { normalizePlan, PRICING_PLANS } from '../../../../lib/limits-types'
 import DashboardContainer from '../../../(cms)/concept/DashboardContainer'
 import { Loader2 } from 'lucide-react'
+import { isAdminEmail } from '../../../../lib/auth/admin-emails'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,16 +17,15 @@ function DashboardFallback() {
   )
 }
 
-export default async function ConceptPage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params
+export default async function ConceptPage({ params: _params }: { params: Promise<{ locale: string }> }) {
   return (
     <Suspense fallback={<DashboardFallback />}>
-      <DashboardDataLoader locale={locale} />
+      <DashboardDataLoader />
     </Suspense>
   )
 }
 
-async function DashboardDataLoader({ locale }: { locale: string }) {
+async function DashboardDataLoader() {
   const user = await getSessionUser()
 
   if (!user) {
@@ -42,11 +42,13 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
         userName={null}
         summarizedPreference={null}
         isGuest={true}
+        userPlan={null}
       />
     )
   }
 
   const plan = normalizePlan(user.plan || 'FREE')
+  const accessPlan = isAdminEmail(user.email) ? 'ADMIN' : plan
   void dbService.deleteExpiredCampaignsForUser(user.id, plan)
 
   const [brands, campaigns] = await Promise.all([
@@ -117,6 +119,7 @@ async function DashboardDataLoader({ locale }: { locale: string }) {
       userId={user.id}
       userName={user.name}
       summarizedPreference={summarizedPreference}
+      userPlan={accessPlan}
     />
   )
 }

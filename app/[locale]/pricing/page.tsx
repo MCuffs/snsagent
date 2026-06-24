@@ -75,8 +75,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       price: isEn ? '$0' : '₩0',
       priceNote: isEn ? 'Free for everyone' : '무료로 시작',
       features: isEn
-        ? ['2 card news in total', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results']
-        : ['최초 2회 카드뉴스 생성', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
+        ? ['2 card news in total', 'Video card news not included', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results']
+        : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '무료로 시작하기',
       highlight: false,
     },

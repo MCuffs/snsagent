@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard } from 'lucide-react'
+import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
@@ -27,14 +28,18 @@ const navItems: NavItem[] = [
 interface SidebarNavProps {
   hasCompleteBrand: boolean
   locale?: string
+  userPlan?: string | null
 }
 
-export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps) {
+export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
   const t = useTranslations('cms')
+  const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
+  const pricingPath = `${prefix}/pricing`
+  const isFreePlan = userPlan === 'FREE'
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     analytics.sidebarClick(item.key, {
@@ -42,6 +47,13 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
       to_tab: item.key,
       has_complete_brand: hasCompleteBrand,
     })
+
+    if (item.key === 'video-cardnews' && isFreePlan) {
+      e.preventDefault()
+      setShowVideoUpgradePrompt(true)
+      return
+    }
+
     if (pathname === conceptPath) {
       e.preventDefault()
       if (activeTab !== item.key) {
@@ -54,8 +66,9 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
   }
 
   return (
-    <nav className="flex-1 space-y-0.5 px-2 py-3">
-      {navItems.map((item) => {
+    <>
+      <nav className="flex-1 space-y-0.5 px-2 py-3">
+        {navItems.map((item) => {
         const Icon = item.icon
         const disabled = false
         const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`
@@ -91,6 +104,9 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
+                {item.key === 'video-cardnews' && isFreePlan && (
+                  <Lock className={`h-3 w-3 ${isActive ? 'text-white/70' : 'text-[#9ca3af]'}`} />
+                )}
                 {item.badge && (
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{item.badge}</span>
                 )}
@@ -101,7 +117,49 @@ export default function SidebarNav({ hasCompleteBrand, locale }: SidebarNavProps
             </div>
           </Link>
         )
-      })}
-    </nav>
+        })}
+      </nav>
+
+      {showVideoUpgradePrompt && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-[360px] rounded-2xl border border-white/70 bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVideoUpgradePrompt(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#9ca3af] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+                aria-label="닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-2">
+              <h2 className="text-base font-black text-[#111827]">영상 카드뉴스는 유료 플랜에서 제작할 수 있습니다.</h2>
+              <p className="text-sm font-medium leading-6 text-[#6b7280]">
+                Free 플랜은 카드뉴스 2회 생성만 제공됩니다. 영상 카드뉴스를 만들려면 Creator 플랜 이상으로 업그레이드해 주세요.
+              </p>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <Link
+                href={pricingPath}
+                className="flex flex-1 items-center justify-center rounded-xl bg-[#111827] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1f2937]"
+              >
+                요금제 보기
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowVideoUpgradePrompt(false)}
+                className="rounded-xl border border-[#e5e7eb] px-4 py-2.5 text-sm font-bold text-[#6b7280] transition-colors hover:bg-[#f9fafb]"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
