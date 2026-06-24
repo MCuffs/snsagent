@@ -960,22 +960,6 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
     if (phase === 'confirming') return '[지금 만들기] 또는 [처음부터] 버튼을 눌러주세요'
     return '생성 중...'
   }
-  const quickPrompts = [
-    '20대 직장인을 대상으로, 월요일 아침 루틴을 바꾸는 커피 브랜드 영상 카드뉴스',
-    '신제품 선크림 출시 소식을 여름 휴가 분위기로 보여주는 5장 영상 카드뉴스',
-    '동네 병원의 독감 예방접종 안내를 신뢰감 있게 설명하는 짧은 카드뉴스',
-    '앱 서비스의 핵심 기능을 프리미엄한 분위기로 소개하는 영상 카드뉴스',
-  ]
-  const composerStatus = [
-    `브랜드 ${brand.name}`,
-    `${slideCount}장`,
-    attachedImages.length > 0 ? `참고 이미지 ${attachedImages.length}개` : '참고 이미지 선택 가능',
-    generationBusy ? '생성 중' : phase === 'confirming' ? '기획안 확인 중' : 'AI 디렉터 대기',
-  ]
-  const applyQuickPrompt = (example: string) => {
-    setTopic(example)
-    window.setTimeout(() => inputRef.current?.focus(), 0)
-  }
   const renderComposer = (mode: 'hero' | 'dock') => {
     const isHero = mode === 'hero'
     return (
@@ -1008,14 +992,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             </div>
           )}
 
-          <div className={`rounded-[26px] border border-[#c7d4ff] bg-white/82 shadow-[0_22px_60px_rgba(87,119,185,0.18)] backdrop-blur-xl transition-all focus-within:border-[#9fb7ff] focus-within:shadow-[0_26px_72px_rgba(87,119,185,0.22)] ${isHero ? 'px-4 py-4' : 'px-3 py-3'}`}>
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">VIDEO</span>
-              <span className="rounded-full bg-[#eef2ff] px-2 py-1 text-[11px] font-bold text-[#4f46e5]">Kling</span>
-              <span className="rounded-full bg-[#f8fafc] px-2 py-1 text-[11px] font-semibold text-[#64748b]">{brand.industry || '브랜드 반영'}</span>
-              <span className="rounded-full bg-[#f8fafc] px-2 py-1 text-[11px] font-semibold text-[#64748b]">텍스트 오버레이</span>
-            </div>
-
+          <div className={`rounded-[24px] border border-[#d9e3ff] bg-white/78 shadow-[0_22px_58px_rgba(70,103,164,0.14)] backdrop-blur-xl transition-all focus-within:border-[#b9c9ff] focus-within:bg-white/88 focus-within:shadow-[0_26px_72px_rgba(70,103,164,0.18)] ${isHero ? 'px-5 py-5' : 'px-4 py-3'}`}>
             <textarea
               ref={inputRef}
               rows={isHero ? 4 : 2}
@@ -1024,20 +1001,20 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               onKeyDown={handleKeyDown}
               placeholder={isHero ? '예: 신제품 출시 소식을 20대 직장인에게 감각적으로 보여주는 5장 영상 카드뉴스' : getPlaceholder()}
               disabled={inputDisabled}
-              className={`w-full resize-none border-none bg-transparent px-0 text-[#111111] outline-none placeholder-[#a8b0bd] disabled:opacity-50 ${isHero ? 'min-h-[96px] text-[15px] leading-7' : 'text-sm leading-6'}`}
+              className={`w-full resize-none border-none bg-transparent px-0 text-[#111111] outline-none placeholder-[#a8b0bd] disabled:opacity-50 ${isHero ? 'min-h-[118px] text-[15px] leading-7' : 'text-sm leading-6'}`}
             />
 
             <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" disabled={generating || isStartingGeneration || attachedImages.length >= 3}
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:text-[#334155] disabled:opacity-40">
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:text-[#334155] disabled:opacity-40"
+                  title="참고 이미지 추가">
                   <ImagePlus className="h-3.5 w-3.5" />
-                  이미지
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
                   onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }} />
-                <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white p-1">
+                <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white/84 p-1">
                   {([3, 5, 7] as const).map(n => (
                     <button
                       key={n}
@@ -1050,19 +1027,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                           : 'text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#111827]'
                       } disabled:opacity-50`}
                     >
-                      {n}장
+                      {n}
                     </button>
                   ))}
                 </div>
-                {!isHero && (
-                  <div className="hidden items-center gap-1.5 lg:flex">
-                    {composerStatus.slice(0, 3).map(item => (
-                      <span key={item} className="rounded-full border border-[#eef2f7] bg-white px-2 py-1 text-[10px] font-semibold text-[#94a3b8]">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {generationBusy ? (
@@ -1073,23 +1041,13 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 </button>
               ) : (
                 <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#6366f1] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(99,102,241,0.24)] transition-all hover:bg-[#4f46e5] hover:shadow-[0_16px_34px_rgba(99,102,241,0.28)] disabled:opacity-30">
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#111827] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_34px_rgba(15,23,42,0.22)] disabled:opacity-30">
                   <Send className="h-4 w-4" />
-                  보내기
+                  시작
                 </button>
               )}
             </div>
           </div>
-
-          {isHero && (
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-              {composerStatus.map(item => (
-                <span key={item} className="rounded-full border border-white/80 bg-white/56 px-3 py-1.5 text-[11px] font-semibold text-[#64748b] shadow-sm backdrop-blur-xl">
-                  {item}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     )
@@ -1256,10 +1214,6 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               transition={{ ...smoothEase, delay: 0.03 }}
               className="flex w-full max-w-[820px] flex-col items-center text-center"
             >
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/58 px-3 py-1.5 text-[11px] font-bold text-[#64748b] shadow-sm backdrop-blur-xl">
-                <Sparkles className="h-3.5 w-3.5 text-[#6366f1]" />
-                AI 영상 카드뉴스 디렉터
-              </p>
               <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
                 어떤 영상 카드뉴스를 만들까요?
               </h1>
@@ -1271,50 +1225,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 {renderComposer('hero')}
               </div>
 
-              <div className="mt-9 grid w-full max-w-[760px] gap-4 md:grid-cols-[0.86fr_1.14fr]">
-                <div className="space-y-3 text-left">
-                  <p className="px-1 text-[11px] font-bold text-[#64748b]">제작 설정</p>
-                  <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-[#c7d4ff] bg-white/62 px-4 py-3 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl transition-all hover:bg-white/78">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
-                      <ImagePlus className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-bold text-[#111827]">참고 이미지</span>
-                      <span className="block text-xs font-medium text-[#94a3b8]">최대 3장까지 장면에 반영</span>
-                    </span>
-                  </button>
-                  <div className="flex w-full items-center gap-3 rounded-2xl border border-[#c7d4ff] bg-white/62 px-4 py-3 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                      <Clapperboard className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-bold text-[#111827]">{slideCount}장 구성</span>
-                      <span className="block text-xs font-medium text-[#94a3b8]">상단 composer에서 즉시 변경</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#c7d4ff] bg-white/62 p-4 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl">
-                  <p className="mb-3 flex items-center gap-2 text-xs font-bold text-[#111827]">
-                    <Sparkles className="h-3.5 w-3.5 text-[#6366f1]" />
-                    예시를 시도하세요
-                  </p>
-                  <div className="space-y-1.5">
-                    {quickPrompts.map(example => (
-                      <button
-                        key={example}
-                        type="button"
-                        onClick={() => applyQuickPrompt(example)}
-                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-semibold leading-5 text-[#334155] transition-all hover:bg-white/72"
-                      >
-                        <span>{example}</span>
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <VideoCardNewsHeroMockup />
             </motion.div>
           </div>
         )}
@@ -1327,6 +1238,65 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 }
 
 // ── Sub-components ───────────────────────────────────────────────
+
+function VideoCardNewsHeroMockup() {
+  const cards = [
+    {
+      label: '01',
+      title: '장면을 열고',
+      body: '짧은 영상으로 시선을 잡습니다',
+      tone: 'from-[#dbeafe] via-[#eef2ff] to-[#ffffff]',
+      panel: 'bg-[#111827]',
+    },
+    {
+      label: '02',
+      title: '메시지를 얹고',
+      body: '제목과 본문을 카드 하단에 정리합니다',
+      tone: 'from-[#ecfeff] via-[#f8fafc] to-[#ffffff]',
+      panel: 'bg-[#0f172a]',
+    },
+    {
+      label: '03',
+      title: '흐름을 완성',
+      body: '연결된 카드뉴스로 저장합니다',
+      tone: 'from-[#f5f3ff] via-[#f8fafc] to-[#ffffff]',
+      panel: 'bg-[#18181b]',
+    },
+  ]
+
+  return (
+    <div className="mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
+      {cards.map((card, index) => (
+        <motion.div
+          key={card.label}
+          initial={{ opacity: 0, y: 18, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
+          animate={{ opacity: 1, y: 0, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
+          transition={{ duration: 0.72, delay: 0.1 + index * 0.08, ease: [0.19, 1, 0.22, 1] }}
+          className={`relative w-[30%] min-w-[96px] max-w-[150px] overflow-hidden rounded-[18px] border border-white/80 bg-white/70 p-1.5 shadow-[0_22px_60px_rgba(70,103,164,0.14)] backdrop-blur-xl ${index === 1 ? 'mb-5 scale-105' : 'mb-0'}`}
+        >
+          <div className="aspect-[4/5] overflow-hidden rounded-[14px] bg-white">
+            <div className={`relative h-[48%] bg-gradient-to-br ${card.tone}`}>
+              <div className="absolute inset-x-3 top-3 flex items-center justify-between">
+                <span className="h-1.5 w-8 rounded-full bg-white/80" />
+                <span className="h-5 w-5 rounded-full bg-white/70" />
+              </div>
+              <div className="absolute left-3 top-10 h-10 w-10 rounded-2xl bg-white/58 shadow-sm" />
+              <div className="absolute bottom-4 right-3 h-14 w-9 rounded-full bg-white/68 shadow-sm" />
+              <div className="absolute bottom-3 left-3 h-2 w-16 rounded-full bg-white/80" />
+            </div>
+            <div className={`${card.panel} flex h-[52%] flex-col justify-between p-3 text-left text-white`}>
+              <span className="text-[9px] font-black tracking-[0.18em] text-white/42">{card.label}</span>
+              <div>
+                <p className="text-[13px] font-black leading-4">{card.title}</p>
+                <p className="mt-2 text-[10px] font-semibold leading-4 text-white/58">{card.body}</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
 
 function AiBubbleAvatar() {
   return (
