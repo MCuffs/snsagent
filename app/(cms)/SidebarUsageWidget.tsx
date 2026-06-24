@@ -13,15 +13,28 @@ const PLAN_LABELS: Record<string, string> = {
   UNLIMITED: 'Studio',
 }
 
-function UsageBar({ used, limit }: { used: number; limit: number }) {
-  const pct = limit >= 999999 ? 0 : Math.min(100, Math.round((used / limit) * 100))
-  const isHigh = pct >= 80
-  const isFull = pct >= 100
+function isUnlimited(limit: number) {
+  return limit >= 999999
+}
+
+function getRemaining(used: number, limit: number) {
+  return isUnlimited(limit) ? Infinity : Math.max(0, limit - used)
+}
+
+function formatCount(value: number) {
+  return value === Infinity ? '∞' : `${value}회`
+}
+
+function RemainingBar({ used, limit }: { used: number; limit: number }) {
+  const remaining = getRemaining(used, limit)
+  const pct = isUnlimited(limit) ? 100 : Math.min(100, Math.round((remaining / limit) * 100))
+  const isLow = !isUnlimited(limit) && pct <= 20
+  const isEmpty = !isUnlimited(limit) && pct <= 0
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#f3f4f6]">
       <div
-        className={`h-full rounded-full transition-all ${isFull ? 'bg-red-400' : isHigh ? 'bg-amber-400' : 'bg-[#111111]'}`}
-        style={{ width: limit >= 999999 ? '0%' : `${pct}%` }}
+        className={`h-full rounded-full transition-all ${isEmpty ? 'bg-red-400' : isLow ? 'bg-amber-400' : 'bg-[#111111]'}`}
+        style={{ width: `${pct}%` }}
       />
     </div>
   )
@@ -61,6 +74,8 @@ export function SidebarUsageWidget({ initialData = null }: { initialData?: Usage
   if (!data) return null
 
   const periodLabel = data.period === 'lifetime' ? '누적' : '이번 달'
+  const imageRemaining = getRemaining(data.image.used, data.image.limit)
+  const videoRemaining = getRemaining(data.video.used, data.video.limit)
 
   return (
     <>
@@ -70,7 +85,7 @@ export function SidebarUsageWidget({ initialData = null }: { initialData?: Usage
         className="w-full rounded-md px-3 py-2 text-left transition-colors hover:bg-[#f3f4f6]"
       >
         <p className="mb-1.5 text-[11px] font-semibold text-[#374151]">
-          {periodLabel} 생성 횟수
+          생성 가능 잔여량
         </p>
         <div className="space-y-1.5">
           <div>
@@ -80,10 +95,10 @@ export function SidebarUsageWidget({ initialData = null }: { initialData?: Usage
                 이미지 카드뉴스
               </span>
               <span>
-                {data.image.limit >= 999999 ? '∞' : `${data.image.used} / ${data.image.limit}`}
+                {formatCount(imageRemaining)}
               </span>
             </div>
-            <UsageBar used={data.image.used} limit={data.image.limit} />
+            <RemainingBar used={data.image.used} limit={data.image.limit} />
           </div>
           <div>
             <div className="mb-0.5 flex items-center justify-between text-[10px] text-[#6b7280]">
@@ -92,10 +107,10 @@ export function SidebarUsageWidget({ initialData = null }: { initialData?: Usage
                 영상 카드뉴스
               </span>
               <span>
-                {data.video.limit >= 999999 ? '∞' : `${data.video.used} / ${data.video.limit}`}
+                {formatCount(videoRemaining)}
               </span>
             </div>
-            <UsageBar used={data.video.used} limit={data.video.limit} />
+            <RemainingBar used={data.video.used} limit={data.video.limit} />
           </div>
         </div>
       </button>
@@ -125,21 +140,26 @@ export function SidebarUsageWidget({ initialData = null }: { initialData?: Usage
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-[#f9fafb] px-3 py-2">
               <p className="text-[10px] text-[#6b7280]">이미지</p>
-              <p className="text-sm font-bold text-[#111111]">
-                {data.image.used}
-                <span className="text-[11px] font-normal text-[#9ca3af]">
-                  {data.image.limit < 999999 ? ` / ${data.image.limit}` : ''}
-                </span>
+              <p className="text-sm font-bold text-[#111111]">{formatCount(imageRemaining)}</p>
+              <p className="mt-0.5 text-[10px] text-[#9ca3af]">
+                차감 {data.image.used}회
+                {!isUnlimited(data.image.limit) && ` · 총 ${data.image.limit}회`}
               </p>
             </div>
             <div className="rounded-xl bg-[#f9fafb] px-3 py-2">
               <p className="text-[10px] text-[#6b7280]">영상</p>
-              <p className="text-sm font-bold text-[#111111]">
-                {data.video.used}
-                <span className="text-[11px] font-normal text-[#9ca3af]">
-                  {data.video.limit < 999999 ? ` / ${data.video.limit}` : ''}
-                </span>
+              <p className="text-sm font-bold text-[#111111]">{formatCount(videoRemaining)}</p>
+              <p className="mt-0.5 text-[10px] text-[#9ca3af]">
+                차감 {data.video.used}회
+                {!isUnlimited(data.video.limit) && ` · 총 ${data.video.limit}회`}
               </p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-[#f3f4f6] px-3 py-2">
+            <p className="text-[10px] font-semibold text-[#374151]">이번 달 생성 횟수</p>
+            <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] text-[#6b7280]">
+              <span>이미지 {data.image.used}회</span>
+              <span>영상 {data.video.used}회</span>
             </div>
           </div>
         </div>
