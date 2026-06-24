@@ -972,7 +972,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       >
         <div className="space-y-2.5">
           {isDragging && (
-            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
+            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#f59e0b] bg-[#fff7ed] py-3 text-sm font-medium text-[#d97706]">
               이미지를 여기에 놓으세요
             </div>
           )}
@@ -992,7 +992,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             </div>
           )}
 
-          <div className={`rounded-[24px] border border-[#d9e3ff] bg-white/78 shadow-[0_22px_58px_rgba(70,103,164,0.14)] backdrop-blur-xl transition-all focus-within:border-[#b9c9ff] focus-within:bg-white/88 focus-within:shadow-[0_26px_72px_rgba(70,103,164,0.18)] ${isHero ? 'px-5 py-5' : 'px-4 py-3'}`}>
+          <div className={`rounded-[24px] border border-[#fed7aa] bg-white/78 shadow-[0_22px_58px_rgba(194,103,31,0.13)] backdrop-blur-xl transition-all focus-within:border-[#fdba74] focus-within:bg-white/88 focus-within:shadow-[0_26px_72px_rgba(194,103,31,0.18)] ${isHero ? 'px-5 py-5' : 'px-4 py-3'}`}>
             <textarea
               ref={inputRef}
               rows={isHero ? 4 : 2}
@@ -1023,8 +1023,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                       onClick={() => handleSlideCountChange(n)}
                       className={`h-6 rounded-full px-2.5 text-[11px] font-bold transition-all ${
                         slideCount === n
-                          ? 'bg-[#111827] text-white'
-                          : 'text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#111827]'
+                          ? 'bg-[#f97316] text-white'
+                          : 'text-[#64748b] hover:bg-[#fff7ed] hover:text-[#9a3412]'
                       } disabled:opacity-50`}
                     >
                       {n}
@@ -1041,7 +1041,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 </button>
               ) : (
                 <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#111827] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-[#1f2937] hover:shadow-[0_16px_34px_rgba(15,23,42,0.22)] disabled:opacity-30">
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#f97316] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(249,115,22,0.24)] transition-all hover:bg-[#ea580c] hover:shadow-[0_16px_34px_rgba(249,115,22,0.28)] disabled:opacity-30">
                   <Send className="h-4 w-4" />
                   시작
                 </button>
@@ -1068,7 +1068,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           className="flex flex-col items-center gap-6 text-center"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm border border-[#e5e7eb]">
-            <Film className="h-7 w-7 text-[#3b82f6]" />
+            <Film className="h-7 w-7 text-[#f97316]" />
           </div>
           <div className="space-y-2">
             <p className="text-lg font-bold text-[#111111]">영상 카드뉴스가 완성됐습니다</p>
@@ -1087,12 +1087,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       <style dangerouslySetInnerHTML={{ __html: `
         .shuffla-video-ambient {
           background:
-            radial-gradient(circle at 16% 16%, rgba(207, 216, 255, 0.22), transparent 36%),
-            radial-gradient(circle at 78% 10%, rgba(247, 250, 255, 0.64), transparent 38%),
-            radial-gradient(circle at 54% 42%, rgba(214, 238, 255, 0.24), transparent 36%),
-            radial-gradient(circle at 84% 74%, rgba(194, 224, 255, 0.22), transparent 40%),
-            radial-gradient(circle at 22% 88%, rgba(188, 205, 255, 0.18), transparent 44%),
-            linear-gradient(180deg, #fbfdff 0%, #f8fbff 56%, #f4f8ff 100%);
+            radial-gradient(circle at 16% 16%, rgba(255, 237, 213, 0.44), transparent 36%),
+            radial-gradient(circle at 78% 10%, rgba(255, 251, 235, 0.70), transparent 38%),
+            radial-gradient(circle at 54% 42%, rgba(254, 215, 170, 0.28), transparent 36%),
+            radial-gradient(circle at 84% 74%, rgba(251, 191, 36, 0.18), transparent 40%),
+            radial-gradient(circle at 22% 88%, rgba(255, 247, 237, 0.42), transparent 44%),
+            linear-gradient(180deg, #fffdf8 0%, #fff8ed 56%, #fff3df 100%);
           background-size: 135% 135%;
           animation: shufflaVideoAmbientDrift 26s ease-in-out infinite alternate;
         }
@@ -1101,8 +1101,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           position: absolute;
           inset: -18%;
           background:
-            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.22), transparent 20%),
-            radial-gradient(circle at 70% 92%, rgba(158, 184, 255, 0.14), transparent 30%);
+            radial-gradient(circle at 44% 20%, rgba(255, 255, 245, 0.30), transparent 20%),
+            radial-gradient(circle at 70% 92%, rgba(249, 115, 22, 0.12), transparent 30%);
           filter: blur(34px);
           animation: shufflaVideoAmbientFloat 34s ease-in-out infinite alternate;
         }
@@ -1117,7 +1117,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         }
       ` }} />
       {/* Left: Chat */}
-      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#e8f0ff] bg-[#fbfdff]">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#ffedd5] bg-[#fffaf2]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-video-ambient" />
 
         {/* Header */}
@@ -1154,7 +1154,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                       className="contents"
                     >
                       <div className="flex justify-end">
-                        <div className="max-w-[78%] rounded-[20px] rounded-tr-md bg-[#6672f2] px-4 py-3 text-sm font-bold leading-6 text-white shadow-[0_18px_42px_rgba(99,102,241,0.22)] whitespace-pre-wrap flex flex-col gap-2">
+                        <div className="max-w-[78%] rounded-[20px] rounded-tr-md bg-[#f97316] px-4 py-3 text-sm font-bold leading-6 text-white shadow-[0_18px_42px_rgba(249,115,22,0.22)] whitespace-pre-wrap flex flex-col gap-2">
                           {umsg.images && umsg.images.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 justify-end">
                               {umsg.images.map((img, i) => (
@@ -1245,21 +1245,21 @@ function VideoCardNewsHeroMockup() {
       label: '01',
       title: '장면을 열고',
       body: '짧은 영상으로 시선을 잡습니다',
-      tone: 'from-[#dbeafe] via-[#eef2ff] to-[#ffffff]',
+      tone: 'from-[#ffedd5] via-[#fff7ed] to-[#ffffff]',
       panel: 'bg-[#111827]',
     },
     {
       label: '02',
       title: '메시지를 얹고',
       body: '제목과 본문을 카드 하단에 정리합니다',
-      tone: 'from-[#ecfeff] via-[#f8fafc] to-[#ffffff]',
+      tone: 'from-[#fef3c7] via-[#fff7ed] to-[#ffffff]',
       panel: 'bg-[#0f172a]',
     },
     {
       label: '03',
       title: '흐름을 완성',
       body: '연결된 카드뉴스로 저장합니다',
-      tone: 'from-[#f5f3ff] via-[#f8fafc] to-[#ffffff]',
+      tone: 'from-[#fed7aa] via-[#fff7ed] to-[#ffffff]',
       panel: 'bg-[#18181b]',
     },
   ]
@@ -1272,7 +1272,7 @@ function VideoCardNewsHeroMockup() {
           initial={{ opacity: 0, y: 18, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
           animate={{ opacity: 1, y: 0, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
           transition={{ duration: 0.72, delay: 0.1 + index * 0.08, ease: [0.19, 1, 0.22, 1] }}
-          className={`relative w-[30%] min-w-[96px] max-w-[150px] overflow-hidden rounded-[18px] border border-white/80 bg-white/70 p-1.5 shadow-[0_22px_60px_rgba(70,103,164,0.14)] backdrop-blur-xl ${index === 1 ? 'mb-5 scale-105' : 'mb-0'}`}
+          className={`relative w-[30%] min-w-[96px] max-w-[150px] overflow-hidden rounded-[18px] border border-white/80 bg-white/70 p-1.5 shadow-[0_22px_60px_rgba(194,103,31,0.14)] backdrop-blur-xl ${index === 1 ? 'mb-5 scale-105' : 'mb-0'}`}
         >
           <div className="aspect-[4/5] overflow-hidden rounded-[14px] bg-white">
             <div className={`relative h-[48%] bg-gradient-to-br ${card.tone}`}>
@@ -1336,7 +1336,7 @@ function AiMessage({
       >
         <div className="flex flex-col gap-2.5 items-start max-w-md">
           <AiBubbleAvatar />
-          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl whitespace-pre-line flex flex-col gap-3 w-full">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_16px_38px_rgba(194,103,31,0.11)] backdrop-blur-xl whitespace-pre-line flex flex-col gap-3 w-full">
             <div>{msg.text}</div>
             
             {msg.clarification && msg.clarification.options && onClarificationSelect && (
@@ -1346,7 +1346,7 @@ function AiMessage({
                     key={oIdx}
                     type="button"
                     onClick={() => onClarificationSelect(opt)}
-                    className="rounded-xl border border-white/70 bg-white/48 px-2.5 py-1.5 text-xs text-[#374151] shadow-sm transition-all hover:border-[#bdd0ff] hover:bg-white/72 hover:text-[#111111] active:scale-[0.98]"
+                    className="rounded-xl border border-white/70 bg-white/48 px-2.5 py-1.5 text-xs text-[#374151] shadow-sm transition-all hover:border-[#fed7aa] hover:bg-white/72 hover:text-[#111111] active:scale-[0.98]"
                   >
                     {opt.label}
                   </button>
@@ -1374,7 +1374,7 @@ function AiMessage({
         >
           <div className="flex w-full max-w-[920px] flex-col items-start gap-2.5">
             <AiBubbleAvatar />
-            <div className="w-full space-y-4 rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 shadow-[0_16px_42px_rgba(87,119,185,0.13)] backdrop-blur-xl">
+            <div className="w-full space-y-4 rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 shadow-[0_16px_42px_rgba(194,103,31,0.12)] backdrop-blur-xl">
               <div className="space-y-1">
                 <p className="text-sm font-bold text-[#111111]">생성 전에 기획안을 확인해주세요.</p>
                 <p className="text-xs font-medium leading-5 text-[#6b7280]">필요한 내용을 직접 수정한 뒤 생성할 수 있습니다.</p>
@@ -1459,7 +1459,7 @@ function AiMessage({
       >
         <div className="flex flex-col gap-2.5 items-start max-w-sm w-full">
           <AiBubbleAvatar />
-          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 w-full space-y-4 shadow-[0_16px_42px_rgba(87,119,185,0.13)] backdrop-blur-xl">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-4 w-full space-y-4 shadow-[0_16px_42px_rgba(194,103,31,0.12)] backdrop-blur-xl">
             <p className="text-sm font-bold text-[#111111]">완벽해요! 이렇게 만들게요.</p>
 
             <div className="space-y-2.5 text-sm">
@@ -1540,7 +1540,7 @@ function EditablePlanField({
         placeholder={placeholder}
         disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#aebfdd] focus:shadow-[0_10px_24px_rgba(87,119,185,0.10)] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
+        className="w-full resize-none rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#111111] outline-none transition-all placeholder:text-[#b6bcc6] focus:border-[#fdba74] focus:shadow-[0_10px_24px_rgba(194,103,31,0.10)] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
       />
     </label>
   )
@@ -1556,7 +1556,7 @@ function EditableVideoPromptCard({
   onChange: (patch: Partial<VideoPlanSlide>) => void
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[#e5e7eb] bg-white/78 p-3 shadow-[0_12px_28px_rgba(87,119,185,0.10)]">
+    <div className="min-w-0 rounded-2xl border border-[#e5e7eb] bg-white/78 p-3 shadow-[0_12px_28px_rgba(194,103,31,0.10)]">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] font-bold text-white">
           Card {slide.slideNumber}
@@ -1616,10 +1616,10 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
 
         {/* Progress / result */}
         {msg.type !== 'error' && msg.type !== 'clarify' && msg.type !== 'confirm' && (
-          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 w-full space-y-3 shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl">
+          <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 w-full space-y-3 shadow-[0_16px_38px_rgba(194,103,31,0.11)] backdrop-blur-xl">
             <div className="flex items-center gap-2">
               {msg.type === 'progress' && (
-                <Loader2 className="h-3.5 w-3.5 text-[#3b82f6] animate-spin shrink-0" />
+                <Loader2 className="h-3.5 w-3.5 text-[#f97316] animate-spin shrink-0" />
               )}
               {msg.type === 'result' && (
                 <Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
@@ -1649,11 +1649,11 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
-                className="rounded-[18px] border border-white/70 bg-white/46 p-2.5 shadow-[0_10px_24px_rgba(87,119,185,0.10)] backdrop-blur-xl"
+                className="rounded-[18px] border border-white/70 bg-white/46 p-2.5 shadow-[0_10px_24px_rgba(194,103,31,0.10)] backdrop-blur-xl"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563eb]">Reference images</p>
-                  <span className="text-[10px] font-bold text-[#1d4ed8]">영상 장면에 반영</span>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ea580c]">Reference images</p>
+                  <span className="text-[10px] font-bold text-[#c2410c]">영상 장면에 반영</span>
                 </div>
                 <div className="flex gap-2">
                   {msg.referenceImagePreviews!.map((preview, index) => (
@@ -1679,7 +1679,7 @@ function AiProgressMessage({ msg, onStopGenerate }: { msg: AiChatMessage; onStop
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6b7280]">Draft storyboard</p>
-                  <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-bold text-[#2563eb]">
+                  <span className="rounded-full bg-[#fff7ed] px-2 py-0.5 text-[10px] font-bold text-[#ea580c]">
                     {msg.draftSlides!.length} cards
                   </span>
                 </div>
@@ -1800,14 +1800,14 @@ function DraftSlideMockup({
 function SlideProgressRow({ sp }: { sp: SlideProgress }) {
   const icons = {
     waiting: <div className="h-3 w-3 rounded-full border-2 border-[#d1d5db]" />,
-    generating: <Loader2 className="h-3 w-3 text-[#3b82f6] animate-spin" />,
+    generating: <Loader2 className="h-3 w-3 text-[#f97316] animate-spin" />,
     done: <Check className="h-3 w-3 text-emerald-500" />,
     error: <AlertCircle className="h-3 w-3 text-red-400" />,
   }[sp.status]
 
   const textColor = {
     waiting: 'text-[#9ca3af]',
-    generating: 'text-[#3b82f6]',
+    generating: 'text-[#f97316]',
     done: 'text-emerald-600',
     error: 'text-red-500',
   }[sp.status]
@@ -1821,7 +1821,7 @@ function SlideProgressRow({ sp }: { sp: SlideProgress }) {
 
   const barColor = {
     waiting: 'bg-[#e5e7eb]',
-    generating: 'bg-[#3b82f6]',
+    generating: 'bg-[#f97316]',
     done: 'bg-emerald-400',
     error: 'bg-red-400',
   }[sp.status]
@@ -1902,7 +1902,7 @@ function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
               transition={{ duration: 0.4, delay: i * 0.04 }}
               className={`rounded-xl border p-3.5 transition-all ${
                 sp.status === 'done' ? 'bg-emerald-50/60 border-emerald-100' :
-                sp.status === 'generating' ? 'bg-white border-[#3b82f6] shadow-sm' :
+                sp.status === 'generating' ? 'bg-white border-[#f97316] shadow-sm' :
                 sp.status === 'error' ? 'bg-red-50/60 border-red-100' :
                 'bg-white border-[#e5e7eb]'
               }`}
@@ -1911,7 +1911,7 @@ function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
                 <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#f3f4f6] text-[10px] font-black text-[#374151]">
                   {sp.slideNumber}
                 </span>
-                {sp.status === 'generating' && <Loader2 className="h-3 w-3 text-[#3b82f6] animate-spin ml-auto" />}
+                {sp.status === 'generating' && <Loader2 className="h-3 w-3 text-[#f97316] animate-spin ml-auto" />}
                 {sp.status === 'done' && <Check className="h-3 w-3 text-emerald-500 ml-auto" />}
                 {sp.status === 'error' && <AlertCircle className="h-3 w-3 text-red-400 ml-auto" />}
               </div>
