@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSessionUser } from '../../actions'
+import { getSessionUser } from '../../../lib/auth/user'
 import { dbService } from '../../../lib/db-service'
 import { PRICING_PLANS, normalizePlan } from '../../../lib/limits-types'
 import { getCampaignUsagePeriodStart } from '../../../lib/usage-period'
