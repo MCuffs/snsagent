@@ -94,6 +94,7 @@ interface CollectedInfo {
   cta?: string                // 마지막 행동 유도
   mustInclude?: string        // 반드시 포함할 정보
   avoid?: string              // 피해야 할 정보/표현
+  sceneDirections?: string[]  // 사용자가 명시한 카드별 영상 장면 지시
   refinedTopic: string       // API에 전송할 최종 topic
   videoPlan?: VideoPlanSlide[]
 }
@@ -146,13 +147,49 @@ function roleLabel(role: string) {
   return labels[role] || '장면'
 }
 
+function parseExplicitSceneBrief(text: string) {
+  const markers = Array.from(text.matchAll(/(?:^|\n)\s*(?:영상|장면|씬|scene|slide)\s*(\d+)\s*[.:：]\s*/gi))
+  if (markers.length === 0) return null
+
+  const scenes = markers
+    .map((match, index) => {
+      const start = (match.index ?? 0) + match[0].length
+      const end = index + 1 < markers.length ? markers[index + 1].index ?? text.length : text.length
+      return {
+        number: Number(match[1]),
+        text: text.slice(start, end).trim(),
+      }
+    })
+    .filter(scene => scene.number > 0 && scene.text.length > 0)
+    .sort((a, b) => a.number - b.number)
+
+  if (scenes.length === 0) return null
+  const firstMarkerIndex = markers[0].index ?? 0
+  const brief = text.slice(0, firstMarkerIndex).trim()
+  return { brief, scenes }
+}
+
+function getSceneDirectionsFromMessages(messages: Array<{ role: 'user' | 'assistant'; content: string }>) {
+  const userText = messages
+    .filter(message => message.role === 'user')
+    .map(message => message.content)
+    .join('\n')
+  return parseExplicitSceneBrief(userText)?.scenes.map(scene => scene.text) ?? undefined
+}
+
+function isShufflaPromotion(text: string) {
+  return /shuffla|셔플라/i.test(text)
+}
+
 function buildEditableVideoPlan(
-  info: Pick<CollectedInfo, 'rawTopic' | 'targetAndMessage' | 'mood' | 'objective' | 'cta' | 'mustInclude' | 'avoid'>,
+  info: Pick<CollectedInfo, 'rawTopic' | 'targetAndMessage' | 'mood' | 'objective' | 'cta' | 'mustInclude' | 'avoid' | 'sceneDirections'>,
   slideCount: number,
   brand: Brand,
 ): VideoPlanSlide[] {
   const roles = getVideoRoleSequence(slideCount)
-  const cleanTopic = info.rawTopic.trim()
+  const sceneBrief = parseExplicitSceneBrief(info.rawTopic)
+  const cleanTopic = (sceneBrief?.brief || info.rawTopic).trim()
+  const sourceTopic = info.rawTopic.trim()
   const audience = info.targetAndMessage?.trim() || `${brand.targetAudience || '핵심 고객'}에게 메시지를 명확하게 전달`
   const mood = info.mood?.trim() || `${brand.toneOfVoice || '깔끔하고 신뢰감 있는'} 톤`
   const objective = info.objective?.trim() || '핵심 메시지를 이해시키고 다음 행동을 유도'
@@ -160,12 +197,14 @@ function buildEditableVideoPlan(
   const mustInclude = info.mustInclude?.trim() || ''
   const avoid = info.avoid?.trim() || '근거 없는 수치와 과장 표현'
   const requestedBrandText = extractRequestedBrandText(`${cleanTopic} ${audience} ${mood} ${objective} ${cta} ${mustInclude}`)
+  const sceneDirections = info.sceneDirections?.length ? info.sceneDirections : sceneBrief?.scenes.map(scene => scene.text)
+  const shufflaPromotion = isShufflaPromotion(sourceTopic)
 
   return roles.map((role, index) => {
     const slideNumber = index + 1
     const label = roleLabel(role)
-    const headline = buildDraftHeadline(role, cleanTopic, slideNumber, requestedBrandText)
-    const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText, cta, mustInclude)
+    const headline = buildDraftHeadline(role, cleanTopic, slideNumber, requestedBrandText, shufflaPromotion)
+    const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText, cta, mustInclude, shufflaPromotion)
     const previousRole = roles[index - 1]
     const nextRole = roles[index + 1]
     return {
@@ -185,6 +224,7 @@ function buildEditableVideoPlan(
         cta,
         mustInclude,
         avoid,
+        explicitSceneDirection: sceneDirections?.[index] ?? '',
         brandName: brand.name,
         requestedBrandText,
         totalSlides: roles.length,
@@ -206,7 +246,14 @@ function normalizeBrandText(text: string) {
   return text
 }
 
-function buildDraftHeadline(role: string, topic: string, slideNumber: number, requestedBrandText = '') {
+function buildDraftHeadline(role: string, topic: string, slideNumber: number, requestedBrandText = '', shufflaPromotion = false) {
+  if (shufflaPromotion) {
+    if (role === 'hook') return '상상이 시작되는 순간'
+    if (role === 'key-point') return '장면이 튀어나오다'
+    if (role === 'save-cta') return 'Shuffla.io'
+    if (role === 'context') return '평범한 순간의 반전'
+    if (role === 'summary') return '아이디어를 영상으로'
+  }
   if (requestedBrandText) {
     if (role === 'hook') return `${requestedBrandText}의 핵심 가치`
     if (role === 'key-point') return `더 쉽게 전달하는 방법`
@@ -220,7 +267,14 @@ function buildDraftHeadline(role: string, topic: string, slideNumber: number, re
   return `포인트 ${slideNumber}`
 }
 
-function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '', cta = '더 알아보기', mustInclude = '') {
+function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '', cta = '더 알아보기', mustInclude = '', shufflaPromotion = false) {
+  if (shufflaPromotion) {
+    if (role === 'hook') return '평범한 거리 위로 상상력이 들어오는 첫 장면을 엽니다.'
+    if (role === 'key-point') return '카드 속 세계가 현실로 확장되며 Shuffla의 제작 감각을 각인시킵니다.'
+    if (role === 'save-cta') return '아이디어를 영상 카드뉴스로 바꾸는 시작점을 Shuffla.io로 남깁니다.'
+    if (role === 'context') return '일상적인 장면과 판타지 전환을 대비시켜 시선을 붙잡습니다.'
+    if (role === 'summary') return '상상한 장면을 하나의 브랜드 티저 흐름으로 정리합니다.'
+  }
   if (requestedBrandText) {
     if (role === 'hook') return `${requestedBrandText}가 제공하는 핵심 가치를 첫 장에서 명확하게 제시합니다.`
     if (role === 'key-point') return `${audience}에게 필요한 흐름을 짧고 이해하기 쉬운 메시지로 정리합니다.`
@@ -246,6 +300,7 @@ function buildSceneVideoPrompt(params: {
   cta: string
   mustInclude: string
   avoid: string
+  explicitSceneDirection: string
   brandName: string
   requestedBrandText: string
   totalSlides: number
@@ -288,7 +343,17 @@ function buildSceneDirection(params: {
   role: string
   headline: string
   requestedBrandText: string
+  explicitSceneDirection: string
 }) {
+  if (params.explicitSceneDirection.trim()) {
+    return [
+      `Primary user scene direction: "${params.explicitSceneDirection.trim()}".`,
+      'Use this as the main visual action for this card, translating it into cinematic motion and composition.',
+      'Do not copy this direction into subtitles, captions, UI labels, or card body text.',
+      'If it asks for readable text, reserve that text for the app overlay and keep the generated video itself free of readable text.',
+    ].join(' ')
+  }
+
   const brandText = params.requestedBrandText
   if (brandText) {
     if (params.role === 'hook') {
@@ -630,6 +695,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       }
     }
     history.push({ role: 'user', content: userResponseContent })
+    const sceneDirections = getSceneDirectionsFromMessages(history)
 
     try {
       const res = await fetch('/api/agents/video-cardnews', {
@@ -674,6 +740,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               cta: data.params.cta,
               mustInclude: data.params.mustInclude,
               avoid: data.params.avoid,
+              sceneDirections,
               refinedTopic: buildRefinedTopic({
                 rawTopic: data.params.topic,
                 targetAndMessage: data.params.targetAndMessage ?? '',
@@ -691,6 +758,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 cta: data.params.cta,
                 mustInclude: data.params.mustInclude,
                 avoid: data.params.avoid,
+                sceneDirections,
               }, slideCount, brand),
             }
           : null
@@ -725,6 +793,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           cta: data.params.cta,
           mustInclude: data.params.mustInclude,
           avoid: data.params.avoid,
+          sceneDirections,
           refinedTopic: buildRefinedTopic({
             rawTopic: data.params.topic,
             targetAndMessage: data.params.targetAndMessage ?? '',
@@ -742,6 +811,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             cta: data.params.cta,
             mustInclude: data.params.mustInclude,
             avoid: data.params.avoid,
+            sceneDirections,
           }, slideCount, brand),
         })
         setPhase('confirming')
@@ -859,6 +929,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       cta: collectedInfo.cta,
       mustInclude: collectedInfo.mustInclude,
       avoid: collectedInfo.avoid,
+      sceneDirections: collectedInfo.sceneDirections,
     }, slideCount, brand)
     if (!collectedInfo.videoPlan?.length) {
       setCollectedInfo(prev => ({ ...prev, videoPlan: fallbackVideoPlan }))
@@ -883,6 +954,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       cta: collectedInfo.cta,
       mustInclude: collectedInfo.mustInclude,
       avoid: collectedInfo.avoid,
+      sceneDirections: collectedInfo.sceneDirections,
       refinedTopic: collectedInfo.refinedTopic ?? buildRefinedTopic({
         rawTopic: collectedInfo.rawTopic,
         targetAndMessage: collectedInfo.targetAndMessage ?? '',
@@ -974,6 +1046,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         cta: collectedInfo.cta,
         mustInclude: collectedInfo.mustInclude,
         avoid: collectedInfo.avoid,
+        sceneDirections: collectedInfo.sceneDirections,
       }, slideCount, brand)).map(slide =>
         slide.slideNumber === slideNumber ? { ...slide, ...patch } : slide,
       )
@@ -1005,6 +1078,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       cta: collectedInfo.cta,
       mustInclude: collectedInfo.mustInclude,
       avoid: collectedInfo.avoid,
+      sceneDirections: collectedInfo.sceneDirections,
     }, nextCount, brand)
     setCollectedInfo(prev => ({ ...prev, videoPlan: nextPlan }))
     setAiMessages(prev => prev.map(message => {
