@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
     brandId: string
     slideCount?: number
     durationSeconds?: 3 | 5
+    videoContinuityMode?: 'separate' | 'continuous'
     domainLabel?: string
     brandTone?: string
     language?: 'ko' | 'en'
@@ -206,6 +207,9 @@ export async function POST(request: NextRequest) {
   }
 
   const { topic, targetAndMessage, mood, objective, cta, mustInclude, avoid, brandId, slideCount = 5, durationSeconds = 5, language = 'ko' } = body
+  const videoContinuityMode = body.videoContinuityMode === 'continuous' && slideCount === 3
+    ? 'continuous'
+    : 'separate'
   const productionBrief = [
     targetAndMessage ? `타겟/메시지: ${targetAndMessage}` : '',
     objective ? `제작 목적: ${objective}` : '',
@@ -331,7 +335,9 @@ export async function POST(request: NextRequest) {
         // Stage 2: Video generation
         sse(controller, 'stage', {
           stage: 'video',
-          message: `${slides.length}개 영상을 순차 생성합니다. 실패 시 즉시 중단됩니다.`,
+          message: videoContinuityMode === 'continuous'
+            ? '연결된 긴 원본 영상을 생성한 뒤 카드별 구간으로 나눕니다.'
+            : `${slides.length}개 영상을 순차 생성합니다. 실패 시 즉시 중단됩니다.`,
           total: slides.length,
         })
 
@@ -345,6 +351,7 @@ export async function POST(request: NextRequest) {
             domainLabel,
             brandTone: body.brandTone,
             durationSeconds,
+            videoContinuityMode,
             referenceImageUrls,
             signal: request.signal,
             onProgress: (event) => {
@@ -389,6 +396,7 @@ export async function POST(request: NextRequest) {
         // Provider URLs may expire. Persist each successful result before saving the campaign.
         sse(controller, 'stage', { stage: 'saving', message: '생성 영상을 영구 저장소로 옮기는 중...' })
         const durableSlides: typeof result.slides = []
+        const persistedUrlCache = new Map<string, string>()
         for (const slide of result.slides) {
           if (!slide.videoUrl) {
             const message = slide.error || `슬라이드 ${slide.slideNumber} 영상 URL이 없습니다.`
@@ -401,11 +409,15 @@ export async function POST(request: NextRequest) {
             return
           }
           try {
-            const durableUrl = await persistGeneratedVideo({
-              sourceUrl: slide.videoUrl,
-              userId: user.id,
-              slideNumber: slide.slideNumber,
-            })
+            let durableUrl = persistedUrlCache.get(slide.videoUrl)
+            if (!durableUrl) {
+              durableUrl = await persistGeneratedVideo({
+                sourceUrl: slide.videoUrl,
+                userId: user.id,
+                slideNumber: slide.slideNumber,
+              })
+              persistedUrlCache.set(slide.videoUrl, durableUrl)
+            }
             durableSlides.push({ ...slide, videoUrl: durableUrl })
           } catch (error) {
             const message = error instanceof Error ? error.message : '영상 영구 저장 실패'
@@ -480,7 +492,7 @@ export async function POST(request: NextRequest) {
             backgroundImageUrl: null,
             mediaType: s.videoUrl ? 'video' : 'image',
             videoUrl: s.videoUrl,
-            videoStartSec: 0,
+            videoStartSec: s.videoStartSec ?? 0,
             videoDurationSec: s.durationSeconds,
           }))
         )
@@ -506,6 +518,7 @@ export async function POST(request: NextRequest) {
             body: s.body,
             role: s.role,
             videoUrl: s.videoUrl,
+            videoStartSec: s.videoStartSec ?? 0,
             durationSeconds: s.durationSeconds,
             error: s.error ?? null,
           })),

@@ -6,7 +6,7 @@ const KLING_MODEL = normalizeKlingModel(process.env.KLINGAI_VIDEO_MODEL)
 
 export interface KlingVideoOptions {
   prompt: string
-  duration?: 3 | 5
+  duration?: 3 | 5 | 10
   aspectRatio?: '9:16' | '16:9' | '1:1'
   referenceImageUrls?: string[]
   signal?: AbortSignal

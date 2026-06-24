@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight, RotateCcw, Square } from 'lucide-react'
+import { Loader2, AlertCircle, Send, Clapperboard, ImagePlus, X, Check, Clock, Sparkles, Film, ArrowRight, RotateCcw, Square, Link2, Rows3 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Brand {
@@ -22,6 +22,7 @@ interface VideoSlide {
   body: string
   role: string
   videoUrl: string | null
+  videoStartSec?: number
   durationSeconds: number
   error?: string | null
 }
@@ -85,6 +86,7 @@ interface ClarificationPrompt {
 // ── 대화형 흐름 상태 ──────────────────────────────────────────────
 
 type ChatPhase = 'idle' | 'clarifying' | 'confirming' | 'generating' | 'done'
+type VideoContinuityMode = 'separate' | 'continuous'
 
 interface CollectedInfo {
   rawTopic: string
@@ -95,6 +97,7 @@ interface CollectedInfo {
   mustInclude?: string        // 반드시 포함할 정보
   avoid?: string              // 피해야 할 정보/표현
   sceneDirections?: string[]  // 사용자가 명시한 카드별 영상 장면 지시
+  videoContinuityMode?: VideoContinuityMode // 장면 연결 방식
   refinedTopic: string       // API에 전송할 최종 topic
   videoPlan?: VideoPlanSlide[]
 }
@@ -512,6 +515,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           brandId: brand.id,
           slideCount,
           durationSeconds: 5,
+          videoContinuityMode: info.videoContinuityMode ?? 'separate',
           domainLabel: brand.industry,
           brandTone: brand.toneOfVoice,
           language: 'ko',
@@ -548,7 +552,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           } else if (stage === 'saving') {
             updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.saving }))
           } else if (stage === 'video') {
-            updateActiveMsg(m => ({ ...m, stageLabel: STAGE_LABELS.video_start }))
+            updateActiveMsg(m => ({ ...m, stageLabel: (data.message as string | undefined) ?? STAGE_LABELS.video_start }))
           }
         } else if (eventName === 'copy_done') {
           const copySlides = (data.slides as DraftVideoSlide[]) ?? []
@@ -741,6 +745,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               mustInclude: data.params.mustInclude,
               avoid: data.params.avoid,
               sceneDirections,
+              videoContinuityMode: 'separate' as const,
               refinedTopic: buildRefinedTopic({
                 rawTopic: data.params.topic,
                 targetAndMessage: data.params.targetAndMessage ?? '',
@@ -794,6 +799,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           mustInclude: data.params.mustInclude,
           avoid: data.params.avoid,
           sceneDirections,
+          videoContinuityMode: 'separate',
           refinedTopic: buildRefinedTopic({
             rawTopic: data.params.topic,
             targetAndMessage: data.params.targetAndMessage ?? '',
@@ -955,6 +961,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       mustInclude: collectedInfo.mustInclude,
       avoid: collectedInfo.avoid,
       sceneDirections: collectedInfo.sceneDirections,
+      videoContinuityMode: collectedInfo.videoContinuityMode ?? 'separate',
       refinedTopic: collectedInfo.refinedTopic ?? buildRefinedTopic({
         rawTopic: collectedInfo.rawTopic,
         targetAndMessage: collectedInfo.targetAndMessage ?? '',
@@ -1080,10 +1087,21 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       avoid: collectedInfo.avoid,
       sceneDirections: collectedInfo.sceneDirections,
     }, nextCount, brand)
-    setCollectedInfo(prev => ({ ...prev, videoPlan: nextPlan }))
+    setCollectedInfo(prev => ({
+      ...prev,
+      videoPlan: nextPlan,
+      videoContinuityMode: nextCount === 3 ? prev.videoContinuityMode : 'separate',
+    }))
     setAiMessages(prev => prev.map(message => {
       if (message.type !== 'confirm' || !message.confirmInfo) return message
-      return { ...message, confirmInfo: { ...message.confirmInfo, videoPlan: nextPlan } }
+      return {
+        ...message,
+        confirmInfo: {
+          ...message.confirmInfo,
+          videoPlan: nextPlan,
+          videoContinuityMode: nextCount === 3 ? message.confirmInfo.videoContinuityMode : 'separate',
+        },
+      }
     }))
   }
 
@@ -1592,6 +1610,13 @@ function AiMessage({
                 </div>
               </div>
 
+              <VideoContinuitySelector
+                value={info.videoContinuityMode ?? 'separate'}
+                slideCount={slideCount}
+                disabled={confirmBusy}
+                onChange={value => onConfirmInfoChange({ videoContinuityMode: value })}
+              />
+
               {videoPlan.length > 0 && onVideoPlanChange && (
                 <div className="space-y-3 border-t border-[#f3f4f6] pt-3">
                   <div className="space-y-1">
@@ -1700,6 +1725,84 @@ function AiMessage({
   }
 
   return <AiProgressMessage msg={msg} onStopGenerate={onStopGenerate} />
+}
+
+function VideoContinuitySelector({
+  value,
+  slideCount,
+  disabled,
+  onChange,
+}: {
+  value: VideoContinuityMode
+  slideCount: number
+  disabled?: boolean
+  onChange: (value: VideoContinuityMode) => void
+}) {
+  const continuousAvailable = slideCount === 3
+  const options: Array<{
+    value: VideoContinuityMode
+    title: string
+    description: string
+    icon: typeof Rows3
+    disabled?: boolean
+  }> = [
+    {
+      value: 'separate',
+      title: '따로 만들어도 괜찮아요',
+      description: '카드마다 다른 장면을 독립적으로 생성합니다.',
+      icon: Rows3,
+    },
+    {
+      value: 'continuous',
+      title: '모두 이어져야 해요',
+      description: continuousAvailable
+        ? '긴 원본 영상 하나를 만들고 0/3/6초로 나눕니다.'
+        : '현재는 3장 구성에서만 사용할 수 있습니다.',
+      icon: Link2,
+      disabled: !continuousAvailable,
+    },
+  ]
+
+  return (
+    <div className="space-y-2 border-t border-[#f3f4f6] pt-3">
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-[#111111]">장면 연결 방식</p>
+        <p className="text-[11px] font-medium leading-5 text-[#6b7280]">
+          영상들이 하나의 흐름으로 이어져야 하는지, 카드별로 독립 생성해도 되는지 선택해주세요.
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {options.map(option => {
+          const Icon = option.icon
+          const active = value === option.value
+          const optionDisabled = disabled || option.disabled
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={optionDisabled}
+              onClick={() => onChange(option.value)}
+              className={`flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${
+                active
+                  ? 'border-[#4252ff] bg-[#f5f7ff] shadow-[0_12px_30px_rgba(66,82,255,0.10)]'
+                  : 'border-[#e5e7eb] bg-white/72 hover:border-[#c7d2fe] hover:bg-white'
+              } disabled:cursor-not-allowed disabled:opacity-45`}
+            >
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                active ? 'bg-[#4252ff] text-white' : 'bg-[#f8fafc] text-[#64748b]'
+              }`}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-black text-[#111827]">{option.title}</span>
+                <span className="mt-1 block text-[11px] font-medium leading-5 text-[#6b7280]">{option.description}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function EditablePlanField({

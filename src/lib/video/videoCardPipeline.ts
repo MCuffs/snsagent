@@ -27,6 +27,7 @@ export interface VideoCardPipelineInput {
   domainLabel?: string
   brandTone?: string
   durationSeconds?: 3 | 5
+  videoContinuityMode?: 'separate' | 'continuous'
   referenceImageUrls?: string[]
   signal?: AbortSignal
   onProgress?: (event: VideoCardProgressEvent) => void
@@ -46,6 +47,7 @@ export interface VideoCardSlideResult {
   role: EditorialSlideRole
   videoUrl: string | null
   videoPrompt: string
+  videoStartSec?: number
   durationSeconds: number
   error?: string
 }
@@ -58,7 +60,7 @@ export interface VideoCardPipelineResult {
 
 interface VideoProviderFallbackInput {
   prompt: string
-  duration: 3 | 5
+  duration: 3 | 5 | 10
   referenceImageUrls?: string[]
   signal?: AbortSignal
   klingProvider: KlingVideoProvider | null
@@ -74,6 +76,8 @@ const HEADLINE_MAX_KO = 20
 const HEADLINE_MAX_EN = 30
 const BODY_MAX_KO = 100
 const BODY_MAX_EN = 150
+const CONTINUOUS_SEGMENT_SECONDS = 3
+const CONTINUOUS_SOURCE_SECONDS = 10
 
 async function generateWithProviderFallback(input: VideoProviderFallbackInput): Promise<UnifiedVideoResult> {
   const options = {
@@ -111,6 +115,7 @@ export async function generateVideoCardNews(
 
   const klingProvider = useKling ? new KlingVideoProvider() : null
   const duration = input.durationSeconds ?? 5
+  const shouldGenerateContinuousSource = input.videoContinuityMode === 'continuous' && input.slides.length === 3
   const onProgress = input.onProgress
 
   const prompts = buildCarouselVideoPrompts(
@@ -127,6 +132,7 @@ export async function generateVideoCardNews(
     domainLabel: input.domainLabel ?? '(none)',
     brandTone: input.brandTone ?? '(none)',
     durationSeconds: duration,
+    videoContinuityMode: input.videoContinuityMode ?? 'separate',
     topicPreview: input.topic.slice(0, 100),
     firstPromptPreview: prompts[0]?.prompt.slice(0, 200) ?? '(empty)',
   })
@@ -166,6 +172,50 @@ export async function generateVideoCardNews(
   }
 
   const results: VideoCardSlideResult[] = []
+  if (shouldGenerateContinuousSource) {
+    const continuousPrompt = buildContinuousVideoPrompt(input.slides, prompts.map(prompt => prompt.prompt), input.topic)
+    try {
+      input.signal?.throwIfAborted()
+      for (const slide of input.slides) {
+        onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
+      }
+      const videoResult = await generateWithProviderFallback({
+        prompt: continuousPrompt,
+        duration: CONTINUOUS_SOURCE_SECONDS,
+        referenceImageUrls: input.referenceImageUrls,
+        signal: input.signal,
+        klingProvider,
+        onPoll: (elapsed) => {
+          onProgress?.({ type: 'video_polling', slideNumber: input.slides[0].slideNumber, elapsed })
+        },
+      })
+      for (const slide of input.slides) {
+        onProgress?.({ type: 'video_done', slideNumber: slide.slideNumber })
+      }
+      return {
+        slides: input.slides.map((slide, index) => ({
+          slideNumber: slide.slideNumber,
+          headline: slide.headline,
+          body: slide.body,
+          role: slide.role,
+          videoUrl: videoResult.videoUrl,
+          videoPrompt: continuousPrompt,
+          videoStartSec: index * CONTINUOUS_SEGMENT_SECONDS,
+          durationSeconds: CONTINUOUS_SEGMENT_SECONDS,
+        })),
+        topic: input.topic,
+        totalSlides: input.slides.length,
+      }
+    } catch (error) {
+      if (input.signal?.aborted) throw error
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn('[VideoCardPipeline] Continuous source generation failed; falling back to separate clips:', message)
+      for (const slide of input.slides) {
+        onProgress?.({ type: 'video_error', slideNumber: slide.slideNumber, error: `연결 영상 생성 실패, 개별 생성으로 전환: ${message}` })
+      }
+    }
+  }
+
   for (let i = 0; i < input.slides.length; i += 1) {
     input.signal?.throwIfAborted()
     results.push(await generateOne(input.slides[i], i))
@@ -176,6 +226,36 @@ export async function generateVideoCardNews(
     topic: input.topic,
     totalSlides: input.slides.length,
   }
+}
+
+function buildContinuousVideoPrompt(
+  slides: VideoCardSlideInput[],
+  generatedPrompts: string[],
+  topic: string,
+) {
+  const timeline = slides
+    .map((slide, index) => {
+      const start = index * CONTINUOUS_SEGMENT_SECONDS
+      const end = start + CONTINUOUS_SEGMENT_SECONDS
+      const sourcePrompt = slide.videoPrompt?.trim() || generatedPrompts[index] || ''
+      return `${start}-${end}s / Card ${slide.slideNumber} (${slide.role})
+Headline overlay planned by app: "${slide.headline}"
+Body overlay planned by app: "${slide.body}"
+Visual direction only: ${sourcePrompt.slice(0, 1200)}`
+    })
+    .join('\n\n')
+
+  return `Create one continuous ${CONTINUOUS_SOURCE_SECONDS}-second cinematic video source for a 3-card video card news sequence.
+The final app will split this single video into three 3-second card segments at 0s, 3s, and 6s. Do not make three unrelated clips.
+Keep the same visual world, subject identity, lighting, camera language, and motion continuity across the full sequence.
+Use smooth transitions between each timeline beat. Avoid abrupt scene resets unless the user explicitly requested an impact moment.
+All readable Korean/English text, subtitles, titles, URLs, logos, UI, and card body copy will be added by the app overlay. Do not render readable text inside the generated video unless the visual direction explicitly requires a physical object with text.
+Topic: ${topic.slice(0, 500)}
+
+Timeline:
+${timeline}
+
+Output: wide 16:9 cinematic video, clean composition, subtle realistic motion, no unrelated stock footage, no extra captions.`
 }
 
 // LLM을 이용해 영상 카드뉴스용 슬라이드 카피 생성
