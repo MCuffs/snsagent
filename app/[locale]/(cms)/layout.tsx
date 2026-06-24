@@ -9,6 +9,7 @@ import LocaleSwitcher from '../../components/LocaleSwitcher'
 import { getTranslations } from 'next-intl/server'
 import MobileHeader from '../../(cms)/MobileHeader'
 import { UserProfileDrawer } from '../../(cms)/UserProfileDrawer'
+import { SidebarUsageWidget } from '../../(cms)/SidebarUsageWidget'
 
 export default async function CmsLayout({
   children,
@@ -63,6 +64,8 @@ export default async function CmsLayout({
                   <span className="text-[#3b82f6] font-semibold">{t('plan_label')}</span>
                 </Link>
 
+                <SidebarUsageWidget />
+
                 <UserProfileDrawer
                   userName={user.name ?? null}
                   userEmail={user.email}
@@ -108,6 +111,8 @@ export default async function CmsLayout({
                       </span>
                       <span className="text-[#3b82f6] font-semibold">{t('plan_label')}</span>
                     </Link>
+
+                    <SidebarUsageWidget />
 
                     <UserProfileDrawer
                       userName={user.name ?? null}
