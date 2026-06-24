@@ -11,9 +11,6 @@ import {
   Sparkles,
   Send,
   X,
-  Target,
-  Compass,
-  Layers,
   Sparkle,
   ChevronLeft,
   Check,
@@ -187,11 +184,6 @@ function getUserDisplayTextFromHistory(content: string, locale: string) {
   return content.startsWith(newTopicPrefix) ? content.slice(newTopicPrefix.length) : content
 }
 
-function compactSlidePreview(slides: NonNullable<GenerateParams['structurePreview']>) {
-  if (slides.length <= 4) return slides
-  return [...slides.slice(0, 3), slides[slides.length - 1]]
-}
-
 function buildCardCopyContext(params: GenerateParams) {
   const lines = [
     `주제: ${params.topic}`,
@@ -215,28 +207,7 @@ function buildCardCopyContext(params: GenerateParams) {
 // Custom smooth cubic bezier for high-end feel
 const smoothTransition = { duration: 0.75, ease: [0.19, 1, 0.22, 1] as const }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.15
-    }
-  }
-}
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.8,
-      ease: [0.25, 0.8, 0.25, 1] as const
-    }
-  }
-}
 
 const formContainerVariants = {
   hidden: { opacity: 0 },
@@ -284,7 +255,7 @@ export default function GenerateForm({
   const [isWaiting, setIsWaiting] = useState(true)
   const [isRevealingMessage, setIsRevealingMessage] = useState(false)
   const [readyParams, setReadyParams] = useState<GenerateParams | null>(null)
-  const [briefingStage, setBriefingStage] = useState(0)
+  const [, setBriefingStage] = useState(0)
   const [phase, setPhase] = useState<'chat' | 'preview' | 'generating'>('chat')
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -1143,7 +1114,7 @@ export default function GenerateForm({
       {/* Chat panel */}
       <motion.div
         variants={formItemVariants}
-        className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#e8f0ff] bg-[#fbfdff]"
+        className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfdff]"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-ambient-gradient" />
         {/* Header containing Brand chip & Mode Label */}
@@ -1159,7 +1130,8 @@ export default function GenerateForm({
         </div>
 
         {/* Messages */}
-        <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 space-y-7 custom-scrollbar" aria-live="polite">
+        <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 custom-scrollbar" aria-live="polite">
+          <div className="mx-auto flex w-full max-w-[920px] flex-col gap-7">
           {/* Initial loading skeleton */}
           {displayMessages.length === 0 && isWaiting && (
             <div className="flex justify-start">
@@ -1377,241 +1349,49 @@ export default function GenerateForm({
             </motion.div>
           )}
 
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
 
         {/* Input bar */}
         <div className="relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3">
-          <form onSubmit={handleSend}>
-            <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.12)] transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.16)]">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={
-                  pendingNewTopic
-                    ? (locale === 'en' ? 'Enter the new topic to research from scratch' : '새로 만들 주제를 입력하세요')
-                    : readyParams ? t('feedback_placeholder') : t('input_placeholder')
-                }
-                disabled={isWaiting || isRevealingMessage}
-                className="h-10 flex-1 bg-transparent border-none outline-none px-2 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 font-medium"
-                autoFocus
-              />
-              {isWaiting && (
-                <button
-                  type="button"
-                  onClick={handleCancelAgent}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-[#9ca3af] hover:text-[#6b7280] transition-colors"
-                  title={locale === 'en' ? 'Cancel' : '취소'}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={!input.trim() || isWaiting || isRevealingMessage}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:opacity-30 shrink-0"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </form>
-        </div>
-      </motion.div>
-
-      {/* AI Strategy Director Panel (hidden on mobile) */}
-      <motion.div
-        variants={formItemVariants}
-        className="hidden w-[390px] shrink-0 flex-col bg-white text-[#111111] border-l border-[#e5e7eb] overflow-y-auto xl:flex custom-scrollbar"
-      >
-        <div className="border-b border-[#e5e7eb] px-5 py-5 bg-white sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] flex items-center gap-1">
-                <Sparkle className="h-3 w-3 fill-current" /> AI Content Director
-              </p>
-              <h3 className="mt-1 text-base font-black tracking-tight text-[#111111]">{t('director_title')}</h3>
-            </div>
-            {readyParams ? (
-              <span className="flex items-center gap-1.5 rounded-full bg-[#EDF7F2] px-2.5 py-1 text-[10px] font-bold text-[#2F7E53] border border-[#C6EBCE]/50 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#2F7E53] animate-pulse" />
-                {t('status_ready')}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 rounded-full bg-[#FEF6EE] px-2.5 py-1 text-[10px] font-bold text-[#C27330] border border-[#FAD8BC]/50 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#C27330] animate-pulse" />
-                {t('status_waiting')}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {readyParams ? (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="flex-1 px-5 py-6 space-y-6"
-          >
-            {/* 1. Core Summary Card */}
-            <motion.div 
-              variants={itemVariants}
-              className="rounded-xl border border-[#e5e7eb] bg-white p-4.5 space-y-3.5 shadow-sm"
-            >
-              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
-                <span className="text-[11px] text-[#6b7280] font-bold">{t('topic_label')}</span>
-                <span className="text-xs font-black text-[#111111] truncate max-w-[200px]">{readyParams.topic}</span>
-              </div>
-              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
-                <span className="text-[11px] text-[#6b7280] font-bold">{t('visual_label')}</span>
-                <span className="rounded bg-[#3b82f6]/10 border border-[#3b82f6]/20 px-2 py-0.5 text-[10px] font-black text-[#3b82f6]">
-                  {readyParams.visualHint}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-[#e5e7eb] pb-2.5">
-                <span className="text-[11px] text-[#6b7280] font-bold">{t('content_type_label')}</span>
-                <span className="text-xs font-bold text-[#374151]">{readyParams.contentType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[11px] text-[#6b7280] font-bold">{t('slide_count_label')}</span>
-                <span className="text-xs font-bold text-[#374151]">{t('slide_count_value', { count: readyParams.slideCount })}</span>
-              </div>
-              <div className="rounded-xl bg-[#f9fafb] px-3 py-3">
-                <span className="block text-[10px] font-bold text-[#9ca3af] mb-1">{t('objective_label')}</span>
-                <p className="text-xs font-semibold leading-5 text-[#374151]">{readyParams.objective}</p>
-              </div>
-            </motion.div>
-
-            <AnimatePresence>
-              {briefingStage >= 2 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
-                  className="space-y-4"
-                >
-                  <h4 className="text-xs font-black uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-[#6b7280]" /> {t('hook_section')}
-                  </h4>
-                  <div className="bg-white border border-[#e5e7eb] rounded-xl p-4 space-y-3 shadow-sm">
-                    {readyParams.hookDirection && (
-                      <div>
-                        <span className="block text-[9px] font-bold text-[#9ca3af]">{t('hook_label')}</span>
-                        <p className="text-xs font-bold text-[#111111] mt-1 leading-5">{readyParams.hookDirection}</p>
-                      </div>
-                    )}
-                    {readyParams.recommendedCta && (
-                      <div className="border-t border-[#e5e7eb] pt-3">
-                        <span className="block text-[9px] font-bold text-[#9ca3af]">{t('cta_label')}</span>
-                        <p className="text-xs font-bold text-[#3b82f6] mt-1">{readyParams.recommendedCta}</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* 3. Slide Flow / Draft Copy Preview */}
-            {briefingStage >= 3 && (
-              ((readyParams.draftSlides && readyParams.draftSlides.length > 0) || (readyParams.structurePreview && readyParams.structurePreview.length > 0))
-            ) && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, ease: [0.19, 1, 0.22, 1] }}
-                className="space-y-4 pt-2"
-              >
-                <h4 className="text-xs font-black uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[#6b7280]" />
-                  {readyParams.draftSlides && readyParams.draftSlides.length > 0 ? (locale === 'en' ? 'Draft Copy & Strategy' : '기획 및 카피 초안') : t('flow_section')}
-                </h4>
-                
-                {readyParams.draftSlides && readyParams.draftSlides.length > 0 ? (
-                  <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-1.5 custom-scrollbar">
-                    {readyParams.draftSlides.map((slide, idx) => (
-                      <motion.div
-                        key={`draft-${slide.slideNumber}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1], delay: idx * 0.05 }}
-                        className="relative bg-white border border-[#e5e7eb] rounded-xl p-4.5 shadow-sm space-y-2.5 hover:border-[#d1d5db] transition-all"
-                      >
-                        <div className="flex items-center justify-between border-b border-[#e5e7eb] pb-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#111827] text-[10px] font-black text-white shadow-sm">
-                            {slide.slideNumber}
-                          </span>
-                          <span className="rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#374151]">
-                            {slide.role}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <p className="text-xs font-black leading-5 text-[#111111]">{slide.headline}</p>
-                          <p className="text-[11px] font-medium leading-relaxed text-[#374151]">{slide.body}</p>
-                        </div>
-                        {slide.reasoning && (
-                          <div className="border-t border-[#e5e7eb] pt-2 mt-1">
-                            <span className="block text-[8px] font-black text-[#6b7280] uppercase tracking-[0.12em]">{locale === 'en' ? 'Reasoning' : '디렉터 기획 의도'}</span>
-                            <p className="text-[10px] text-[#6b7280] leading-relaxed mt-0.5 font-semibold">{slide.reasoning}</p>
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <div className="relative border-l border-dashed border-[#e5e7eb] pl-5 ml-2.5 space-y-5">
-                      {compactSlidePreview(readyParams.structurePreview!).map((slide, idx) => (
-                        <motion.div 
-                          key={slide.slideNumber}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1], delay: idx * 0.08 + 0.3 }}
-                          className="relative"
-                        >
-                          <span className="absolute -left-[30px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white border-2 border-[#3b82f6] text-[10px] font-black text-[#3b82f6] shadow-sm">
-                            {slide.slideNumber}
-                          </span>
-                          <div className="space-y-0.5">
-                            <span className="text-[9px] font-black tracking-wider uppercase text-[#6b7280]">{slide.role}</span>
-                            <p className="text-xs font-semibold text-[#374151] leading-5">{slide.description}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                    {readyParams.structurePreview!.length > 4 && (
-                      <p className="pl-2 text-[10px] font-bold text-[#9ca3af]">
-                        {t('flow_note', { count: readyParams.structurePreview!.length - 4 })}
-                      </p>
-                    )}
-                  </>
+          <div className="mx-auto w-full max-w-[920px]">
+            <form onSubmit={handleSend}>
+              <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.12)] transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.16)]">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={
+                    pendingNewTopic
+                      ? (locale === 'en' ? 'Enter the new topic to research from scratch' : '새로 만들 주제를 입력하세요')
+                      : readyParams ? t('feedback_placeholder') : t('input_placeholder')
+                  }
+                  disabled={isWaiting || isRevealingMessage}
+                  className="h-10 flex-1 bg-transparent border-none outline-none px-2 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 font-medium"
+                  autoFocus
+                />
+                {isWaiting && (
+                  <button
+                    type="button"
+                    onClick={handleCancelAgent}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-[#9ca3af] hover:text-[#6b7280] transition-colors"
+                    title={locale === 'en' ? 'Cancel' : '취소'}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
-              </motion.div>
-            )}
-          </motion.div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center space-y-5 relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-transparent blur-[60px] pointer-events-none" />
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#e5e7eb] shadow-sm"
-            >
-              <Compass className="h-6 w-6 text-[#6b7280] animate-[spin_12s_linear_infinite]" />
-            </motion.div>
-            <div className="relative z-10 space-y-2">
-              <p className="text-sm font-black text-[#111111]">{t('director_waiting')}</p>
-              <p className="text-xs leading-5 text-[#6b7280] font-semibold max-w-[240px] mx-auto">
-                {t('director_waiting_desc')}
-              </p>
-            </div>
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isWaiting || isRevealingMessage}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:opacity-30 shrink-0"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-
-        <div className="border-t border-[#e5e7eb] px-5 py-4 bg-white text-center shrink-0">
-          <p className="text-[10px] text-[#9ca3af] leading-relaxed font-semibold">
-            Shuffla AI Content Strategy Engine v2.0
-          </p>
         </div>
       </motion.div>
     </motion.div>
