@@ -36,6 +36,10 @@ interface VideoCardAgentResponse {
     topic: string
     targetAndMessage?: string
     mood?: string
+    objective?: string
+    cta?: string
+    mustInclude?: string
+    avoid?: string
   }
   clarification?: ClarificationPrompt
 }
@@ -66,21 +70,21 @@ function buildSystemPrompt(brand: {
 
   if (isEn) {
     return `You are Shuffla's video card news director. ${brandLine}
-Collect only 3 fields: topic, targetAndMessage, mood.
-Decision: if topic plus either audience/message or mood is inferable, set ready=true. Ask at most one follow-up otherwise.
+Build a compact production brief with 7 fields: topic, targetAndMessage, mood, objective, cta, mustInclude, avoid.
+Decision: if topic and audience/message are inferable, set ready=true and infer the remaining fields conservatively. Ask at most one follow-up only when the core topic or audience/message is unclear.
 Follow-up: one natural question, 2-3 concrete options, no long explanation.
 Output valid JSON only:
 ready=false -> {"message":"short follow-up","ready":false,"clarification":{"question":"one question","allowCustom":true,"skipLabel":"Use current info","options":[{"label":"short","value":"specific answer"}]}}
-ready=true -> {"message":"short editable brief","ready":true,"params":{"topic":"refined topic","targetAndMessage":"audience + key message","mood":"visual mood"}}`
+ready=true -> {"message":"short editable brief","ready":true,"params":{"topic":"refined topic","targetAndMessage":"audience + key message","mood":"visual mood","objective":"campaign purpose","cta":"final viewer action","mustInclude":"required facts/details","avoid":"things to avoid"}}`
   }
 
   return `당신은 Shuffla 영상 카드뉴스 디렉터입니다. ${brandLine}
-필요 필드는 3개뿐입니다: topic, targetAndMessage, mood.
-판단: 주제와 타겟/메시지 또는 분위기를 추론할 수 있으면 ready=true. 부족하면 질문은 1개만 합니다.
+제작 브리프 필드는 7개입니다: topic, targetAndMessage, mood, objective, cta, mustInclude, avoid.
+판단: 주제와 타겟/메시지를 추론할 수 있으면 ready=true로 두고 나머지는 보수적으로 추론합니다. 핵심 주제나 타겟/메시지가 불명확할 때만 질문은 1개만 합니다.
 질문: 짧고 자연스럽게, 선택지는 구체적인 2-3개, 장문 설명 금지.
 유효한 JSON만 반환:
 ready=false -> {"message":"짧은 후속 질문","ready":false,"clarification":{"question":"질문 1개","allowCustom":true,"skipLabel":"현재 정보로 진행","options":[{"label":"짧은 라벨","value":"구체 답변"}]}}
-ready=true -> {"message":"짧은 수정 가능 기획안","ready":true,"params":{"topic":"정제 주제","targetAndMessage":"타겟+핵심 메시지","mood":"영상 분위기"}}`
+ready=true -> {"message":"짧은 수정 가능 기획안","ready":true,"params":{"topic":"정제 주제","targetAndMessage":"타겟+핵심 메시지","mood":"영상 분위기","objective":"제작 목적","cta":"마지막 행동 유도","mustInclude":"반드시 포함할 정보","avoid":"피해야 할 정보나 표현"}}`
 }
 
 function getOpenAIUserFacingError(error: unknown) {
@@ -135,6 +139,10 @@ function buildFallbackResponse(messages: ChatMessage[], language?: 'ko' | 'en'):
         topic: topic || 'Video card news topic',
         targetAndMessage: 'People who need a short, clear vertical video card news flow. Show the main idea in a simple and persuasive way.',
         mood: 'Clean, bright, polished short-form tone with smooth motion and readable text.',
+        objective: 'Explain the topic clearly and make viewers interested enough to continue.',
+        cta: 'Invite viewers to learn more or try the service.',
+        mustInclude: 'Use only details provided by the user or brand profile.',
+        avoid: 'Avoid unsupported facts, exact text inside generated video, and exaggerated claims.',
       },
     }
   }
@@ -146,6 +154,10 @@ function buildFallbackResponse(messages: ChatMessage[], language?: 'ko' | 'en'):
       topic: topic || '영상 카드뉴스 주제',
       targetAndMessage: '짧고 명확한 영상 카드뉴스가 필요한 사용자에게 핵심 메시지를 쉽고 설득력 있게 전달합니다.',
       mood: '깔끔하고 밝은 숏폼 톤, 부드러운 움직임, 읽기 쉬운 텍스트 중심',
+      objective: '주제를 명확하게 설명하고 시청자가 다음 내용을 계속 보게 만듭니다.',
+      cta: '더 알아보기 또는 바로 시도하기를 자연스럽게 유도합니다.',
+      mustInclude: '사용자 입력과 브랜드 프로필에서 확인된 정보만 포함합니다.',
+      avoid: '근거 없는 수치, 과장 표현, 생성 영상 내부의 정확한 텍스트 렌더링은 피합니다.',
     },
   }
 }
@@ -206,7 +218,7 @@ export async function POST(request: Request) {
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...compactMessages],
       response_format: { type: 'json_object' },
-      max_completion_tokens: 700,
+      max_completion_tokens: 1000,
     })
 
     const content = response.choices[0]?.message?.content

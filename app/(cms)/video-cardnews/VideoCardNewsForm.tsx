@@ -90,6 +90,10 @@ interface CollectedInfo {
   rawTopic: string
   targetAndMessage?: string  // 1차 답변 전체 (타겟 + 핵심 메시지)
   mood?: string              // 2차 답변 (분위기)
+  objective?: string          // 제작 목적
+  cta?: string                // 마지막 행동 유도
+  mustInclude?: string        // 반드시 포함할 정보
+  avoid?: string              // 피해야 할 정보/표현
   refinedTopic: string       // API에 전송할 최종 topic
   videoPlan?: VideoPlanSlide[]
 }
@@ -98,6 +102,10 @@ function buildRefinedTopic(info: Omit<CollectedInfo, 'refinedTopic'>): string {
   const parts = [info.rawTopic]
   if (info.targetAndMessage) parts.push(`독자와 메시지: ${info.targetAndMessage}`)
   if (info.mood) parts.push(`분위기: ${info.mood}`)
+  if (info.objective) parts.push(`제작 목적: ${info.objective}`)
+  if (info.cta) parts.push(`CTA: ${info.cta}`)
+  if (info.mustInclude) parts.push(`반드시 포함: ${info.mustInclude}`)
+  if (info.avoid) parts.push(`피해야 할 내용: ${info.avoid}`)
   return parts.join('\n')
 }
 
@@ -139,7 +147,7 @@ function roleLabel(role: string) {
 }
 
 function buildEditableVideoPlan(
-  info: Pick<CollectedInfo, 'rawTopic' | 'targetAndMessage' | 'mood'>,
+  info: Pick<CollectedInfo, 'rawTopic' | 'targetAndMessage' | 'mood' | 'objective' | 'cta' | 'mustInclude' | 'avoid'>,
   slideCount: number,
   brand: Brand,
 ): VideoPlanSlide[] {
@@ -147,13 +155,17 @@ function buildEditableVideoPlan(
   const cleanTopic = info.rawTopic.trim()
   const audience = info.targetAndMessage?.trim() || `${brand.targetAudience || '핵심 고객'}에게 메시지를 명확하게 전달`
   const mood = info.mood?.trim() || `${brand.toneOfVoice || '깔끔하고 신뢰감 있는'} 톤`
-  const requestedBrandText = extractRequestedBrandText(`${cleanTopic} ${audience} ${mood}`)
+  const objective = info.objective?.trim() || '핵심 메시지를 이해시키고 다음 행동을 유도'
+  const cta = info.cta?.trim() || '더 알아보기'
+  const mustInclude = info.mustInclude?.trim() || ''
+  const avoid = info.avoid?.trim() || '근거 없는 수치와 과장 표현'
+  const requestedBrandText = extractRequestedBrandText(`${cleanTopic} ${audience} ${mood} ${objective} ${cta} ${mustInclude}`)
 
   return roles.map((role, index) => {
     const slideNumber = index + 1
     const label = roleLabel(role)
     const headline = buildDraftHeadline(role, cleanTopic, slideNumber, requestedBrandText)
-    const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText)
+    const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText, cta, mustInclude)
     const previousRole = roles[index - 1]
     const nextRole = roles[index + 1]
     return {
@@ -169,6 +181,10 @@ function buildEditableVideoPlan(
         headline,
         audience,
         mood,
+        objective,
+        cta,
+        mustInclude,
+        avoid,
         brandName: brand.name,
         requestedBrandText,
         totalSlides: roles.length,
@@ -204,17 +220,17 @@ function buildDraftHeadline(role: string, topic: string, slideNumber: number, re
   return `포인트 ${slideNumber}`
 }
 
-function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '') {
+function buildDraftBody(role: string, topic: string, audience: string, requestedBrandText = '', cta = '더 알아보기', mustInclude = '') {
   if (requestedBrandText) {
     if (role === 'hook') return `${requestedBrandText}가 제공하는 핵심 가치를 첫 장에서 명확하게 제시합니다.`
     if (role === 'key-point') return `${audience}에게 필요한 흐름을 짧고 이해하기 쉬운 메시지로 정리합니다.`
-    if (role === 'save-cta') return `지금 필요한 다음 행동을 자연스럽게 떠올릴 수 있도록 마무리합니다.`
+    if (role === 'save-cta') return `${cta} 행동을 자연스럽게 떠올릴 수 있도록 마무리합니다.`
   }
   if (role === 'hook') return `${topic}의 핵심 가치를 첫 화면에서 바로 이해할 수 있게 전달합니다.`
   if (role === 'context') return `${audience} 관점에서 지금 이 메시지가 필요한 이유를 짚어줍니다.`
-  if (role === 'key-point') return `복잡한 내용을 짧고 명확한 흐름으로 정리해 이해를 돕습니다.`
+  if (role === 'key-point') return mustInclude ? `${mustInclude}를 중심으로 핵심 정보를 짧고 명확하게 정리합니다.` : `복잡한 내용을 짧고 명확한 흐름으로 정리해 이해를 돕습니다.`
   if (role === 'summary') return `앞선 메시지를 하나의 결론으로 묶어 기억하기 쉽게 정리합니다.`
-  if (role === 'save-cta') return `사용자가 다음 행동을 떠올릴 수 있도록 차분하게 마무리합니다.`
+  if (role === 'save-cta') return `${cta} 행동을 떠올릴 수 있도록 차분하게 마무리합니다.`
   return `${topic}에 대한 구체적인 장점을 쉬운 문장으로 보강합니다.`
 }
 
@@ -226,6 +242,10 @@ function buildSceneVideoPrompt(params: {
   headline: string
   audience: string
   mood: string
+  objective: string
+  cta: string
+  mustInclude: string
+  avoid: string
   brandName: string
   requestedBrandText: string
   totalSlides: number
@@ -241,7 +261,7 @@ function buildSceneVideoPrompt(params: {
     `Scene ${params.slideNumber} of ${params.totalSlides} (${params.label}) in one continuous sequence.`,
     continuity,
     scene,
-    `Topic: ${params.topic}. Message: ${params.audience}. Mood: ${params.mood}. Brand context: ${params.brandName}.`,
+    `Topic: ${params.topic}. Objective: ${params.objective}. Message: ${params.audience}. Mood: ${params.mood}. CTA overlay intent: ${params.cta}. Must include in card copy only: ${params.mustInclude || 'none'}. Avoid: ${params.avoid}. Brand context: ${params.brandName}.`,
     textRule,
     'Keep the same subject identity or object family, same location family, same lighting, same color grade, same lens feel, and same premium composition across all scenes. Keep the main subject centered with generous headroom and side margins. Natural subtle motion, realistic office lighting, clean premium composition. Do not reset into an unrelated stock scene.',
   ].join(' ')
@@ -420,6 +440,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           topic: info.rawTopic,
           targetAndMessage: info.targetAndMessage,
           mood: info.mood,
+          objective: info.objective,
+          cta: info.cta,
+          mustInclude: info.mustInclude,
+          avoid: info.avoid,
           brandId: brand.id,
           slideCount,
           durationSeconds: 5,
@@ -625,6 +649,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           topic: string
           targetAndMessage?: string
           mood?: string
+          objective?: string
+          cta?: string
+          mustInclude?: string
+          avoid?: string
         }
         clarification?: ClarificationPrompt
         error?: string
@@ -642,15 +670,27 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               rawTopic: data.params.topic,
               targetAndMessage: data.params.targetAndMessage,
               mood: data.params.mood,
+              objective: data.params.objective,
+              cta: data.params.cta,
+              mustInclude: data.params.mustInclude,
+              avoid: data.params.avoid,
               refinedTopic: buildRefinedTopic({
                 rawTopic: data.params.topic,
                 targetAndMessage: data.params.targetAndMessage ?? '',
                 mood: data.params.mood ?? '',
+                objective: data.params.objective ?? '',
+                cta: data.params.cta ?? '',
+                mustInclude: data.params.mustInclude ?? '',
+                avoid: data.params.avoid ?? '',
               }),
               videoPlan: buildEditableVideoPlan({
                 rawTopic: data.params.topic,
                 targetAndMessage: data.params.targetAndMessage,
                 mood: data.params.mood,
+                objective: data.params.objective,
+                cta: data.params.cta,
+                mustInclude: data.params.mustInclude,
+                avoid: data.params.avoid,
               }, slideCount, brand),
             }
           : null
@@ -681,15 +721,27 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           rawTopic: data.params.topic,
           targetAndMessage: data.params.targetAndMessage,
           mood: data.params.mood,
+          objective: data.params.objective,
+          cta: data.params.cta,
+          mustInclude: data.params.mustInclude,
+          avoid: data.params.avoid,
           refinedTopic: buildRefinedTopic({
             rawTopic: data.params.topic,
             targetAndMessage: data.params.targetAndMessage ?? '',
             mood: data.params.mood ?? '',
+            objective: data.params.objective ?? '',
+            cta: data.params.cta ?? '',
+            mustInclude: data.params.mustInclude ?? '',
+            avoid: data.params.avoid ?? '',
           }),
           videoPlan: buildEditableVideoPlan({
             rawTopic: data.params.topic,
             targetAndMessage: data.params.targetAndMessage,
             mood: data.params.mood,
+            objective: data.params.objective,
+            cta: data.params.cta,
+            mustInclude: data.params.mustInclude,
+            avoid: data.params.avoid,
           }, slideCount, brand),
         })
         setPhase('confirming')
@@ -803,6 +855,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       rawTopic: collectedInfo.rawTopic,
       targetAndMessage: collectedInfo.targetAndMessage,
       mood: collectedInfo.mood,
+      objective: collectedInfo.objective,
+      cta: collectedInfo.cta,
+      mustInclude: collectedInfo.mustInclude,
+      avoid: collectedInfo.avoid,
     }, slideCount, brand)
     if (!collectedInfo.videoPlan?.length) {
       setCollectedInfo(prev => ({ ...prev, videoPlan: fallbackVideoPlan }))
@@ -823,10 +879,18 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       rawTopic: collectedInfo.rawTopic,
       targetAndMessage: collectedInfo.targetAndMessage,
       mood: collectedInfo.mood,
+      objective: collectedInfo.objective,
+      cta: collectedInfo.cta,
+      mustInclude: collectedInfo.mustInclude,
+      avoid: collectedInfo.avoid,
       refinedTopic: collectedInfo.refinedTopic ?? buildRefinedTopic({
         rawTopic: collectedInfo.rawTopic,
         targetAndMessage: collectedInfo.targetAndMessage ?? '',
         mood: collectedInfo.mood ?? '',
+        objective: collectedInfo.objective ?? '',
+        cta: collectedInfo.cta ?? '',
+        mustInclude: collectedInfo.mustInclude ?? '',
+        avoid: collectedInfo.avoid ?? '',
       }),
       videoPlan: collectedInfo.videoPlan,
     }
@@ -873,10 +937,14 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       const next = { ...prev, ...patch }
       if (next.rawTopic) {
         next.refinedTopic = buildRefinedTopic({
-          rawTopic: next.rawTopic,
-          targetAndMessage: next.targetAndMessage ?? '',
-          mood: next.mood ?? '',
-        })
+        rawTopic: next.rawTopic,
+        targetAndMessage: next.targetAndMessage ?? '',
+        mood: next.mood ?? '',
+        objective: next.objective ?? '',
+        cta: next.cta ?? '',
+        mustInclude: next.mustInclude ?? '',
+        avoid: next.avoid ?? '',
+      })
       }
       return next
     })
@@ -887,6 +955,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         rawTopic: nextInfo.rawTopic,
         targetAndMessage: nextInfo.targetAndMessage ?? '',
         mood: nextInfo.mood ?? '',
+        objective: nextInfo.objective ?? '',
+        cta: nextInfo.cta ?? '',
+        mustInclude: nextInfo.mustInclude ?? '',
+        avoid: nextInfo.avoid ?? '',
       })
       return { ...message, confirmInfo: nextInfo }
     }))
@@ -898,6 +970,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         rawTopic: collectedInfo.rawTopic ?? '',
         targetAndMessage: collectedInfo.targetAndMessage,
         mood: collectedInfo.mood,
+        objective: collectedInfo.objective,
+        cta: collectedInfo.cta,
+        mustInclude: collectedInfo.mustInclude,
+        avoid: collectedInfo.avoid,
       }, slideCount, brand)).map(slide =>
         slide.slideNumber === slideNumber ? { ...slide, ...patch } : slide,
       )
@@ -925,6 +1001,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       rawTopic: collectedInfo.rawTopic,
       targetAndMessage: collectedInfo.targetAndMessage,
       mood: collectedInfo.mood,
+      objective: collectedInfo.objective,
+      cta: collectedInfo.cta,
+      mustInclude: collectedInfo.mustInclude,
+      avoid: collectedInfo.avoid,
     }, nextCount, brand)
     setCollectedInfo(prev => ({ ...prev, videoPlan: nextPlan }))
     setAiMessages(prev => prev.map(message => {
@@ -1402,6 +1482,40 @@ function AiMessage({
                   disabled={confirmBusy}
                   onChange={value => onConfirmInfoChange({ mood: value })}
                 />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <EditablePlanField
+                    label="제작 목적"
+                    value={info.objective ?? ''}
+                    rows={3}
+                    placeholder="홍보, 안내, 교육, 판매, 브랜드 인지도 등 목적을 입력하세요."
+                    disabled={confirmBusy}
+                    onChange={value => onConfirmInfoChange({ objective: value })}
+                  />
+                  <EditablePlanField
+                    label="CTA"
+                    value={info.cta ?? ''}
+                    rows={3}
+                    placeholder="마지막에 유도할 행동을 입력하세요."
+                    disabled={confirmBusy}
+                    onChange={value => onConfirmInfoChange({ cta: value })}
+                  />
+                  <EditablePlanField
+                    label="반드시 포함"
+                    value={info.mustInclude ?? ''}
+                    rows={3}
+                    placeholder="제품명, 혜택, 날짜, 장소, 기능 등 꼭 들어갈 정보를 입력하세요."
+                    disabled={confirmBusy}
+                    onChange={value => onConfirmInfoChange({ mustInclude: value })}
+                  />
+                  <EditablePlanField
+                    label="피해야 할 내용"
+                    value={info.avoid ?? ''}
+                    rows={3}
+                    placeholder="과장 표현, 금지어, 특정 장면, 불확실한 수치 등을 입력하세요."
+                    disabled={confirmBusy}
+                    onChange={value => onConfirmInfoChange({ avoid: value })}
+                  />
+                </div>
               </div>
 
               {videoPlan.length > 0 && onVideoPlanChange && (

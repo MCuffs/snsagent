@@ -183,6 +183,10 @@ export async function POST(request: NextRequest) {
     topic: string
     targetAndMessage?: string
     mood?: string
+    objective?: string
+    cta?: string
+    mustInclude?: string
+    avoid?: string
     brandId: string
     slideCount?: number
     durationSeconds?: 3 | 5
@@ -201,12 +205,19 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { topic, targetAndMessage, mood, brandId, slideCount = 5, durationSeconds = 5, language = 'ko' } = body
+  const { topic, targetAndMessage, mood, objective, cta, mustInclude, avoid, brandId, slideCount = 5, durationSeconds = 5, language = 'ko' } = body
+  const productionBrief = [
+    targetAndMessage ? `타겟/메시지: ${targetAndMessage}` : '',
+    objective ? `제작 목적: ${objective}` : '',
+    cta ? `CTA: ${cta}` : '',
+    mustInclude ? `반드시 포함: ${mustInclude}` : '',
+    avoid ? `피해야 할 내용: ${avoid}` : '',
+  ].filter(Boolean).join('\n')
 
   // Resolve domain from topic + industry + target/message using the shared domainProfile engine.
   // This maps Korean industry labels (e.g. "카페/F&B") to English domain keys (e.g. "food")
   // that DOMAIN_VISUAL_STYLE in videoPromptEngine understands.
-  const resolvedDomain: ContentDomain = inferContentDomain(topic, body.domainLabel, targetAndMessage)
+  const resolvedDomain: ContentDomain = inferContentDomain(topic, body.domainLabel, productionBrief || targetAndMessage)
   const domainLabel = resolvedDomain === 'general' ? (body.domainLabel ?? 'general') : resolvedDomain
   console.log(`[VideoCardNews] domain resolution: industry="${body.domainLabel}" → domain="${resolvedDomain}"`)
   const referenceImageUrls = Array.isArray(body.referenceImageUrls)
@@ -236,7 +247,7 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       try {
         let researchContext = ''
-        const newsDecision = shouldUseNewsResearch({ topic, targetAndMessage, mood, domainLabel })
+        const newsDecision = shouldUseNewsResearch({ topic, targetAndMessage: productionBrief || targetAndMessage, mood, domainLabel })
         console.log(`[VideoCardNews:ResearchDecision] useNews=${newsDecision.useNews} reason=${newsDecision.reason} topic="${topic.slice(0, 120)}"`)
 
         if (newsDecision.useNews) {
@@ -292,7 +303,7 @@ export async function POST(request: NextRequest) {
           try {
             slides = await generateVideoCardCopy({
               topic,
-              targetAndMessage,
+              targetAndMessage: productionBrief || targetAndMessage,
               mood,
               slideCount,
               brandTone: body.brandTone,
