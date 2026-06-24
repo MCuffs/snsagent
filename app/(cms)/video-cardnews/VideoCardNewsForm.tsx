@@ -953,11 +953,146 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
 
   const generationBusy = generating || isStartingGeneration || phase === 'generating'
   const inputDisabled = generationBusy || isWaiting || phase === 'confirming' || phase === 'done'
+  const hasConversation = userMessages.length > 0 || aiMessages.length > 0 || phase !== 'idle'
   const getPlaceholder = () => {
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
     if (phase === 'clarifying') return 'AI 디렉터의 질문에 답해 주세요...'
     if (phase === 'confirming') return '[지금 만들기] 또는 [처음부터] 버튼을 눌러주세요'
     return '생성 중...'
+  }
+  const quickPrompts = [
+    '20대 직장인을 대상으로, 월요일 아침 루틴을 바꾸는 커피 브랜드 영상 카드뉴스',
+    '신제품 선크림 출시 소식을 여름 휴가 분위기로 보여주는 5장 영상 카드뉴스',
+    '동네 병원의 독감 예방접종 안내를 신뢰감 있게 설명하는 짧은 카드뉴스',
+    '앱 서비스의 핵심 기능을 프리미엄한 분위기로 소개하는 영상 카드뉴스',
+  ]
+  const composerStatus = [
+    `브랜드 ${brand.name}`,
+    `${slideCount}장`,
+    attachedImages.length > 0 ? `참고 이미지 ${attachedImages.length}개` : '참고 이미지 선택 가능',
+    generationBusy ? '생성 중' : phase === 'confirming' ? '기획안 확인 중' : 'AI 디렉터 대기',
+  ]
+  const applyQuickPrompt = (example: string) => {
+    setTopic(example)
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }
+  const renderComposer = (mode: 'hero' | 'dock') => {
+    const isHero = mode === 'hero'
+    return (
+      <div
+        ref={dropZoneRef}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={isHero ? 'w-full max-w-[760px]' : 'relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3'}
+      >
+        <div className="space-y-2.5">
+          {isDragging && (
+            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
+              이미지를 여기에 놓으세요
+            </div>
+          )}
+
+          {attachedImages.length > 0 && (
+            <div className={`flex gap-2 ${isHero ? 'justify-start' : ''}`}>
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.preview} alt="" className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => removeImage(i)}
+                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className={`rounded-[26px] border border-[#c7d4ff] bg-white/82 shadow-[0_22px_60px_rgba(87,119,185,0.18)] backdrop-blur-xl transition-all focus-within:border-[#9fb7ff] focus-within:shadow-[0_26px_72px_rgba(87,119,185,0.22)] ${isHero ? 'px-4 py-4' : 'px-3 py-3'}`}>
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">VIDEO</span>
+              <span className="rounded-full bg-[#eef2ff] px-2 py-1 text-[11px] font-bold text-[#4f46e5]">Kling</span>
+              <span className="rounded-full bg-[#f8fafc] px-2 py-1 text-[11px] font-semibold text-[#64748b]">{brand.industry || '브랜드 반영'}</span>
+              <span className="rounded-full bg-[#f8fafc] px-2 py-1 text-[11px] font-semibold text-[#64748b]">텍스트 오버레이</span>
+            </div>
+
+            <textarea
+              ref={inputRef}
+              rows={isHero ? 4 : 2}
+              value={topic}
+              onChange={e => setTopic(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isHero ? '예: 신제품 출시 소식을 20대 직장인에게 감각적으로 보여주는 5장 영상 카드뉴스' : getPlaceholder()}
+              disabled={inputDisabled}
+              className={`w-full resize-none border-none bg-transparent px-0 text-[#111111] outline-none placeholder-[#a8b0bd] disabled:opacity-50 ${isHero ? 'min-h-[96px] text-[15px] leading-7' : 'text-sm leading-6'}`}
+            />
+
+            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" disabled={generating || isStartingGeneration || attachedImages.length >= 3}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:text-[#334155] disabled:opacity-40">
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  이미지
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+                  onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }} />
+                <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white p-1">
+                  {([3, 5, 7] as const).map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={generating || isStartingGeneration || phase === 'generating'}
+                      onClick={() => handleSlideCountChange(n)}
+                      className={`h-6 rounded-full px-2.5 text-[11px] font-bold transition-all ${
+                        slideCount === n
+                          ? 'bg-[#111827] text-white'
+                          : 'text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#111827]'
+                      } disabled:opacity-50`}
+                    >
+                      {n}장
+                    </button>
+                  ))}
+                </div>
+                {!isHero && (
+                  <div className="hidden items-center gap-1.5 lg:flex">
+                    {composerStatus.slice(0, 3).map(item => (
+                      <span key={item} className="rounded-full border border-[#eef2f7] bg-white px-2 py-1 text-[10px] font-semibold text-[#94a3b8]">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {generationBusy ? (
+                <button type="button" onClick={handleStopGenerate}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-4 text-xs font-bold text-white shadow-[0_10px_22px_rgba(39,39,42,0.18)] transition-colors hover:bg-[#27272a]">
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                  중단하기
+                </button>
+              ) : (
+                <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#6366f1] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(99,102,241,0.24)] transition-all hover:bg-[#4f46e5] hover:shadow-[0_16px_34px_rgba(99,102,241,0.28)] disabled:opacity-30">
+                  <Send className="h-4 w-4" />
+                  보내기
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isHero && (
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {composerStatus.map(item => (
+                <span key={item} className="rounded-full border border-white/80 bg-white/56 px-3 py-1.5 text-[11px] font-semibold text-[#64748b] shadow-sm backdrop-blur-xl">
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // 편집 화면 전환 오버레이
@@ -1048,69 +1183,55 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           </div>
         </div>
 
-        {/* Chat */}
-        <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 space-y-7">
-
-          {/* Greeting */}
-          <motion.div {...fadeIn} transition={{ ...smoothEase, delay: 0.05 }} className="flex justify-start">
-            <div className="flex flex-col gap-2.5 items-start max-w-md">
-              <AiBubbleAvatar />
-              <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/70 px-4 py-3.5 text-sm leading-7 text-[#111111] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl">
-                <span className="font-bold">영상 카드뉴스</span>로 만들 주제를 알려주세요.
-                <br />
-                타깃, 분위기, 꼭 담을 메시지를 같이 적어주면 더 정확하게 기획할 수 있어요.
-                <div className="mt-3 space-y-2">
-                  {[
-                    '20대 직장인을 대상으로, 월요일 아침 루틴을 바꾸는 커피 브랜드 영상 카드뉴스',
-                    '신제품 선크림 출시 소식을 여름 휴가 분위기로 보여주는 5장 영상 카드뉴스',
-                    '동네 병원의 독감 예방접종 안내를 신뢰감 있게 설명하는 짧은 카드뉴스',
-                  ].map(example => (
-                    <button
-                      key={example}
-                      type="button"
-                      onClick={() => {
-                        setTopic(example)
-                        inputRef.current?.focus()
-                      }}
-                      className="block w-full rounded-xl border border-white/70 bg-white/46 px-3 py-2 text-left text-xs font-semibold leading-5 text-[#334155] transition-all hover:border-[#bdd0ff] hover:bg-white/72 hover:shadow-[0_10px_24px_rgba(87,119,185,0.10)]"
+        {hasConversation ? (
+          <>
+            <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8">
+              <div className="mx-auto flex w-full max-w-[920px] flex-col gap-7">
+                <AnimatePresence initial={false}>
+                  {userMessages.map((umsg, idx) => (
+                    <motion.div key={umsg.id}
+                      initial={{ opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' }}
+                      animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                      transition={smoothEase}
+                      className="contents"
                     >
-                      {example}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-3 text-[11px] font-semibold leading-5 text-[#9ca3af]">
-                  ✦ 9:16 세로 영상 · 장면/제목/본문 초안 먼저 확인 · 텍스트 자동 합성
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Interleaved messages */}
-          <AnimatePresence initial={false}>
-            {userMessages.map((umsg, idx) => (
-              <motion.div key={umsg.id}
-                initial={{ opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)' }}
-                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-                transition={smoothEase} className="contents"
-              >
-                <div className="flex justify-end">
-                  <div className="max-w-[78%] rounded-[20px] rounded-tr-md border border-[#c8d8ff] bg-white/62 px-4 py-3 text-sm font-medium leading-6 text-[#26334a] shadow-[0_16px_38px_rgba(87,119,185,0.12)] backdrop-blur-xl whitespace-pre-wrap flex flex-col gap-2">
-                    {umsg.images && umsg.images.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 justify-end">
-                        {umsg.images.map((img, i) => (
-                          <div key={i} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img} alt="" className="h-full w-full object-cover" />
-                          </div>
-                        ))}
+                      <div className="flex justify-end">
+                        <div className="max-w-[78%] rounded-[20px] rounded-tr-md bg-[#6672f2] px-4 py-3 text-sm font-bold leading-6 text-white shadow-[0_18px_42px_rgba(99,102,241,0.22)] whitespace-pre-wrap flex flex-col gap-2">
+                          {umsg.images && umsg.images.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 justify-end">
+                              {umsg.images.map((img, i) => (
+                                <div key={i} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-white/40 shadow-sm">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={img} alt="" className="h-full w-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {umsg.content && <div>{umsg.content}</div>}
+                        </div>
                       </div>
-                    )}
-                    {umsg.content && <div>{umsg.content}</div>}
-                  </div>
-                </div>
-                {aiMessages[idx] && (
+                      {aiMessages[idx] && (
+                        <AiMessage
+                          msg={aiMessages[idx]}
+                          onConfirmGenerate={handleConfirmGenerateWithPing}
+                          onConfirmInfoChange={handleConfirmInfoChange}
+                          onVideoPlanChange={handleVideoPlanChange}
+                          slideCount={slideCount}
+                          brand={brand}
+                          confirmBusy={isStartingGeneration || generating || phase === 'generating'}
+                          onReset={handleReset}
+                          onClarificationSelect={handleClarificationSelect}
+                          onStopGenerate={handleStopGenerate}
+                        />
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {aiMessages.slice(userMessages.length).map(msg => (
                   <AiMessage
-                    msg={aiMessages[idx]}
+                    key={msg.id}
+                    msg={msg}
                     onConfirmGenerate={handleConfirmGenerateWithPing}
                     onConfirmInfoChange={handleConfirmInfoChange}
                     onVideoPlanChange={handleVideoPlanChange}
@@ -1121,93 +1242,82 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                     onClarificationSelect={handleClarificationSelect}
                     onStopGenerate={handleStopGenerate}
                   />
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                ))}
 
-          <div ref={chatBottomRef} />
-        </div>
-
-        {/* Input bar */}
-        <div
-          ref={dropZoneRef}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className="relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3 space-y-2.5"
-        >
-          {isDragging && (
-            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#3b82f6] bg-[#eff6ff] py-3 text-sm font-medium text-[#3b82f6]">
-              이미지를 여기에 놓으세요
+                <div ref={chatBottomRef} />
+              </div>
             </div>
-          )}
+            {renderComposer('dock')}
+          </>
+        ) : (
+          <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-8">
+            <motion.div
+              {...fadeIn}
+              transition={{ ...smoothEase, delay: 0.03 }}
+              className="flex w-full max-w-[820px] flex-col items-center text-center"
+            >
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/58 px-3 py-1.5 text-[11px] font-bold text-[#64748b] shadow-sm backdrop-blur-xl">
+                <Sparkles className="h-3.5 w-3.5 text-[#6366f1]" />
+                AI 영상 카드뉴스 디렉터
+              </p>
+              <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
+                어떤 영상 카드뉴스를 만들까요?
+              </h1>
+              <p className="mt-3 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">
+                주제, 타깃, 분위기만 입력하면 장면 흐름과 제목, 본문, Kling 프롬프트를 먼저 기획합니다.
+              </p>
 
-          {attachedImages.length > 0 && (
-            <div className="flex gap-2">
-              {attachedImages.map((img, i) => (
-                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.preview} alt="" className="h-full w-full object-cover" />
-                  <button type="button" onClick={() => removeImage(i)}
-                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
-                    <X className="h-2.5 w-2.5" />
+              <div className="mt-6 w-full">
+                {renderComposer('hero')}
+              </div>
+
+              <div className="mt-9 grid w-full max-w-[760px] gap-4 md:grid-cols-[0.86fr_1.14fr]">
+                <div className="space-y-3 text-left">
+                  <p className="px-1 text-[11px] font-bold text-[#64748b]">제작 설정</p>
+                  <button type="button" onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-[#c7d4ff] bg-white/62 px-4 py-3 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl transition-all hover:bg-white/78">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
+                      <ImagePlus className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-[#111827]">참고 이미지</span>
+                      <span className="block text-xs font-medium text-[#94a3b8]">최대 3장까지 장면에 반영</span>
+                    </span>
                   </button>
+                  <div className="flex w-full items-center gap-3 rounded-2xl border border-[#c7d4ff] bg-white/62 px-4 py-3 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                      <Clapperboard className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-[#111827]">{slideCount}장 구성</span>
+                      <span className="block text-xs font-medium text-[#94a3b8]">상단 composer에서 즉시 변경</span>
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Slide count selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#9ca3af] font-semibold">슬라이드</span>
-            {([3, 5, 7] as const).map(n => (
-              <button
-                key={n}
-                type="button"
-                disabled={generating || isStartingGeneration || phase === 'generating'}
-                onClick={() => handleSlideCountChange(n)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                  slideCount === n
-                    ? 'bg-[#111111] text-white'
-                    : 'bg-[#eeeeee] text-[#374151] hover:bg-[#e5e7eb]'
-                } disabled:opacity-50`}
-              >
-                {n}장
-              </button>
-            ))}
+                <div className="rounded-2xl border border-[#c7d4ff] bg-white/62 p-4 text-left shadow-[0_14px_34px_rgba(87,119,185,0.10)] backdrop-blur-xl">
+                  <p className="mb-3 flex items-center gap-2 text-xs font-bold text-[#111827]">
+                    <Sparkles className="h-3.5 w-3.5 text-[#6366f1]" />
+                    예시를 시도하세요
+                  </p>
+                  <div className="space-y-1.5">
+                    {quickPrompts.map(example => (
+                      <button
+                        key={example}
+                        type="button"
+                        onClick={() => applyQuickPrompt(example)}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-semibold leading-5 text-[#334155] transition-all hover:bg-white/72"
+                      >
+                        <span>{example}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
-
-          <div className={`flex items-center gap-2 rounded-[22px] border bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.14)] transition-all focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.18)] ${isDragging ? 'border-[#93b8ff]' : 'border-white/75'}`}>
-            <button type="button" disabled={generating || isStartingGeneration || attachedImages.length >= 3}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9ca3af] hover:text-[#6b7280] transition-colors disabled:opacity-40">
-              <ImagePlus className="h-4 w-4" />
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
-              onChange={e => { if (e.target.files) addImages(e.target.files); e.target.value = '' }} />
-
-            <textarea ref={inputRef} rows={2} value={topic}
-              onChange={e => setTopic(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={getPlaceholder()}
-              disabled={inputDisabled}
-              className="flex-1 resize-none bg-transparent border-none outline-none px-2 py-1 text-sm text-[#111111] placeholder-[#9ca3af] disabled:opacity-50 transition-all" />
-
-            {generationBusy ? (
-              <button type="button" onClick={handleStopGenerate}
-                className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-4 text-xs font-bold text-white shadow-[0_10px_22px_rgba(39,39,42,0.18)] transition-colors hover:bg-[#27272a]">
-                <Square className="h-3.5 w-3.5 fill-current" />
-                중단하기
-              </button>
-            ) : (
-              <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#27272a] text-white hover:bg-[#18181b] disabled:opacity-30 transition-colors">
-                <Send className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Right: Script panel */}
