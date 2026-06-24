@@ -1287,7 +1287,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         }
       ` }} />
       {/* Left: Chat */}
-      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[#edf2ff] bg-white">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-video-ambient" />
 
         {/* Header */}
@@ -1400,9 +1400,6 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           </div>
         )}
       </div>
-
-      {/* Right: Script panel */}
-      <ScriptPanel aiMessages={aiMessages} />
     </div>
   )
 }
@@ -2140,8 +2137,6 @@ function SlideProgressRow({ sp }: { sp: SlideProgress }) {
   )
 }
 
-// ── Script panel (right side) ────────────────────────────────────
-
 const ROLE_LABEL: Record<string, string> = {
   hook: 'HOOK',
   context: 'CONTEXT',
@@ -2150,93 +2145,4 @@ const ROLE_LABEL: Record<string, string> = {
   stat: 'STAT',
   summary: 'SUMMARY',
   'save-cta': 'CTA',
-}
-
-function ScriptPanel({ aiMessages }: { aiMessages: AiChatMessage[] }) {
-  const latest = aiMessages.filter(m => m.type === 'progress' || m.type === 'result').pop()
-  const slideProgress = latest?.slideProgress ?? []
-  const resultSlides = latest?.slides
-
-  return (
-    <div className="hidden w-[340px] shrink-0 flex-col xl:flex bg-white border-l border-[#e5e7eb]">
-      <div className="shrink-0 border-b border-[#e5e7eb] bg-white px-5 py-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6b7280] mb-1 flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3" /> 슬라이드 스크립트
-        </p>
-        <p className="text-sm font-bold text-[#111111]">AI 기획 내용</p>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3">
-        <AnimatePresence initial={false}>
-          {slideProgress.length === 0 && !resultSlides && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center h-48 text-center gap-3"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f3f4f6] border border-[#e5e7eb] shadow-sm">
-                <Film className="h-5 w-5 text-[#9ca3af]" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#374151]">스크립트 미리보기</p>
-                <p className="text-[11px] text-[#6b7280] mt-1">주제를 입력하면<br />슬라이드별 스크립트가 여기 나타납니다</p>
-              </div>
-            </motion.div>
-          )}
-
-          {slideProgress.length > 0 && !resultSlides && slideProgress.map((sp, i) => (
-            <motion.div
-              key={`sp-${sp.slideNumber}`}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.04 }}
-              className={`rounded-xl border p-3.5 transition-all ${
-                sp.status === 'done' ? 'bg-emerald-50/60 border-emerald-100' :
-                sp.status === 'generating' ? 'bg-white border-[#4252ff] shadow-sm' :
-                sp.status === 'error' ? 'bg-red-50/60 border-red-100' :
-                'bg-white border-[#e5e7eb]'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#f3f4f6] text-[10px] font-black text-[#374151]">
-                  {sp.slideNumber}
-                </span>
-                {sp.status === 'generating' && <Loader2 className="h-3 w-3 text-[#4252ff] animate-spin ml-auto" />}
-                {sp.status === 'done' && <Check className="h-3 w-3 text-emerald-500 ml-auto" />}
-                {sp.status === 'error' && <AlertCircle className="h-3 w-3 text-red-400 ml-auto" />}
-              </div>
-              <div className="text-[11px] text-[#6b7280]">
-                {sp.status === 'waiting' && '영상 생성 대기 중'}
-                {sp.status === 'generating' && `렌더링 중${sp.elapsed ? ` (${sp.elapsed}초)` : '...'}`}
-                {sp.status === 'done' && '영상 완성'}
-                {sp.status === 'error' && <span className="text-red-400 text-[10px]">{sp.error}</span>}
-              </div>
-            </motion.div>
-          ))}
-
-          {resultSlides && resultSlides.map((slide, i) => (
-            <motion.div
-              key={`slide-${slide.slideNumber}`}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.06 }}
-              className={`rounded-xl border p-3.5 ${slide.videoUrl ? 'bg-white border-[#e5e7eb]' : 'bg-red-50/60 border-red-100 opacity-60'}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-[#111827] text-[9px] font-black text-white">
-                  {slide.slideNumber}
-                </span>
-                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#374151] bg-[#f3f4f6] rounded-full px-2 py-0.5">
-                  {ROLE_LABEL[slide.role] ?? slide.role}
-                </span>
-                {slide.videoUrl
-                  ? <Check className="h-3 w-3 text-emerald-500 ml-auto" />
-                  : <AlertCircle className="h-3 w-3 text-red-400 ml-auto" />}
-              </div>
-              <p className="text-[12px] font-bold text-[#111111] leading-5 mb-1">{slide.headline}</p>
-              <p className="text-[11px] text-[#6b7280] leading-relaxed">{slide.body}</p>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-    </div>
-  )
 }
