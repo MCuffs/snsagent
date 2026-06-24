@@ -254,8 +254,9 @@ export function buildCarouselVideoPrompts(
   // Establish a "visual anchor" — shared subject context across all slides
   const anchorDomain = domainLabel || 'general'
   const anchorStyle = DOMAIN_VISUAL_STYLE[anchorDomain] || DOMAIN_VISUAL_STYLE.general
+  const continuityBible = buildContinuityBible(topic, anchorStyle, brandTone)
 
-  return slides.map(slide => {
+  return slides.map((slide, index) => {
     const base = buildVideoPrompt({
       ...slide,
       topic,
@@ -266,15 +267,74 @@ export function buildCarouselVideoPrompts(
       referenceImageCount: referenceImageUrls.length,
     })
 
-    // Add coherence note to all slides after the first
-    if (slide.slideNumber > 1) {
-      const coherenceNote = `Maintain visual consistency with the series: same ${anchorStyle.colorGrade} color grade, same ${anchorStyle.lightingTemp} lighting character, same visual world as slide 1.`
-      return {
-        prompt: base.prompt + '\n\n' + coherenceNote,
-        negativeHint: base.negativeHint,
-      }
-    }
+    const previous = slides[index - 1]
+    const next = slides[index + 1]
+    const continuityNote = buildContinuityNote({
+      current: slide,
+      previous,
+      next,
+      totalSlides: slides.length,
+      continuityBible,
+    })
 
-    return base
+    return {
+      prompt: `${base.prompt}\n\n${continuityNote}`,
+      negativeHint: base.negativeHint,
+    }
   })
+}
+
+function buildContinuityBible(
+  topic: string,
+  anchorStyle: (typeof DOMAIN_VISUAL_STYLE)[string],
+  brandTone?: string,
+) {
+  return [
+    'Series continuity bible:',
+    `All clips belong to one continuous cinematic sequence about "${topic}".`,
+    `Use the same visual world, same primary subject type (${anchorStyle.subject}), same location family, same ${anchorStyle.lightingTemp} lighting character, and same ${anchorStyle.colorGrade} color grade.`,
+    brandTone ? `Keep the same brand tone throughout: ${brandTone}.` : '',
+    'Do not reset into a new unrelated stock scene between cards. Avoid changing to a different location, different subject identity, different time of day, or different visual genre.',
+  ].filter(Boolean).join(' ')
+}
+
+function buildContinuityNote(params: {
+  current: {
+    slideNumber: number
+    role: EditorialSlideRole
+    headline: string
+    body: string
+  }
+  previous?: {
+    slideNumber: number
+    role: EditorialSlideRole
+    headline: string
+    body: string
+  }
+  next?: {
+    slideNumber: number
+    role: EditorialSlideRole
+    headline: string
+    body: string
+  }
+  totalSlides: number
+  continuityBible: string
+}) {
+  const { current, previous, next, totalSlides, continuityBible } = params
+  const sequencePosition = `This is scene ${current.slideNumber} of ${totalSlides}, not a standalone video.`
+  const previousBeat = previous
+    ? `It should feel like it continues from scene ${previous.slideNumber}, where the visual idea was "${previous.headline}". Begin with the same subject, location, lighting, and camera direction already established.`
+    : 'This is the establishing scene. Introduce the subject, location, lighting, and camera direction clearly so the following scenes can continue from it.'
+  const nextBeat = next
+    ? `End with a visual cue that can naturally lead into scene ${next.slideNumber}, whose next idea is "${next.headline}".`
+    : 'End with a calm resolved final beat that feels like the conclusion of the same sequence.'
+
+  return [
+    continuityBible,
+    sequencePosition,
+    previousBeat,
+    `Current narrative beat: "${current.headline}" — ${current.body}`,
+    nextBeat,
+    'Camera continuity: keep motion smooth and progressive, as if each card is the next cut in the same short film. Use subtle match-cut logic, consistent lens feel, and no abrupt visual reset.',
+  ].join(' ')
 }

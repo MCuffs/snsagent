@@ -154,6 +154,8 @@ function buildEditableVideoPlan(
     const label = roleLabel(role)
     const headline = buildDraftHeadline(role, cleanTopic, slideNumber, requestedBrandText)
     const body = buildDraftBody(role, cleanTopic, audience, requestedBrandText)
+    const previousRole = roles[index - 1]
+    const nextRole = roles[index + 1]
     return {
       slideNumber,
       role,
@@ -169,6 +171,9 @@ function buildEditableVideoPlan(
         mood,
         brandName: brand.name,
         requestedBrandText,
+        totalSlides: roles.length,
+        previousLabel: previousRole ? roleLabel(previousRole) : null,
+        nextLabel: nextRole ? roleLabel(nextRole) : null,
       }),
     }
   })
@@ -224,20 +229,42 @@ function buildSceneVideoPrompt(params: {
   mood: string
   brandName: string
   requestedBrandText: string
+  totalSlides: number
+  previousLabel: string | null
+  nextLabel: string | null
 }) {
   const scene = buildSceneDirection(params)
   const textRule = params.requestedBrandText
     ? `Readable text rule: the only readable text allowed is exactly "${params.requestedBrandText}" on the computer monitor or final close-up. Do not add any other words, subtitles, UI labels, menus, watermarks, or random logos.`
     : 'No readable text, no subtitles, no UI labels, no logo, no watermark.'
+  const continuity = buildEditableContinuityDirection(params)
 
   return [
     'Wide 16:9 cinematic video for the upper media panel of a vertical card news layout.',
-    `Scene ${params.slideNumber} (${params.label}).`,
+    `Scene ${params.slideNumber} of ${params.totalSlides} (${params.label}) in one continuous sequence.`,
+    continuity,
     scene,
     `Topic: ${params.topic}. Message: ${params.audience}. Mood: ${params.mood}. Brand context: ${params.brandName}.`,
     textRule,
-    'Keep the main subject centered with generous headroom and side margins. Natural subtle motion, realistic office lighting, clean premium composition.',
+    'Keep the same subject identity or object family, same location family, same lighting, same color grade, same lens feel, and same premium composition across all scenes. Keep the main subject centered with generous headroom and side margins. Natural subtle motion, realistic office lighting, clean premium composition. Do not reset into an unrelated stock scene.',
   ].join(' ')
+}
+
+function buildEditableContinuityDirection(params: {
+  slideNumber: number
+  totalSlides: number
+  label: string
+  previousLabel: string | null
+  nextLabel: string | null
+}) {
+  const intro = params.slideNumber === 1
+    ? 'This opening scene establishes the visual world, main subject, location, lighting, and camera direction for the entire sequence.'
+    : `This scene continues directly from scene ${params.slideNumber - 1}${params.previousLabel ? ` (${params.previousLabel})` : ''}; begin with the same visual world, subject, location, lighting, and camera direction already established.`
+  const outro = params.slideNumber < params.totalSlides
+    ? `End with a natural visual cue that leads into scene ${params.slideNumber + 1}${params.nextLabel ? ` (${params.nextLabel})` : ''}.`
+    : 'End as the resolved final beat of the same sequence, not as a separate commercial shot.'
+
+  return `${intro} Current beat: ${params.label}. ${outro} Camera continuity should feel like the next cut in one short film, using subtle match-cut logic and no abrupt visual reset.`
 }
 
 function buildSceneDirection(params: {
