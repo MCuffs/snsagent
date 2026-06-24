@@ -375,6 +375,7 @@ function buildSceneDirection(params: {
 export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const router = useRouter()
   const locale = useLocale()
+  const isEn = locale === 'en'
   const [topic, setTopic] = useState('')
   const [userMessages, setUserMessages] = useState<UserChatMessage[]>([])
   const [aiMessages, setAiMessages] = useState<AiChatMessage[]>([])
@@ -518,7 +519,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           videoContinuityMode: info.videoContinuityMode ?? 'separate',
           domainLabel: brand.industry,
           brandTone: brand.toneOfVoice,
-          language: 'ko',
+          language: isEn ? 'en' : 'ko',
           referenceImageUrls,
           plannedSlides: info.videoPlan,
         }),
@@ -1127,6 +1128,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
   const inputDisabled = generationBusy || isWaiting || phase === 'confirming' || phase === 'done'
   const hasConversation = userMessages.length > 0 || aiMessages.length > 0 || phase !== 'idle'
   const getPlaceholder = () => {
+    if (isEn) {
+      if (phase === 'idle') return 'Enter a video card news topic...'
+      if (phase === 'clarifying') return 'Answer the AI director question...'
+      if (phase === 'confirming') return 'Choose Generate now or Start over.'
+      return 'Generating...'
+    }
     if (phase === 'idle') return '영상 카드뉴스 주제를 입력하세요...'
     if (phase === 'clarifying') return 'AI 디렉터의 질문에 답해 주세요...'
     if (phase === 'confirming') return '[지금 만들기] 또는 [처음부터] 버튼을 눌러주세요'
@@ -1171,7 +1178,11 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               value={topic}
               onChange={e => setTopic(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isHero ? '예: 신제품 출시 소식을 20대 직장인에게 감각적으로 보여주는 5장 영상 카드뉴스' : getPlaceholder()}
+              placeholder={isHero
+                ? (isEn
+                  ? 'Ex. A 5-scene video card news that introduces our new sunscreen to office workers in their 20s'
+                  : '예: 신제품 출시 소식을 20대 직장인에게 감각적으로 보여주는 5장 영상 카드뉴스')
+                : getPlaceholder()}
               disabled={inputDisabled}
               className={`w-full resize-none border-none bg-transparent px-0 text-[#111111] outline-none placeholder-[#a8b0bd] disabled:opacity-50 ${isHero ? 'min-h-[118px] text-[15px] leading-7' : 'text-sm leading-6'}`}
             />
@@ -1181,7 +1192,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 <button type="button" disabled={generating || isStartingGeneration || attachedImages.length >= 3}
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:text-[#334155] disabled:opacity-40"
-                  title="참고 이미지 추가">
+                  title={isEn ? 'Add reference image' : '참고 이미지 추가'}>
                   <ImagePlus className="h-3.5 w-3.5" />
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
@@ -1209,13 +1220,13 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
                 <button type="button" onClick={handleStopGenerate}
                   className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#3f3f46] px-4 text-xs font-bold text-white shadow-[0_10px_22px_rgba(39,39,42,0.18)] transition-colors hover:bg-[#27272a]">
                   <Square className="h-3.5 w-3.5 fill-current" />
-                  중단하기
+                  {isEn ? 'Stop' : '중단하기'}
                 </button>
               ) : (
                 <button type="button" onClick={handleSend} disabled={inputDisabled || (!topic.trim() && attachedImages.length === 0)}
                   className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#4252ff] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(66,82,255,0.22)] transition-all hover:bg-[#3442e8] hover:shadow-[0_16px_34px_rgba(66,82,255,0.26)] disabled:opacity-30">
                   <Send className="h-4 w-4" />
-                  시작
+                  {isEn ? 'Start' : '시작'}
                 </button>
               )}
             </div>
@@ -1243,10 +1254,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             <Film className="h-7 w-7 text-[#4252ff]" />
           </div>
           <div className="space-y-2">
-            <p className="text-lg font-bold text-[#111111]">영상 카드뉴스가 완성됐습니다</p>
+            <p className="text-lg font-bold text-[#111111]">{isEn ? 'Video card news is ready' : '영상 카드뉴스가 완성됐습니다'}</p>
             <p className="text-sm text-[#6b7280] flex items-center gap-2 justify-center">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              편집 화면으로 이동하는 중...
+              {isEn ? 'Moving to the editor...' : '편집 화면으로 이동하는 중...'}
             </p>
           </div>
         </motion.div>
@@ -1294,7 +1305,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         <div className="relative z-10 shrink-0 border-b border-white/60 bg-white/55 px-5 py-3 backdrop-blur-xl flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
             <Clapperboard className="h-3.5 w-3.5" />
-            영상 카드뉴스
+            {isEn ? 'Video card news' : '영상 카드뉴스'}
             <span className="rounded-full bg-[#111827] px-1.5 py-0.5 text-[9px] font-black text-white tracking-wide">BETA</span>
           </div>
           <div className="flex items-center gap-3">
@@ -1302,7 +1313,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               <button type="button" onClick={handleReset}
                 className="flex items-center gap-1 text-[11px] text-[#9ca3af] hover:text-[#6b7280] transition-colors">
                 <RotateCcw className="h-3 w-3" />
-                처음부터
+                {isEn ? 'Start over' : '처음부터'}
               </button>
             )}
             <div className="text-xs text-[#9ca3af]">
@@ -1385,10 +1396,12 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               className="flex w-full max-w-[820px] flex-col items-center text-center"
             >
               <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
-                어떤 영상 카드뉴스를 만들까요?
+                {isEn ? 'What video card news should we make?' : '어떤 영상 카드뉴스를 만들까요?'}
               </h1>
               <p className="mt-3 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">
-                주제, 타깃, 분위기만 입력하면 장면 흐름과 제목, 본문, Kling 프롬프트를 먼저 기획합니다.
+                {isEn
+                  ? 'Enter a topic, target, and mood first. Shuffla will plan scenes, titles, body copy, and Kling prompts.'
+                  : '주제, 타깃, 분위기만 입력하면 장면 흐름과 제목, 본문, Kling 프롬프트를 먼저 기획합니다.'}
               </p>
 
               <div className="mt-6 w-full">

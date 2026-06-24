@@ -114,6 +114,7 @@ interface CopyPreviewSlide {
 }
 
 const NEW_TOPIC_OPTION_VALUE = '__SHUFFLA_NEW_TOPIC__'
+const DISABLE_INITIAL_GREETING = true
 
 function truncateOptionLabel(label: string, locale: string) {
   const max = locale === 'en' ? 30 : 18
@@ -252,7 +253,7 @@ export default function GenerateForm({
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [isWaiting, setIsWaiting] = useState(true)
+  const [isWaiting, setIsWaiting] = useState(false)
   const [isRevealingMessage, setIsRevealingMessage] = useState(false)
   const [readyParams, setReadyParams] = useState<GenerateParams | null>(null)
   const [, setBriefingStage] = useState(0)
@@ -273,6 +274,7 @@ export default function GenerateForm({
   const generating = phase === 'generating'
 
   const generationMode = brand.websiteUrl === 'general_profile' ? 'general' : 'brand'
+  const shouldShowHero = !isWaiting && displayMessages.length === 0 && !readyParams && !isRevealingMessage
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -554,7 +556,7 @@ export default function GenerateForm({
 
   // Load the initial Agent greeting (Brand Mode only)
   useEffect(() => {
-    if (generationMode !== 'brand') return
+    if (generationMode !== 'brand' || DISABLE_INITIAL_GREETING) return
     let active = true
     const loadGreeting = async () => {
       try {
@@ -583,7 +585,7 @@ export default function GenerateForm({
   // General Mode: show greeting and wait for user to enter a topic.
   // The agent route handles RSS fetching server-side when processing messages.
   useEffect(() => {
-    if (generationMode !== 'general') return
+    if (generationMode !== 'general' || DISABLE_INITIAL_GREETING) return
 
     let active = true
     const greet = async () => {
@@ -1120,15 +1122,92 @@ export default function GenerateForm({
         {/* Header containing Brand chip & Mode Label */}
         <div className="relative z-10 shrink-0 border-b border-white/60 bg-white/55 px-5 py-3 backdrop-blur-xl flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
-            <span className="h-2.5 w-2.5 rounded-full shadow-sm" style={{ backgroundColor: brand.mainColor || '#3b82f6' }} />
-            {brand.name}
+            <Sparkles className="h-3.5 w-3.5" />
+            {locale === 'en' ? 'Image card news' : '이미지 카드뉴스'}
           </div>
 
-          <div className="text-xs text-[#9ca3af]">
-            {generationMode === 'general' ? t('mode_general') : t('mode_brand')}
+          <div className="flex items-center gap-3 text-xs text-[#9ca3af]">
+            <span>{generationMode === 'general' ? t('mode_general') : t('mode_brand')}</span>
+            <span>{brand.name}</span>
           </div>
         </div>
 
+        {shouldShowHero ? (
+          <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-8">
+            <motion.div
+              variants={formItemVariants}
+              className="flex w-full max-w-[820px] flex-col items-center text-center"
+            >
+              <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
+                {locale === 'en' ? 'What image card news should we make?' : '어떤 이미지 카드뉴스를 만들까요?'}
+              </h1>
+              <p className="mt-3 max-w-[590px] text-sm font-medium leading-6 text-[#64748b]">
+                {locale === 'en'
+                  ? 'Enter a topic, target, and mood first. Shuffla will plan the hook, body copy, and visual direction.'
+                  : '주제, 타깃, 분위기만 입력하면 후킹 제목, 본문, 비주얼 방향을 먼저 기획합니다.'}
+              </p>
+
+              <form onSubmit={handleSend} className="mt-6 w-full max-w-[760px]">
+                <div className="rounded-[24px] border border-[#dfe7ff] bg-white/86 px-5 py-5 shadow-[0_24px_68px_rgba(79,70,229,0.13)] backdrop-blur-xl transition-all focus-within:border-[#c4b5fd] focus-within:bg-white/92 focus-within:shadow-[0_28px_82px_rgba(79,70,229,0.17)]">
+                  <textarea
+                    rows={4}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void handleSend()
+                      }
+                    }}
+                    placeholder={locale === 'en'
+                      ? 'Ex. A 5-slide card news that introduces our new sunscreen to office workers in their 20s'
+                      : '예: 신제품 출시 소식을 20대 직장인에게 감각적으로 보여주는 5장 이미지 카드뉴스'}
+                    disabled={isWaiting || isRevealingMessage}
+                    className="min-h-[118px] w-full resize-none border-none bg-transparent px-0 text-[15px] leading-7 text-[#111111] outline-none placeholder-[#a8b0bd] disabled:opacity-50"
+                    autoFocus
+                  />
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#94a3b8] opacity-70"
+                        title={locale === 'en' ? 'Reference images can be added after planning.' : '참고 이미지는 기획 후 추가할 수 있습니다.'}
+                      >
+                        <ImagePlus className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white/84 p-1">
+                        {[3, 5, 7].map((count) => (
+                          <span
+                            key={count}
+                            className={`flex h-6 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-bold ${
+                              count === 5 ? 'bg-[#4252ff] text-white' : 'text-[#64748b]'
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || isWaiting || isRevealingMessage}
+                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#4252ff] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(66,82,255,0.22)] transition-all hover:bg-[#3442e8] hover:shadow-[0_16px_34px_rgba(66,82,255,0.26)] disabled:opacity-30"
+                    >
+                      <Send className="h-4 w-4" />
+                      {locale === 'en' ? 'Start' : '시작'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <ImageCardNewsHeroMockup />
+            </motion.div>
+          </div>
+        ) : (
+          <>
         {/* Messages */}
         <div className="relative z-10 flex-1 overflow-y-auto bg-transparent px-6 py-8 custom-scrollbar" aria-live="polite">
           <div className="mx-auto flex w-full max-w-[920px] flex-col gap-7">
@@ -1393,12 +1472,73 @@ export default function GenerateForm({
             </form>
           </div>
         </div>
+          </>
+        )}
       </motion.div>
     </motion.div>
   )
 }
 
 // ── Role label map ────────────────────────────────────────────────
+
+function ImageCardNewsHeroMockup() {
+  const cards = [
+    {
+      label: '01',
+      title: '후킹을 잡고',
+      body: '첫 장에서 시선을 멈추게 합니다',
+      tone: 'from-[#dbeafe] via-[#f4f7ff] to-[#ffffff]',
+      panel: 'bg-[#111827]',
+    },
+    {
+      label: '02',
+      title: '메시지를 엮고',
+      body: '제목과 본문을 카드 하단에 정리합니다',
+      tone: 'from-[#ede9fe] via-[#f8f7ff] to-[#ffffff]',
+      panel: 'bg-[#0f172a]',
+    },
+    {
+      label: '03',
+      title: '흐름을 완성',
+      body: '연결된 카드뉴스로 저장합니다',
+      tone: 'from-[#e0f2fe] via-[#f5f3ff] to-[#ffffff]',
+      panel: 'bg-[#18181b]',
+    },
+  ]
+
+  return (
+    <div className="mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
+      {cards.map((card, index) => (
+        <motion.div
+          key={card.label}
+          initial={{ opacity: 0, y: 18, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
+          animate={{ opacity: 1, y: 0, rotate: index === 0 ? -2 : index === 2 ? 2 : 0 }}
+          transition={{ duration: 0.72, delay: 0.1 + index * 0.08, ease: [0.19, 1, 0.22, 1] }}
+          className={`relative w-[30%] min-w-[96px] max-w-[150px] overflow-hidden rounded-[18px] border border-white/80 bg-white/70 p-1.5 shadow-[0_22px_60px_rgba(79,70,229,0.12)] backdrop-blur-xl ${index === 1 ? 'mb-5 scale-105' : 'mb-0'}`}
+        >
+          <div className="aspect-[4/5] overflow-hidden rounded-[14px] bg-white">
+            <div className={`relative h-[48%] bg-gradient-to-br ${card.tone}`}>
+              <div className="absolute inset-x-3 top-3 flex items-center justify-between">
+                <span className="h-1.5 w-8 rounded-full bg-white/80" />
+                <span className="h-5 w-5 rounded-full bg-white/70" />
+              </div>
+              <div className="absolute left-3 top-10 h-10 w-10 rounded-2xl bg-white/58 shadow-sm" />
+              <div className="absolute bottom-4 right-3 h-14 w-9 rounded-full bg-white/68 shadow-sm" />
+              <div className="absolute bottom-3 left-3 h-2 w-16 rounded-full bg-white/80" />
+            </div>
+            <div className={`${card.panel} flex h-[52%] flex-col justify-between p-3 text-left text-white`}>
+              <span className="text-[9px] font-black tracking-[0.18em] text-white/42">{card.label}</span>
+              <div>
+                <p className="text-[13px] font-black leading-4">{card.title}</p>
+                <p className="mt-2 text-[10px] font-semibold leading-4 text-white/58">{card.body}</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
 
 function CopyPreviewPanel({
   slides,
