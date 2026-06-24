@@ -278,19 +278,20 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
   // ── URL Phase ──────────────────────────────────────────────────
   if (phase === 'url') {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center px-6 py-16">
+      <div className="relative isolate flex min-h-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-16">
+        <ProfileAmbientBackdrop />
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="w-full max-w-lg"
+          className="relative z-10 w-full max-w-[760px] text-center"
         >
           <motion.div variants={itemVariants} className="mb-10">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Step 1 of 1</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#111111]">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748b]">Brand Concept</p>
+            <h1 className="mt-3 text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
               {t('url_title')}
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[#52525b]">
+            <p className="mx-auto mt-3 max-w-[590px] text-sm font-medium leading-6 text-[#64748b]">
               {t('url_desc')}
             </p>
           </motion.div>
@@ -302,7 +303,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             </motion.div>
           )}
 
-          <motion.form variants={itemVariants} onSubmit={handleAnalyze} className="space-y-4">
+          <motion.form variants={itemVariants} onSubmit={handleAnalyze} className="space-y-4 rounded-[24px] border border-[#dfe7ff] bg-white/86 p-5 text-left shadow-[0_24px_68px_rgba(79,70,229,0.13)] backdrop-blur-xl">
             <div className="relative">
               <Globe className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a1a1aa]" />
               <input
@@ -312,19 +313,19 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                 disabled={isAnalyzing}
                 required
                 placeholder="https://smartstore.naver.com/..."
-                className="h-12 w-full rounded-lg border border-[#e4e4e7] bg-white pl-11 pr-4 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10 disabled:opacity-50"
+                className="h-12 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 pl-11 pr-4 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10 disabled:opacity-50"
               />
             </div>
 
             {isAnalyzing && (
-              <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] p-4">
+              <div className="rounded-2xl border border-[#dfe7ff] bg-[#f8fbff] p-4">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-xs font-medium text-[#0066ff]">{steps[analyzeStep]}</span>
+                  <span className="text-xs font-bold text-[#4252ff]">{steps[analyzeStep]}</span>
                   <span className="text-xs text-[#71717a]">{Math.round(((analyzeStep + 1) / 4) * 100)}%</span>
                 </div>
                 <div className="h-1 w-full overflow-hidden rounded-full bg-[#e4e4e7]">
                   <div
-                    className="h-full bg-[#0066ff] transition-all duration-1000 ease-out"
+                    className="h-full bg-[#4252ff] transition-all duration-1000 ease-out"
                     style={{ width: `${((analyzeStep + 1) / 4) * 100}%` }}
                   />
                 </div>
@@ -334,7 +335,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             <button
               type="submit"
               disabled={isAnalyzing || !url}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#111111] text-sm font-semibold text-white transition hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#4252ff] text-sm font-bold text-white shadow-[0_12px_28px_rgba(66,82,255,0.22)] transition-all hover:bg-[#3442e8] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isAnalyzing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -355,8 +356,8 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                 transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
                 className="mt-4 space-y-4 overflow-hidden"
               >
-                <div className="rounded-lg border border-[#e4e4e7] bg-[#fafafa] overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e4e4e7] bg-white">
+                <div className="overflow-hidden rounded-2xl border border-[#dfe7ff] bg-white/78 shadow-[0_16px_42px_rgba(79,70,229,0.10)] backdrop-blur-xl">
+                  <div className="flex items-center gap-2 border-b border-[#edf1ff] bg-white/72 px-4 py-3">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                     <span className="text-xs font-semibold text-[#111111]">{t('analysis_complete')}</span>
                   </div>
@@ -390,7 +391,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                     }
                   }}
                   disabled={isSaving}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0066ff] text-sm font-semibold text-white transition hover:bg-[#0052cc] disabled:opacity-50"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#111827] text-sm font-bold text-white transition hover:bg-[#1f2937] disabled:opacity-50"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {t('save_continue')}
@@ -417,26 +418,27 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
 
   // ── Profile Phase ──────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative isolate flex h-full overflow-hidden bg-white">
+      <ProfileAmbientBackdrop />
       {/* Main form */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="relative z-10 flex-1 overflow-y-auto">
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="mx-auto max-w-2xl px-6 py-12"
+        className="mx-auto max-w-[920px] px-6 py-10"
       >
-      <motion.div variants={itemVariants} className="mb-10 flex items-start justify-between">
+      <motion.div variants={itemVariants} className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">Brand Concept</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#111111]">{t('profile_title')}</h1>
-          <p className="mt-1.5 text-sm text-[#52525b]">{t('profile_desc')}</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748b]">Brand Concept</p>
+          <h1 className="mt-2 text-[28px] font-black tracking-[-0.01em] text-[#111827]">{t('profile_title')}</h1>
+          <p className="mt-2 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">{t('profile_desc')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setPhase('url')}
-            className="flex items-center gap-1.5 rounded-md border border-[#e4e4e7] bg-white px-3 py-1.5 text-xs font-medium text-[#52525b] hover:border-[#a1a1aa] transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-white/82 px-3 py-1.5 text-xs font-bold text-[#64748b] shadow-sm backdrop-blur-xl transition-colors hover:border-[#c7d2fe] hover:text-[#111827]"
           >
             <Globe className="h-3.5 w-3.5" />
             {t('reanalyze')}
@@ -444,10 +446,10 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
           <button
             type="button"
             onClick={() => setChatOpen(prev => !prev)}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur-xl transition-colors ${
               chatOpen
-                ? 'border-[#0066ff] bg-[#0066ff]/5 text-[#0066ff]'
-                : 'border-[#e4e4e7] bg-white text-[#52525b] hover:border-[#a1a1aa]'
+                ? 'border-[#4252ff] bg-[#f5f7ff] text-[#4252ff]'
+                : 'border-[#e5e7eb] bg-white/82 text-[#64748b] hover:border-[#c7d2fe] hover:text-[#111827]'
             }`}
           >
             <MessageCircle className="h-3.5 w-3.5" />
@@ -469,7 +471,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         </motion.div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-8">
+      <form onSubmit={handleSave} className="space-y-5">
         {/* Store URL */}
         <Section title={t('section_url')}>
           <div className="relative">
@@ -479,7 +481,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://smartstore.naver.com/..."
-              className="h-11 w-full rounded-lg border border-[#e4e4e7] bg-white pl-10 pr-3 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+              className="h-11 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 pl-10 pr-3 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
             />
           </div>
         </Section>
@@ -503,7 +505,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             onChange={(e) => handleBrandDescriptionChange(e.target.value)}
             placeholder={t('brand_desc_placeholder')}
             rows={4}
-            className="w-full resize-none rounded-lg border border-[#e4e4e7] bg-white px-3.5 py-2.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+            className="w-full resize-none rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 py-2.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
           />
         </Section>
 
@@ -518,10 +520,10 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   key={mood.id}
                   type="button"
                   onClick={() => setVisualMood(mood.id)}
-                  className={`rounded-lg border p-3 text-left transition-all ${
+                  className={`rounded-2xl border p-3 text-left transition-all ${
                     visualMood === mood.id
-                      ? 'border-[#0066ff] bg-[#0066ff]/5 ring-1 ring-[#0066ff]'
-                      : 'border-[#e4e4e7] bg-white hover:border-[#a1a1aa]'
+                      ? 'border-[#4252ff] bg-[#f5f7ff] shadow-[0_12px_28px_rgba(66,82,255,0.10)] ring-1 ring-[#4252ff]'
+                      : 'border-[#e5e7eb] bg-white/82 hover:border-[#c7d2fe]'
                   }`}
                 >
                   <p className="text-xs font-semibold text-[#111111]">{mood.label}</p>
@@ -541,13 +543,13 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   value={mainColor}
                   onChange={(e) => setMainColor(e.target.value)}
                   placeholder="#0066ff"
-                  className="h-11 flex-1 rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+                  className="h-11 flex-1 rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
                 />
                 <input
                   type="color"
                   value={mainColor.startsWith('#') && mainColor.length === 7 ? mainColor : '#0066ff'}
                   onChange={(e) => setMainColor(e.target.value)}
-                  className="h-11 w-11 cursor-pointer rounded-lg border border-[#e4e4e7] p-1"
+                  className="h-11 w-11 cursor-pointer rounded-2xl border border-[#e5e7eb] bg-white/88 p-1"
                   aria-label={t('color_picker')}
                 />
               </div>
@@ -583,11 +585,11 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
         </Section>
 
         {/* Actions */}
-        <motion.div variants={itemVariants} className="flex items-center gap-3 border-t border-[#e4e4e7] pt-6">
+        <motion.div variants={itemVariants} className="flex items-center gap-3 pt-2">
           <button
             type="submit"
             disabled={isSaving || !name}
-            className="flex h-11 items-center gap-2 rounded-lg bg-[#111111] px-5 text-sm font-semibold text-white transition hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 items-center gap-2 rounded-full bg-[#111827] px-5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(15,23,42,0.16)] transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {t('save_btn')}
@@ -602,7 +604,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                 window.history.pushState(null, '', newUrl)
                 setActiveTab('generate')
               }}
-              className="flex h-11 items-center gap-2 rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#a1a1aa] hover:bg-[#fafafa]"
+              className="flex h-11 items-center gap-2 rounded-full border border-[#dfe7ff] bg-white/86 px-5 text-sm font-bold text-[#111827] shadow-sm backdrop-blur-xl transition hover:border-[#c7d2fe] hover:bg-[#f8fbff]"
             >
               {t('continue_btn')}
               <ArrowRight className="h-4 w-4" />
@@ -621,12 +623,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             animate={{ width: 360, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-            className="flex shrink-0 flex-col border-l border-[#e4e4e7] bg-[#fafafa] overflow-hidden"
+            className="relative z-20 flex shrink-0 flex-col overflow-hidden border-l border-white/60 bg-white/62 shadow-[0_24px_80px_rgba(79,70,229,0.10)] backdrop-blur-xl"
           >
             {/* Chat header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-[#e4e4e7] px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/60 px-4 py-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0066ff] text-[10px] font-bold text-white">S</div>
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#4252ff] text-[10px] font-bold text-white">S</div>
                 <span className="text-xs font-semibold text-[#111111]">{t('ai_panel_title')}</span>
               </div>
               <button
@@ -641,7 +643,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
               {chatMessages.length === 0 && !chatWaiting && (
-                <div className="rounded-xl rounded-tl-sm bg-[#f0f0f0] px-3.5 py-2.5 text-sm leading-5.5 text-[#111111]">
+                <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/72 px-3.5 py-2.5 text-sm leading-5.5 text-[#111111] shadow-[0_12px_28px_rgba(79,70,229,0.08)]">
                   {t('ai_welcome')}
                 </div>
               )}
@@ -657,8 +659,8 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                     <div
                       className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-6 ${
                         msg.role === 'user'
-                          ? 'rounded-tr-sm bg-[#111111] text-white'
-                          : 'rounded-tl-sm bg-[#f0f0f0] text-[#111111]'
+                          ? 'rounded-tr-md bg-[#4252ff] text-white shadow-[0_12px_28px_rgba(66,82,255,0.18)]'
+                          : 'rounded-tl-md border border-white/70 bg-white/72 text-[#111111] shadow-[0_12px_28px_rgba(79,70,229,0.08)]'
                       }`}
                     >
                       {msg.content}
@@ -672,7 +674,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="rounded-xl rounded-tl-sm bg-[#f0f0f0] px-4 py-3">
+                  <div className="rounded-[20px] rounded-tl-md border border-white/70 bg-white/72 px-4 py-3">
                     <div className="flex gap-1.5">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a1a1aa]" style={{ animationDelay: '0ms' }} />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#a1a1aa]" style={{ animationDelay: '120ms' }} />
@@ -685,7 +687,7 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
             </div>
 
             {/* Input */}
-            <div className="shrink-0 border-t border-[#e4e4e7] bg-white px-3 py-3">
+            <div className="shrink-0 border-t border-white/60 bg-white/72 px-3 py-3">
               {!brandId && (
                 <p className="mb-2 text-[11px] text-[#a1a1aa]">{t('ai_no_brand')}</p>
               )}
@@ -697,12 +699,12 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={chatWaiting || !brandId}
                   placeholder={brandId ? t('chat_placeholder') : t('chat_placeholder_no_brand')}
-                  className="h-10 flex-1 rounded-xl border border-[#e4e4e7] bg-[#fafafa] px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10 disabled:opacity-50"
+                  className="h-10 flex-1 rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm text-[#111111] placeholder-[#a8b0bd] outline-none focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10 disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || chatWaiting || !brandId}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#111111] text-white transition hover:bg-[#333333] disabled:opacity-30"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#4252ff] text-white transition hover:bg-[#3442e8] disabled:opacity-30"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -717,8 +719,8 @@ export default function ConceptForm({ existingBrand }: ConceptFormProps) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <motion.div variants={itemVariants}>
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#71717a]">{title}</h2>
+    <motion.div variants={itemVariants} className="rounded-[24px] border border-white/70 bg-white/76 p-5 shadow-[0_18px_48px_rgba(79,70,229,0.10)] backdrop-blur-xl">
+      <h2 className="mb-4 text-xs font-black uppercase tracking-[0.14em] text-[#64748b]">{title}</h2>
       {children}
     </motion.div>
   )
@@ -739,15 +741,53 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-[#52525b]">{label}</label>
+      <label className="mb-1.5 block text-xs font-semibold text-[#52525b]">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="h-11 w-full rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+        className="h-11 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
       />
     </div>
+  )
+}
+
+function ProfileAmbientBackdrop() {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .shuffla-profile-ambient {
+          background:
+            radial-gradient(circle at 56% 36%, rgba(219, 234, 254, 0.44), transparent 34%),
+            radial-gradient(circle at 82% 42%, rgba(237, 233, 254, 0.56), transparent 32%),
+            radial-gradient(circle at 44% 54%, rgba(191, 219, 254, 0.28), transparent 30%),
+            linear-gradient(180deg, #ffffff 0%, #fbfdff 58%, #ffffff 100%);
+          background-size: 150% 150%;
+          animation: shufflaProfileAmbientDrift 26s ease-in-out infinite alternate;
+        }
+        .shuffla-profile-ambient::after {
+          content: "";
+          position: absolute;
+          inset: -18%;
+          background:
+            radial-gradient(circle at 46% 42%, rgba(96, 165, 250, 0.18), transparent 26%),
+            radial-gradient(circle at 72% 48%, rgba(168, 85, 247, 0.16), transparent 30%);
+          filter: blur(42px);
+          animation: shufflaProfileAmbientFloat 34s ease-in-out infinite alternate;
+        }
+        @keyframes shufflaProfileAmbientDrift {
+          0% { background-position: 0% 0%; transform: scale(1); }
+          50% { background-position: 58% 38%; transform: scale(1.025); }
+          100% { background-position: 100% 84%; transform: scale(1.045); }
+        }
+        @keyframes shufflaProfileAmbientFloat {
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.42; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.58; }
+        }
+      ` }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-profile-ambient" />
+    </>
   )
 }

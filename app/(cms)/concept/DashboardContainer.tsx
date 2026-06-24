@@ -186,11 +186,11 @@ export default function DashboardContainer({
       <div className={tabPanelClass('concept')} aria-hidden={activeTab !== 'concept'}>
         <div className="flex h-full flex-col">
           {subProfile !== null && (
-            <div className="border-b border-[#e4e4e7] bg-white px-6 py-2.5 shrink-0">
+            <div className="shrink-0 border-b border-white/60 bg-white/62 px-6 py-2.5 backdrop-blur-xl">
               <button
                 type="button"
                 onClick={() => setSubProfile(null)}
-                className="text-xs font-medium text-[#71717a] hover:text-[#111111] transition-colors"
+                className="text-xs font-bold text-[#64748b] transition-colors hover:text-[#111827]"
               >
                 ← {subProfile === 'brand' ? t('select_url_title') : t('select_general_title')}
               </button>
@@ -498,12 +498,14 @@ function ProfileSelectScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="flex h-full flex-col items-center justify-center px-6 py-16"
+      className="relative isolate flex h-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-16"
     >
-      <div className="w-full max-w-lg">
+      <ProfileSelectAmbientBackdrop />
+      <div className="relative z-10 w-full max-w-[820px]">
         <div className="mb-10 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-[#111111]">{t('select_title')}</h1>
-          <p className="mt-2 text-sm text-[#71717a]">{t('select_desc')}</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748b]">Brand Concept</p>
+          <h1 className="mt-3 text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">{t('select_title')}</h1>
+          <p className="mx-auto mt-3 max-w-[590px] text-sm font-medium leading-6 text-[#64748b]">{t('select_desc')}</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {cards.map(({ key, icon: Icon, title, desc, complete }) => (
@@ -511,7 +513,7 @@ function ProfileSelectScreen({
               key={key}
               type="button"
               onClick={() => onSelect(key)}
-              className="group relative flex flex-col items-start gap-4 rounded-xl border border-[#e5e7eb] bg-white p-6 text-left transition-all hover:border-[#d1d5db] hover:shadow-sm active:scale-[0.99]"
+              className="group relative flex min-h-[190px] flex-col items-start gap-4 rounded-[24px] border border-white/70 bg-white/76 p-6 text-left shadow-[0_18px_48px_rgba(79,70,229,0.10)] backdrop-blur-xl transition-all hover:border-[#c7d2fe] hover:bg-white/86 hover:shadow-[0_22px_60px_rgba(79,70,229,0.13)] active:scale-[0.99]"
             >
               {complete && (
                 <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
@@ -519,21 +521,21 @@ function ProfileSelectScreen({
                   {t('profile_complete')}
                 </span>
               )}
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f3f4f6] transition-colors group-hover:bg-[#111827]">
-                <Icon className="h-5 w-5 text-[#71717a] transition-colors group-hover:text-white" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff] transition-colors group-hover:bg-[#4252ff] group-hover:text-white">
+                <Icon className="h-5 w-5 transition-colors" />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#111111]">{title}</p>
-                <p className="mt-1 text-xs leading-5 text-[#71717a]">{desc}</p>
+                <p className="text-base font-black text-[#111827]">{title}</p>
+                <p className="mt-2 text-sm font-medium leading-6 text-[#64748b]">{desc}</p>
               </div>
             </button>
           ))}
         </div>
 
-        <div className="mt-8 rounded-xl border border-[#e4e4e7] bg-gradient-to-br from-[#faf8ff] to-[#f5f3ff] p-5">
+        <div className="mt-6 rounded-[24px] border border-white/70 bg-white/66 p-5 shadow-[0_18px_48px_rgba(79,70,229,0.10)] backdrop-blur-xl">
           <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-4 w-4 text-[#8b5cf6]" />
-            <p className="text-xs font-bold uppercase tracking-wide text-[#8b5cf6]">{t('report_title')}</p>
+            <Sparkles className="h-4 w-4 text-[#4252ff]" />
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#4252ff]">{t('report_title')}</p>
           </div>
           {hasPreference ? (
             <>
@@ -556,6 +558,44 @@ function ProfileSelectScreen({
         </div>
       </div>
     </motion.div>
+  )
+}
+
+function ProfileSelectAmbientBackdrop() {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .shuffla-profile-select-ambient {
+          background:
+            radial-gradient(circle at 56% 36%, rgba(219, 234, 254, 0.44), transparent 34%),
+            radial-gradient(circle at 82% 42%, rgba(237, 233, 254, 0.56), transparent 32%),
+            radial-gradient(circle at 44% 54%, rgba(191, 219, 254, 0.28), transparent 30%),
+            linear-gradient(180deg, #ffffff 0%, #fbfdff 58%, #ffffff 100%);
+          background-size: 150% 150%;
+          animation: shufflaProfileSelectAmbientDrift 26s ease-in-out infinite alternate;
+        }
+        .shuffla-profile-select-ambient::after {
+          content: "";
+          position: absolute;
+          inset: -18%;
+          background:
+            radial-gradient(circle at 46% 42%, rgba(96, 165, 250, 0.18), transparent 26%),
+            radial-gradient(circle at 72% 48%, rgba(168, 85, 247, 0.16), transparent 30%);
+          filter: blur(42px);
+          animation: shufflaProfileSelectAmbientFloat 34s ease-in-out infinite alternate;
+        }
+        @keyframes shufflaProfileSelectAmbientDrift {
+          0% { background-position: 0% 0%; transform: scale(1); }
+          50% { background-position: 58% 38%; transform: scale(1.025); }
+          100% { background-position: 100% 84%; transform: scale(1.045); }
+        }
+        @keyframes shufflaProfileSelectAmbientFloat {
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.42; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.58; }
+        }
+      ` }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-profile-select-ambient" />
+    </>
   )
 }
 

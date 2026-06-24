@@ -169,20 +169,21 @@ export default function GeneralProfileForm({
   }
 
   return (
-    <div className="flex h-full overflow-y-auto bg-[#fafafa]">
-      <div className="flex-1">
+    <div className="relative isolate flex h-full overflow-y-auto bg-white">
+      <ProfileAmbientBackdrop />
+      <div className="relative z-10 flex-1">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="mx-auto max-w-2xl px-6 py-12"
+          className="mx-auto max-w-[920px] px-6 py-10"
         >
           <motion.div variants={itemVariants} className="mb-10">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#71717a]">General Profile</p>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#111111]">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748b]">General Profile</p>
+            <h1 className="mt-2 text-[28px] font-black tracking-[-0.01em] text-[#111827]">
               {t('general_title')}
             </h1>
-            <p className="mt-1.5 text-sm text-[#52525b]">
+            <p className="mt-2 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">
               {t('general_desc')}
             </p>
           </motion.div>
@@ -190,10 +191,10 @@ export default function GeneralProfileForm({
           {/* Core Word AI discovery card */}
           <motion.div
             variants={itemVariants}
-            className="mb-8 rounded-2xl border border-[#0066ff]/20 bg-[#0066ff]/5 p-5 shadow-sm"
+            className="mb-5 rounded-[24px] border border-[#dfe7ff] bg-white/76 p-5 shadow-[0_18px_48px_rgba(79,70,229,0.10)] backdrop-blur-xl"
           >
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4.5 w-4.5 text-[#0066ff]" />
+              <Sparkles className="h-4.5 w-4.5 text-[#4252ff]" />
               <h3 className="text-sm font-bold text-[#111111]">{t('core_word')} AI 분석</h3>
             </div>
             <p className="text-xs text-[#52525b] mb-4 leading-relaxed">
@@ -206,13 +207,13 @@ export default function GeneralProfileForm({
                 onChange={(e) => setCoreWord(e.target.value)}
                 disabled={isAnalyzing}
                 placeholder={t('core_word_placeholder')}
-                className="h-11 flex-1 rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10 disabled:opacity-50"
+                className="h-11 flex-1 rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10 disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={handleAnalyzeCoreWord}
                 disabled={isAnalyzing || !coreWord.trim()}
-                className="flex h-11 items-center justify-center gap-1.5 rounded-lg bg-[#0066ff] px-4 text-xs font-semibold text-white transition hover:bg-[#0052cc] disabled:cursor-not-allowed disabled:opacity-50 shadow-sm shrink-0"
+                className="flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#4252ff] px-4 text-xs font-bold text-white shadow-[0_12px_28px_rgba(66,82,255,0.22)] transition hover:bg-[#3442e8] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isAnalyzing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -237,7 +238,7 @@ export default function GeneralProfileForm({
             </motion.div>
           )}
 
-          <form onSubmit={handleSave} className="space-y-8">
+          <form onSubmit={handleSave} className="space-y-5">
             {/* Basic Info */}
             <Section title={t('section_basic')}>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -255,7 +256,7 @@ export default function GeneralProfileForm({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[#e4e4e7] bg-white px-3 text-sm text-[#111111] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+                    className="h-11 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 px-3 text-sm font-medium text-[#111111] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
                   >
                     <option value="current-affairs">{t('category_current_affairs')}</option>
                     <option value="information">{t('category_information')}</option>
@@ -275,7 +276,7 @@ export default function GeneralProfileForm({
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder={t('keywords_placeholder')}
                   required
-                  className="h-11 w-full rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+                  className="h-11 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
                 />
                 <p className="mt-1.5 text-[11px] leading-relaxed text-[#71717a]">{t('keywords_hint')}</p>
               </div>
@@ -312,13 +313,13 @@ export default function GeneralProfileForm({
                       value={mainColor}
                       onChange={(e) => setMainColor(e.target.value)}
                       placeholder="#0f172a"
-                      className="h-11 flex-1 rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+                      className="h-11 flex-1 rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
                     />
                     <input
                       type="color"
                       value={mainColor.startsWith('#') && mainColor.length === 7 ? mainColor : '#0f172a'}
                       onChange={(e) => setMainColor(e.target.value)}
-                      className="h-11 w-11 cursor-pointer rounded-lg border border-[#e4e4e7] p-1"
+                      className="h-11 w-11 cursor-pointer rounded-2xl border border-[#e5e7eb] bg-white/88 p-1"
                       aria-label={t('color_picker')}
                     />
                   </div>
@@ -327,11 +328,11 @@ export default function GeneralProfileForm({
             </Section>
 
             {/* Actions */}
-            <motion.div variants={itemVariants} className="flex items-center gap-3 border-t border-[#e4e4e7] pt-6">
+            <motion.div variants={itemVariants} className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
                 disabled={isSaving || !name}
-                className="flex h-11 items-center gap-2 rounded-lg bg-[#111111] px-5 text-sm font-semibold text-white transition hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 items-center gap-2 rounded-full bg-[#111827] px-5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(15,23,42,0.16)] transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t('save_btn')}
@@ -344,7 +345,7 @@ export default function GeneralProfileForm({
                   whileTap={{ scale: 0.97 }}
                   animate={isContinuing ? { scale: [1, 0.98, 1] } : { scale: 1 }}
                   transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative flex h-11 items-center gap-2 overflow-hidden rounded-lg border border-[#e4e4e7] bg-white px-5 text-sm font-semibold text-[#111111] transition hover:border-[#0066ff] hover:bg-[#f5f8ff] hover:text-[#0066ff] disabled:cursor-wait disabled:border-[#0066ff]/40 disabled:bg-[#f5f8ff] disabled:text-[#0066ff]"
+                  className="relative flex h-11 items-center gap-2 overflow-hidden rounded-full border border-[#dfe7ff] bg-white/86 px-5 text-sm font-bold text-[#111827] shadow-sm backdrop-blur-xl transition hover:border-[#c7d2fe] hover:bg-[#f8fbff] hover:text-[#4252ff] disabled:cursor-wait disabled:border-[#4252ff]/40 disabled:bg-[#f5f7ff] disabled:text-[#4252ff]"
                 >
                   {isContinuing && (
                     <motion.span
@@ -371,8 +372,8 @@ export default function GeneralProfileForm({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <motion.div variants={itemVariants}>
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#71717a]">{title}</h2>
+    <motion.div variants={itemVariants} className="rounded-[24px] border border-white/70 bg-white/76 p-5 shadow-[0_18px_48px_rgba(79,70,229,0.10)] backdrop-blur-xl">
+      <h2 className="mb-4 text-xs font-black uppercase tracking-[0.14em] text-[#64748b]">{title}</h2>
       {children}
     </motion.div>
   )
@@ -393,15 +394,53 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-[#52525b]">{label}</label>
+      <label className="mb-1.5 block text-xs font-semibold text-[#52525b]">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="h-11 w-full rounded-lg border border-[#e4e4e7] bg-white px-3.5 text-sm text-[#111111] placeholder-[#a1a1aa] outline-none focus:border-[#0066ff] focus:ring-2 focus:ring-[#0066ff]/10"
+        className="h-11 w-full rounded-2xl border border-[#e5e7eb] bg-white/88 px-3.5 text-sm font-medium text-[#111111] placeholder-[#a8b0bd] outline-none transition-all focus:border-[#c4b5fd] focus:ring-2 focus:ring-[#4252ff]/10"
       />
     </div>
+  )
+}
+
+function ProfileAmbientBackdrop() {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .shuffla-profile-ambient {
+          background:
+            radial-gradient(circle at 56% 36%, rgba(219, 234, 254, 0.44), transparent 34%),
+            radial-gradient(circle at 82% 42%, rgba(237, 233, 254, 0.56), transparent 32%),
+            radial-gradient(circle at 44% 54%, rgba(191, 219, 254, 0.28), transparent 30%),
+            linear-gradient(180deg, #ffffff 0%, #fbfdff 58%, #ffffff 100%);
+          background-size: 150% 150%;
+          animation: shufflaProfileAmbientDrift 26s ease-in-out infinite alternate;
+        }
+        .shuffla-profile-ambient::after {
+          content: "";
+          position: absolute;
+          inset: -18%;
+          background:
+            radial-gradient(circle at 46% 42%, rgba(96, 165, 250, 0.18), transparent 26%),
+            radial-gradient(circle at 72% 48%, rgba(168, 85, 247, 0.16), transparent 30%);
+          filter: blur(42px);
+          animation: shufflaProfileAmbientFloat 34s ease-in-out infinite alternate;
+        }
+        @keyframes shufflaProfileAmbientDrift {
+          0% { background-position: 0% 0%; transform: scale(1); }
+          50% { background-position: 58% 38%; transform: scale(1.025); }
+          100% { background-position: 100% 84%; transform: scale(1.045); }
+        }
+        @keyframes shufflaProfileAmbientFloat {
+          0% { transform: translate3d(-2%, -1%, 0) rotate(0deg); opacity: 0.42; }
+          100% { transform: translate3d(3%, 2%, 0) rotate(3deg); opacity: 0.58; }
+        }
+      ` }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 shuffla-profile-ambient" />
+    </>
   )
 }
