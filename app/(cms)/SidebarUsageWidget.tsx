@@ -2,24 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X, ImageIcon, Video, Clock } from 'lucide-react'
+import type { UsageSummary } from '../../lib/usage-summary'
 
-interface UsageHistory {
-  id: string
-  title: string
-  mediaType: 'image' | 'video'
-  createdAt: string
-  status: string
-}
-
-interface UsageData {
-  plan: string
-  period: 'month' | 'lifetime'
-  image: { used: number; limit: number }
-  video: { used: number; limit: number }
-  history: UsageHistory[]
-}
+type UsageData = UsageSummary
 
 const PLAN_LABELS: Record<string, string> = {
+  ADMIN: 'Admin',
   FREE: 'Free',
   PRO: 'Creator',
   UNLIMITED: 'Studio',
@@ -43,8 +31,8 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
 }
 
-export function SidebarUsageWidget() {
-  const [data, setData] = useState<UsageData | null>(null)
+export function SidebarUsageWidget({ initialData = null }: { initialData?: UsageData | null }) {
+  const [data, setData] = useState<UsageData | null>(initialData)
   const [open, setOpen] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
 

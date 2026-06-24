@@ -10,6 +10,8 @@ import { getTranslations } from 'next-intl/server'
 import MobileHeader from '../../(cms)/MobileHeader'
 import { UserProfileDrawer } from '../../(cms)/UserProfileDrawer'
 import { SidebarUsageWidget } from '../../(cms)/SidebarUsageWidget'
+import { isAdminEmail } from '../../../lib/auth/admin-emails'
+import { getUsageSummaryForUser } from '../../../lib/usage-summary'
 
 export default async function CmsLayout({
   children,
@@ -25,6 +27,9 @@ export default async function CmsLayout({
   const brands = user ? await getCachedBrands(user.id) : []
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
   const hasSubscription = Boolean(user?.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
+  const isAdminUser = isAdminEmail(user?.email)
+  const planLabel = isAdminUser ? 'ADMIN' : user?.plan
+  const usageSummary = user ? await getUsageSummaryForUser(user) : null
 
   return (
     <TabProvider>
@@ -59,17 +64,17 @@ export default async function CmsLayout({
                 >
                   <span className="flex items-center gap-1.5">
                     <CreditCard className="h-3.5 w-3.5" />
-                    <span className="font-medium uppercase tracking-wide">{user.plan}</span>
+                    <span className="font-medium uppercase tracking-wide">{planLabel}</span>
                   </span>
                   <span className="text-[#3b82f6] font-semibold">{t('plan_label')}</span>
                 </Link>
 
-                <SidebarUsageWidget />
+                <SidebarUsageWidget initialData={usageSummary} />
 
                 <UserProfileDrawer
                   userName={user.name ?? null}
                   userEmail={user.email}
-                  userPlan={user.plan}
+                  userPlan={planLabel ?? user.plan}
                   createdAt={user.createdAt.toISOString()}
                   hasSubscription={hasSubscription}
                 />
@@ -107,17 +112,17 @@ export default async function CmsLayout({
                     >
                       <span className="flex items-center gap-1.5">
                         <CreditCard className="h-3.5 w-3.5" />
-                        <span className="font-medium uppercase tracking-wide">{user.plan}</span>
+                        <span className="font-medium uppercase tracking-wide">{planLabel}</span>
                       </span>
                       <span className="text-[#3b82f6] font-semibold">{t('plan_label')}</span>
                     </Link>
 
-                    <SidebarUsageWidget />
+                    <SidebarUsageWidget initialData={usageSummary} />
 
                     <UserProfileDrawer
                       userName={user.name ?? null}
                       userEmail={user.email}
-                      userPlan={user.plan}
+                      userPlan={planLabel ?? user.plan}
                       createdAt={user.createdAt.toISOString()}
                       hasSubscription={hasSubscription}
                     />
