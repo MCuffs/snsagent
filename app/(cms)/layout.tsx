@@ -8,6 +8,7 @@ import SidebarNav from './SidebarNav'
 import ThinkingDataProvider from '../components/ThinkingDataProvider'
 import MobileHeader from './MobileHeader'
 import { UserProfileDrawer } from './UserProfileDrawer'
+import { SidebarUsageWidget } from './SidebarUsageWidget'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser()
@@ -54,6 +55,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
                 <span className="text-[#3b82f6] font-semibold">{t('plan_link')}</span>
               </Link>
 
+              <SidebarUsageWidget />
+
               <UserProfileDrawer
                 userName={user.name ?? null}
                 userEmail={user.email}
@@ -95,6 +98,8 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
                     </span>
                     <span className="text-[#3b82f6] font-semibold">{t('plan_link')}</span>
                   </Link>
+
+                  <SidebarUsageWidget />
 
                   <UserProfileDrawer
                     userName={user.name ?? null}
