@@ -5,7 +5,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['@resvg/resvg-js'],
+  serverExternalPackages: ['@resvg/resvg-js', '@ffmpeg-installer/ffmpeg', '@ffmpeg-installer/linux-x64'],
   async rewrites() {
     return [
       { source: '/sitemap.xml', destination: '/api/sitemap' },
