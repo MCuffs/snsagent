@@ -93,8 +93,8 @@ export default function DashboardContainer({
       ? '/en'
       : ''
   const pricingPath = `${localePrefix}/pricing`
-  const activeVideoTabBlocked = (activeTab === 'video-cardnews' || activeTab === 'video') && isFreePlan
-  const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeVideoTabBlocked && !dismissedVideoUpgradePrompt)
+  const activeCreatorTabBlocked = (activeTab === 'video-cardnews' || activeTab === 'video' || activeTab === 'youtube-automation') && isFreePlan
+  const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeCreatorTabBlocked && !dismissedVideoUpgradePrompt)
   const closeVideoUpgradePrompt = () => {
     setShowVideoUpgradePrompt(false)
     setDismissedVideoUpgradePrompt(true)
@@ -353,7 +353,15 @@ export default function DashboardContainer({
       </div>
 
       <div className={tabPanelClass('youtube-automation')} aria-hidden={activeTab !== 'youtube-automation'}>
-        <YouTubeAutomationDashboard />
+        {isFreePlan ? (
+          <VideoUpgradeEmptyState
+            pricingPath={pricingPath}
+            featureName="유튜브 자동화"
+            description="월 25,000원 Creator 이상 플랜에서 30일 플래너 생성, 기획, TTS, MP4 렌더링을 시작할 수 있습니다."
+          />
+        ) : (
+          <YouTubeAutomationDashboard />
+        )}
       </div>
 
       {brandToPass && (
@@ -604,16 +612,24 @@ function ProfileSelectAmbientBackdrop() {
   )
 }
 
-function VideoUpgradeEmptyState({ pricingPath }: { pricingPath: string }) {
+function VideoUpgradeEmptyState({
+  pricingPath,
+  featureName = '영상 카드뉴스',
+  description = '월 25,000원 Creator 이상 플랜에서 고급 영상 제작 기능을 사용할 수 있습니다.',
+}: {
+  pricingPath: string
+  featureName?: string
+  description?: string
+}) {
   return (
     <div className="flex h-full items-center justify-center px-6 py-12 text-center">
       <div className="w-full max-w-md rounded-3xl border border-white/70 bg-white/78 p-8 shadow-[0_24px_80px_rgba(79,70,229,0.12)] backdrop-blur-xl">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
           <Lock className="h-6 w-6" />
         </div>
-        <h2 className="mt-5 text-lg font-black text-[#111827]">영상 카드뉴스는 유료 플랜에서 제작할 수 있습니다.</h2>
+        <h2 className="mt-5 text-lg font-black text-[#111827]">{featureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
         <p className="mt-3 text-sm font-medium leading-6 text-[#6b7280]">
-          Free 플랜에서는 카드뉴스 2회 생성만 제공됩니다. 영상 카드뉴스 제작은 Creator 플랜 이상에서 사용할 수 있습니다.
+          {description}
         </p>
         <Link
           href={pricingPath}

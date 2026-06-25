@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import prisma from '../../../../lib/db'
+import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
 
 export const runtime = 'nodejs'
@@ -48,6 +49,7 @@ function safeJsonArray(value: unknown) {
 
 export async function GET() {
   const user = await getSessionUser()
+  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const projects = await prisma.youTubeAutomationProject.findMany({
@@ -62,6 +64,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
+  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const body = await request.json().catch(() => null) as { topic?: string } | null

@@ -37,14 +37,16 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const { activeTab, setActiveTab } = useTab()
   const t = useTranslations('cms')
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
+  const [upgradeFeatureName, setUpgradeFeatureName] = useState('영상 카드뉴스')
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
   const pricingPath = `${prefix}/pricing`
   const isFreePlan = userPlan === 'FREE'
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    if (item.key === 'video-cardnews' && isFreePlan) {
+    if ((item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan) {
       e.preventDefault()
+      setUpgradeFeatureName(item.key === 'youtube-automation' ? '유튜브 자동화' : '영상 카드뉴스')
       setShowVideoUpgradePrompt(true)
       window.setTimeout(() => {
         analytics.sidebarClick(item.key, {
@@ -112,7 +114,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
-                {item.key === 'video-cardnews' && isFreePlan && (
+                {(item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan && (
                   <Lock className={`h-3 w-3 ${isActive ? 'text-white/70' : 'text-[#9ca3af]'}`} />
                 )}
                 {item.badge && (
@@ -145,9 +147,9 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
               </button>
             </div>
             <div className="mt-4 space-y-2">
-              <h2 className="text-base font-black text-[#111827]">영상 카드뉴스는 유료 플랜에서 제작할 수 있습니다.</h2>
+              <h2 className="text-base font-black text-[#111827]">{upgradeFeatureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
               <p className="text-sm font-medium leading-6 text-[#6b7280]">
-                Free 플랜은 카드뉴스 2회 생성만 제공됩니다. 영상 카드뉴스를 만들려면 Creator 플랜 이상으로 업그레이드해 주세요.
+                월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.
               </p>
             </div>
             <div className="mt-5 flex gap-2">

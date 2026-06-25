@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
+import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
 import type { StockVideoCandidate, YouTubeScenePlan } from '../../../../../../src/lib/youtube/automation'
 import { renderYouTubeShortsFromStock } from '../../../../../../src/lib/youtube/render'
 
@@ -9,6 +10,7 @@ export const maxDuration = 600
 
 export async function POST(_request: Request, context: { params: Promise<{ dayId: string }> }) {
   const user = await getSessionUser()
+  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const { dayId } = await context.params
