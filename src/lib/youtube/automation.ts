@@ -196,10 +196,11 @@ async function searchPixabayVideos(query: string, limit: number): Promise<Omit<S
   try {
     const params = new URLSearchParams({
       key: apiKey,
-      q: query,
+      q: query.slice(0, 100),
       video_type: 'film',
-      per_page: String(limit),
+      per_page: String(Math.min(200, Math.max(3, limit))),
       safesearch: 'true',
+      order: 'popular',
     })
     const res = await fetch(`https://pixabay.com/api/videos/?${params.toString()}`, {
       signal: AbortSignal.timeout(6000),
