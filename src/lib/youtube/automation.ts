@@ -57,10 +57,12 @@ export async function generateThirtyDayPlanner(topic: string, userId?: string): 
   const prompt = [
     `주제: ${cleanTopic}`,
     '',
-    '유튜브 쇼츠 채널용 30일 콘텐츠 캘린더를 만드세요.',
-    '타겟은 유튜브 경험이 적은 40-60대 부업 희망자입니다.',
-    '각 항목은 제목만 필요합니다.',
+    '주제에 관심 있는 일반 시청자가 클릭할 만한 유튜브 쇼츠 제목 30개를 만드세요.',
+    '각 항목은 실제 영상에 그대로 노출될 제목만 필요합니다.',
+    '제작자용 기획안, 채널 운영법, 편집법, 썸네일, 업로드 시간, 수익화, 조회수, 구독자, 키워드, 저작권, 배경음악, 댓글 관리 같은 메타 주제는 절대 넣지 마세요.',
+    '입력 주제가 건강이면 건강 상식/습관/음식/운동/주의 신호처럼 시청자가 궁금해할 제목을 만드세요.',
     '제목은 클릭하고 싶게 만들되 과장된 수익 보장, 의학/금융 확정 표현은 피하세요.',
+    '모든 제목은 서로 다른 각도여야 하며, 18-36자 안팎의 자연스러운 한국어 제목으로 작성하세요.',
     'JSON 형식: {"days":[{"dayNumber":1,"title":"..."}, ... 30개]}',
   ].join('\n')
 
@@ -234,9 +236,10 @@ function normalizePlannerDays(days: PlannerDay[] | undefined, topic: string) {
   const source = Array.isArray(days) ? days : []
   const normalized = Array.from({ length: 30 }, (_, index) => {
     const candidate = source.find(day => Number(day.dayNumber) === index + 1) || source[index]
+    const candidateTitle = String(candidate?.title || '').trim()
     return {
       dayNumber: index + 1,
-      title: String(candidate?.title || buildFallbackTitle(topic, index + 1)).trim().slice(0, 80),
+      title: normalizeAudienceTitle(candidateTitle, topic, index + 1),
     }
   })
   return normalized
@@ -295,14 +298,53 @@ function buildFallbackDayPlan(topic: string, title: string): DayPlanResponse {
 }
 
 function buildFallbackTitle(topic: string, day: number) {
-  const patterns = [
-    `${topic} 초보가 가장 먼저 알아야 할 3가지`,
-    `${topic}을 매일 쉽게 시작하는 방법`,
-    `${topic}에서 사람들이 자주 놓치는 포인트`,
-    `${topic}을 오래 지속하는 작은 습관`,
-    `${topic} 입문자가 피해야 할 실수`,
-  ]
+  const patterns = getAudienceTitlePatterns(topic)
   return patterns[(day - 1) % patterns.length]
+}
+
+function normalizeAudienceTitle(title: string, topic: string, day: number) {
+  const clean = title
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+    .replace(/^\s*(?:Day|DAY|일차|[0-9]+일차)\s*[0-9]*\s*[:.)-]?\s*/u, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!clean || isCreatorMetaTitle(clean)) return buildFallbackTitle(topic, day)
+  return clean.slice(0, 80)
+}
+
+function isCreatorMetaTitle(title: string) {
+  return /채널|콘텐츠|쇼츠|영상|편집|썸네일|업로드|조회수|구독자|수익|부업|키워드|저작권|배경음악|댓글|캘린더|기획|대본|스크립트|나레이션|목소리|TTS|브랜딩|소스|소재|템플릿|촬영|제작|운영|성장/u.test(title)
+}
+
+function getAudienceTitlePatterns(topic: string) {
+  if (/건강|운동|다이어트|식단|혈당|혈압|수면|영양/u.test(topic)) {
+    return [
+      '아침에 물 한 잔이 몸에 주는 변화',
+      '잠들기 전 피해야 할 의외의 습관',
+      '혈당을 빨리 올리는 흔한 음식',
+      '걷기 운동 효과를 높이는 간단한 방법',
+      '몸이 보내는 피로 신호 3가지',
+      '식후 바로 누우면 생기는 일',
+      '중년 이후 꼭 챙겨야 할 근육 습관',
+      '건강해 보이지만 과하면 위험한 음식',
+      '아침 공복에 피하면 좋은 행동',
+      '매일 10분 스트레칭이 필요한 이유',
+    ]
+  }
+
+  return [
+    `${topic}에서 사람들이 가장 많이 오해하는 것`,
+    `${topic}을 처음 볼 때 꼭 확인할 3가지`,
+    `${topic}이 생각보다 중요한 이유`,
+    `${topic} 전에 알아두면 좋은 사실`,
+    `${topic}을 쉽게 이해하는 핵심 포인트`,
+    `${topic} 때문에 자주 생기는 실수`,
+    `${topic}을 바꾸는 작은 습관 하나`,
+    `${topic}을 제대로 고르는 기준`,
+    `${topic}을 놓치면 아쉬운 이유`,
+    `${topic}에 대한 의외의 진실`,
+  ]
 }
 
 function sanitizeSearchKeyword(value: string) {
