@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
+import ffmpegStatic from 'ffmpeg-static'
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 
 interface RenderYouTubeShortsParams {
@@ -257,7 +258,7 @@ async function copyFontIfAvailable(fontsDir: string) {
 }
 
 async function runFfmpeg(args: string[], cwd?: string) {
-  const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg'
+  const ffmpegPath = process.env.FFMPEG_PATH || ffmpegStatic || 'ffmpeg'
   await new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { cwd, windowsHide: true })
     let stderr = ''
