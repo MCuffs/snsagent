@@ -50,6 +50,8 @@ model User {
   adminNotes                AdminNote[]
   creditLedger              CreditLedger[]
   paymentRecords            PaymentRecord[]
+  youtubeAutomationProjects YouTubeAutomationProject[]
+  youtubeAutomationDays     YouTubeAutomationDay[]
 }
 
 model Brand {
@@ -118,6 +120,56 @@ model Campaign {
   slides                     CarouselSlide[]
   posts                      Post[]
   qualityScoreLogs           QualityScoreLog[]
+  youtubeAutomationDays      YouTubeAutomationDay[]
+}
+
+model YouTubeAutomationProject {
+  id             String                 @id @default(uuid())
+  userId         String
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic          String
+  status         String                 @default("planned") // planned, in_progress, completed
+  currentOpenDay Int                    @default(1)
+  planJson       String                 @default("{}")
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  days           YouTubeAutomationDay[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model YouTubeAutomationDay {
+  id             String                   @id @default(uuid())
+  projectId      String
+  project        YouTubeAutomationProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       Campaign?                @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  dayNumber      Int
+  scheduledDate  DateTime
+  title          String
+  status         String                   @default("locked") // locked, open, planning, ready, rendering, completed, uploaded, failed
+  script         String?
+  description    String?
+  tagsJson       String?
+  pinnedComment  String?
+  scenesJson     String?
+  sourceClipsJson String?
+  ttsProvider    String?
+  ttsAudioUrl    String?
+  subtitleJson   String?
+  mp4Url         String?
+  thumbnailUrl   String?
+  uploadedAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([projectId, dayNumber])
+  @@index([userId, scheduledDate])
+  @@index([status])
+  @@index([campaignId])
 }
 
 model CarouselSlide {

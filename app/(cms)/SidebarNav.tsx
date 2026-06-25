@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X } from 'lucide-react'
+import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X, TvMinimalPlay } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { key: 'concept', label: 'Concept', labelKey: 'nav_concept', icon: BookOpen, descKey: 'nav_concept_desc', href: '/concept' },
   { key: 'generate', label: 'Generate', labelKey: 'nav_generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
   { key: 'video-cardnews', label: '영상 카드뉴스', labelKey: 'nav_video', icon: Clapperboard, descKey: 'nav_video_cardnews_desc', href: '/concept?tab=video-cardnews', badge: 'Beta' },
+  { key: 'youtube-automation', label: 'YouTube', labelKey: 'nav_youtube_automation', icon: TvMinimalPlay, descKey: 'nav_youtube_automation_desc', href: '/concept?tab=youtube-automation', badge: 'New' },
   { key: 'works', label: 'Works', labelKey: 'nav_works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
 ]
 

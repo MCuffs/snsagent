@@ -7,6 +7,7 @@ import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
 import GenerateForm from '../generate/GenerateForm'
 import VideoCardNewsForm from '../video-cardnews/VideoCardNewsForm'
+import YouTubeAutomationDashboard from '../youtube-automation/YouTubeAutomationDashboard'
 import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
@@ -349,6 +350,10 @@ export default function DashboardContainer({
           retentionDays={retentionDays}
           canUpgradeRetention={canUpgradeRetention}
         />
+      </div>
+
+      <div className={tabPanelClass('youtube-automation')} aria-hidden={activeTab !== 'youtube-automation'}>
+        <YouTubeAutomationDashboard />
       </div>
 
       {brandToPass && (
