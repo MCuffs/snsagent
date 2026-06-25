@@ -47,6 +47,21 @@ type Project = {
   days: PlannerDay[]
 }
 
+async function readApiJson<T>(res: Response): Promise<T> {
+  const text = await res.text()
+  if (!text) return {} as T
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return {
+      error: res.ok
+        ? '서버 응답을 읽을 수 없습니다.'
+        : `요청이 실패했습니다. (${res.status})`,
+    } as T
+  }
+}
+
 export default function YouTubeAutomationDashboard() {
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
@@ -74,7 +89,7 @@ export default function YouTubeAutomationDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: clean }),
       })
-      const data = await res.json() as { project?: Project; error?: string }
+      const data = await readApiJson<{ project?: Project; error?: string }>(res)
       if (!res.ok || !data.project) throw new Error(data.error || '30일 플래너를 만들지 못했습니다.')
       setProject(data.project)
       setSelectedDay(data.project.days.find(day => day.status === 'open') || data.project.days[0] || null)
@@ -94,7 +109,7 @@ export default function YouTubeAutomationDashboard() {
     setError(null)
     try {
       const res = await fetch(`/api/youtube-automation/days/${day.id}/start`, { method: 'POST' })
-      const data = await res.json() as { day?: Partial<PlannerDay>; error?: string }
+      const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
       if (!res.ok || !data.day) throw new Error(data.error || '제작안을 만들지 못했습니다.')
       applyDayUpdate(day.id, data.day)
     } catch (err) {
@@ -110,7 +125,7 @@ export default function YouTubeAutomationDashboard() {
     setError(null)
     try {
       const res = await fetch(`/api/youtube-automation/days/${selectedDay.id}/render`, { method: 'POST' })
-      const data = await res.json() as { day?: Partial<PlannerDay>; message?: string; error?: string }
+      const data = await readApiJson<{ day?: Partial<PlannerDay>; message?: string; error?: string }>(res)
       if (!res.ok || !data.day) throw new Error(data.error || '렌더링을 완료하지 못했습니다.')
       applyDayUpdate(selectedDay.id, data.day)
       setError(null)
@@ -127,7 +142,7 @@ export default function YouTubeAutomationDashboard() {
     setError(null)
     try {
       const res = await fetch(`/api/youtube-automation/days/${selectedDay.id}/upload-check`, { method: 'PATCH' })
-      const data = await res.json() as { currentOpenDay?: number; days?: Partial<PlannerDay>[]; error?: string }
+      const data = await readApiJson<{ currentOpenDay?: number; days?: Partial<PlannerDay>[]; error?: string }>(res)
       if (!res.ok) throw new Error(data.error || '업로드 체크를 저장하지 못했습니다.')
       const statusById = new Map((data.days || []).map(day => [day.id, day]))
       const updatedDays = project.days.map(day => ({ ...day, ...(statusById.get(day.id) || {}) }))
