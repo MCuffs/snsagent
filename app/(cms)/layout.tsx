@@ -33,11 +33,15 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         userPlan={user?.plan ?? undefined}
         userName={user?.name ?? undefined}
       />
-      <div className="flex h-screen overflow-hidden bg-[#f9fafb] text-[#111111]">
+      <div className="relative flex h-screen overflow-hidden bg-white text-[#111111]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_56%_34%,rgba(219,234,254,0.50),transparent_31%),radial-gradient(circle_at_86%_44%,rgba(237,233,254,0.54),transparent_32%),radial-gradient(circle_at_18%_88%,rgba(224,242,254,0.36),transparent_34%),linear-gradient(180deg,#ffffff_0%,#fbfdff_58%,#ffffff_100%)]"
+        />
         {/* Sidebar */}
-        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#e5e7eb] bg-white lg:flex">
+        <aside className="relative z-10 hidden w-[220px] shrink-0 flex-col border-r border-white/55 bg-white/76 shadow-[12px_0_42px_rgba(87,119,185,0.08)] backdrop-blur-2xl lg:flex">
           {/* Logo */}
-          <div className="flex h-[60px] items-center border-b border-[#e5e7eb] px-5">
+          <div className="flex h-[60px] items-center border-b border-white/60 px-5">
             <Link href="/concept" className="flex items-center gap-2.5">
               <Image src="/shuffla-logo-mark.png" width={27} height={27} alt={t('logo_alt')} />
               <span className="text-[15px] font-bold tracking-tight text-[#111111]">Shuffla</span>
@@ -48,12 +52,12 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
 
         {/* User + Plan */}
-        <div className="border-t border-[#e5e7eb] p-3 space-y-1.5">
+        <div className="space-y-1.5 border-t border-white/60 bg-white/36 p-3 backdrop-blur-xl">
           {user ? (
             <>
               <Link
                 href="/billing"
-                className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#64748b] transition-colors hover:bg-white/58 hover:text-[#111827]"
               >
                 <span className="flex items-center gap-1.5">
                   <CreditCard className="h-3.5 w-3.5" />
@@ -86,18 +90,18 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main */}
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile Header Drawer */}
         <MobileHeader>
           <div className="flex flex-col h-full justify-between pb-4">
             <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
 
-            <div className="border-t border-[#e5e7eb] p-3 space-y-1.5 mt-auto">
+            <div className="mt-auto space-y-1.5 border-t border-white/60 bg-white/36 p-3 backdrop-blur-xl">
               {user ? (
                 <>
                   <Link
                     href="/billing"
-                    className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
+                    className="flex items-center justify-between rounded-md px-3 py-2 text-xs text-[#64748b] transition-colors hover:bg-white/58 hover:text-[#111827]"
                   >
                     <span className="flex items-center gap-1.5">
                       <CreditCard className="h-3.5 w-3.5" />
@@ -130,7 +134,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           </div>
         </MobileHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f9fafb]">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-transparent">
           {children}
         </div>
       </main>

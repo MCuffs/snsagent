@@ -67,7 +67,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
 
   return (
     <>
-      <nav className="flex-1 space-y-0.5 px-2 py-3">
+      <nav className="flex-1 space-y-1 px-2.5 py-3">
         {navItems.map((item) => {
         const Icon = item.icon
         const disabled = false
@@ -94,13 +94,16 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             key={item.key}
             href={href}
             onClick={(e) => handleNavClick(e, item)}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150 ${
+            className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
               isActive
-                ? 'bg-[#111827] text-white font-medium'
-                : 'text-[#374151] hover:bg-[#f3f4f6] hover:text-[#111111]'
+                ? 'bg-[#111827]/95 text-white font-semibold shadow-[0_14px_32px_rgba(15,23,42,0.16),0_0_0_1px_rgba(255,255,255,0.34)_inset]'
+                : 'text-[#475569] hover:bg-white/58 hover:text-[#111827] hover:shadow-[0_10px_26px_rgba(87,119,185,0.08)]'
             }`}
           >
-            <Icon className="h-4 w-4 shrink-0" />
+            {isActive && (
+              <span className="absolute -left-1 top-1/2 h-7 w-1 -translate-y-1/2 rounded-full bg-[#9eb8ff]" />
+            )}
+            <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white/86' : 'text-[#64748b] group-hover:text-[#4252ff]'}`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
@@ -111,7 +114,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{item.badge}</span>
                 )}
               </div>
-              <p className={`mt-0.5 text-[11px] ${isActive ? 'text-white/60' : 'text-[#9ca3af]'}`}>
+              <p className={`mt-0.5 text-[11px] ${isActive ? 'text-white/58' : 'text-[#94a3b8]'}`}>
                 {t(item.descKey as Parameters<typeof t>[0])}
               </p>
             </div>

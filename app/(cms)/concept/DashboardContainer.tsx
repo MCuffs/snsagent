@@ -176,7 +176,7 @@ export default function DashboardContainer({
     }`
 
   return (
-    <div className="relative h-full overflow-hidden">
+    <div className="relative h-full overflow-hidden bg-transparent">
       {showLoginPrompt && (
         <GuestLoginOverlay onClose={() => setShowLoginPrompt(false)} />
       )}
@@ -242,9 +242,9 @@ export default function DashboardContainer({
       </div>
 
       <div className={tabPanelClass('generate', 'flex h-full flex-col')} aria-hidden={activeTab !== 'generate'}>
-          {hasAnyProfile && <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-[#e5e7eb] bg-white px-5 py-2.5">
-            <span className="shrink-0 text-xs font-semibold text-[#71717a]">{t('generate_profile_label')}</span>
-            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-[#f4f4f5] p-1">
+          {hasAnyProfile && <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-white/60 bg-white/48 px-5 py-2.5 backdrop-blur-xl">
+            <span className="shrink-0 text-xs font-bold text-[#64748b]">{t('generate_profile_label')}</span>
+            <div className="flex shrink-0 items-center gap-1 rounded-xl border border-white/70 bg-white/50 p-1 shadow-[0_10px_24px_rgba(87,119,185,0.08)]">
               {urlProfile ? (
                 <GenerateProfileButton
                   active={brandToPass?.id === urlProfile.id}
@@ -392,8 +392,8 @@ function GenerateProfileButton({
       aria-pressed={active}
       className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
         active
-          ? 'bg-white text-[#111111] shadow-sm'
-          : 'text-[#71717a] hover:text-[#111111]'
+          ? 'bg-white/90 text-[#111111] shadow-sm'
+          : 'text-[#64748b] hover:bg-white/58 hover:text-[#111111]'
       }`}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -417,7 +417,7 @@ function CreateProfileButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-[#d4d4d8] bg-white/60 px-3 py-1.5 text-xs font-semibold text-[#71717a] transition-colors hover:border-[#a1a1aa] hover:text-[#111111]"
+      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-white/80 bg-white/42 px-3 py-1.5 text-xs font-semibold text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:bg-white/70 hover:text-[#111111]"
     >
       <Icon className="h-3.5 w-3.5" />
       <span>{label}</span>
@@ -446,9 +446,9 @@ function EmptyProfileChoice({
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-xl border border-[#e4e4e7] bg-white p-5 text-left transition-all hover:border-[#a1a1aa] hover:shadow-sm"
+      className="group rounded-2xl border border-white/70 bg-white/58 p-5 text-left shadow-[0_14px_34px_rgba(87,119,185,0.08)] backdrop-blur-xl transition-all hover:border-white hover:bg-white/74 hover:shadow-[0_18px_42px_rgba(87,119,185,0.12)]"
     >
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f4f4f5] transition-colors group-hover:bg-[#111111]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 shadow-sm transition-colors group-hover:bg-[#111827]">
         <Icon className="h-4 w-4 text-[#71717a] transition-colors group-hover:text-white" />
       </div>
       <p className="mt-4 text-sm font-bold text-[#111111]">{title}</p>
@@ -498,7 +498,7 @@ function ProfileSelectScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="relative isolate flex h-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-16"
+      className="relative isolate flex h-full flex-col items-center justify-center overflow-hidden bg-transparent px-6 py-16"
     >
       <ProfileSelectAmbientBackdrop />
       <div className="relative z-10 w-full max-w-[820px]">
