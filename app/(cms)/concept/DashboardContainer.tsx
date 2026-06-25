@@ -169,10 +169,10 @@ export default function DashboardContainer({
   }
 
   const tabPanelClass = (tabName: string, baseClass = 'h-full') =>
-    `${baseClass} absolute inset-0 transform-gpu transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+    `${baseClass} absolute inset-0 transform-gpu transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none ${
       activeTab === tabName
         ? 'z-10 translate-y-0 scale-100 opacity-100 pointer-events-auto'
-        : 'z-0 translate-y-2 scale-[0.995] opacity-0 pointer-events-none'
+        : 'z-0 translate-y-1 opacity-0 pointer-events-none'
     }`
 
   return (

@@ -42,27 +42,31 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const isFreePlan = userPlan === 'FREE'
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    analytics.sidebarClick(item.key, {
-      from_tab: activeTab,
-      to_tab: item.key,
-      has_complete_brand: hasCompleteBrand,
-    })
-
     if (item.key === 'video-cardnews' && isFreePlan) {
       e.preventDefault()
       setShowVideoUpgradePrompt(true)
+      window.setTimeout(() => {
+        analytics.sidebarClick(item.key, {
+          from_tab: activeTab,
+          to_tab: item.key,
+          has_complete_brand: hasCompleteBrand,
+        })
+      }, 0)
       return
     }
 
     if (pathname === conceptPath) {
       e.preventDefault()
-      if (activeTab !== item.key) {
-        analytics.tabSwitch(activeTab, item.key, {
-          has_complete_brand: hasCompleteBrand,
-        })
-      }
       setActiveTab(item.key)
     }
+
+    window.setTimeout(() => {
+      analytics.sidebarClick(item.key, {
+        from_tab: activeTab,
+        to_tab: item.key,
+        has_complete_brand: hasCompleteBrand,
+      })
+    }, 0)
   }
 
   return (
@@ -94,7 +98,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             key={item.key}
             href={href}
             onClick={(e) => handleNavClick(e, item)}
-            className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+            className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-100 ${
               isActive
                 ? 'bg-[#111827]/95 text-white font-semibold shadow-[0_14px_32px_rgba(15,23,42,0.16),0_0_0_1px_rgba(255,255,255,0.34)_inset]'
                 : 'text-[#475569] hover:bg-white/58 hover:text-[#111827] hover:shadow-[0_10px_26px_rgba(87,119,185,0.08)]'

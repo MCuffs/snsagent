@@ -19,7 +19,6 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
   const setActiveTab = (tab: string) => {
     const prevTab = activeTab
     setActiveTabState(tab)
-    analytics.tabSwitch(prevTab, tab)
     const params = new URLSearchParams(window.location.search)
     if (tab === 'concept') {
       params.delete('tab')
@@ -29,6 +28,9 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     const query = params.toString()
     const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
     window.history.replaceState(null, '', newUrl)
+    window.setTimeout(() => {
+      analytics.tabSwitch(prevTab, tab)
+    }, 0)
   }
 
   return (
