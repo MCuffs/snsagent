@@ -188,7 +188,9 @@ async function createSpeechAudio(script: string, outputPath: string, scenes: You
   const response = await openai.audio.speech.create({
     model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
     voice: process.env.OPENAI_TTS_VOICE || 'alloy',
-    input: script.slice(0, TTS_MAX_CHARS),
+    input: script.length > TTS_MAX_CHARS
+      ? (console.warn(`[TTS] 스크립트가 ${TTS_MAX_CHARS}자를 초과해 잘립니다. (${script.length}자)`), script.slice(0, TTS_MAX_CHARS))
+      : script,
     response_format: 'mp3',
   })
   await fs.writeFile(outputPath, Buffer.from(await response.arrayBuffer()))

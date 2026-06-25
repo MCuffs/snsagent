@@ -27,11 +27,22 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
     data: { status: 'planning' },
   })
 
-  const plan = await generateDayProductionPlan({
-    topic: day.project.topic,
-    title: day.title,
-    userId: user.id,
-  })
+  let plan: Awaited<ReturnType<typeof generateDayProductionPlan>>
+  try {
+    plan = await generateDayProductionPlan({
+      topic: day.project.topic,
+      title: day.title,
+      userId: user.id,
+    })
+  } catch (error) {
+    await prisma.youTubeAutomationDay.update({
+      where: { id: day.id },
+      data: { status: 'open' },
+    }).catch(() => undefined)
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : '제작안 생성에 실패했습니다.',
+    }, { status: 500 })
+  }
 
   const updated = await prisma.youTubeAutomationDay.update({
     where: { id: day.id },
