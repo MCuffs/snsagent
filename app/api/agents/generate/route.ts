@@ -29,6 +29,7 @@ interface GenerateAgentRequest {
   brandId: string
   language?: 'ko' | 'en'
   generationMode?: 'brand' | 'general'
+  slideCount?: number
 }
 
 interface DraftSlide {
@@ -212,13 +213,22 @@ function buildSystemPrompt(
   language?: 'ko' | 'en',
   generationMode?: 'brand' | 'general',
   rssContext?: string,
-  userTurnCount?: number
+  userTurnCount?: number,
+  slideCount?: number
 ) {
   const isGeneral = generationMode === 'general'
   const dnaText = formatBrandDnaForPrompt(brand.brandDna)
+
+  let slideCountGuidance = ''
+  if (slideCount) {
+    slideCountGuidance = language === 'en'
+      ? `\n- The user requested a ${slideCount}-slide carousel. Please ensure your response targets exactly slideCount: ${slideCount} (meaning structurePreview and draftSlides must contain exactly ${slideCount} slides).`
+      : `\n- 사용자가 선호하는 슬라이드 수: ${slideCount}장. 기획안의 slideCount를 반드시 ${slideCount}로 설정하고, structurePreview와 draftSlides의 개수를 정확히 ${slideCount}개로 구성하세요.`
+  }
+
   const briefingGuidance = language === 'en'
-    ? `The user has sent ${userTurnCount ?? 0} request turn(s). Prefer one-pass planning: if the request has a usable topic, return ready:true with a complete strategy and draftSlides. Ask one clarification only when the topic is too vague to produce useful copy.`
-    : `사용자가 요청을 ${userTurnCount ?? 0}번 보냈습니다. 기본은 원패스 기획입니다. 주제가 카드뉴스로 만들 수 있을 정도면 ready:true로 기획안과 draftSlides를 한 번에 반환하세요. 너무 막연해서 좋은 카피를 만들 수 없을 때만 질문하세요.`
+    ? `The user has sent ${userTurnCount ?? 0} request turn(s). ${slideCountGuidance} Prefer one-pass planning: if the request has a usable topic, return ready:true with a complete strategy and draftSlides. Ask one clarification only when the topic is too vague to produce useful copy.`
+    : `사용자가 요청을 ${userTurnCount ?? 0}번 보냈습니다. ${slideCountGuidance} 기본은 원패스 기획입니다. 주제가 카드뉴스로 만들 수 있을 정도면 ready:true로 기획안과 draftSlides를 한 번에 반환하세요. 너무 막연해서 좋은 카피를 만들 수 없을 때만 질문하세요.`
 
   if (language === 'en') {
     return buildEnglishSystemPrompt({
@@ -276,7 +286,7 @@ ${contextBlock || '추가 참고 정보 없음'}
 - 확인되지 않은 수치, 순위, 후기, 성과 예측, 의료/금융 단정 표현은 만들지 마세요.
 - message는 3문단 이내, 220자 이하로 쓰고 카피 확인 후 생성을 자연스럽게 제안하세요.
 - visualHint는 dark-editorial, trend-feed, community-style, minimal-clean, breaking-news 중 하나입니다.
-- slideCount는 5, 7, 10 중 하나입니다. 기본은 5 또는 7입니다.
+- slideCount는 3, 5, 7 중 하나입니다. 기본은 5입니다.
 - structurePreview와 draftSlides는 slideCount와 같은 개수여야 합니다.
 - draftSlides는 실제 카드에 들어갈 문구입니다. headline은 24자 이하, body는 100~200자의 2~3문장으로 구체적인 정보·이유·기준을 충분히 담아 쓰세요.
 - reasoning은 공백 포함 30자 이내의 짧은 한글 문장입니다.
@@ -461,7 +471,7 @@ function validateParams(params: unknown): params is GenerateParams {
   if (!p.visualHint || !VISUAL_HINT_OPTIONS.includes(p.visualHint as string)) return false
   if (!p.contentType || typeof p.contentType !== 'string') return false
   if (!p.objective || typeof p.objective !== 'string') return false
-  if (!p.slideCount || ![5, 7, 10].includes(Number(p.slideCount))) return false
+  if (!p.slideCount || ![3, 5, 7].includes(Number(p.slideCount))) return false
   return true
 }
 
@@ -540,7 +550,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as GenerateAgentRequest
-    const { messages, brandId, language, generationMode } = body
+    const { messages, brandId, language, generationMode, slideCount } = body
 
     if (!brandId) return NextResponse.json({ error: 'brandId가 필요합니다.' }, { status: 400 })
 
@@ -735,7 +745,7 @@ export async function POST(request: Request) {
           const openai = new OpenAI({ apiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) })
           const model = getCopywritingModel()
           const diagnosticContext = { stepName: 'generate agent strategy', provider: 'openai' as const, model, baseURL: getOpenAIBaseURLHost(), keyFingerprint: getOpenAIKeyFingerprint(apiKey), userId: user.id, brandId: brand.id, metadata: { language, generationMode } }
-          const systemPrompt = buildSystemPrompt(brand, preferencesText, [scrapedContext, purchasePersuasionContext, researchContext].filter(Boolean).join('\n\n'), language, generationMode, rssContext, userTurnCount)
+          const systemPrompt = buildSystemPrompt(brand, preferencesText, [scrapedContext, purchasePersuasionContext, researchContext].filter(Boolean).join('\n\n'), language, generationMode, rssContext, userTurnCount, slideCount)
           const modelMessages = requestsNewTopic ? messages.map(m => m.role === 'assistant' ? { ...m, content: stripAgentMemoryContext(m.content) } : m) : messages
 
           logAiDiagnostic({ status: 'start', ...diagnosticContext })

@@ -1147,7 +1147,8 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={isHero ? 'w-full max-w-[760px]' : 'relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3'}
+        className={isHero ? 'relative z-20 w-full max-w-[760px]' : 'relative z-30 shrink-0 bg-transparent px-4 pt-3'}
+        style={isHero ? undefined : { paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
         <div className="space-y-2.5">
           {isDragging && (
@@ -1171,7 +1172,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             </div>
           )}
 
-          <div className={`rounded-[24px] border border-[#dfe7ff] bg-white/82 shadow-[0_22px_58px_rgba(79,70,229,0.12)] backdrop-blur-xl transition-all focus-within:border-[#c4b5fd] focus-within:bg-white/90 focus-within:shadow-[0_26px_72px_rgba(79,70,229,0.16)] ${isHero ? 'px-5 py-5' : 'px-4 py-3'}`}>
+          <div className={`relative z-20 rounded-[24px] border border-[#dfe7ff] bg-white/82 shadow-[0_22px_58px_rgba(79,70,229,0.12)] backdrop-blur-xl transition-all focus-within:border-[#c4b5fd] focus-within:bg-white/90 focus-within:shadow-[0_26px_72px_rgba(79,70,229,0.16)] ${isHero ? 'px-5 py-5' : 'px-4 py-3'}`}>
             <textarea
               ref={inputRef}
               rows={isHero ? 4 : 2}
@@ -1395,7 +1396,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
               transition={{ ...smoothEase, delay: 0.03 }}
               className="flex w-full max-w-[820px] flex-col items-center text-center"
             >
-              <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
+              <h1 className="text-[22px] font-black tracking-[-0.01em] text-[#111827] sm:text-[28px] md:text-[34px]">
                 {isEn ? 'What video card news should we make?' : '어떤 영상 카드뉴스를 만들까요?'}
               </h1>
               <p className="mt-3 max-w-[560px] text-sm font-medium leading-6 text-[#64748b]">
@@ -1445,7 +1446,7 @@ function VideoCardNewsHeroMockup() {
   ]
 
   return (
-    <div className="mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
+    <div className="pointer-events-none mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
       {cards.map((card, index) => (
         <motion.div
           key={card.label}

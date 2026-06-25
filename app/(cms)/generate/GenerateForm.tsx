@@ -264,6 +264,7 @@ export default function GenerateForm({
   const [copyPreviewSlides, setCopyPreviewSlides] = useState<CopyPreviewSlide[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [pendingNewTopic, setPendingNewTopic] = useState(false)
+  const [selectedSlideCount, setSelectedSlideCount] = useState<3 | 5 | 7>(5)
 
   // Promo payment modal states
   const [showPromoModal, setShowPromoModal] = useState(false)
@@ -472,7 +473,7 @@ export default function GenerateForm({
       const res = await fetch('/api/agents/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode }),
+        body: JSON.stringify({ messages: history, brandId: brand.id, language, generationMode, slideCount: selectedSlideCount }),
         signal: controller.signal,
       })
 
@@ -552,7 +553,7 @@ export default function GenerateForm({
       setIsWaiting(false)
       setThinkingSteps([])
     }
-  }, [appendAiMessage, brand.id, generationMode, locale, language])
+  }, [appendAiMessage, brand.id, generationMode, locale, language, selectedSlideCount])
 
   // Load the initial Agent greeting (Brand Mode only)
   useEffect(() => {
@@ -563,7 +564,7 @@ export default function GenerateForm({
         const res = await fetch('/api/agents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [], brandId: brand.id, language, generationMode }),
+          body: JSON.stringify({ messages: [], brandId: brand.id, language, generationMode, slideCount: selectedSlideCount }),
         })
         const data = await readJsonResponse<{ message?: string; error?: string }>(res)
         if (!active) return
@@ -578,7 +579,7 @@ export default function GenerateForm({
     }
     void loadGreeting()
     return () => { active = false }
-  }, [generationMode, appendAiMessage, brand.id, language, locale])
+  }, [generationMode, appendAiMessage, brand.id, language, locale, selectedSlideCount])
 
   // Automated General Mode Briefing: greet and let the user enter a topic.
   // RSS is fetched server-side when the agent processes the user's message.
@@ -617,7 +618,9 @@ export default function GenerateForm({
       role: 'user',
       content: pendingNewTopic
         ? (locale === 'en' ? `New topic: ${text}` : `새 주제로 전환: ${text}`)
-        : text,
+        : (locale === 'en'
+          ? `[Selected slide count: ${selectedSlideCount}]\n${text}`
+          : `[선택한 카드뉴스 장수: ${selectedSlideCount}장]\n${text}`),
     }
     const baseHistory = pendingNewTopic
       ? chatHistory.map(message => (
@@ -1133,12 +1136,12 @@ export default function GenerateForm({
         </div>
 
         {shouldShowHero ? (
-          <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-8">
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-8">
             <motion.div
               variants={formItemVariants}
               className="flex w-full max-w-[820px] flex-col items-center text-center"
             >
-              <h1 className="text-[30px] font-black tracking-[-0.01em] text-[#111827] md:text-[34px]">
+              <h1 className="text-[22px] font-black tracking-[-0.01em] text-[#111827] sm:text-[28px] md:text-[34px]">
                 {locale === 'en' ? 'What image card news should we make?' : '어떤 이미지 카드뉴스를 만들까요?'}
               </h1>
               <p className="mt-3 max-w-[590px] text-sm font-medium leading-6 text-[#64748b]">
@@ -1147,8 +1150,8 @@ export default function GenerateForm({
                   : '주제, 타깃, 분위기만 입력하면 후킹 제목, 본문, 비주얼 방향을 먼저 기획합니다.'}
               </p>
 
-              <form onSubmit={handleSend} className="mt-6 w-full max-w-[760px]">
-                <div className="rounded-[24px] border border-[#dfe7ff] bg-white/86 px-5 py-5 shadow-[0_24px_68px_rgba(79,70,229,0.13)] backdrop-blur-xl transition-all focus-within:border-[#c4b5fd] focus-within:bg-white/92 focus-within:shadow-[0_28px_82px_rgba(79,70,229,0.17)]">
+              <form onSubmit={handleSend} className="relative z-20 mt-6 w-full max-w-[760px]">
+                <div className="relative z-20 rounded-[24px] border border-[#dfe7ff] bg-white/86 px-5 py-5 shadow-[0_24px_68px_rgba(79,70,229,0.13)] backdrop-blur-xl transition-all focus-within:border-[#c4b5fd] focus-within:bg-white/92 focus-within:shadow-[0_28px_82px_rgba(79,70,229,0.17)]">
                   <textarea
                     rows={4}
                     value={input}
@@ -1169,24 +1172,26 @@ export default function GenerateForm({
 
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#94a3b8] opacity-70"
-                        title={locale === 'en' ? 'Reference images can be added after planning.' : '참고 이미지는 기획 후 추가할 수 있습니다.'}
+                      <label
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#64748b] transition-colors hover:border-[#cbd5e1] hover:text-[#334155]"
+                        title={locale === 'en' ? 'Add reference image' : '참고 이미지 추가'}
                       >
                         <ImagePlus className="h-3.5 w-3.5" />
-                      </button>
+                        <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
+                      </label>
                       <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white/84 p-1">
                         {[3, 5, 7].map((count) => (
-                          <span
+                          <button
                             key={count}
+                            type="button"
+                            onClick={() => setSelectedSlideCount(count as 3 | 5 | 7)}
+                            aria-pressed={selectedSlideCount === count}
                             className={`flex h-6 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-bold ${
-                              count === 5 ? 'bg-[#4252ff] text-white' : 'text-[#64748b]'
+                              selectedSlideCount === count ? 'bg-[#4252ff] text-white' : 'text-[#64748b] hover:bg-[#f5f7ff] hover:text-[#3730a3]'
                             }`}
                           >
                             {count}
-                          </span>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -1433,7 +1438,7 @@ export default function GenerateForm({
         </div>
 
         {/* Input bar */}
-        <div className="relative z-10 shrink-0 bg-transparent px-4 pb-5 pt-3">
+        <div className="relative z-30 shrink-0 bg-transparent px-4 pt-3" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
           <div className="mx-auto w-full max-w-[920px]">
             <form onSubmit={handleSend}>
               <div className="flex items-center gap-2 rounded-[22px] border border-white/75 bg-white px-3 py-2 shadow-[0_18px_42px_rgba(87,119,185,0.12)] transition-all focus-within:border-[#bdd0ff] focus-within:shadow-[0_22px_54px_rgba(87,119,185,0.16)]">
@@ -1461,6 +1466,30 @@ export default function GenerateForm({
                     <X className="h-4 w-4" />
                   </button>
                 )}
+                <label
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-[#9ca3af] transition-colors hover:bg-[#f8fafc] hover:text-[#3b82f6]"
+                  title={locale === 'en' ? 'Add reference image' : '참고 이미지 추가'}
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={selectReferenceFiles} />
+                </label>
+                <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white/84 p-1">
+                  {([3, 5, 7] as const).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setSelectedSlideCount(count)}
+                      aria-pressed={selectedSlideCount === count}
+                      className={`h-6 rounded-full px-2 text-[11px] font-bold transition-all ${
+                        selectedSlideCount === count
+                          ? 'bg-[#4252ff] text-white'
+                          : 'text-[#64748b] hover:bg-[#f5f7ff] hover:text-[#3730a3]'
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="submit"
                   disabled={!input.trim() || isWaiting || isRevealingMessage}
@@ -1507,7 +1536,7 @@ function ImageCardNewsHeroMockup() {
   ]
 
   return (
-    <div className="mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
+    <div className="pointer-events-none mt-10 flex w-full max-w-[720px] items-end justify-center gap-3 px-4">
       {cards.map((card, index) => (
         <motion.div
           key={card.label}
