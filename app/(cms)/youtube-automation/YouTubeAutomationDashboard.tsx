@@ -2,7 +2,7 @@
 
 import type React from 'react'
 import { useMemo, useState } from 'react'
-import { CalendarDays, Check, Download, Loader2, Lock, Mic2, Play, Search, Sparkles, Upload, Video } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Check, Download, ExternalLink, Loader2, Lock, Mic2, Play, Sparkles, Upload, Video } from 'lucide-react'
 
 type ScenePlan = {
   sceneNumber: number
@@ -66,6 +66,7 @@ export default function YouTubeAutomationDashboard() {
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [selectedDay, setSelectedDay] = useState<PlannerDay | null>(null)
+  const [viewMode, setViewMode] = useState<'planner' | 'studio'>('planner')
   const [loading, setLoading] = useState<'planner' | 'day' | 'render' | 'upload' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -103,7 +104,10 @@ export default function YouTubeAutomationDashboard() {
   const startDay = async (day: PlannerDay) => {
     if (day.status === 'locked') return
     setSelectedDay(day)
-    if (day.script) return
+    if (day.script) {
+      setViewMode('studio')
+      return
+    }
 
     setLoading('day')
     setError(null)
@@ -111,7 +115,9 @@ export default function YouTubeAutomationDashboard() {
       const res = await fetch(`/api/youtube-automation/days/${day.id}/start`, { method: 'POST' })
       const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
       if (!res.ok || !data.day) throw new Error(data.error || '제작안을 만들지 못했습니다.')
+      setSelectedDay({ ...day, ...data.day })
       applyDayUpdate(day.id, data.day)
+      setViewMode('studio')
     } catch (err) {
       setError(err instanceof Error ? err.message : '제작안을 만들지 못했습니다.')
     } finally {
@@ -222,6 +228,7 @@ export default function YouTubeAutomationDashboard() {
             onClick={() => {
               setProject(null)
               setSelectedDay(null)
+              setViewMode('planner')
               setTopic('')
               setError(null)
             }}
@@ -232,8 +239,17 @@ export default function YouTubeAutomationDashboard() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_430px]">
-        <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-5">
+      {viewMode === 'studio' && selectedDay ? (
+        <YouTubeProductionStudio
+          day={selectedDay}
+          busy={loading}
+          error={error}
+          onBack={() => setViewMode('planner')}
+          onRender={requestRender}
+          onUploaded={markUploaded}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {sortedDays.map(day => {
               const locked = day.status === 'locked'
@@ -262,115 +278,64 @@ export default function YouTubeAutomationDashboard() {
                   <p className="line-clamp-2 text-sm font-black leading-5 text-[#111827]">{day.title}</p>
                   <p className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#94a3b8]">
                     {locked ? <Lock className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                    {locked ? '하루에 하나씩 오픈됩니다' : '제목 클릭 시 제작 시작'}
+                    {loading === 'day' && active ? '제작 화면 준비 중' : locked ? '하루에 하나씩 오픈됩니다' : '제목 클릭 시 제작 화면으로 이동'}
                   </p>
                 </button>
               )
             })}
           </div>
+          {error && <p className="mt-4 rounded-xl bg-[#fff7ed] p-3 text-xs font-bold leading-5 text-[#c2410c]">{error}</p>}
         </div>
-
-        <aside className="min-h-0 overflow-y-auto border-t border-white/60 bg-white/58 p-5 backdrop-blur-xl lg:border-l lg:border-t-0">
-          {selectedDay ? (
-            <ProductionPanel
-              day={selectedDay}
-              busy={loading}
-              error={error}
-              onRender={requestRender}
-              onUploaded={markUploaded}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-center text-sm font-semibold text-[#64748b]">
-              제작할 날짜를 선택해 주세요.
-            </div>
-          )}
-        </aside>
-      </div>
+      )}
     </div>
   )
 }
 
-function ProductionPanel({
+function YouTubeProductionStudio({
   day,
   busy,
   error,
+  onBack,
   onRender,
   onUploaded,
 }: {
   day: PlannerDay
   busy: string | null
   error: string | null
+  onBack: () => void
   onRender: () => void
   onUploaded: () => void
 }) {
   const scenes = day.scenes || []
   const sourceClips = day.sourceClips || []
+  const usableClips = sourceClips.filter(clip => clip.videoUrl)
+  const firstClip = usableClips[0]
+  const totalDuration = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0)
 
   return (
-    <div>
-      <div className="mb-5">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#64748b]">Day {day.dayNumber}</p>
-        <h2 className="mt-2 text-lg font-black leading-7 text-[#111827]">{day.title}</h2>
-      </div>
-
-      {busy === 'day' && (
-        <ProgressBlock icon={Loader2} spinning title="제작안 생성 중" desc="스크립트, 장면 키워드, 무료 영상 후보를 준비하고 있습니다." />
-      )}
-
-      {!day.script && busy !== 'day' && (
-        <ProgressBlock icon={Play} title="제목을 클릭하면 시작됩니다" desc="오픈된 날짜의 제목을 클릭하면 그때부터 기획과 영상 소스 수집이 시작됩니다." />
-      )}
-
-      {day.script && (
-        <div className="space-y-4">
-          <Section title="스크립트" icon={Mic2}>
-            <p className="whitespace-pre-line text-sm font-semibold leading-6 text-[#334155]">{day.script}</p>
-          </Section>
-
-          <Section title="장면별 검색 키워드" icon={Search}>
-            <div className="space-y-2">
-              {scenes.map(scene => (
-                <div key={scene.sceneNumber} className="rounded-xl bg-[#f8fafc] p-3">
-                  <p className="text-xs font-black text-[#111827]">Scene {scene.sceneNumber} · {scene.durationSeconds}s</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[#64748b]">{scene.narration}</p>
-                  <p className="mt-2 text-[11px] font-black text-[#4252ff]">{scene.searchKeyword}</p>
-                </div>
-              ))}
+    <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc]">
+      <div className="sticky top-0 z-20 border-b border-white/70 bg-white/82 px-5 py-3 backdrop-blur-xl">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e5e7eb] bg-white text-[#64748b] transition-colors hover:text-[#111827]"
+              aria-label="플래너로 돌아가기"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#4252ff]">Day {day.dayNumber} Production</p>
+              <h2 className="truncate text-lg font-black text-[#111827]">{day.title}</h2>
             </div>
-          </Section>
-
-          <Section title="무료 영상 후보" icon={Video}>
-            <div className="space-y-2">
-              {sourceClips.slice(0, 8).map(clip => (
-                <div key={`${clip.provider}-${clip.id}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#f8fafc] p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-black text-[#111827]">{clip.provider.toUpperCase()} · {clip.title}</p>
-                    <p className="truncate text-[11px] font-semibold text-[#94a3b8]">{clip.keyword}</p>
-                  </div>
-                  {clip.sourceUrl ? (
-                    <a href={clip.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 text-[11px] font-black text-[#4252ff]">
-                      원본
-                    </a>
-                  ) : (
-                    <span className="shrink-0 text-[11px] font-black text-[#f59e0b]">대기</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="메타데이터" icon={Sparkles}>
-            <p className="text-sm font-semibold leading-6 text-[#334155]">{day.description}</p>
-            <p className="mt-3 text-xs font-black text-[#4252ff]">{(day.tags || []).map(tag => `#${tag}`).join(' ')}</p>
-            {day.pinnedComment && <p className="mt-3 rounded-xl bg-[#f8fafc] p-3 text-xs font-semibold leading-5 text-[#64748b]">{day.pinnedComment}</p>}
-          </Section>
-
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          </div>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onRender}
-              disabled={busy === 'render'}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 text-xs font-black text-white transition-colors hover:bg-[#1f2937] disabled:opacity-60"
+              disabled={!day.script || busy === 'render'}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 text-xs font-black text-white transition-colors hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy === 'render' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {day.mp4Url ? 'MP4 다시 렌더링' : 'MP4 렌더링'}
@@ -379,30 +344,152 @@ function ProductionPanel({
               type="button"
               onClick={onUploaded}
               disabled={busy === 'upload'}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#dbe3ef] bg-white px-4 text-xs font-black text-[#334155] transition-colors hover:bg-[#f8fafc] disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#dbe3ef] bg-white px-4 text-xs font-black text-[#334155] transition-colors hover:bg-[#f8fafc] disabled:opacity-60"
             >
               {busy === 'upload' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              업로드 완료 체크
+              업로드 완료
             </button>
           </div>
         </div>
+      </div>
+
+      {busy === 'day' && (
+        <div className="flex min-h-[520px] items-center justify-center px-5">
+          <ProgressBlock icon={Loader2} spinning title="제작 화면 준비 중" desc="스크립트, 자막 타임라인, 무료 영상 소스를 불러오고 있습니다." />
+        </div>
       )}
 
-      {day.mp4Url && (
-        <a
-          href={day.mp4Url}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#4252ff] px-4 text-xs font-black text-white transition-colors hover:bg-[#3443d4]"
-        >
-          <Download className="h-4 w-4" />
-          완성 MP4 열기
-        </a>
-      )}
+      {day.script && busy !== 'day' && (
+        <div className="grid gap-5 px-5 py-5 xl:grid-cols-[390px_minmax(0,1fr)]">
+          <section className="rounded-2xl border border-white/80 bg-[#111827] p-4 shadow-[0_24px_70px_rgba(15,23,42,0.18)]">
+            <div className="mx-auto aspect-[9/16] w-full max-w-[330px] overflow-hidden rounded-[28px] bg-black shadow-2xl">
+              <div className="relative h-full w-full">
+                {firstClip?.videoUrl ? (
+                  <video
+                    src={firstClip.videoUrl}
+                    poster={firstClip.previewUrl || undefined}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-[#172554] to-[#020617] px-8 text-center text-sm font-bold text-white/70">
+                    무료 영상 소스를 찾는 중입니다
+                  </div>
+                )}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/72 to-transparent p-5 pt-24">
+                  <p className="text-center text-[22px] font-black leading-tight text-white drop-shadow">{day.title}</p>
+                  <p className="mt-4 rounded-xl bg-black/54 px-3 py-2 text-center text-sm font-bold leading-5 text-white">
+                    {scenes[0]?.narration || day.script.split('\n')[0]}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <Metric label="Scenes" value={String(scenes.length)} />
+              <Metric label="Clips" value={String(usableClips.length)} />
+              <Metric label="Seconds" value={String(totalDuration || 0)} />
+            </div>
+            {day.mp4Url && (
+              <a
+                href={day.mp4Url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#4252ff] px-4 text-xs font-black text-white transition-colors hover:bg-[#3443d4]"
+              >
+                <Download className="h-4 w-4" />
+                완성 MP4 열기
+              </a>
+            )}
+          </section>
 
-      {error && <p className="mt-4 rounded-xl bg-[#fff7ed] p-3 text-xs font-bold leading-5 text-[#c2410c]">{error}</p>}
+          <div className="min-w-0 space-y-5">
+            <Section title="장면별 영상과 자막" icon={Video}>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {scenes.map((scene, index) => {
+                  const clip = sourceClips.find(item => item.keyword === scene.searchKeyword) || sourceClips[index]
+                  return (
+                    <article key={scene.sceneNumber} className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
+                      <div className="aspect-video bg-[#0f172a]">
+                        {clip?.videoUrl ? (
+                          <video src={clip.videoUrl} poster={clip.previewUrl || undefined} muted loop playsInline controls className="h-full w-full object-cover" />
+                        ) : clip?.previewUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={clip.previewUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs font-bold text-white/54">영상 후보 없음</div>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <p className="text-xs font-black text-[#111827]">Scene {scene.sceneNumber} · {scene.durationSeconds}s</p>
+                          {clip?.sourceUrl && (
+                            <a href={clip.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-black text-[#4252ff]">
+                              원본 <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <p className="rounded-xl bg-[#111827] px-3 py-2 text-sm font-bold leading-5 text-white">{scene.narration}</p>
+                        <p className="mt-2 text-[11px] font-bold text-[#64748b]">{scene.searchKeyword}</p>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </Section>
+
+            <Section title="자막 타임라인" icon={Mic2}>
+              <div className="space-y-2">
+                {scenes.map((scene, index) => {
+                  const start = scenes.slice(0, index).reduce((sum, item) => sum + item.durationSeconds, 0)
+                  return (
+                    <div key={scene.sceneNumber} className="grid gap-3 rounded-xl bg-[#f8fafc] p-3 sm:grid-cols-[88px_minmax(0,1fr)]">
+                      <p className="text-xs font-black text-[#4252ff]">{formatTime(start)} - {formatTime(start + scene.durationSeconds)}</p>
+                      <p className="text-sm font-semibold leading-6 text-[#334155]">{scene.narration}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </Section>
+
+            <Section title="전체 스크립트와 메타데이터" icon={Sparkles}>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs font-black text-[#64748b]">Script</p>
+                  <p className="whitespace-pre-line rounded-xl bg-[#f8fafc] p-3 text-sm font-semibold leading-6 text-[#334155]">{day.script}</p>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-black text-[#64748b]">Upload metadata</p>
+                  <p className="text-sm font-semibold leading-6 text-[#334155]">{day.description}</p>
+                  <p className="mt-3 text-xs font-black text-[#4252ff]">{(day.tags || []).map(tag => `#${tag}`).join(' ')}</p>
+                  {day.pinnedComment && <p className="mt-3 rounded-xl bg-[#f8fafc] p-3 text-xs font-semibold leading-5 text-[#64748b]">{day.pinnedComment}</p>}
+                </div>
+              </div>
+            </Section>
+
+            {error && <p className="rounded-xl bg-[#fff7ed] p-3 text-xs font-bold leading-5 text-[#c2410c]">{error}</p>}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white/10 px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/40">{label}</p>
+      <p className="mt-1 text-sm font-black text-white">{value}</p>
+    </div>
+  )
+}
+
+function formatTime(seconds: number) {
+  const min = Math.floor(seconds / 60)
+  const sec = Math.floor(seconds % 60)
+  return `${min}:${String(sec).padStart(2, '0')}`
 }
 
 function StatusPill({ status }: { status: string }) {
