@@ -88,6 +88,7 @@ interface CampaignResultViewProps {
   post: Post
   brand: Brand
   planName: string
+  showWatermark: boolean
   regenerationAccess: 'blocked' | 'single-use' | 'included'
 }
 
@@ -341,6 +342,8 @@ export default function CampaignResultView({
   post,
   brand,
   planName,
+  showWatermark,
+  regenerationAccess,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const locale = useLocale()
@@ -482,15 +485,16 @@ export default function CampaignResultView({
             imageUrl: slide.videoThumbnailUrl,
           }
         : slide
+      const watermarkOpts = { hideWatermark: !showWatermark }
       return [
         slide.id,
         slide.editorDocument
-          ? parseEditorialDocument(slide.editorDocument, seed)
-          : applyBrandStyleMemory(parseEditorialDocument(null, seed), brand.editorPreferences),
+          ? parseEditorialDocument(slide.editorDocument, seed, watermarkOpts)
+          : applyBrandStyleMemory(parseEditorialDocument(null, seed, watermarkOpts), brand.editorPreferences),
       ]
     }))
     if (campaign.slides[0]) initializeEditor(initialDocuments, campaign.slides[0].id)
-  }, [brand.editorPreferences, campaign.imageModel, campaign.slides, initializeEditor])
+  }, [brand.editorPreferences, campaign.imageModel, campaign.slides, initializeEditor, showWatermark])
 
   useEffect(() => {
     if (!activeSlide || !activeDocument || !dirtySlides[activeSlide.id] || editorBusy) return
@@ -977,19 +981,17 @@ export default function CampaignResultView({
   const exportZip = async () => {
     setDownloadingAll(true)
     setMessage(null)
-    // 편집 중인 텍스트를 먼저 store에 flush (현재 활성 슬라이드가 열린 싄 보호)
     await flushActiveTextEdit()
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     analytics.campaignDownload(campaign.id, 'zip', slides.length, {
       export_scale: 1,
       download_scope: 'all_slides',
     })
     try {
-      const zip = new JSZip()
       const results = await Promise.all(
         slides.map(async slide => {
           const doc = documents[slide.id]
           const bgLayer = doc?.layers.find(l => l.type === 'background')
-          // 영상 배경 슬라이드 — 클라이언트 canvas 합성
           if (bgLayer?.videoUrl && doc) {
             const exportedVideo = await exportSlideAsVideo({
               videoUrl: bgLayer.videoUrl,
@@ -1000,23 +1002,39 @@ export default function CampaignResultView({
             })
             return { name: fileNameFor(campaign.title, slide.slideNumber, exportedVideo.extension), blob: exportedVideo.blob }
           }
-          // 이미지 슬라이드 — 기존 서버 PNG 렌더
           const result = await exportEditorialSlideAction(slide.id, JSON.stringify(doc || slide), 'png', 1)
           if (!result.success) throw new Error(result.error)
           const response = await fetch(result.url, { cache: 'force-cache' })
           return { name: fileNameFor(campaign.title, slide.slideNumber), blob: await response.blob() }
         })
       )
-      for (const { name, blob } of results) zip.file(name, blob)
-      const archive = await zip.generateAsync({ 
-        type: 'blob',
-        compression: 'STORE', // No compression for speed (PNGs are already compressed)
-      })
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(archive)
-      link.download = `${campaign.title.replace(/\s+/g, '-')}-instagram-4x5.zip`
-      link.click()
-      URL.revokeObjectURL(link.href)
+
+      // Mobile: Web Share API → sequential individual downloads fallback
+      if (isMobile) {
+        const files = results.map(({ name, blob }) => new File([blob], name, { type: blob.type || 'image/png' }))
+        const canShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files })
+        if (canShare) {
+          await navigator.share({ files, title: campaign.title })
+        } else {
+          // Sequential download — one by one so mobile browser handles each
+          for (const { name, blob } of results) {
+            downloadBlob(blob, name)
+            // Small delay so the browser processes each download
+            await new Promise(r => setTimeout(r, 300))
+          }
+        }
+      } else {
+        // Desktop: ZIP
+        const zip = new JSZip()
+        for (const { name, blob } of results) zip.file(name, blob)
+        const archive = await zip.generateAsync({ type: 'blob', compression: 'STORE' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(archive)
+        link.download = `${campaign.title.replace(/\s+/g, '-')}-instagram-4x5.zip`
+        link.click()
+        URL.revokeObjectURL(link.href)
+      }
+
       analytics.exportComplete({
         campaignId: campaign.id,
         format: 'zip',
@@ -1026,6 +1044,11 @@ export default function CampaignResultView({
       })
       setMessage({ type: 'success', text: t('message_zip_done') })
     } catch (error) {
+      // Web Share API cancellation is not an error
+      if (error instanceof Error && error.name === 'AbortError') {
+        setDownloadingAll(false)
+        return
+      }
       analytics.exportComplete({
         campaignId: campaign.id,
         format: 'zip',
@@ -1064,7 +1087,7 @@ export default function CampaignResultView({
 
   return (
     <div
-      className="mx-auto max-w-[1500px] px-5 py-8 md:px-8"
+      className="mx-auto max-w-[1500px] px-4 py-5 sm:px-5 sm:py-8 md:px-8"
       style={isVideoCardNews ? {
         background: 'linear-gradient(135deg, #ffffff 0%, #f4f8ff 30%, #eaf1ff 65%, #e2ecfe 100%)',
         minHeight: '100%',
@@ -1106,33 +1129,33 @@ export default function CampaignResultView({
           {uploadToast.status === 'done' && <div className="h-1 bg-emerald-500" />}
         </div>
       )}
-      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
           {isVideoCardNews ? (
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#c0d0f5] bg-[#eef4ff] px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm mb-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#c0d0f5] bg-[#eef4ff] px-3 py-1.5 text-xs font-bold text-[#3b5bdb] shadow-sm mb-3 tap-sm">
               <span className="flex h-1.5 w-1.5 rounded-full bg-[#4c6ef5] animate-pulse" />
               VIDEO CARD NEWS STUDIO
             </div>
           ) : (
             <p className="eyebrow">{t('page_eyebrow')}</p>
           )}
-          <h1 className={`mt-2 max-w-4xl text-4xl font-black leading-[1.2] tracking-[-0.03em] md:text-5xl ${
+          <h1 className={`mt-2 max-w-4xl text-2xl font-black leading-[1.2] tracking-[-0.03em] sm:text-3xl md:text-4xl lg:text-5xl ${
             isVideoCardNews ? 'text-[#1a2a5e]' : 'text-[#1f1512]'
           }`}>
             {campaign.title}
           </h1>
-          <p className={`mt-3 max-w-2xl text-sm leading-6 ${isVideoCardNews ? 'text-[#5a6ea8]' : 'text-[#746a62]'}`}>
+          <p className={`mt-2 max-w-2xl text-sm leading-6 sm:mt-3 ${isVideoCardNews ? 'text-[#5a6ea8]' : 'text-[#746a62]'}`}>
             {isVideoCardNews
               ? 'AI가 생성한 영상 슬라이드를 확인하고, 텍스트를 직접 편집한 뒤 다운로드하세요.'
               : t('page_desc')}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary px-5">
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary px-4 text-sm sm:px-5">
             {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {t('export_zip_full')}
           </button>
-          <button type="button" onClick={() => router.push(`/${locale}/generate`)} className="btn-secondary px-5">
+          <button type="button" onClick={() => router.push(`/${locale}/generate`)} className="btn-secondary px-4 text-sm sm:px-5">
             <RefreshCw className="h-4 w-4" />
             {t('new_card')}
           </button>
@@ -1149,15 +1172,17 @@ export default function CampaignResultView({
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <section className="space-y-5">
-          <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-5 shadow-[0_24px_70px_rgba(31,21,18,0.18)]">
-            {activeSlide && <EditorialCanvas slideId={activeSlide.id} fallbackImageUrl={activeSlide.imageUrl} />}
+          <div className="rounded-[10px] border border-[#21242b] bg-[#111318] p-3 shadow-[0_24px_70px_rgba(31,21,18,0.18)] sm:p-5">
+            <div className="overflow-x-auto">
+              {activeSlide && <EditorialCanvas slideId={activeSlide.id} fallbackImageUrl={activeSlide.imageUrl} />}
+            </div>
 
-            <div className="mt-5 flex items-center justify-between">
+            <div className="mt-4 flex items-center justify-between sm:mt-5">
               <button
                 type="button"
                 onClick={() => selectSlide(Math.max(0, activeSlideIndex - 1))}
                 disabled={activeSlideIndex === 0}
-                className="btn-secondary min-h-10 px-4 disabled:opacity-40"
+                className="btn-secondary min-h-[44px] w-[44px] px-0 disabled:opacity-40 sm:w-auto sm:px-4"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -1168,14 +1193,14 @@ export default function CampaignResultView({
                 type="button"
                 onClick={() => selectSlide(Math.min(slides.length - 1, activeSlideIndex + 1))}
                 disabled={activeSlideIndex === slides.length - 1}
-                className="btn-secondary min-h-10 px-4 disabled:opacity-40"
+                className="btn-secondary min-h-[44px] w-[44px] px-0 disabled:opacity-40 sm:w-auto sm:px-4"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-3 gap-2 xs:grid-cols-4 sm:grid-cols-5 sm:gap-3">
             {slides.map((slide, index) => (
               <button
                 key={slide.id}
@@ -1374,29 +1399,29 @@ export default function CampaignResultView({
             <p className="mb-3">
               {t('download_desc')}
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {(activeSlide?.imageUrl || activeSlide?.videoUrl) && (
                 <>
-                  <a href={activeSlide.videoUrl || activeSlide.imageUrl || '#'} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-4 text-xs">
+                  <a href={activeSlide.videoUrl || activeSlide.imageUrl || '#'} target="_blank" rel="noreferrer" className="btn-secondary min-h-10 px-3 text-xs sm:px-4">
                     <ExternalLink className="h-4 w-4" />
                     {t('open_original')}
                   </a>
-                  <button type="button" onClick={downloadActiveSlide} disabled={exporting} className="btn-secondary min-h-10 px-4 text-xs">
+                  <button type="button" onClick={downloadActiveSlide} disabled={exporting} className="btn-secondary min-h-10 px-3 text-xs sm:px-4">
                     {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     {t('download_current')}
                   </button>
                 </>
               )}
-              <button type="button" onClick={() => exportActive('png', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+              <button type="button" onClick={() => exportActive('png', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-3 text-xs sm:px-4">
                 PNG
               </button>
-              <button type="button" onClick={() => exportActive('jpg', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+              <button type="button" onClick={() => exportActive('jpg', 1)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-3 text-xs sm:px-4">
                 JPG
               </button>
-              <button type="button" onClick={() => exportActive('png', 2)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-4 text-xs">
+              <button type="button" onClick={() => exportActive('png', 2)} disabled={exporting || !activeDocument} className="btn-secondary min-h-10 px-3 text-xs sm:px-4">
                 PNG 2x
               </button>
-              <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary min-h-10 px-4 text-xs">
+              <button type="button" onClick={exportZip} disabled={downloadingAll} className="btn-primary col-span-2 min-h-10 px-3 text-xs sm:col-span-1 sm:px-4">
                 {downloadingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 {t('export_zip')}
               </button>

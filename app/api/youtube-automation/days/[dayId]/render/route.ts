@@ -55,6 +55,8 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
         thumbnailUrl: rendered.thumbnailUrl,
         ttsAudioUrl: rendered.ttsAudioUrl,
         ttsProvider: rendered.ttsProvider,
+        // Store actual subtitle timings (derived from real TTS durations)
+        subtitleJson: JSON.stringify(rendered.subtitles),
       },
     })
 
@@ -66,6 +68,7 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
         thumbnailUrl: updated.thumbnailUrl,
         ttsAudioUrl: updated.ttsAudioUrl,
         ttsProvider: updated.ttsProvider,
+        subtitles: rendered.subtitles,
       },
     })
   } catch (error) {

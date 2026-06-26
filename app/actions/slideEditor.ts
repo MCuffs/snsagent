@@ -7,6 +7,7 @@ import { getPipelineImageModel, getPipelineImageProvider } from '../../src/lib/a
 import { getTextGenerationModel, temperatureOption } from '../../src/lib/ai/llmClient'
 import { layerByType, parseEditorialDocument, serializeBrandStyleMemory } from '../../src/lib/editor/document'
 import { renderEditorialDocument } from '../../src/lib/editor/renderer'
+import { hasWatermark } from '../../lib/limits'
 import { repairRenderableCopy } from '../../src/lib/copywriting/renderableCopy'
 import { logEditEvent } from '../../src/lib/intelligence/editLogger'
 import {
@@ -171,10 +172,13 @@ export async function exportEditorialSlideAction(
   const user = await getSessionUser()
   if (!user) return unauthenticated()
   try {
-    const slide = await dbService.getSlide(slideId)
+    const [slide, userHasWatermark] = await Promise.all([
+      dbService.getSlide(slideId),
+      hasWatermark(user.id),
+    ])
     if (!slide) return failed('슬라이드를 찾을 수 없습니다.')
     if (slide.campaign.userId !== user.id) return forbidden()
-    const document = parseEditorialDocument(rawDocument, slideEditorSeed(slide))
+    const document = parseEditorialDocument(rawDocument, slideEditorSeed(slide), { hideWatermark: !userHasWatermark })
     const renderDoc = withBackgroundFallback(document, slide.backgroundImageUrl)
     const url = await renderEditorialDocument(`export-${Date.now()}-${slide.slideNumber}`, renderDoc, { format, scale })
     return { success: true as const, url }

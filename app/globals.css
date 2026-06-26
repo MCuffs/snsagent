@@ -31,15 +31,23 @@ body {
 @layer base {
   * {
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     background: var(--background);
     letter-spacing: 0;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     min-width: 320px;
+    /* safe-area padding for notch/home indicator */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    overscroll-behavior: none;
   }
 
   button,
@@ -47,6 +55,7 @@ body {
   textarea,
   select {
     font: inherit;
+    touch-action: manipulation;
   }
 
   ::selection {
@@ -93,7 +102,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 2.5rem;
+    min-height: 2.75rem;
     border-radius: 6px;
     background: #111827;
     color: #fff;
@@ -101,6 +110,7 @@ body {
     font-weight: 600;
     padding: 0 1.25rem;
     transition: background 160ms ease, box-shadow 160ms ease;
+    touch-action: manipulation;
   }
 
   .btn-primary:hover {
@@ -118,7 +128,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 2.5rem;
+    min-height: 2.75rem;
     border-radius: 6px;
     border: 1px solid var(--border-muted);
     background: #ffffff;
@@ -127,6 +137,7 @@ body {
     font-weight: 500;
     padding: 0 1rem;
     transition: background 160ms ease, border-color 160ms ease;
+    touch-action: manipulation;
   }
 
   .btn-secondary:hover {

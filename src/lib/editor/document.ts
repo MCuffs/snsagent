@@ -28,7 +28,7 @@ const OVERLAY_PRESETS: OverlayPreset[] = [
   'modern-korean-media',
 ]
 
-export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocument {
+export function createEditorialDocument(seed: SlideEditorSeed, { hideWatermark = false }: { hideWatermark?: boolean } = {}): EditorialDocument {
   const role = seed.slideNumber === 1 ? 'hook' : 'editorial-detail'
   const fontPreset = toFontPreset(seed.fontPreset)
   const textColor = validColor(seed.textColor, '#ffffff')
@@ -82,6 +82,7 @@ export function createEditorialDocument(seed: SlideEditorSeed): EditorialDocumen
         tracking: 4,
         color: '#ffffff',
         opacity: 48,
+        visible: !hideWatermark,
       }),
       layer('title', '타이틀', 40, {
         text: seed.headline,
@@ -183,11 +184,11 @@ export function createTemplatedEditorialDocument(seed: SlideEditorSeed, t: Templ
   return doc
 }
 
-export function parseEditorialDocument(raw: string | null | undefined, seed: SlideEditorSeed): EditorialDocument {
-  if (!raw) return createEditorialDocument(seed)
+export function parseEditorialDocument(raw: string | null | undefined, seed: SlideEditorSeed, { hideWatermark = false }: { hideWatermark?: boolean } = {}): EditorialDocument {
+  if (!raw) return createEditorialDocument(seed, { hideWatermark })
   try {
     const input = JSON.parse(raw) as Partial<EditorialDocument>
-    const fallback = createEditorialDocument(seed)
+    const fallback = createEditorialDocument(seed, { hideWatermark })
     if (!Array.isArray(input.layers)) return fallback
     const doc = normalizeDocument({ ...fallback, ...input, layers: input.layers })
     const documentBackground = layerByType(doc, 'background')?.imageUrl
@@ -208,11 +209,13 @@ export function parseEditorialDocument(raw: string | null | undefined, seed: Sli
           }
         : layer.type === 'subtitle'
           ? { ...layer, text: safeSubtitleText(seed.headline, layer.text || seed.body) }
-          : layer
+          : layer.type === 'watermark'
+            ? { ...layer, visible: !hideWatermark }
+            : layer
     )
     return doc
   } catch {
-    return createEditorialDocument(seed)
+    return createEditorialDocument(seed, { hideWatermark })
   }
 }
 

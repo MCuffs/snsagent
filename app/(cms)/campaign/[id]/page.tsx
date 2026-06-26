@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { dbService } from '../../../../lib/db-service'
-import { PRICING_PLANS } from '../../../../lib/limits'
+import { PRICING_PLANS, hasWatermark as checkHasWatermark } from '../../../../lib/limits'
 import { normalizePlan } from '../../../../lib/limits-types'
 import { getHistoryRetentionStatus } from '../../../../lib/history-retention'
 import CampaignResultView from './CampaignResultView'
@@ -32,6 +32,7 @@ export default async function CampaignDetailsPage({
   if (!brand || !post) redirect('/concept?tab=works')
 
   const planName = PRICING_PLANS[userPlan].name
+  const showWatermark = await checkHasWatermark(user.id)
 
   const serializedCampaign = {
     id: campaign.id,
@@ -87,6 +88,7 @@ export default async function CampaignDetailsPage({
       post={serializedPost}
       brand={serializedBrand}
       planName={planName}
+      showWatermark={showWatermark}
       regenerationAccess={userPlan === 'FREE' ? 'blocked' : 'included'}
     />
   )

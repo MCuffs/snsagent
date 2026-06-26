@@ -5,7 +5,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+// @ffmpeg-installer/ffmpeg has no bundled type declarations
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 
 interface RenderYouTubeShortsParams {
@@ -22,6 +24,8 @@ interface StoredRenderedAsset {
   thumbnailUrl: string | null
   ttsAudioUrl: string | null
   ttsProvider: string
+  // Actual subtitle timings derived from real TTS audio durations (replaces plan-based estimate)
+  subtitles: Array<{ start: number; end: number; text: string }>
 }
 
 const MAX_SOURCE_VIDEO_BYTES = 180 * 1024 * 1024
@@ -45,9 +49,28 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     await fs.mkdir(fontsDir, { recursive: true })
     await copyFontIfAvailable(fontsDir)
 
-    const normalizedClips: string[] = []
+    // ── Step 1: Generate per-scene TTS and measure actual audio durations ──
+    // This is the key to sync: we let TTS dictate scene duration,
+    // then cut the video clip and set subtitle timing to match.
+    const ttsProvider = await getTtsProvider()
+    const sceneAudioPaths: string[] = []
+    const actualDurations: number[] = []
+
     for (let index = 0; index < params.scenes.length; index += 1) {
       const scene = params.scenes[index]
+      const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
+      await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
+      const actualDuration = await probeAudioDuration(sceneSpeechPath)
+      // Add a small gap after each scene so speech doesn't feel rushed
+      const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
+      sceneAudioPaths.push(sceneSpeechPath)
+      actualDurations.push(paddedDuration)
+      console.log(`[YouTubeRender] Scene ${index + 1}: narration="${scene.narration.slice(0, 40)}..." tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s planned=${scene.durationSeconds}s`)
+    }
+
+    // ── Step 2: Download and cut each video clip to match actual TTS duration ──
+    const normalizedClips: string[] = []
+    for (let index = 0; index < params.scenes.length; index += 1) {
       const clip = usableClips[index % usableClips.length]
       const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
       const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
@@ -55,11 +78,20 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       await normalizeClip({
         inputPath: rawPath,
         outputPath: normalizedPath,
-        durationSeconds: scene.durationSeconds,
+        durationSeconds: actualDurations[index],
       })
       normalizedClips.push(normalizedPath)
     }
 
+    // ── Step 3: Concatenate per-scene TTS audio into one track ──
+    const speechPath = path.join(workDir, 'speech.mp3')
+    await concatenateAudio(sceneAudioPaths, speechPath, workDir)
+
+    // ── Step 4: Build subtitles timed to actual TTS durations ──
+    const subtitlePath = path.join(workDir, 'subtitles.ass')
+    await fs.writeFile(subtitlePath, buildAssSubtitlesWithDurations(params.scenes, actualDurations), 'utf8')
+
+    // ── Step 5: Concatenate video clips ──
     const concatPath = path.join(workDir, 'concat.txt')
     await fs.writeFile(
       concatPath,
@@ -67,12 +99,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       'utf8',
     )
 
-    const subtitlePath = path.join(workDir, 'subtitles.ass')
-    await fs.writeFile(subtitlePath, buildAssSubtitles(params.scenes), 'utf8')
-
-    const speechPath = path.join(workDir, 'speech.mp3')
-    const ttsProvider = await createSpeechAudio(params.script, speechPath, params.scenes)
-
+    // ── Step 6: Merge video + audio + subtitles ──
     const outputPath = path.join(workDir, 'output.mp4')
     await runFfmpeg([
       '-y',
@@ -126,7 +153,16 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       }).catch(() => null),
     ])
 
-    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider }
+    // Build accurate subtitle timings from actual TTS durations for the API response
+    let subtitleCursor = 0
+    const subtitles = params.scenes.map((scene, index) => {
+      const duration = actualDurations[index] ?? scene.durationSeconds
+      const start = subtitleCursor
+      subtitleCursor += duration
+      return { start, end: subtitleCursor, text: scene.narration }
+    })
+
+    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider, subtitles }
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -171,30 +207,83 @@ async function normalizeClip(params: {
   ])
 }
 
-async function createSpeechAudio(script: string, outputPath: string, scenes: YouTubeScenePlan[]) {
+async function getTtsProvider(): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey || apiKey.length < 10) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('TTS 생성을 위한 OPENAI_API_KEY가 설정되어 있지 않습니다.')
     }
-    await createSilentAudio(outputPath, scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0))
     return 'silent-dev'
+  }
+  return process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts'
+}
+
+// Generate TTS for a single scene narration.
+// Falls back to silence (dev) when no API key is available.
+async function createSceneSpeechAudio(narration: string, outputPath: string, fallbackDurationSeconds: number) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey || apiKey.length < 10) {
+    await createSilentAudio(outputPath, fallbackDurationSeconds)
+    return
   }
 
   const openai = new OpenAI({
     apiKey,
     ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
   })
+  const input = narration.length > TTS_MAX_CHARS
+    ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
+    : narration
   const response = await openai.audio.speech.create({
     model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-    voice: process.env.OPENAI_TTS_VOICE || 'alloy',
-    input: script.length > TTS_MAX_CHARS
-      ? (console.warn(`[TTS] 스크립트가 ${TTS_MAX_CHARS}자를 초과해 잘립니다. (${script.length}자)`), script.slice(0, TTS_MAX_CHARS))
-      : script,
+    voice: (process.env.OPENAI_TTS_VOICE || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
+    input,
     response_format: 'mp3',
   })
   await fs.writeFile(outputPath, Buffer.from(await response.arrayBuffer()))
-  return process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts'
+}
+
+// Probe the actual duration of an audio file using ffmpeg.
+// This is the source of truth for sync: TTS determines scene length.
+async function probeAudioDuration(filePath: string): Promise<number> {
+  const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
+  return new Promise(resolve => {
+    let stderr = ''
+    const child = spawn(ffmpegPath, ['-i', filePath, '-f', 'null', '-'], { windowsHide: true })
+    child.stderr.on('data', (chunk: Buffer) => { stderr += String(chunk) })
+    child.on('close', () => {
+      const match = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/)
+      if (match) {
+        const duration = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3])
+        resolve(duration)
+      } else {
+        console.warn('[YouTubeRender] Could not probe audio duration, using 5s fallback')
+        resolve(5)
+      }
+    })
+  })
+}
+
+// Concatenate multiple MP3 files into one using ffmpeg concat demuxer.
+async function concatenateAudio(inputPaths: string[], outputPath: string, workDir: string) {
+  if (inputPaths.length === 1) {
+    await fs.copyFile(inputPaths[0], outputPath)
+    return
+  }
+  const listPath = path.join(workDir, 'audio-concat.txt')
+  await fs.writeFile(
+    listPath,
+    inputPaths.map(p => `file '${p.replaceAll('\\', '/').replaceAll("'", "'\\''")}'`).join('\n'),
+    'utf8',
+  )
+  await runFfmpeg([
+    '-y',
+    '-f', 'concat',
+    '-safe', '0',
+    '-i', listPath,
+    '-c', 'copy',
+    outputPath,
+  ], workDir)
 }
 
 async function createSilentAudio(outputPath: string, durationSeconds: number) {
@@ -209,12 +298,16 @@ async function createSilentAudio(outputPath: string, durationSeconds: number) {
   ])
 }
 
-function buildAssSubtitles(scenes: YouTubeScenePlan[]) {
+// Build ASS subtitles using actual per-scene TTS durations (not LLM-planned durationSeconds).
+// Each subtitle window is trimmed slightly at the end so text clears before the next scene starts.
+function buildAssSubtitlesWithDurations(scenes: YouTubeScenePlan[], actualDurations: number[]) {
   let cursor = 0
-  const events = scenes.map(scene => {
+  const events = scenes.map((scene, index) => {
+    const duration = actualDurations[index] ?? scene.durationSeconds
     const start = cursor
-    const end = cursor + scene.durationSeconds
-    cursor = end
+    // End subtitle slightly before the scene ends to avoid overlap with next line
+    const end = cursor + Math.max(duration - 0.15, duration * 0.9)
+    cursor += duration
     return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(scene.narration)}`
   })
 

@@ -33,7 +33,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         userPlan={user?.plan ?? undefined}
         userName={user?.name ?? undefined}
       />
-      <div className="relative flex h-screen overflow-hidden bg-white text-[#111111]">
+      <div className="relative flex h-[100dvh] overflow-hidden bg-white text-[#111111]">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_56%_34%,rgba(219,234,254,0.50),transparent_31%),radial-gradient(circle_at_86%_44%,rgba(237,233,254,0.54),transparent_32%),radial-gradient(circle_at_18%_88%,rgba(224,242,254,0.36),transparent_34%),linear-gradient(180deg,#ffffff_0%,#fbfdff_58%,#ffffff_100%)]"
