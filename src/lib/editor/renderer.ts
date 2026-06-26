@@ -106,7 +106,11 @@ function renderLayer(layer: EditorialLayer, document: EditorialDocument, backgro
   const background = layer.textBackground
     ? `<rect x="${layer.x - 12}" y="${layer.y - 8}" width="${layer.width + 24}" height="${layer.height + 16}" rx="10" fill="${escapeXml(layer.textBackground)}" opacity="${opacity}"/>`
     : ''
-  return `${background}<text font-family="${fontFamily}" font-size="${fontSize}" font-weight="${layer.fontWeight || 400}" letter-spacing="${layer.tracking || 0}" fill="${escapeXml(layer.color || '#ffffff')}" opacity="${opacity}" stroke="${escapeXml(layer.strokeColor || 'none')}" stroke-width="${layer.stroke || 0}" paint-order="stroke" filter="${layer.shadow ? 'url(#editor-text-shadow)' : ''}" transform="rotate(${layer.rotation} ${anchorX} ${layer.y}) scale(${layer.scale})">${text}</text>`
+  // clipPath prevents text from visually overflowing the layer bounds even when
+  // estimateTextWidth slightly underestimates actual glyph advances.
+  const clipId = `clip-${layer.id}`
+  const clipDef = `<clipPath id="${clipId}"><rect x="${layer.x}" y="${layer.y - fontSize}" width="${layer.width + 4}" height="${layer.height + fontSize * 2}"/></clipPath>`
+  return `${clipDef}${background}<text font-family="${fontFamily}" font-size="${fontSize}" font-weight="${layer.fontWeight || 400}" letter-spacing="${layer.tracking || 0}" fill="${escapeXml(layer.color || '#ffffff')}" opacity="${opacity}" stroke="${escapeXml(layer.strokeColor || 'none')}" stroke-width="${layer.stroke || 0}" paint-order="stroke" filter="${layer.shadow ? 'url(#editor-text-shadow)' : ''}" transform="rotate(${layer.rotation} ${anchorX} ${layer.y}) scale(${layer.scale})" clip-path="url(#${clipId})">${text}</text>`
 }
 
 interface TextRun {
@@ -136,7 +140,7 @@ function renderRichText(layer: EditorialLayer, anchorX: number, fontFamily: stri
     let cursorX = startX
     return line.runs.map(run => {
       const output = `<tspan x="${cursorX}" y="${cursorY}" font-family="${fontFamily}" font-size="${run.fontSize || layer.fontSize || 24}" font-weight="${run.fontWeight || layer.fontWeight || 400}"${run.italic ? ' font-style="italic"' : ''}${run.underline ? ' text-decoration="underline"' : ''}>${escapeXml(run.text)}</tspan>`
-      cursorX += estimateTextWidth(run.text, run.fontSize || layer.fontSize || 24, layer.tracking || 0)
+      cursorX += estimateTextWidth(run.text, run.fontSize || layer.fontSize || 24, layer.tracking || 0, run.fontWeight || layer.fontWeight || 400)
       return output
     }).join('')
   }).join('')
@@ -165,7 +169,8 @@ function wrapRichTextForLayer(layer: EditorialLayer) {
         continue
       }
       const runFontSize = run.fontSize || baseFontSize
-      const width = estimateTextWidth(char, runFontSize, tracking)
+      const runFontWeight = run.fontWeight || layer.fontWeight || 400
+      const width = estimateTextWidth(char, runFontSize, tracking, runFontWeight)
       if (currentRuns.length > 0 && currentWidth + width > maxWidth) pushLine()
       const previous = currentRuns.at(-1)
       if (previous && sameRunStyle(previous, run)) {
@@ -259,14 +264,16 @@ function decodeHtml(value: string) {
     .replace(/&#39;/g, "'")
 }
 
-function estimateTextWidth(text: string, fontSize: number, tracking: number) {
+function estimateTextWidth(text: string, fontSize: number, tracking: number, fontWeight = 400) {
+  // Heavier weights have slightly wider glyph advances in Pretendard
+  const wf = fontWeight >= 800 ? 1.04 : fontWeight >= 700 ? 1.02 : fontWeight >= 600 ? 1.01 : 1.0
   let width = 0
   for (const char of text) {
     if (/\s/.test(char)) width += fontSize * 0.32
-    else if (/[A-Z]/.test(char)) width += fontSize * 0.68
-    else if (/[a-z0-9]/.test(char)) width += fontSize * 0.55
+    else if (/[A-Z]/.test(char)) width += fontSize * 0.68 * wf
+    else if (/[a-z0-9]/.test(char)) width += fontSize * 0.55 * wf
     else if (/[.,:;!?/()'"-]/.test(char)) width += fontSize * 0.38
-    else width += fontSize
+    else width += fontSize * wf  // CJK / Korean
     width += tracking
   }
   return width

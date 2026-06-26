@@ -3,8 +3,11 @@ import { Resvg } from '@resvg/resvg-js'
 
 const FONT_FILES = [
   path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-Regular.otf'),
+  path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-Medium.otf'),
   path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-SemiBold.otf'),
   path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-Bold.otf'),
+  path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-ExtraBold.otf'),
+  path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', 'Pretendard-Black.otf'),
 ]
 
 export function renderSvgToPng(svg: string, scale = 1): Buffer {
