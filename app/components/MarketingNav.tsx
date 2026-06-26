@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import LocaleSwitcher from './LocaleSwitcher'
 import { NavScrollWrapper } from './NavScrollWrapper'
+import { ProductNavDropdown } from './ProductNavDropdown'
 
 interface MarketingNavProps {
   authenticated?: boolean
@@ -43,7 +44,7 @@ export async function MarketingNav({ authenticated = false, locale }: MarketingN
           <span>Shuffla</span>
         </Link>
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 text-sm md:flex">
-          <Link href={`${prefix}/#product`} className="transition-colors hover:opacity-70">{label('제품', 'product')}</Link>
+          <ProductNavDropdown prefix={prefix} label={label('제품', 'product')} />
           <Link href={`${prefix}/mcp`} className="transition-colors hover:opacity-70">{label('MCP', 'mcp')}</Link>
           <Link href={`${prefix}/pricing`} className="transition-colors hover:opacity-70">{label('요금제', 'pricing')}</Link>
           <Link href={`${prefix}/blog`} className="transition-colors hover:opacity-70">{label('리소스', 'resources')}</Link>
