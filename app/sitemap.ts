@@ -4,16 +4,18 @@ import { getAllBlogPostPaths } from '../lib/blog-posts'
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 const LOCALES = ['ko', 'en'] as const
 
-const staticPages = ['', '/pricing', '/blog', '/terms', '/privacy', '/login']
+const staticPages = ['', '/pricing', '/blog', '/terms', '/privacy', '/login', '/solutions/video-card-news', '/solutions/youtube-automation']
 
 // 실제 페이지 콘텐츠 마지막 수정일 — 배포할 때마다 업데이트
 const LAST_MODIFIED: Record<string, string> = {
-  '': '2026-06-24',
+  '': '2026-06-26',
   '/pricing': '2026-06-24',
   '/blog': '2026-06-24',
   '/terms': '2026-05-20',
   '/privacy': '2026-05-20',
   '/login': '2026-05-20',
+  '/solutions/video-card-news': '2026-06-26',
+  '/solutions/youtube-automation': '2026-06-26',
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -22,7 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   for (const page of staticPages) {
     for (const locale of LOCALES) {
       const url = `${BASE_URL}/${locale}${page}`
-      const priority = page === '' ? 1.0 : page === '/pricing' ? 0.9 : page === '/blog' ? 0.8 : 0.6
+      const priority = page === '' ? 1.0 : page === '/pricing' ? 0.9 : page === '/blog' ? 0.8 : page.startsWith('/solutions/') ? 0.85 : 0.6
       const changeFrequency = page === '' ? 'weekly' : page === '/blog' ? 'weekly' : 'monthly'
 
       entries.push({
