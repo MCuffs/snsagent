@@ -9,7 +9,7 @@ const staticPages = ['', '/pricing', '/blog', '/terms', '/privacy', '/login', '/
 // 실제 페이지 콘텐츠 마지막 수정일 — 배포할 때마다 업데이트
 const LAST_MODIFIED: Record<string, string> = {
   '': '2026-06-26',
-  '/pricing': '2026-06-24',
+  '/pricing': '2026-06-26',
   '/blog': '2026-06-24',
   '/terms': '2026-05-20',
   '/privacy': '2026-05-20',
