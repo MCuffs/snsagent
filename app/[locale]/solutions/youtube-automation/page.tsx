@@ -94,7 +94,7 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
 
           <div className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/50">
             <video
-              src="/solution-youtube-automation.mp4"
+              src="https://xpsfm8kjiynpuakq.public.blob.vercel-storage.com/solution-youtube-automation.mp4"
               autoPlay
               muted
               loop

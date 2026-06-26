@@ -96,7 +96,7 @@ export default async function VideoCardNewsSolutionPage({ params }: { params: Pr
 
           <div className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/50">
             <video
-              src="/solution-video-card-news.mp4"
+              src="https://xpsfm8kjiynpuakq.public.blob.vercel-storage.com/solution-video-card-news.mp4"
               autoPlay
               muted
               loop
