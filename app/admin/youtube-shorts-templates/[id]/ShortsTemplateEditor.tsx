@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ShortsTemplateConfig, YouTubeShortsTemplateRecord } from '../../../../lib/youtube-shorts-templates/types'
+import { applyHookPreset } from '../../../../lib/youtube-shorts-templates/hook-presets'
 import { saveShortsTemplateAction } from '../actions'
 import { ShortsTemplatePreview } from '../ShortsTemplatePreview'
 
@@ -17,6 +18,15 @@ export function ShortsTemplateEditor({ initial }: { initial: YouTubeShortsTempla
     setDraft(current => {
       const sectionValue = current.config[section] as unknown as Record<string, unknown>
       const config = { ...current.config, [section]: { ...sectionValue, [field]: value } }
+      setAdvanced(JSON.stringify(config, null, 2))
+      return { ...current, config }
+    })
+  }
+
+  function selectHookPreset(preset: ShortsTemplateConfig['hookDesign']['preset']) {
+    setDraft(current => {
+      const hookDesign = applyHookPreset(current.config.hookDesign, preset)
+      const config = { ...current.config, hookDesign }
       setAdvanced(JSON.stringify(config, null, 2))
       return { ...current, config }
     })
@@ -82,6 +92,44 @@ export function ShortsTemplateEditor({ initial }: { initial: YouTubeShortsTempla
             <ColorField label="자막색" value={draft.config.captionStyle.captionColor} onChange={v => updateConfig('captionStyle', 'captionColor', v)} />
             <ColorField label="외곽선색" value={draft.config.captionStyle.captionStrokeColor} onChange={v => updateConfig('captionStyle', 'captionStrokeColor', v)} />
             <NumberField label="최대 글자 수" value={draft.config.captionStyle.captionMaxCharacters} onChange={v => updateConfig('captionStyle', 'captionMaxCharacters', v)} />
+          </div>
+        </Panel>
+
+        <Panel title="후킹 디자인">
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {([
+              ['breaking_news', '뉴스'],
+              ['drama_archive', '드라마'],
+              ['knowledge_bold', '지식'],
+              ['entertainment_feed', '예능'],
+              ['anime_editorial', '애니'],
+            ] as const).map(([preset, label]) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => selectHookPreset(preset)}
+                className={`rounded-lg border px-3 py-2 text-xs font-black ${draft.config.hookDesign.preset === preset ? 'border-[#111] bg-[#111] text-white' : 'bg-white'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Select label="글꼴" value={draft.config.hookDesign.fontFamily} options={['Pretendard', 'Pretendard ExtraBold', 'Pretendard Black']} onChange={v => updateConfig('hookDesign', 'fontFamily', v)} />
+            <NumberField label="글자 크기" value={draft.config.hookDesign.fontSize} onChange={v => updateConfig('hookDesign', 'fontSize', v)} />
+            <NumberField label="글자 굵기" value={draft.config.hookDesign.fontWeight} step={100} onChange={v => updateConfig('hookDesign', 'fontWeight', v)} />
+            <NumberField label="자간" value={draft.config.hookDesign.letterSpacing} onChange={v => updateConfig('hookDesign', 'letterSpacing', v)} />
+            <NumberField label="행간" value={draft.config.hookDesign.lineHeight} step={0.02} onChange={v => updateConfig('hookDesign', 'lineHeight', v)} />
+            <NumberField label="최대 줄 수" value={draft.config.hookDesign.maxLines} onChange={v => updateConfig('hookDesign', 'maxLines', v)} />
+            <ColorField label="기본 글자색" value={draft.config.hookDesign.textColor} onChange={v => updateConfig('hookDesign', 'textColor', v)} />
+            <ColorField label="강조색" value={draft.config.hookDesign.emphasisColor} onChange={v => updateConfig('hookDesign', 'emphasisColor', v)} />
+            <ColorField label="배경색" value={draft.config.hookDesign.backgroundColor} onChange={v => updateConfig('hookDesign', 'backgroundColor', v)} />
+            <Select label="배경 방식" value={draft.config.hookDesign.backgroundType} options={['solid', 'gradient', 'transparent']} onChange={v => updateConfig('hookDesign', 'backgroundType', v)} />
+            <Select label="정렬" value={draft.config.hookDesign.textAlign} options={['left', 'center', 'right']} onChange={v => updateConfig('hookDesign', 'textAlign', v)} />
+            <Check label="카테고리 배지" checked={draft.config.hookDesign.categoryBadgeEnabled} onChange={v => updateConfig('hookDesign', 'categoryBadgeEnabled', v)} />
+            <Check label="프로필 헤더" checked={draft.config.hookDesign.profileHeaderEnabled} onChange={v => updateConfig('hookDesign', 'profileHeaderEnabled', v)} />
+            <Check label="외곽선" checked={draft.config.hookDesign.strokeEnabled} onChange={v => updateConfig('hookDesign', 'strokeEnabled', v)} />
+            <Check label="그림자" checked={draft.config.hookDesign.shadowEnabled} onChange={v => updateConfig('hookDesign', 'shadowEnabled', v)} />
           </div>
         </Panel>
 

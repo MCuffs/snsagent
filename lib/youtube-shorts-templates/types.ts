@@ -4,6 +4,9 @@ export const SHORTS_CONTENT_TYPES = [
   'drama_highlight', 'news', 'knowledge', 'sports', 'anime', 'entertainment', 'default',
 ] as const
 export const SHORTS_TONES = ['emotional', 'serious', 'funny', 'informative', 'dramatic', 'neutral'] as const
+export const HOOK_DESIGN_PRESETS = [
+  'breaking_news', 'drama_archive', 'knowledge_bold', 'entertainment_feed', 'anime_editorial',
+] as const
 
 const hex = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
 
@@ -26,6 +29,36 @@ export const headerStyleSchema = z.object({
   headerFontWeight: z.number().int().min(100).max(900).default(800),
   headerTextAlign: z.enum(['left', 'center', 'right']).default('center'),
   hookTextStyle: z.enum(['plain', 'highlight', 'breaking', 'editorial']).default('highlight'),
+})
+
+export const hookDesignSchema = z.object({
+  preset: z.enum(HOOK_DESIGN_PRESETS).default('knowledge_bold'),
+  fontFamily: z.enum(['Pretendard', 'Pretendard ExtraBold', 'Pretendard Black']).default('Pretendard Black'),
+  fontSize: z.number().int().min(32).max(140).default(88),
+  fontWeight: z.number().int().min(400).max(900).default(900),
+  lineHeight: z.number().min(0.8).max(1.6).default(1.08),
+  letterSpacing: z.number().min(-10).max(20).default(-3),
+  maxLines: z.number().int().min(1).max(3).default(2),
+  textColor: hex.default('#080808'),
+  emphasisColor: hex.default('#16E0E8'),
+  secondaryColor: hex.default('#FFFFFF'),
+  strokeEnabled: z.boolean().default(false),
+  strokeColor: hex.default('#000000'),
+  strokeWidth: z.number().min(0).max(10).default(0),
+  shadowEnabled: z.boolean().default(false),
+  shadowColor: hex.default('#000000'),
+  shadowBlur: z.number().min(0).max(30).default(0),
+  shadowOffsetY: z.number().min(-10).max(30).default(0),
+  backgroundType: z.enum(['solid', 'gradient', 'transparent']).default('solid'),
+  backgroundColor: hex.default('#FFFFFF'),
+  backgroundGradientStart: hex.default('#071127'),
+  backgroundGradientEnd: hex.default('#101D3C'),
+  paddingX: z.number().int().min(20).max(180).default(72),
+  paddingY: z.number().int().min(10).max(160).default(42),
+  textAlign: z.enum(['left', 'center', 'right']).default('center'),
+  quoteEnabled: z.boolean().default(false),
+  profileHeaderEnabled: z.boolean().default(false),
+  categoryBadgeEnabled: z.boolean().default(false),
 })
 
 export const captionStyleSchema = z.object({
@@ -79,6 +112,7 @@ export const overlayConfigSchema = z.object({
 export const shortsTemplateConfigSchema = z.object({
   layout: layoutConfigSchema,
   headerStyle: headerStyleSchema,
+  hookDesign: hookDesignSchema.optional().transform(value => hookDesignSchema.parse(value ?? {})),
   captionStyle: captionStyleSchema,
   videoRules: videoRulesSchema,
   cta: ctaConfigSchema,
@@ -129,6 +163,7 @@ export function makeDefaultShortsTemplate(): ShortsTemplateInput {
     config: {
       layout: {},
       headerStyle: {},
+      hookDesign: {},
       captionStyle: {},
       videoRules: {},
       cta: {},

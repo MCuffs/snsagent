@@ -6,13 +6,16 @@ import {
   type ShortsTemplateInput,
   type YouTubeShortsTemplateRecord,
 } from './types'
+import { applyHookPreset, type HookDesign } from './hook-presets'
 
 type Row = Awaited<ReturnType<typeof prisma.youTubeShortsTemplate.findFirstOrThrow>>
 
 function decodeConfig(row: Row): ShortsTemplateConfig {
+  const rawHeader = JSON.parse(row.headerStyle) as Record<string, unknown>
   return shortsTemplateConfigSchema.parse({
     layout: JSON.parse(row.layoutConfig),
-    headerStyle: JSON.parse(row.headerStyle),
+    headerStyle: rawHeader,
+    hookDesign: rawHeader.hookDesign ?? {},
     captionStyle: JSON.parse(row.captionStyle),
     videoRules: JSON.parse(row.videoRules),
     cta: JSON.parse(row.ctaConfig),
@@ -40,7 +43,7 @@ export function toShortsTemplateRecord(row: Row): YouTubeShortsTemplateRecord {
 function configData(config: ShortsTemplateConfig) {
   return {
     layoutConfig: JSON.stringify(config.layout),
-    headerStyle: JSON.stringify(config.headerStyle),
+    headerStyle: JSON.stringify({ ...config.headerStyle, hookDesign: config.hookDesign }),
     captionStyle: JSON.stringify(config.captionStyle),
     videoRules: JSON.stringify(config.videoRules),
     ctaConfig: JSON.stringify(config.cta),
@@ -72,6 +75,53 @@ export async function ensureDefaultShortsTemplate() {
     })
   })
   return toShortsTemplateRecord(row)
+}
+
+const BUILT_IN_HOOK_TEMPLATES: Array<{
+  key: string
+  name: string
+  category: string
+  preset: HookDesign['preset']
+  contentTypes: ShortsTemplateConfig['aiMatching']['contentTypes']
+  tones: Array<'emotional' | 'serious' | 'funny' | 'informative' | 'dramatic' | 'neutral'>
+}> = [
+  { key: 'breaking_news', name: 'Breaking News', category: 'news', preset: 'breaking_news', contentTypes: ['news', 'sports'], tones: ['serious', 'informative'] },
+  { key: 'drama_archive', name: 'Drama Archive', category: 'drama_highlight', preset: 'drama_archive', contentTypes: ['drama_highlight'], tones: ['emotional', 'dramatic'] },
+  { key: 'knowledge_bold', name: 'Knowledge Bold', category: 'knowledge', preset: 'knowledge_bold', contentTypes: ['knowledge'], tones: ['informative', 'serious'] },
+  { key: 'entertainment_feed', name: 'Entertainment Feed', category: 'entertainment', preset: 'entertainment_feed', contentTypes: ['entertainment'], tones: ['funny', 'neutral'] },
+  { key: 'anime_editorial', name: 'Anime Editorial', category: 'anime', preset: 'anime_editorial', contentTypes: ['anime'], tones: ['dramatic', 'emotional'] },
+]
+
+export async function ensureBuiltInShortsTemplates() {
+  const fallback = await ensureDefaultShortsTemplate()
+  for (const seed of BUILT_IN_HOOK_TEMPLATES) {
+    const exists = await prisma.youTubeShortsTemplate.findUnique({ where: { templateKey: seed.key } })
+    if (exists) continue
+    const config: ShortsTemplateConfig = {
+      ...fallback.config,
+      hookDesign: applyHookPreset(fallback.config.hookDesign, seed.preset),
+      aiMatching: {
+        ...fallback.config.aiMatching,
+        matchingCategories: [seed.category],
+        contentTypes: seed.contentTypes,
+        tones: seed.tones,
+        fallbackPriority: 50,
+        minimumConfidenceScore: 0.62,
+      },
+    }
+    await prisma.youTubeShortsTemplate.create({
+      data: {
+        templateName: seed.name,
+        templateKey: seed.key,
+        category: seed.category,
+        description: `Built-in ${seed.name} hook design preset.`,
+        isActive: true,
+        isDefault: false,
+        ...configData(config),
+      },
+    }).catch(() => undefined)
+  }
+  return fallback
 }
 
 export async function listShortsTemplates(activeOnly = false) {

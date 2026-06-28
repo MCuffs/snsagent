@@ -1,4 +1,4 @@
-import { ensureDefaultShortsTemplate, listShortsTemplates } from './db'
+import { ensureBuiltInShortsTemplates, listShortsTemplates } from './db'
 import type { ShortsClassifierResult, YouTubeShortsTemplateRecord } from './types'
 
 export interface TemplateSelection {
@@ -43,7 +43,7 @@ export function chooseShortsTemplate(
 }
 
 export async function selectShortsTemplate(classification: ShortsClassifierResult | null) {
-  await ensureDefaultShortsTemplate()
+  await ensureBuiltInShortsTemplates()
   const result = chooseShortsTemplate(await listShortsTemplates(true), classification)
   if (!result) throw new Error('No active default YouTube Shorts template is configured.')
   return result

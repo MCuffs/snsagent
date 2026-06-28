@@ -2,14 +2,14 @@ import Link from 'next/link'
 import { Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { AdminPageHeader, EmptyState, Section } from '../_components/AdminShell'
 import { formatDate } from '../_components/adminUtils'
-import { ensureDefaultShortsTemplate, listShortsTemplates } from '../../../lib/youtube-shorts-templates/db'
+import { ensureBuiltInShortsTemplates, listShortsTemplates } from '../../../lib/youtube-shorts-templates/db'
 import { deleteShortsTemplateAction, setDefaultShortsTemplateAction } from './actions'
 import { ShortsTemplatePreview } from './ShortsTemplatePreview'
 
 export const dynamic = 'force-dynamic'
 
 export default async function YouTubeShortsTemplatesPage() {
-  await ensureDefaultShortsTemplate()
+  await ensureBuiltInShortsTemplates()
   const templates = await listShortsTemplates()
   return (
     <>

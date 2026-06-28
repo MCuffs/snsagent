@@ -10,6 +10,7 @@ import OpenAI from 'openai'
 const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
+import { renderHookOverlay, splitHook } from './hookRenderer'
 
 interface RenderYouTubeShortsParams {
   userId: string
@@ -97,6 +98,14 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       buildAssSubtitlesWithDurations(params.scenes, actualDurations, params.title, params.template),
       'utf8',
     )
+    const hookOverlayPath = params.template
+      ? await renderHookOverlay({
+        title: params.title,
+        template: params.template,
+        outputPath: path.join(workDir, 'hook-overlay.png'),
+        repoRoot: REPO_ROOT,
+      })
+      : null
 
     // ── Step 5: Concatenate video clips ──
     const concatPath = path.join(workDir, 'concat.txt')
@@ -108,15 +117,18 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
 
     // ── Step 6: Merge video + audio + subtitles ──
     const outputPath = path.join(workDir, 'output.mp4')
-    await runFfmpeg([
+    const renderArgs = [
       '-y',
       '-f', 'concat',
       '-safe', '0',
       '-i', concatPath,
       '-i', speechPath,
-      '-vf', 'subtitles=subtitles.ass:fontsdir=fonts',
+      ...(hookOverlayPath ? ['-loop', '1', '-i', hookOverlayPath] : []),
+      ...(hookOverlayPath
+        ? ['-filter_complex', '[0:v][2:v]overlay=0:0:format=auto[decorated];[decorated]subtitles=subtitles.ass:fontsdir=fonts[v]']
+        : ['-vf', 'subtitles=subtitles.ass:fontsdir=fonts']),
       '-shortest',
-      '-map', '0:v:0',
+      '-map', hookOverlayPath ? '[v]' : '0:v:0',
       '-map', '1:a:0',
       '-c:v', 'libx264',
       '-preset', 'veryfast',
@@ -125,7 +137,8 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       '-b:a', '128k',
       '-movflags', '+faststart',
       outputPath,
-    ], workDir)
+    ]
+    await runFfmpeg(renderArgs, workDir)
 
     const thumbnailPath = path.join(workDir, 'thumbnail.jpg')
     await runFfmpeg([
@@ -330,6 +343,7 @@ function buildAssSubtitlesWithDurations(
 ) {
   const caption = template?.config.captionStyle
   const header = template?.config.headerStyle
+  const hook = template?.config.hookDesign
   const layout = template?.config.layout
   const captionAlignment = caption?.captionPosition === 'top' ? 8 : caption?.captionPosition === 'center' ? 5 : 2
   const captionMargin = caption?.captionPosition === 'bottom'
@@ -350,9 +364,18 @@ function buildAssSubtitlesWithDurations(
     return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(scene.narration)}`
   })
   const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
+  const hookLines = hook ? splitHook(title, hook.maxLines, hook.fontSize, hook.paddingX) : [title]
+  const hookText = hookLines.map((line, index) => {
+    const color = index === hookLines.length - 1 && hookLines.length > 1 ? hook?.emphasisColor : hook?.textColor
+    return `{\\1c${assOverrideColor(color ?? header?.headerTextColor ?? '#111111')}}${escapeAssText(line)}`
+  }).join('\\N')
   const headerEvent = layout?.headerEnabled
-    ? [`Dialogue: 1,0:00:00.00,${formatAssTime(totalDuration)},Header,,0,0,0,,${escapeAssText(title)}`]
+    ? [`Dialogue: 1,0:00:00.00,${formatAssTime(totalDuration)},Header,,0,0,0,,${hookText}`]
     : []
+  const hookAlignment = hook?.textAlign === 'left' ? 7 : hook?.textAlign === 'right' ? 9 : 8
+  const hookMarginV = hook && layout
+    ? Math.max(20, Math.round((1920 * layout.headerHeight / 100 - hookLines.length * hook.fontSize * hook.lineHeight) / 2))
+    : 55
 
   return [
     '[Script Info]',
@@ -363,7 +386,7 @@ function buildAssSubtitlesWithDurations(
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
     `Style: Default,${caption?.captionFontFamily ?? 'Pretendard'},${caption?.captionFontSize ?? 72},${primary},&H000000FF,${outline},${back},${fontWeight},0,0,0,100,100,0,0,${borderStyle},5,2,${captionAlignment},72,72,${captionMargin},1`,
-    `Style: Header,Pretendard,${header?.headerFontSize ?? 52},${assColor(header?.headerTextColor ?? '#111111')},&H000000FF,&H00000000,&H00000000,${(header?.headerFontWeight ?? 800) >= 600 ? -1 : 0},0,0,0,100,100,0,0,1,0,0,8,70,70,55,1`,
+    `Style: Header,Pretendard,${hook?.fontSize ?? header?.headerFontSize ?? 52},${assColor(hook?.textColor ?? header?.headerTextColor ?? '#111111')},&H000000FF,${assColor(hook?.strokeColor ?? '#000000')},&H00000000,${(hook?.fontWeight ?? header?.headerFontWeight ?? 800) >= 600 ? -1 : 0},0,0,0,100,100,${hook?.letterSpacing ?? 0},0,1,${hook?.strokeEnabled ? hook.strokeWidth : 0},${hook?.shadowEnabled ? Math.max(1, hook.shadowBlur / 3) : 0},${hookAlignment},${hook?.paddingX ?? 70},${hook?.paddingX ?? 70},${hookMarginV},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
@@ -378,6 +401,11 @@ function assColor(hex: string, alpha = '00') {
   const g = clean.slice(2, 4)
   const b = clean.slice(4, 6)
   return `&H${alpha}${b}${g}${r}`
+}
+
+function assOverrideColor(hex: string) {
+  const clean = hex.replace('#', '').padEnd(6, '0')
+  return `&H${clean.slice(4, 6)}${clean.slice(2, 4)}${clean.slice(0, 2)}&`
 }
 
 function formatAssTime(totalSeconds: number) {
@@ -397,11 +425,13 @@ function escapeAssText(text: string) {
 }
 
 async function copyFontIfAvailable(fontsDir: string) {
-  const source = path.join(REPO_ROOT, 'public', 'fonts', 'Pretendard-Bold.otf')
-  try {
-    await fs.copyFile(source, path.join(fontsDir, 'Pretendard-Bold.otf'))
-  } catch {
-    // FFmpeg will fall back to a system font when the bundled font is unavailable.
+  for (const fileName of ['Pretendard-Bold.otf', 'Pretendard-ExtraBold.otf', 'Pretendard-Black.otf']) {
+    const source = path.join(REPO_ROOT, 'public', 'fonts', fileName)
+    try {
+      await fs.copyFile(source, path.join(fontsDir, fileName))
+    } catch {
+      // FFmpeg will fall back to a system font when a bundled font is unavailable.
+    }
   }
 }
 
