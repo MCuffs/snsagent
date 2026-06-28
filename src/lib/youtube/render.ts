@@ -9,6 +9,7 @@ import OpenAI from 'openai'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
+import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 
 interface RenderYouTubeShortsParams {
   userId: string
@@ -17,6 +18,7 @@ interface RenderYouTubeShortsParams {
   script: string
   scenes: YouTubeScenePlan[]
   sourceClips: StockVideoCandidate[]
+  template?: YouTubeShortsTemplateRecord
 }
 
 interface StoredRenderedAsset {
@@ -79,6 +81,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         inputPath: rawPath,
         outputPath: normalizedPath,
         durationSeconds: actualDurations[index],
+        template: params.template,
       })
       normalizedClips.push(normalizedPath)
     }
@@ -89,7 +92,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
 
     // ── Step 4: Build subtitles timed to actual TTS durations ──
     const subtitlePath = path.join(workDir, 'subtitles.ass')
-    await fs.writeFile(subtitlePath, buildAssSubtitlesWithDurations(params.scenes, actualDurations), 'utf8')
+    await fs.writeFile(
+      subtitlePath,
+      buildAssSubtitlesWithDurations(params.scenes, actualDurations, params.title, params.template),
+      'utf8',
+    )
 
     // ── Step 5: Concatenate video clips ──
     const concatPath = path.join(workDir, 'concat.txt')
@@ -192,13 +199,28 @@ async function normalizeClip(params: {
   inputPath: string
   outputPath: string
   durationSeconds: number
+  template?: YouTubeShortsTemplateRecord
 }) {
+  const layout = params.template?.config.layout
+  const headerHeight = layout?.headerEnabled ? layout.headerHeight : 0
+  const footerHeight = layout?.footerEnabled ? layout.footerHeight : 0
+  const videoHeightPercent = Math.min(layout?.videoAreaHeight ?? 100, 100 - headerHeight - footerHeight)
+  const videoHeight = Math.max(2, Math.floor((1920 * videoHeightPercent / 100) / 2) * 2)
+  const top = Math.max(0, Math.floor(1920 * headerHeight / 100))
+  const background = (layout?.backgroundColor ?? '#000000').replace('#', '0x')
+  const filter = [
+    `scale=1080:${videoHeight}:force_original_aspect_ratio=increase`,
+    `crop=1080:${videoHeight}`,
+    'fps=30',
+    'format=yuv420p',
+    `pad=1080:1920:0:${top}:${background}`,
+  ].join(',')
   await runFfmpeg([
     '-y',
     '-stream_loop', '2',
     '-i', params.inputPath,
     '-t', String(params.durationSeconds),
-    '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,format=yuv420p',
+    '-vf', filter,
     '-an',
     '-c:v', 'libx264',
     '-preset', 'veryfast',
@@ -300,7 +322,24 @@ async function createSilentAudio(outputPath: string, durationSeconds: number) {
 
 // Build ASS subtitles using actual per-scene TTS durations (not LLM-planned durationSeconds).
 // Each subtitle window is trimmed slightly at the end so text clears before the next scene starts.
-function buildAssSubtitlesWithDurations(scenes: YouTubeScenePlan[], actualDurations: number[]) {
+function buildAssSubtitlesWithDurations(
+  scenes: YouTubeScenePlan[],
+  actualDurations: number[],
+  title: string,
+  template?: YouTubeShortsTemplateRecord,
+) {
+  const caption = template?.config.captionStyle
+  const header = template?.config.headerStyle
+  const layout = template?.config.layout
+  const captionAlignment = caption?.captionPosition === 'top' ? 8 : caption?.captionPosition === 'center' ? 5 : 2
+  const captionMargin = caption?.captionPosition === 'bottom'
+    ? Math.round(1920 * ((layout?.footerEnabled ? layout.footerHeight : 0) / 100)) + 80
+    : 100
+  const primary = assColor(caption?.captionColor ?? '#ffffff')
+  const outline = assColor(caption?.captionStrokeColor ?? '#000000')
+  const back = assColor(caption?.captionBackgroundColor ?? '#000000', caption?.captionBackgroundEnabled ? '88' : '00')
+  const borderStyle = caption?.captionBackgroundEnabled ? 3 : 1
+  const fontWeight = (caption?.captionFontWeight ?? 800) >= 600 ? -1 : 0
   let cursor = 0
   const events = scenes.map((scene, index) => {
     const duration = actualDurations[index] ?? scene.durationSeconds
@@ -310,6 +349,10 @@ function buildAssSubtitlesWithDurations(scenes: YouTubeScenePlan[], actualDurati
     cursor += duration
     return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(scene.narration)}`
   })
+  const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
+  const headerEvent = layout?.headerEnabled
+    ? [`Dialogue: 1,0:00:00.00,${formatAssTime(totalDuration)},Header,,0,0,0,,${escapeAssText(title)}`]
+    : []
 
   return [
     '[Script Info]',
@@ -319,12 +362,22 @@ function buildAssSubtitlesWithDurations(scenes: YouTubeScenePlan[], actualDurati
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    'Style: Default,Pretendard,72,&H00FFFFFF,&H000000FF,&HCC000000,&H88000000,-1,0,0,0,100,100,0,0,1,5,2,2,72,72,210,1',
+    `Style: Default,${caption?.captionFontFamily ?? 'Pretendard'},${caption?.captionFontSize ?? 72},${primary},&H000000FF,${outline},${back},${fontWeight},0,0,0,100,100,0,0,${borderStyle},5,2,${captionAlignment},72,72,${captionMargin},1`,
+    `Style: Header,Pretendard,${header?.headerFontSize ?? 52},${assColor(header?.headerTextColor ?? '#111111')},&H000000FF,&H00000000,&H00000000,${(header?.headerFontWeight ?? 800) >= 600 ? -1 : 0},0,0,0,100,100,0,0,1,0,0,8,70,70,55,1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+    ...headerEvent,
     ...events,
   ].join('\n')
+}
+
+function assColor(hex: string, alpha = '00') {
+  const clean = hex.replace('#', '').padEnd(6, '0')
+  const r = clean.slice(0, 2)
+  const g = clean.slice(2, 4)
+  const b = clean.slice(4, 6)
+  return `&H${alpha}${b}${g}${r}`
 }
 
 function formatAssTime(totalSeconds: number) {

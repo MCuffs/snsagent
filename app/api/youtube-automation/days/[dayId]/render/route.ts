@@ -4,6 +4,7 @@ import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
 import type { StockVideoCandidate, YouTubeScenePlan } from '../../../../../../src/lib/youtube/automation'
 import { renderYouTubeShortsFromStock } from '../../../../../../src/lib/youtube/render'
+import { shortsTemplateInputSchema, type YouTubeShortsTemplateRecord } from '../../../../../../lib/youtube-shorts-templates/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -38,6 +39,7 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
 
   try {
     const scenes = parseJsonArray<YouTubeScenePlan>(day.scenesJson)
+    const template = parseTemplateSnapshot(day.templateSnapshotJson)
     const rendered = await renderYouTubeShortsFromStock({
       userId: user.id,
       dayId: day.id,
@@ -45,6 +47,7 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
       script: day.script,
       scenes,
       sourceClips,
+      template,
     })
 
     const updated = await prisma.youTubeAutomationDay.update({
@@ -90,5 +93,15 @@ function parseJsonArray<T>(value: string | null): T[] {
     return Array.isArray(parsed) ? parsed as T[] : []
   } catch {
     return []
+  }
+}
+
+function parseTemplateSnapshot(value: string | null): YouTubeShortsTemplateRecord | undefined {
+  if (!value) return undefined
+  try {
+    const parsed = JSON.parse(value) as YouTubeShortsTemplateRecord
+    return shortsTemplateInputSchema.safeParse(parsed).success ? parsed : undefined
+  } catch {
+    return undefined
   }
 }

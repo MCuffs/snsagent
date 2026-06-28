@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
-import { generateDayProductionPlan } from '../../../../../../src/lib/youtube/automation'
+import { classifyShortsContent, generateDayProductionPlan } from '../../../../../../src/lib/youtube/automation'
+import { selectShortsTemplate } from '../../../../../../lib/youtube-shorts-templates/select'
 
 export const runtime = 'nodejs'
 
@@ -28,11 +29,21 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
   })
 
   let plan: Awaited<ReturnType<typeof generateDayProductionPlan>>
+  let classification: Awaited<ReturnType<typeof classifyShortsContent>> = null
+  let selection: Awaited<ReturnType<typeof selectShortsTemplate>>
   try {
+    classification = await classifyShortsContent({
+      topic: day.project.topic,
+      title: day.title,
+      userId: user.id,
+    })
+    selection = await selectShortsTemplate(classification)
     plan = await generateDayProductionPlan({
       topic: day.project.topic,
       title: day.title,
       userId: user.id,
+      template: selection.template,
+      usedDefaultTemplate: selection.usedDefaultTemplate,
     })
   } catch (error) {
     await prisma.youTubeAutomationDay.update({
@@ -56,6 +67,13 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
       sourceClipsJson: JSON.stringify(plan.sourceClips),
       ttsProvider: plan.ttsProvider,
       subtitleJson: JSON.stringify(plan.subtitles),
+      selectedTemplateKey: selection.template.templateKey,
+      templateVersion: selection.template.version,
+      templateSnapshotJson: JSON.stringify(selection.template),
+      classifierResultJson: JSON.stringify(classification),
+      usedDefaultTemplate: selection.usedDefaultTemplate,
+      selectionReason: selection.reason,
+      videoStructureJson: JSON.stringify(plan.videoStructure),
     },
   })
 

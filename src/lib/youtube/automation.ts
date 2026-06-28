@@ -1,4 +1,9 @@
 import { getLightClient } from '../ai/llmClient'
+import {
+  classifierResultSchema,
+  type ShortsClassifierResult,
+  type YouTubeShortsTemplateRecord,
+} from '../../../lib/youtube-shorts-templates/types'
 
 export interface PlannerDay {
   dayNumber: number
@@ -31,6 +36,25 @@ export interface DayProductionPlan {
   sourceClips: StockVideoCandidate[]
   ttsProvider: string
   subtitles: Array<{ start: number; end: number; text: string }>
+  videoStructure: {
+    selectedTemplateKey: string
+    usedDefaultTemplate: boolean
+    title: string
+    hook: string
+    totalDuration: number
+    scenes: Array<{
+      sceneIndex: number
+      start: number
+      end: number
+      visualInstruction: string
+      caption: string
+      captionEmphasis: string[]
+      emotion: string
+      transition: string
+      zoomEffect: string
+    }>
+    cta: { enabled: boolean; text: string; start: number; end: number }
+  } | null
 }
 
 interface PlannerResponse {
@@ -84,6 +108,8 @@ export async function generateDayProductionPlan(params: {
   topic: string
   title: string
   userId?: string
+  template?: YouTubeShortsTemplateRecord
+  usedDefaultTemplate?: boolean
 }): Promise<DayProductionPlan> {
   const fallback = () => buildFallbackDayPlan(params.topic, params.title)
   const prompt = [
@@ -109,9 +135,9 @@ export async function generateDayProductionPlan(params: {
     },
   )
 
-  const scenes = normalizeScenes(result.scenes, result.script)
+  const scenes = normalizeScenes(result.scenes, result.script, params.template)
   const sourceClips = await collectStockVideoCandidates(scenes)
-  return {
+  const productionPlan: DayProductionPlan = {
     script: String(result.script || fallback().script).trim(),
     description: String(result.description || fallback().description).trim(),
     tags: normalizeTags(result.tags, params.topic),
@@ -120,6 +146,42 @@ export async function generateDayProductionPlan(params: {
     sourceClips,
     ttsProvider: process.env.OPENAI_API_KEY ? 'openai-tts-ready' : 'tts-not-configured',
     subtitles: buildSubtitles(scenes),
+    videoStructure: null,
+  }
+  productionPlan.videoStructure = params.template
+    ? buildVideoStructure(params.title, scenes, params.template, Boolean(params.usedDefaultTemplate))
+    : null
+  return productionPlan
+}
+
+export async function classifyShortsContent(params: {
+  topic: string
+  title: string
+  userId?: string
+}): Promise<ShortsClassifierResult | null> {
+  const prompt = [
+    `Topic: ${params.topic}`,
+    `Video title: ${params.title}`,
+    'Classify this YouTube Shorts content.',
+    'Return JSON only with contentType, tone, recommendedTemplateKey, confidenceScore, and reason.',
+    'contentType: drama_highlight | news | knowledge | sports | anime | entertainment | default',
+    'tone: emotional | serious | funny | informative | dramatic | neutral',
+  ].join('\n')
+  const fallback = () => deterministicClassification(`${params.topic} ${params.title}`)
+  try {
+    const result = await getLightClient().generateJson<ShortsClassifierResult>(
+      'youtube-shorts-template-classifier',
+      prompt,
+      fallback,
+      {
+        temperature: 0.1,
+        diagnostics: { userId: params.userId, metadata: { topic: params.topic, title: params.title } },
+        systemPrompt: 'You classify Korean YouTube Shorts content. Return valid JSON only.',
+      },
+    )
+    return classifierResultSchema.parse(result)
+  } catch {
+    return classifierResultSchema.parse(fallback())
   }
 }
 
@@ -245,7 +307,11 @@ function normalizePlannerDays(days: PlannerDay[] | undefined, topic: string) {
   return normalized
 }
 
-function normalizeScenes(scenes: YouTubeScenePlan[] | undefined, script: string) {
+function normalizeScenes(
+  scenes: YouTubeScenePlan[] | undefined,
+  script: string,
+  template?: YouTubeShortsTemplateRecord,
+) {
   const source = Array.isArray(scenes) ? scenes : []
   const fallbackLines = script.split(/[.!?\n]/).map(line => line.trim()).filter(Boolean)
   const normalized = source.length >= 3 ? source : fallbackLines.slice(0, 5).map((line, index) => ({
@@ -254,12 +320,74 @@ function normalizeScenes(scenes: YouTubeScenePlan[] | undefined, script: string)
     searchKeyword: `vertical ${line.split(/\s+/).slice(0, 4).join(' ')}`,
     durationSeconds: 8,
   }))
-  return normalized.slice(0, 8).map((scene, index) => ({
+  const min = template?.config.videoRules.sceneDurationMin ?? 4
+  const max = template?.config.videoRules.sceneDurationMax ?? 12
+  return normalized.slice(0, 12).map((scene, index) => ({
     sceneNumber: index + 1,
     narration: String(scene.narration || '').trim().slice(0, 220),
     searchKeyword: sanitizeSearchKeyword(scene.searchKeyword),
-    durationSeconds: Math.max(4, Math.min(12, Number(scene.durationSeconds) || 8)),
+    durationSeconds: Math.max(min, Math.min(max, Number(scene.durationSeconds) || (min + max) / 2)),
   })).filter(scene => scene.narration && scene.searchKeyword)
+}
+
+function deterministicClassification(text: string): ShortsClassifierResult {
+  const normalized = text.toLowerCase()
+  const rules: Array<[RegExp, ShortsClassifierResult['contentType'], ShortsClassifierResult['tone']]> = [
+    [/축구|야구|농구|스포츠|감독|선수/, 'sports', 'serious'],
+    [/뉴스|속보|정치|경제|사건|화제/, 'news', 'serious'],
+    [/애니|만화|진격의 거인|캐릭터/, 'anime', 'dramatic'],
+    [/드라마|영화|명장면|배우/, 'drama_highlight', 'emotional'],
+    [/예능|웃긴|연예|아이돌|유머/, 'entertainment', 'funny'],
+    [/지식|이유|방법|사실|건강|과학|역사/, 'knowledge', 'informative'],
+  ]
+  const matched = rules.find(([pattern]) => pattern.test(normalized))
+  return {
+    contentType: matched?.[1] ?? 'default',
+    tone: matched?.[2] ?? 'neutral',
+    recommendedTemplateKey: null,
+    confidenceScore: matched ? 0.72 : 0.35,
+    reason: matched ? 'Keyword-based fallback classification.' : 'No reliable category signal.',
+  }
+}
+
+function buildVideoStructure(
+  title: string,
+  scenes: YouTubeScenePlan[],
+  template: YouTubeShortsTemplateRecord,
+  usedDefaultTemplate: boolean,
+) {
+  let cursor = 0
+  const structuredScenes = scenes.map((scene, index) => {
+    const start = cursor
+    cursor += scene.durationSeconds
+    return {
+      sceneIndex: index + 1,
+      start,
+      end: cursor,
+      visualInstruction: scene.searchKeyword,
+      caption: scene.narration,
+      captionEmphasis: [],
+      emotion: template.config.aiMatching.tones[0] ?? 'neutral',
+      transition: template.config.videoRules.transitionType,
+      zoomEffect: template.config.videoRules.zoomEffect,
+    }
+  })
+  const totalDuration = Math.min(template.config.videoRules.totalDuration, cursor)
+  const ctaDuration = Math.min(template.config.cta.ctaDuration, totalDuration)
+  return {
+    selectedTemplateKey: template.templateKey,
+    usedDefaultTemplate,
+    title,
+    hook: title,
+    totalDuration,
+    scenes: structuredScenes,
+    cta: {
+      enabled: template.config.cta.ctaEnabled,
+      text: template.config.cta.ctaText,
+      start: Math.max(0, totalDuration - ctaDuration),
+      end: totalDuration,
+    },
+  }
 }
 
 function normalizeTags(tags: unknown, topic: string) {

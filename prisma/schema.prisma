@@ -162,6 +162,13 @@ model YouTubeAutomationDay {
   subtitleJson   String?
   mp4Url         String?
   thumbnailUrl   String?
+  selectedTemplateKey  String?
+  templateVersion      Int?
+  templateSnapshotJson String?
+  classifierResultJson String?
+  usedDefaultTemplate  Boolean                  @default(false)
+  selectionReason      String?
+  videoStructureJson   String?
   uploadedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -170,6 +177,29 @@ model YouTubeAutomationDay {
   @@index([userId, scheduledDate])
   @@index([status])
   @@index([campaignId])
+}
+
+model YouTubeShortsTemplate {
+  id               String   @id @default(uuid())
+  templateName     String
+  templateKey      String   @unique
+  category         String
+  description      String?
+  isActive         Boolean  @default(false)
+  isDefault        Boolean  @default(false)
+  layoutConfig     String   @default("{}")
+  headerStyle      String   @default("{}")
+  captionStyle     String   @default("{}")
+  videoRules       String   @default("{}")
+  ctaConfig        String   @default("{}")
+  aiMatchingConfig String   @default("{}")
+  overlayConfig    String   @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive, category])
+  @@index([isDefault])
 }
 
 model CarouselSlide {
