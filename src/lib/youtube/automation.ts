@@ -4,6 +4,7 @@ import {
   type ShortsClassifierResult,
   type YouTubeShortsTemplateRecord,
 } from '../../../lib/youtube-shorts-templates/types'
+import type { YouTubePlanStrategy } from '../../../lib/youtube-plan-strategies'
 
 export interface PlannerDay {
   dayNumber: number
@@ -12,6 +13,7 @@ export interface PlannerDay {
 
 export interface YouTubeScenePlan {
   sceneNumber: number
+  sceneRole?: string
   narration: string
   searchKeyword: string
   durationSeconds: number
@@ -44,6 +46,7 @@ export interface DayProductionPlan {
     totalDuration: number
     scenes: Array<{
       sceneIndex: number
+      sceneRole: string
       start: number
       end: number
       visualInstruction: string
@@ -110,9 +113,20 @@ export async function generateDayProductionPlan(params: {
   userId?: string
   template?: YouTubeShortsTemplateRecord
   usedDefaultTemplate?: boolean
+  planStrategy?: YouTubePlanStrategy
 }): Promise<DayProductionPlan> {
   const fallback = () => buildFallbackDayPlan(params.topic, params.title)
+  const strategyInstructions = params.planStrategy ? [
+    `Narrative strategy: ${params.planStrategy.key} (${params.planStrategy.name})`,
+    `Hook pattern: ${params.planStrategy.hookPattern}`,
+    `Ending pattern: ${params.planStrategy.endingPattern}`,
+    `Pacing: ${params.planStrategy.pacing}`,
+    `Narration direction: ${params.planStrategy.narrationStyle}`,
+    `Create exactly ${params.planStrategy.targetSceneCount} scenes in this role order: ${params.planStrategy.sceneRoles.join(' -> ')}`,
+    'Every scene must include sceneRole matching that order. Vary sentence rhythm and visual keyword per role.',
+  ] : []
   const prompt = [
+    ...strategyInstructions,
     `채널 주제: ${params.topic}`,
     `오늘 제목: ${params.title}`,
     '',
@@ -121,7 +135,7 @@ export async function generateDayProductionPlan(params: {
     '영상 생성 AI를 쓰지 않습니다. 기존 무료 영상을 잘라 붙이고, TTS 음성과 자막을 얹는 전제입니다.',
     '스크립트는 TTS로 읽기 쉽게 짧은 문장으로 작성하세요.',
     'JSON 형식:',
-    '{"script":"...","description":"...","tags":["..."],"pinnedComment":"...","scenes":[{"sceneNumber":1,"narration":"...","searchKeyword":"english stock video keyword","durationSeconds":8}]}',
+    '{"script":"...","description":"...","tags":["..."],"pinnedComment":"...","scenes":[{"sceneNumber":1,"sceneRole":"question_hook","narration":"...","searchKeyword":"english stock video keyword","durationSeconds":8}]}',
   ].join('\n')
 
   const result = await getLightClient().generateJson<DayPlanResponse>(
@@ -135,7 +149,7 @@ export async function generateDayProductionPlan(params: {
     },
   )
 
-  const scenes = normalizeScenes(result.scenes, result.script, params.template)
+  const scenes = normalizeScenes(result.scenes, result.script, params.template, params.planStrategy)
   const sourceClips = await collectStockVideoCandidates(scenes)
   const productionPlan: DayProductionPlan = {
     script: String(result.script || fallback().script).trim(),
@@ -311,10 +325,11 @@ function normalizeScenes(
   scenes: YouTubeScenePlan[] | undefined,
   script: string,
   template?: YouTubeShortsTemplateRecord,
+  strategy?: YouTubePlanStrategy,
 ) {
   const source = Array.isArray(scenes) ? scenes : []
   const fallbackLines = script.split(/[.!?\n]/).map(line => line.trim()).filter(Boolean)
-  const normalized = source.length >= 3 ? source : fallbackLines.slice(0, 5).map((line, index) => ({
+  const normalized: YouTubeScenePlan[] = source.length >= 3 ? source : fallbackLines.slice(0, 5).map((line, index) => ({
     sceneNumber: index + 1,
     narration: line,
     searchKeyword: `vertical ${line.split(/\s+/).slice(0, 4).join(' ')}`,
@@ -322,8 +337,11 @@ function normalizeScenes(
   }))
   const min = template?.config.videoRules.sceneDurationMin ?? 4
   const max = template?.config.videoRules.sceneDurationMax ?? 12
-  return normalized.slice(0, 12).map((scene, index) => ({
+  const targetCount = strategy?.targetSceneCount ?? Math.min(12, normalized.length)
+  const sourceForTarget = normalized.slice(0, targetCount)
+  return sourceForTarget.slice(0, 12).map((scene, index) => ({
     sceneNumber: index + 1,
+    sceneRole: strategy?.sceneRoles[index] ?? scene.sceneRole ?? `scene_${index + 1}`,
     narration: String(scene.narration || '').trim().slice(0, 220),
     searchKeyword: sanitizeSearchKeyword(scene.searchKeyword),
     durationSeconds: Math.max(min, Math.min(max, Number(scene.durationSeconds) || (min + max) / 2)),
@@ -362,6 +380,7 @@ function buildVideoStructure(
     cursor += scene.durationSeconds
     return {
       sceneIndex: index + 1,
+      sceneRole: scene.sceneRole ?? `scene_${index + 1}`,
       start,
       end: cursor,
       visualInstruction: scene.searchKeyword,

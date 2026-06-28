@@ -10,7 +10,7 @@ import OpenAI from 'openai'
 const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
-import { renderHookOverlay, splitHook } from './hookRenderer'
+import { fitHookText, renderHookOverlay } from './hookRenderer'
 
 interface RenderYouTubeShortsParams {
   userId: string
@@ -364,7 +364,16 @@ function buildAssSubtitlesWithDurations(
     return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(scene.narration)}`
   })
   const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
-  const hookLines = hook ? splitHook(title, hook.maxLines, hook.fontSize, hook.paddingX) : [title]
+  const hookLayout = hook
+    ? fitHookText(title, {
+      maxLines: hook.maxLines,
+      fontSize: hook.fontSize,
+      paddingX: hook.paddingX,
+      minFontSize: 48,
+      maxCharacters: 42,
+    })
+    : { lines: [title], fontSize: header?.headerFontSize ?? 52, truncated: false }
+  const hookLines = hookLayout.lines
   const hookText = hookLines.map((line, index) => {
     const color = index === hookLines.length - 1 && hookLines.length > 1 ? hook?.emphasisColor : hook?.textColor
     return `{\\1c${assOverrideColor(color ?? header?.headerTextColor ?? '#111111')}}${escapeAssText(line)}`
@@ -374,7 +383,7 @@ function buildAssSubtitlesWithDurations(
     : []
   const hookAlignment = hook?.textAlign === 'left' ? 7 : hook?.textAlign === 'right' ? 9 : 8
   const hookMarginV = hook && layout
-    ? Math.max(20, Math.round((1920 * layout.headerHeight / 100 - hookLines.length * hook.fontSize * hook.lineHeight) / 2))
+    ? Math.max(20, Math.round((1920 * layout.headerHeight / 100 - hookLines.length * hookLayout.fontSize * hook.lineHeight) / 2))
     : 55
 
   return [
@@ -386,7 +395,7 @@ function buildAssSubtitlesWithDurations(
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
     `Style: Default,${caption?.captionFontFamily ?? 'Pretendard'},${caption?.captionFontSize ?? 72},${primary},&H000000FF,${outline},${back},${fontWeight},0,0,0,100,100,0,0,${borderStyle},5,2,${captionAlignment},72,72,${captionMargin},1`,
-    `Style: Header,Pretendard,${hook?.fontSize ?? header?.headerFontSize ?? 52},${assColor(hook?.textColor ?? header?.headerTextColor ?? '#111111')},&H000000FF,${assColor(hook?.strokeColor ?? '#000000')},&H00000000,${(hook?.fontWeight ?? header?.headerFontWeight ?? 800) >= 600 ? -1 : 0},0,0,0,100,100,${hook?.letterSpacing ?? 0},0,1,${hook?.strokeEnabled ? hook.strokeWidth : 0},${hook?.shadowEnabled ? Math.max(1, hook.shadowBlur / 3) : 0},${hookAlignment},${hook?.paddingX ?? 70},${hook?.paddingX ?? 70},${hookMarginV},1`,
+    `Style: Header,Pretendard,${hookLayout.fontSize},${assColor(hook?.textColor ?? header?.headerTextColor ?? '#111111')},&H000000FF,${assColor(hook?.strokeColor ?? '#000000')},&H00000000,${(hook?.fontWeight ?? header?.headerFontWeight ?? 800) >= 600 ? -1 : 0},0,0,0,100,100,${hook?.letterSpacing ?? 0},0,1,${hook?.strokeEnabled ? hook.strokeWidth : 0},${hook?.shadowEnabled ? Math.max(1, hook.shadowBlur / 3) : 0},${hookAlignment},${hook?.paddingX ?? 70},${hook?.paddingX ?? 70},${hookMarginV},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',

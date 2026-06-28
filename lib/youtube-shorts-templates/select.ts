@@ -10,6 +10,7 @@ export interface TemplateSelection {
 export function chooseShortsTemplate(
   templates: YouTubeShortsTemplateRecord[],
   classification: ShortsClassifierResult | null,
+  recentTemplateKeys: string[] = [],
 ): TemplateSelection | null {
   const active = templates.filter(t => t.isActive)
   const fallback = active.find(t => t.isDefault)
@@ -31,6 +32,7 @@ export function chooseShortsTemplate(
       if (match.contentTypes.includes(classification.contentType)) score += 4
       if (match.tones.includes(classification.tone)) score += 1
       if (match.matchingCategories.includes(classification.contentType) || template.category === classification.contentType) score += 3
+      if (recentTemplateKeys.slice(0, 5).includes(template.templateKey)) score -= 5
       return { template, score }
     })
     .filter(item => classification.confidenceScore >= item.template.config.aiMatching.minimumConfidenceScore)
@@ -42,9 +44,12 @@ export function chooseShortsTemplate(
   return { template: fallback, usedDefaultTemplate: true, reason: 'low_confidence_or_no_match' }
 }
 
-export async function selectShortsTemplate(classification: ShortsClassifierResult | null) {
+export async function selectShortsTemplate(
+  classification: ShortsClassifierResult | null,
+  recentTemplateKeys: string[] = [],
+) {
   await ensureBuiltInShortsTemplates()
-  const result = chooseShortsTemplate(await listShortsTemplates(true), classification)
+  const result = chooseShortsTemplate(await listShortsTemplates(true), classification, recentTemplateKeys)
   if (!result) throw new Error('No active default YouTube Shorts template is configured.')
   return result
 }

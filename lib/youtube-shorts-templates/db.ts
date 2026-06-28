@@ -84,12 +84,67 @@ const BUILT_IN_HOOK_TEMPLATES: Array<{
   preset: HookDesign['preset']
   contentTypes: ShortsTemplateConfig['aiMatching']['contentTypes']
   tones: Array<'emotional' | 'serious' | 'funny' | 'informative' | 'dramatic' | 'neutral'>
+  hookOverrides?: Partial<HookDesign>
+  layoutOverrides?: Partial<ShortsTemplateConfig['layout']>
+  captionOverrides?: Partial<ShortsTemplateConfig['captionStyle']>
+  overlayOverrides?: Partial<ShortsTemplateConfig['overlays']>
 }> = [
   { key: 'breaking_news', name: 'Breaking News', category: 'news', preset: 'breaking_news', contentTypes: ['news', 'sports'], tones: ['serious', 'informative'] },
   { key: 'drama_archive', name: 'Drama Archive', category: 'drama_highlight', preset: 'drama_archive', contentTypes: ['drama_highlight'], tones: ['emotional', 'dramatic'] },
   { key: 'knowledge_bold', name: 'Knowledge Bold', category: 'knowledge', preset: 'knowledge_bold', contentTypes: ['knowledge'], tones: ['informative', 'serious'] },
   { key: 'entertainment_feed', name: 'Entertainment Feed', category: 'entertainment', preset: 'entertainment_feed', contentTypes: ['entertainment'], tones: ['funny', 'neutral'] },
   { key: 'anime_editorial', name: 'Anime Editorial', category: 'anime', preset: 'anime_editorial', contentTypes: ['anime'], tones: ['dramatic', 'emotional'] },
+  {
+    key: 'sports_scoreboard',
+    name: 'Sports Scoreboard',
+    category: 'sports',
+    preset: 'breaking_news',
+    contentTypes: ['sports'],
+    tones: ['serious', 'dramatic'],
+    hookOverrides: { emphasisColor: '#F7E733', backgroundGradientStart: '#071B18', backgroundGradientEnd: '#123B32', categoryBadgeEnabled: true },
+    captionOverrides: { captionColor: '#FFFFFF', captionStrokeColor: '#071B18', captionFontSize: 78 },
+  },
+  {
+    key: 'knowledge_comment',
+    name: 'Knowledge Comment',
+    category: 'knowledge',
+    preset: 'knowledge_bold',
+    contentTypes: ['knowledge'],
+    tones: ['informative', 'neutral'],
+    hookOverrides: { emphasisColor: '#1AFF36', fontSize: 86 },
+    layoutOverrides: { headerHeight: 23, videoAreaHeight: 57, footerHeight: 20 },
+    overlayOverrides: { commentCardEnabled: true },
+  },
+  {
+    key: 'drama_quote',
+    name: 'Drama Quote',
+    category: 'drama_highlight',
+    preset: 'drama_archive',
+    contentTypes: ['drama_highlight'],
+    tones: ['emotional', 'dramatic'],
+    hookOverrides: { emphasisColor: '#E32620', quoteEnabled: true, fontSize: 82 },
+    captionOverrides: { captionBackgroundEnabled: true, captionBackgroundColor: '#000000', captionFontSize: 68 },
+  },
+  {
+    key: 'entertainment_neon',
+    name: 'Entertainment Neon',
+    category: 'entertainment',
+    preset: 'entertainment_feed',
+    contentTypes: ['entertainment'],
+    tones: ['funny', 'dramatic'],
+    hookOverrides: { emphasisColor: '#FF3BCD', backgroundType: 'gradient', backgroundGradientStart: '#170C24', backgroundGradientEnd: '#321A46', textColor: '#FFFFFF' },
+    captionOverrides: { captionColor: '#1AFF36', captionStrokeColor: '#000000', captionFontSize: 80 },
+  },
+  {
+    key: 'anime_impact',
+    name: 'Anime Impact',
+    category: 'anime',
+    preset: 'anime_editorial',
+    contentTypes: ['anime'],
+    tones: ['dramatic', 'emotional'],
+    hookOverrides: { backgroundColor: '#FFF8EA', emphasisColor: '#D34A2C', fontSize: 76 },
+    layoutOverrides: { headerHeight: 22, videoAreaHeight: 60, footerHeight: 18 },
+  },
 ]
 
 export async function ensureBuiltInShortsTemplates() {
@@ -97,9 +152,13 @@ export async function ensureBuiltInShortsTemplates() {
   for (const seed of BUILT_IN_HOOK_TEMPLATES) {
     const exists = await prisma.youTubeShortsTemplate.findUnique({ where: { templateKey: seed.key } })
     if (exists) continue
+    const presetHook = applyHookPreset(fallback.config.hookDesign, seed.preset)
     const config: ShortsTemplateConfig = {
       ...fallback.config,
-      hookDesign: applyHookPreset(fallback.config.hookDesign, seed.preset),
+      hookDesign: { ...presetHook, ...seed.hookOverrides },
+      layout: { ...fallback.config.layout, ...seed.layoutOverrides },
+      captionStyle: { ...fallback.config.captionStyle, ...seed.captionOverrides },
+      overlays: { ...fallback.config.overlays, ...seed.overlayOverrides },
       aiMatching: {
         ...fallback.config.aiMatching,
         matchingCategories: [seed.category],

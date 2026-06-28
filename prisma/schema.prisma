@@ -169,6 +169,11 @@ model YouTubeAutomationDay {
   usedDefaultTemplate  Boolean                  @default(false)
   selectionReason      String?
   videoStructureJson   String?
+  selectedPlanStrategyKey String?
+  planStrategySnapshotJson String?
+  sceneRoleSequenceJson String?
+  hookPattern          String?
+  endingPattern        String?
   uploadedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt

@@ -4,6 +4,7 @@ import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
 import { classifyShortsContent, generateDayProductionPlan } from '../../../../../../src/lib/youtube/automation'
 import { selectShortsTemplate } from '../../../../../../lib/youtube-shorts-templates/select'
+import { selectPlanStrategy } from '../../../../../../lib/youtube-plan-strategies'
 
 export const runtime = 'nodejs'
 
@@ -31,19 +32,39 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
   let plan: Awaited<ReturnType<typeof generateDayProductionPlan>>
   let classification: Awaited<ReturnType<typeof classifyShortsContent>> = null
   let selection: Awaited<ReturnType<typeof selectShortsTemplate>>
+  let planStrategy: ReturnType<typeof selectPlanStrategy>
   try {
     classification = await classifyShortsContent({
       topic: day.project.topic,
       title: day.title,
       userId: user.id,
     })
-    selection = await selectShortsTemplate(classification)
+    const recentDays = await prisma.youTubeAutomationDay.findMany({
+      where: {
+        projectId: day.projectId,
+        dayNumber: { lt: day.dayNumber },
+        selectedPlanStrategyKey: { not: null },
+      },
+      orderBy: { dayNumber: 'desc' },
+      take: 5,
+      select: { selectedPlanStrategyKey: true, selectedTemplateKey: true },
+    })
+    selection = await selectShortsTemplate(
+      classification,
+      recentDays.flatMap(item => item.selectedTemplateKey ? [item.selectedTemplateKey] : []),
+    )
+    planStrategy = selectPlanStrategy({
+      classification,
+      recentKeys: recentDays.flatMap(item => item.selectedPlanStrategyKey ? [item.selectedPlanStrategyKey] : []),
+      seed: `${day.projectId}:${day.dayNumber}:${day.title}`,
+    })
     plan = await generateDayProductionPlan({
       topic: day.project.topic,
       title: day.title,
       userId: user.id,
       template: selection.template,
       usedDefaultTemplate: selection.usedDefaultTemplate,
+      planStrategy,
     })
   } catch (error) {
     await prisma.youTubeAutomationDay.update({
@@ -74,6 +95,11 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
       usedDefaultTemplate: selection.usedDefaultTemplate,
       selectionReason: selection.reason,
       videoStructureJson: JSON.stringify(plan.videoStructure),
+      selectedPlanStrategyKey: planStrategy.key,
+      planStrategySnapshotJson: JSON.stringify(planStrategy),
+      sceneRoleSequenceJson: JSON.stringify(plan.scenes.map(scene => scene.sceneRole)),
+      hookPattern: planStrategy.hookPattern,
+      endingPattern: planStrategy.endingPattern,
     },
   })
 
