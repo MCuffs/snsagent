@@ -276,16 +276,19 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
     ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
     : narration
 
-  // NVIDIA Chatterbox: highest priority when key is available
+  // NVIDIA Chatterbox: highest priority when key is available, falls back to OpenAI on error
   if (isNvidiaTtsAvailable()) {
-    console.log('[TTS] NVIDIA Chatterbox 사용 중')
-    const wavBytes = await synthesizeWithNvidia(input, 'ko')
-    // Convert WAV → MP3 via ffmpeg so downstream pipeline stays uniform
-    const wavPath = outputPath.replace(/\.mp3$/, '.wav')
-    await fs.writeFile(wavPath, wavBytes)
-    await runFfmpeg(['-y', '-i', wavPath, '-codec:a', 'libmp3lame', '-q:a', '4', outputPath])
-    await fs.unlink(wavPath).catch(() => undefined)
-    return
+    try {
+      console.log('[TTS] NVIDIA Chatterbox 사용 중')
+      const wavBytes = await synthesizeWithNvidia(input, 'ko')
+      const wavPath = outputPath.replace(/\.mp3$/, '.wav')
+      await fs.writeFile(wavPath, wavBytes)
+      await runFfmpeg(['-y', '-i', wavPath, '-codec:a', 'libmp3lame', '-q:a', '4', outputPath])
+      await fs.unlink(wavPath).catch(() => undefined)
+      return
+    } catch (nvErr) {
+      console.warn('[TTS] NVIDIA Chatterbox 실패, OpenAI로 폴백:', nvErr instanceof Error ? nvErr.message : nvErr)
+    }
   }
 
   // OpenAI fallback
