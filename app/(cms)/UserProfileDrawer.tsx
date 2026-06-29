@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Key, Copy, Check, RefreshCw, Trash2, X, User, Mail, CreditCard, ExternalLink, LogOut, AlertCircle } from 'lucide-react'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   FREE:      { label: 'Free',      color: 'text-[#71717a] bg-[#f4f4f5]' },
   PRO:       { label: 'Creator',   color: 'text-[#7c3aed] bg-[#f5f3ff]' },
+  YOUTUBE_PROMO: { label: 'YouTube', color: 'text-[#2563eb] bg-[#eff6ff]' },
   UNLIMITED: { label: 'Studio',    color: 'text-[#059669] bg-[#ecfdf5]' },
 }
 
@@ -30,10 +32,15 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
   const [revealed, setRevealed] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [portalReady, setPortalReady] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
 
   // 구독 취소 버튼 노출 조건: 구독 중이거나 데모 계정
   const showCancelBtn = hasSubscription || userEmail === DEMO_EMAIL
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   useEffect(() => {
     if (!open || keyLoaded) return
@@ -126,13 +133,16 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
         </div>
       </button>
 
-      {open && <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" />}
+      {portalReady && open && createPortal(
+        <div className="fixed inset-0 z-40 bg-black/20" aria-hidden="true" />,
+        document.body,
+      )}
 
       {/* 드로어 */}
-      <div
+      {portalReady && createPortal(<div
         ref={drawerRef}
-        className={`fixed bottom-0 left-0 z-50 flex h-auto max-h-[90vh] w-[280px] flex-col overflow-y-auto rounded-tr-2xl border-r border-t border-[#e4e4e7] bg-white shadow-2xl transition-transform duration-200 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full pointer-events-none'
+        className={`fixed bottom-3 left-3 z-50 flex h-auto max-h-[calc(100dvh-24px)] w-[min(360px,calc(100vw-24px))] flex-col overflow-y-auto rounded-2xl border border-[#e4e4e7] bg-white shadow-2xl transition-transform duration-200 ease-out ${
+          open ? 'translate-y-0' : 'translate-y-[calc(100%+24px)] pointer-events-none'
         }`}
       >
         {/* 헤더 */}
@@ -289,7 +299,7 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
             </button>
           </form>
         </div>
-      </div>
+      </div>, document.body)}
     </>
   )
 }

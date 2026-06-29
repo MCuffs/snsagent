@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X, TvMinimalPlay } from 'lucide-react'
@@ -38,13 +39,23 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const t = useTranslations('cms')
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const [upgradeFeatureName, setUpgradeFeatureName] = useState('영상 카드뉴스')
+  const [portalReady, setPortalReady] = useState(false)
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
   const pricingPath = `${prefix}/pricing`
-  const isFreePlan = userPlan === 'FREE'
+  const isFreePlan = !userPlan || userPlan === 'FREE'
+  const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
+  const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
+  const canUseYouTubeAutomation = !isFreePlan
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    if ((item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan) {
+    const blockedVideoFeature = item.key === 'video-cardnews' && !canUseVideoFeatures
+    const blockedYouTubeAutomation = item.key === 'youtube-automation' && !canUseYouTubeAutomation
+    if (blockedVideoFeature || blockedYouTubeAutomation) {
       e.preventDefault()
       setUpgradeFeatureName(item.key === 'youtube-automation' ? '유튜브 자동화' : '영상 카드뉴스')
       setShowVideoUpgradePrompt(true)
@@ -114,7 +125,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
-                {(item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan && (
+                {((item.key === 'video-cardnews' && !canUseVideoFeatures) || (item.key === 'youtube-automation' && !canUseYouTubeAutomation)) && (
                   <Lock className={`h-3 w-3 ${isActive ? 'text-white/70' : 'text-[#9ca3af]'}`} />
                 )}
                 {item.badge && (
@@ -130,7 +141,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
         })}
       </nav>
 
-      {showVideoUpgradePrompt && (
+      {portalReady && showVideoUpgradePrompt && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
           <div className="w-full max-w-[360px] rounded-2xl border border-white/70 bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
             <div className="flex items-start justify-between gap-3">
@@ -168,7 +179,8 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

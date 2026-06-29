@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import prisma from '../../../../lib/db'
-import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../lib/youtube-automation-access'
+import {
+  canUseYouTubeAutomation,
+  getYouTubeAutomationHistoryPolicy,
+  youtubeAutomationUpgradeResponse,
+} from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
 
 export const runtime = 'nodejs'
@@ -47,25 +51,68 @@ function safeJsonArray(value: unknown) {
   }
 }
 
+function retentionCutoff(retentionDays: number | null) {
+  if (!retentionDays) return null
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - retentionDays)
+  return cutoff
+}
+
+async function pruneExpiredProjects(userId: string, retentionDays: number | null) {
+  const cutoff = retentionCutoff(retentionDays)
+  if (!cutoff) return
+  await prisma.youTubeAutomationProject.deleteMany({
+    where: {
+      userId,
+      createdAt: { lt: cutoff },
+    },
+  })
+}
+
 export async function GET() {
   const user = await getSessionUser()
   if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
+  const policy = getYouTubeAutomationHistoryPolicy(user)
+  const cutoff = retentionCutoff(policy.retentionDays)
+  await pruneExpiredProjects(user.id, policy.retentionDays)
+
   const projects = await prisma.youTubeAutomationProject.findMany({
-    where: { userId: user.id },
+    where: {
+      userId: user.id,
+      ...(cutoff ? { createdAt: { gte: cutoff } } : {}),
+    },
     orderBy: { createdAt: 'desc' },
-    take: 10,
+    take: policy.limit,
     include: { days: true },
   })
 
-  return NextResponse.json({ projects: projects.map(serializeProject) })
+  return NextResponse.json({ projects: projects.map(serializeProject), historyPolicy: policy })
 }
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
   if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+
+  const policy = getYouTubeAutomationHistoryPolicy(user)
+  const cutoff = retentionCutoff(policy.retentionDays)
+  await pruneExpiredProjects(user.id, policy.retentionDays)
+
+  const currentProjectCount = await prisma.youTubeAutomationProject.count({
+    where: {
+      userId: user.id,
+      ...(cutoff ? { createdAt: { gte: cutoff } } : {}),
+    },
+  })
+  if (policy.retentionDays && currentProjectCount >= policy.limit) {
+    return NextResponse.json({
+      error: `프로모션 플랜은 최근 ${policy.retentionDays}일 동안 작업 히스토리를 최대 ${policy.limit}개까지 저장할 수 있습니다. 기존 작업을 삭제한 뒤 다시 시도해 주세요.`,
+      historyLimit: policy.limit,
+      retentionDays: policy.retentionDays,
+    }, { status: 403 })
+  }
 
   const body = await request.json().catch(() => null) as { topic?: string } | null
   const topic = body?.topic?.trim()
@@ -100,4 +147,27 @@ export async function POST(request: Request) {
   })
 
   return NextResponse.json({ project: serializeProject(project) })
+}
+
+export async function DELETE(request: Request) {
+  const user = await getSessionUser()
+  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
+  if (!user) return NextResponse.json({ error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' }, { status: 401 })
+
+  const body = await request.json().catch(() => null) as { projectId?: string } | null
+  const projectId = body?.projectId?.trim()
+  if (!projectId) return NextResponse.json({ error: '삭제할 작업 ID가 없습니다.' }, { status: 400 })
+
+  const result = await prisma.youTubeAutomationProject.deleteMany({
+    where: {
+      id: projectId,
+      userId: user.id,
+    },
+  })
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: '삭제할 작업을 찾을 수 없습니다.' }, { status: 404 })
+  }
+
+  return NextResponse.json({ ok: true, projectId })
 }

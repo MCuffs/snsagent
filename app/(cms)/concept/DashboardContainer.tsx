@@ -86,14 +86,19 @@ export default function DashboardContainer({
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const [dismissedVideoUpgradePrompt, setDismissedVideoUpgradePrompt] = useState(false)
-  const isFreePlan = userPlan === 'FREE'
+  const isFreePlan = !userPlan || userPlan === 'FREE'
   const localePrefix = pathname?.startsWith('/ko/') || pathname === '/ko'
     ? '/ko'
     : pathname?.startsWith('/en/') || pathname === '/en'
       ? '/en'
       : ''
   const pricingPath = `${localePrefix}/pricing`
-  const activeCreatorTabBlocked = (activeTab === 'video-cardnews' || activeTab === 'video' || activeTab === 'youtube-automation') && isFreePlan
+  const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
+  const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
+  const canUseYouTubeAutomation = !isFreePlan
+  const activeCreatorTabBlocked =
+    ((activeTab === 'video-cardnews' || activeTab === 'video') && !canUseVideoFeatures) ||
+    (activeTab === 'youtube-automation' && !canUseYouTubeAutomation)
   const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeCreatorTabBlocked && !dismissedVideoUpgradePrompt)
   const closeVideoUpgradePrompt = () => {
     setShowVideoUpgradePrompt(false)
@@ -329,7 +334,7 @@ export default function DashboardContainer({
         </div>
 
       <div className={tabPanelClass('video')} aria-hidden={activeTab !== 'video'}>
-        {isFreePlan ? (
+        {!canUseVideoFeatures ? (
           <VideoUpgradeEmptyState pricingPath={pricingPath} />
         ) : brandToPass ? (
           <VideoCardNewsForm
@@ -353,7 +358,7 @@ export default function DashboardContainer({
       </div>
 
       <div className={tabPanelClass('youtube-automation')} aria-hidden={activeTab !== 'youtube-automation'}>
-        {isFreePlan ? (
+        {!canUseYouTubeAutomation ? (
           <VideoUpgradeEmptyState
             pricingPath={pricingPath}
             featureName="유튜브 자동화"
@@ -366,7 +371,7 @@ export default function DashboardContainer({
 
       {brandToPass && (
         <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
-          {isFreePlan ? (
+          {!canUseVideoFeatures ? (
             <VideoUpgradeEmptyState pricingPath={pricingPath} />
           ) : (
             <VideoCardNewsForm

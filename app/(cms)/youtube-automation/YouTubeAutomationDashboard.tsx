@@ -4,7 +4,7 @@ import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarDays, Check, Clock, Download, Folder, FolderOpen,
-  Info, Loader2, Lock, Mic2, Play, Sparkles, Upload, Video, X,
+  Info, Loader2, Lock, Mic2, Play, Sparkles, Trash2, Upload, Video, X,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ type ModalPhase = 'planning' | 'rendering' | 'done' | 'error'
 
 // localStorage key for completed-day timestamps
 const LS_COMPLETED = 'yt-completed-days'
-const MAX_HISTORY_FOLDERS = 5
+const MAX_HISTORY_FOLDERS = 3
 const LOCK_HOURS = 24
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -102,6 +102,7 @@ export default function YouTubeAutomationDashboard() {
   const [history, setHistory] = useState<Project[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [openFolderId, setOpenFolderId] = useState<string | null>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
 
   // Completed-day timestamps for 24h countdown
   const [completedTimes, setCompletedTimes] = useState<Record<string, number>>({})
@@ -153,6 +154,28 @@ export default function YouTubeAutomationDashboard() {
   const handleDayClick = (day: PlannerDay, effectiveLocked: boolean) => {
     if (effectiveLocked) return
     setModalDay(day)
+  }
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('이 작업 히스토리를 삭제할까요?')) return
+    setDeletingProjectId(projectId)
+    setError(null)
+    try {
+      const res = await fetch('/api/youtube-automation/projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const data = await readApiJson<{ error?: string }>(res)
+      if (!res.ok) throw new Error(data.error || '작업 히스토리를 삭제하지 못했습니다.')
+      setHistory(prev => prev.filter(p => p.id !== projectId))
+      setOpenFolderId(prev => (prev === projectId ? null : prev))
+      setProject(prev => (prev?.id === projectId ? null : prev))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '작업 히스토리를 삭제하지 못했습니다.')
+    } finally {
+      setDeletingProjectId(null)
+    }
   }
 
   const handleModalDone = useCallback((updatedDay: Partial<PlannerDay>) => {
@@ -269,10 +292,11 @@ export default function YouTubeAutomationDashboard() {
                   const completedCount = p.days.filter(d => d.mp4Url || d.status === 'uploaded').length
                   return (
                     <div key={p.id} className="overflow-hidden rounded-2xl border border-white/70 bg-white/72 shadow-[0_8px_24px_rgba(87,119,185,0.07)]">
+                      <div className="flex items-center gap-2 px-4 py-3 hover:bg-[#f8fafc] transition-colors">
                       <button
                         type="button"
                         onClick={() => setOpenFolderId(isOpen ? null : p.id)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[#f8fafc] transition-colors"
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         {isOpen
                           ? <FolderOpen className="h-4 w-4 shrink-0 text-[#4252ff]" />
@@ -285,6 +309,16 @@ export default function YouTubeAutomationDashboard() {
                           </p>
                         </div>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteProject(p.id)}
+                        disabled={deletingProjectId === p.id}
+                        aria-label="작업 히스토리 삭제"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#94a3b8] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {deletingProjectId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                      </div>
                       {isOpen && (
                         <div className="border-t border-[#f1f5f9] p-3">
                           <button

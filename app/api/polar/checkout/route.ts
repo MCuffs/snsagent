@@ -5,13 +5,14 @@ import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
 
 export const runtime = 'nodejs'
 
-const CHECKOUT_LINKS: Record<'PRO' | 'UNLIMITED', string | undefined> = {
+const CHECKOUT_LINKS: Record<'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED', string | undefined> = {
+  YOUTUBE_PROMO: process.env.POLAR_CHECKOUT_YOUTUBE_PROMO?.trim(),
   PRO: process.env.POLAR_CHECKOUT_PRO?.trim(),
   UNLIMITED: process.env.POLAR_CHECKOUT_UNLIMITED?.trim(),
 }
 
 const schema = z.object({
-  plan: z.enum(['PRO', 'UNLIMITED']),
+  plan: z.enum(['YOUTUBE_PROMO', 'PRO', 'UNLIMITED']),
 })
 
 export async function POST(request: NextRequest) {

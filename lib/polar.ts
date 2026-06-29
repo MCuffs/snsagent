@@ -107,13 +107,14 @@ export async function verifyPolarWebhook(
 }
 
 // Product ID → plan mapping via env vars
-export const POLAR_PRODUCT_IDS: Record<'PRO' | 'UNLIMITED', string | undefined> = {
+export const POLAR_PRODUCT_IDS: Record<'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED', string | undefined> = {
+  YOUTUBE_PROMO: process.env.POLAR_PRODUCT_YOUTUBE_PROMO?.trim() || process.env.NEXT_PUBLIC_POLAR_PRODUCT_YOUTUBE_PROMO?.trim(),
   PRO: process.env.POLAR_PRODUCT_PRO?.trim() || process.env.NEXT_PUBLIC_POLAR_PRODUCT_PRO?.trim(),
   UNLIMITED: process.env.POLAR_PRODUCT_UNLIMITED?.trim() || process.env.NEXT_PUBLIC_POLAR_PRODUCT_UNLIMITED?.trim(),
 }
 
-export function planFromPolarProductId(productId: string): 'PRO' | 'UNLIMITED' | null {
-  for (const plan of ['PRO', 'UNLIMITED'] as const) {
+export function planFromPolarProductId(productId: string): 'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED' | null {
+  for (const plan of ['YOUTUBE_PROMO', 'PRO', 'UNLIMITED'] as const) {
     if (POLAR_PRODUCT_IDS[plan] === productId) return plan
   }
   return null
