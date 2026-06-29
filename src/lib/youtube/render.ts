@@ -287,7 +287,10 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
       await fs.unlink(wavPath).catch(() => undefined)
       return
     } catch (nvErr) {
-      console.warn('[TTS] NVIDIA Chatterbox 실패, OpenAI로 폴백:', nvErr instanceof Error ? nvErr.message : nvErr)
+      const errMsg = nvErr instanceof Error ? nvErr.message : String(nvErr)
+      const errCode = (nvErr as { code?: number | string })?.code
+      console.error(`[TTS] NVIDIA Chatterbox 실패 (code=${errCode ?? 'n/a'}): ${errMsg}`)
+      console.warn('[TTS] OpenAI TTS로 폴백합니다.')
     }
   }
 
