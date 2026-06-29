@@ -362,7 +362,8 @@ export default function DashboardContainer({
           <VideoUpgradeEmptyState
             pricingPath={pricingPath}
             featureName="유튜브 자동화"
-            description="월 25,000원 Creator 이상 플랜에서 30일 플래너 생성, 기획, TTS, MP4 렌더링을 시작할 수 있습니다."
+            title="유튜브 자동화는 YouTube Promo 플랜부터 사용할 수 있습니다."
+            description="월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다."
           />
         ) : (
           <YouTubeAutomationDashboard />
@@ -620,10 +621,12 @@ function ProfileSelectAmbientBackdrop() {
 function VideoUpgradeEmptyState({
   pricingPath,
   featureName = '영상 카드뉴스',
+  title,
   description = '월 25,000원 Creator 이상 플랜에서 고급 영상 제작 기능을 사용할 수 있습니다.',
 }: {
   pricingPath: string
   featureName?: string
+  title?: string
   description?: string
 }) {
   return (
@@ -632,7 +635,9 @@ function VideoUpgradeEmptyState({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
           <Lock className="h-6 w-6" />
         </div>
-        <h2 className="mt-5 text-lg font-black text-[#111827]">{featureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
+        <h2 className="mt-5 text-lg font-black text-[#111827]">
+          {title || `${featureName}는 Creator 플랜부터 사용할 수 있습니다.`}
+        </h2>
         <p className="mt-3 text-sm font-medium leading-6 text-[#6b7280]">
           {description}
         </p>

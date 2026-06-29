@@ -21,6 +21,22 @@ const plans = [
         highlight: false,
     },
     {
+        name: PRICING_PLANS.YOUTUBE_PROMO.name,
+        tagline: '유튜브 자동화',
+        price: PRICING_PLANS.YOUTUBE_PROMO.price,
+        period: '',
+        desc: PRICING_PLANS.YOUTUBE_PROMO.description,
+        cta: 'Google Login',
+        features: [
+            '유튜브 자동화 전용',
+            '30일 쇼츠 제목 캘린더 생성',
+            '작업 히스토리 최대 3개',
+            '작업 히스토리 30일 보관',
+            '카드뉴스/영상 카드뉴스 생성 미포함',
+        ],
+        highlight: false,
+    },
+    {
         name: PRICING_PLANS.PRO.name,
         tagline: '브랜드 운영',
         price: PRICING_PLANS.PRO.price,
@@ -77,7 +93,7 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.',
+        a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. YouTube Promo는 유튜브 자동화만 사용할 수 있고 작업 히스토리는 3개까지 30일 보관됩니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공합니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
@@ -94,13 +110,14 @@ const faqs = [
 ]
 
 const compareFeatures = [
-    { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
-    { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
-    { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
-    { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
-    { feature: '상품 참고 이미지 입력', free: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
-    { feature: 'AI 배경 재생성', free: '3,000원 / 1회', creator: '1회분/건', studio: '1회분/건' },
-    { feature: '결과 편집 및 다운로드', free: '✓', creator: '✓', studio: '✓' },
+    { feature: '카드뉴스 생성 수', free: '최초 2회', youtube: '미포함', creator: '월 20회', studio: '월 30회' },
+    { feature: '유튜브 자동화', free: '미포함', youtube: '✓', creator: '✓', studio: '✓' },
+    { feature: '작업 히스토리 보관', free: '30일', youtube: '30일 / 최대 3개', creator: '90일', studio: '365일' },
+    { feature: '브랜드 URL 분석', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
+    { feature: 'AI 문구·이미지 생성', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
+    { feature: '상품 참고 이미지 입력', free: '최대 4장', youtube: '미포함', creator: '최대 4장', studio: '최대 4장' },
+    { feature: 'AI 배경 재생성', free: '3,000원 / 1회', youtube: '미포함', creator: '1회분/건', studio: '1회분/건' },
+    { feature: '결과 편집 및 다운로드', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
 ]
 
 export default async function PricingPage() {
@@ -129,7 +146,7 @@ export default async function PricingPage() {
                 {/* PLANS */}
                 <section className="pb-20">
                     <div className="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div className="grid gap-5 md:grid-cols-3 items-start">
+                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4 items-start">
                             {plans.map((plan) => (
                                 <div
                                     key={plan.name}
@@ -223,6 +240,7 @@ export default async function PricingPage() {
                                         <tr className="border-b border-black/[0.06] bg-[#fafaf7]">
                                             <th className="text-left py-4 px-6 font-bold text-[#525252]">기능</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#525252]">Free</th>
+                                            <th className="text-center py-4 px-4 font-bold text-[#525252]">YouTube Promo</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#ff6b35]">Creator</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#525252]">Studio</th>
                                         </tr>
@@ -232,6 +250,7 @@ export default async function PricingPage() {
                                             <tr key={i}>
                                                 <td className="py-4 px-6 font-medium text-[#0a0a0a]">{row.feature}</td>
                                                 <td className="text-center py-4 px-4 text-[#525252]">{row.free}</td>
+                                                <td className="text-center py-4 px-4 text-[#525252]">{row.youtube}</td>
                                                 <td className="text-center py-4 px-4 text-[#0a0a0a] font-bold">{row.creator}</td>
                                                 <td className="text-center py-4 px-4 text-[#525252]">{row.studio}</td>
                                             </tr>

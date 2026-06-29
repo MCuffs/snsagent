@@ -1,7 +1,7 @@
 import { isAdminEmail } from './auth/admin-emails'
 import { normalizePlan } from './limits-types'
 
-export const YOUTUBE_AUTOMATION_REQUIRED_PLAN = 'PRO'
+export const YOUTUBE_AUTOMATION_REQUIRED_PLAN = 'YOUTUBE_PROMO'
 export const YOUTUBE_PROMO_PLAN = 'YOUTUBE_PROMO'
 export const YOUTUBE_PROMO_HISTORY_LIMIT = 3
 export const YOUTUBE_PROMO_RETENTION_DAYS = 30
@@ -24,7 +24,7 @@ export function getYouTubeAutomationHistoryPolicy(user: { plan?: string | null; 
 
 export function youtubeAutomationUpgradeResponse() {
   return {
-    error: '유튜브 자동화는 Creator(월 25,000원) 이상 플랜에서 사용할 수 있습니다.',
+    error: '유튜브 자동화는 YouTube Promo(월 9,900원) 이상 플랜에서 사용할 수 있습니다.',
     requiredPlan: YOUTUBE_AUTOMATION_REQUIRED_PLAN,
   }
 }

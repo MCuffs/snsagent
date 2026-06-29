@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title: t('meta_title'),
     description: isEn
-      ? 'Shuffla pricing: Free plan with 2 card news, Creator at ₩25,000/mo for 20/month, Studio at ₩39,000/mo for 30/month.'
-      : 'Shuffla 요금제: 무료 2회, Creator 월 25,000원(월 20회), Studio 월 39,000원(월 30회).',
+      ? 'Shuffla pricing: Free plan with 2 card news, YouTube Promo at ₩9,900/mo, Creator at ₩25,000/mo, Studio at ₩39,000/mo.'
+      : 'Shuffla 요금제: 무료 2회, YouTube Promo 월 9,900원, Creator 월 25,000원, Studio 월 39,000원.',
     alternates: {
       canonical: `${base}/${locale}/pricing`,
       languages: { ko: `${base}/ko/pricing`, en: `${base}/en/pricing` },
@@ -35,7 +35,7 @@ const faqs = {
     { q: '무료 플랜에서는 무엇을 만들 수 있나요?', a: 'Free 플랜은 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다. 결과 편집과 다운로드는 가능하지만 AI 재생성은 포함되지 않습니다.' },
     { q: 'AI가 만든 카드뉴스를 직접 수정할 수 있나요?', a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있습니다.' },
     { q: '브랜드가 여러 개인 경우에도 사용할 수 있나요?', a: '현재는 계정당 브랜드 1개를 지원합니다. 여러 브랜드 도입은 별도 문의로 확인해 주세요.' },
-    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. Creator는 월 20회, Studio는 월 30회 생성이 가능하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.' },
+    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. YouTube Promo는 유튜브 자동화만 사용할 수 있고 작업 히스토리는 3개까지 30일 보관됩니다. Creator는 월 20회, Studio는 월 30회 카드뉴스 생성이 가능합니다.' },
     { q: '로그인만 하면 바로 생성할 수 있나요?', a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다.' },
     { q: '플랜은 언제든지 변경할 수 있나요?', a: '현재 구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 이후 원하는 새 플랜을 선택할 수 있습니다.' },
     { q: '결제는 어디에서 진행되나요?', a: 'Google Login 후 브랜드를 설정하면 요금제 화면에서 결제를 진행할 수 있습니다.' },
@@ -44,7 +44,7 @@ const faqs = {
     { q: 'What can I create with the free plan?', a: 'The Free plan lets you create 2 card news in total without payment. You can edit and download results, but AI regeneration is not included.' },
     { q: 'Can I edit the AI-generated card news?', a: 'Yes. You can edit the copy and layout directly after generation.' },
     { q: 'Can I use it with multiple brands?', a: 'Currently one brand per account is supported. Contact us for multi-brand inquiries.' },
-    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day history retention. Creator offers 20/month and Studio 30/month, both including AI background regeneration.' },
+    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day history retention. YouTube Promo is for YouTube automation only with up to 3 saved histories for 30 days. Creator offers 20 card news/month and Studio offers 30/month.' },
     { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create 2 card news in total without payment.' },
     { q: 'Can I change plans at any time?', a: 'Canceling your current subscription reverts access immediately. You can then choose a new plan.' },
     { q: 'Where do I complete payment?', a: 'After Google Login and brand setup, the billing screen lets you select and pay for your plan.' },
@@ -79,6 +79,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '무료로 시작하기',
       highlight: false,
+    },
+    {
+      key: 'youtube',
+      name: PRICING_PLANS.YOUTUBE_PROMO.name,
+      price: isEn ? PRICING_PLANS.YOUTUBE_PROMO.price_en : PRICING_PLANS.YOUTUBE_PROMO.price,
+      priceNote: isEn ? 'per month' : '/ 월',
+      features: isEn
+        ? ['YouTube automation only', '30-day Shorts title calendar', 'Up to 3 saved work histories', '30-day work history retention', 'Card news generation not included']
+        : ['유튜브 자동화 전용', '30일 쇼츠 제목 캘린더 생성', '작업 히스토리 최대 3개', '작업 히스토리 30일 보관', '카드뉴스 생성 미포함'],
+      cta: isEn ? 'Get started' : '시작하기',
+      highlight: false,
+      badge: isEn ? 'Promo' : '프로모션',
     },
     {
       key: 'creator',
@@ -138,7 +150,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
           {/* PLANS GRID */}
           <section className="mx-auto max-w-[1300px] px-6 pb-24 lg:px-10">
-            <div className="grid gap-px bg-black/[0.07] border border-black/[0.07] rounded-[20px] overflow-hidden md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-px bg-black/[0.07] border border-black/[0.07] rounded-[20px] overflow-hidden md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {plans.map((plan) => (
                 <div
                   key={plan.key}

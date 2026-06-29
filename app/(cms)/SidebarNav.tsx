@@ -47,6 +47,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
   const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
   const canUseYouTubeAutomation = !isFreePlan
+  const isYouTubeUpgradePrompt = upgradeFeatureName === '유튜브 자동화'
 
   useEffect(() => {
     setPortalReady(true)
@@ -158,9 +159,15 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
               </button>
             </div>
             <div className="mt-4 space-y-2">
-              <h2 className="text-base font-black text-[#111827]">{upgradeFeatureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
+              <h2 className="text-base font-black text-[#111827]">
+                {isYouTubeUpgradePrompt
+                  ? '유튜브 자동화는 YouTube Promo 플랜부터 사용할 수 있습니다.'
+                  : `${upgradeFeatureName}는 Creator 플랜부터 사용할 수 있습니다.`}
+              </h2>
               <p className="text-sm font-medium leading-6 text-[#6b7280]">
-                월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.
+                {isYouTubeUpgradePrompt
+                  ? '월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다.'
+                  : '월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.'}
               </p>
             </div>
             <div className="mt-5 flex gap-2">
