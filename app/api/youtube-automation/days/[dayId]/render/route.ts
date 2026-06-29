@@ -32,10 +32,16 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
     return NextResponse.json({ error: '사용 가능한 영상 클립이 없습니다. 제목을 다시 클릭해 제작안을 재생성해 주세요.' }, { status: 400 })
   }
 
-  await prisma.youTubeAutomationDay.update({
-    where: { id: day.id },
+  const claimed = await prisma.youTubeAutomationDay.updateMany({
+    where: {
+      id: day.id,
+      status: { not: 'rendering' },
+    },
     data: { status: 'rendering' },
   })
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: '이미 렌더링이 진행 중입니다. 잠시 후 다시 시도해 주세요.' }, { status: 409 })
+  }
 
   try {
     const scenes = parseJsonArray<YouTubeScenePlan>(day.scenesJson)

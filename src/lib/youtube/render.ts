@@ -43,9 +43,9 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     throw new Error('Pexels/Pixabay 영상 후보가 없습니다. API 키 또는 검색 키워드를 확인해 주세요.')
   }
 
-  const workDir = path.join(os.tmpdir(), 'shuffla-youtube-automation', params.dayId)
-  await fs.rm(workDir, { recursive: true, force: true })
-  await fs.mkdir(workDir, { recursive: true })
+  const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
+  await fs.mkdir(workRoot, { recursive: true })
+  const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
 
   try {
     const fontsDir = path.join(workDir, 'fonts')
