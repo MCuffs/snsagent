@@ -258,7 +258,6 @@ async function normalizeClip(params: {
 }
 
 async function getTtsProvider(): Promise<string> {
-  if (isNvidiaTtsAvailable()) return 'nvidia-chatterbox'
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey || apiKey.length < 10) {
     if (process.env.NODE_ENV === 'production') {
@@ -276,25 +275,7 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
     ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
     : narration
 
-  // NVIDIA Chatterbox: highest priority when key is available, falls back to OpenAI on error
-  if (isNvidiaTtsAvailable()) {
-    try {
-      console.log('[TTS] NVIDIA Chatterbox 사용 중')
-      const wavBytes = await synthesizeWithNvidia(input, 'ko')
-      const wavPath = outputPath.replace(/\.mp3$/, '.wav')
-      await fs.writeFile(wavPath, wavBytes)
-      await runFfmpeg(['-y', '-i', wavPath, '-codec:a', 'libmp3lame', '-q:a', '4', outputPath])
-      await fs.unlink(wavPath).catch(() => undefined)
-      return
-    } catch (nvErr) {
-      const errMsg = nvErr instanceof Error ? nvErr.message : String(nvErr)
-      const errCode = (nvErr as { code?: number | string })?.code
-      console.error(`[TTS] NVIDIA Chatterbox 실패 (code=${errCode ?? 'n/a'}): ${errMsg}`)
-      console.warn('[TTS] OpenAI TTS로 폴백합니다.')
-    }
-  }
-
-  // OpenAI fallback
+  // OpenAI TTS
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey || apiKey.length < 10) {
     await createSilentAudio(outputPath, fallbackDurationSeconds)
