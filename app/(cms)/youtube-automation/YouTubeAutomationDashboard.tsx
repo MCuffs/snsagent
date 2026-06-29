@@ -451,7 +451,7 @@ export default function YouTubeAutomationDashboard() {
       {/* Production Modal */}
       {modalDay && (
         <DayProductionModal
-          key={`${modalDay.id}-${modalDay.status}-${modalDay.renderProgress ?? 0}`}
+          key={modalDay.id}
           day={modalDay}
           onClose={() => setModalDay(null)}
           onDone={handleModalDone}
@@ -627,6 +627,11 @@ function DayProductionModal({
   useEffect(() => {
     if (day.mp4Url) { setResultDay(day); setPhase('done'); setPct(100); return }
     if (day.status === 'rendering') return
+    if (day.status === 'failed') {
+      setPhase('error')
+      setErrorMsg('영상 제작에 실패했습니다. 다시 시도해 주세요.')
+      return
+    }
     void runPipeline()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

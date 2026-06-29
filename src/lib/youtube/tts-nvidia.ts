@@ -1,23 +1,77 @@
+import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
 import grpc from '@grpc/grpc-js'
 import protoLoader from '@grpc/proto-loader'
-
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PROTO_PATH = path.join(MODULE_DIR, 'riva_tts.proto')
 
 const NVIDIA_GRPC_SERVER = 'grpc.nvcf.nvidia.com:443'
 const CHATTERBOX_FUNCTION_ID = 'ddacc747-1269-4fab-bfd9-8f593dead106'
 
-// Korean voice — falls back to en-US male if no KO voice found at runtime.
-// Available voices can be listed via GetRivaSynthesisConfig.
 const DEFAULT_VOICE_KO = 'Chatterbox-Multilingual.ko-KR.Male'
 const DEFAULT_VOICE_EN = 'Chatterbox-Multilingual.en-US.Male'
+
+// Embed the proto definition inline so it works regardless of the bundle path in production.
+const RIVA_TTS_PROTO = `
+syntax = "proto3";
+package nvidia.riva.tts;
+
+enum AudioEncoding {
+  ENCODING_UNSPECIFIED = 0;
+  LINEAR_PCM = 1;
+  FLAC = 2;
+  MULAW = 3;
+  MP3 = 11;
+  OPUS = 12;
+}
+
+message SynthesizeSpeechRequest {
+  string text = 1;
+  string language_code = 2;
+  AudioEncoding encoding = 3;
+  float sample_rate_hz = 4;
+  string voice_name = 5;
+}
+
+message SynthesizeSpeechResponse {
+  bytes audio = 1;
+  AudioEncoding encoding = 2;
+  string phonemes = 3;
+  repeated float durations_start = 4;
+  repeated float durations_end = 5;
+}
+
+message RivaSynthesisConfigRequest {}
+
+message Voice {
+  string name = 1;
+  string language_code = 2;
+}
+
+message RivaSynthesisConfigResponse {
+  repeated Voice voices = 2;
+}
+
+service RivaSpeechSynthesis {
+  rpc Synthesize(SynthesizeSpeechRequest) returns (SynthesizeSpeechResponse) {}
+  rpc SynthesizeOnline(SynthesizeSpeechRequest) returns (stream SynthesizeSpeechResponse) {}
+  rpc GetRivaSynthesisConfig(RivaSynthesisConfigRequest) returns (RivaSynthesisConfigResponse) {}
+}
+`
+
+// Write the proto to tmpdir once and reuse the path.
+let _protoPath: string | null = null
+function getProtoPath(): string {
+  if (_protoPath) return _protoPath
+  const tmpPath = path.join(os.tmpdir(), 'shuffla-riva-tts.proto')
+  fs.writeFileSync(tmpPath, RIVA_TTS_PROTO, 'utf8')
+  _protoPath = tmpPath
+  return tmpPath
+}
 
 let _clientCache: ReturnType<typeof buildClient> | null = null
 
 function buildClient(apiKey: string) {
-  const packageDef = protoLoader.loadSync(PROTO_PATH, {
+  const packageDef = protoLoader.loadSync(getProtoPath(), {
     keepCase: true,
     longs: String,
     enums: String,
