@@ -8,6 +8,7 @@ import OpenAI from 'openai'
 // @ffmpeg-installer/ffmpeg has no bundled type declarations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
+import { synthesizeWithNvidia, isNvidiaTtsAvailable } from './tts-nvidia'
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 import { fitHookText, renderHookOverlay } from './hookRenderer'
@@ -257,10 +258,11 @@ async function normalizeClip(params: {
 }
 
 async function getTtsProvider(): Promise<string> {
+  if (isNvidiaTtsAvailable()) return 'nvidia-chatterbox'
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey || apiKey.length < 10) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('TTS 생성을 위한 OPENAI_API_KEY가 설정되어 있지 않습니다.')
+      throw new Error('TTS 생성을 위한 OPENAI_API_KEY 또는 NVIDIA_API_KEY가 설정되어 있지 않습니다.')
     }
     return 'silent-dev'
   }
@@ -268,8 +270,25 @@ async function getTtsProvider(): Promise<string> {
 }
 
 // Generate TTS for a single scene narration.
-// Falls back to silence (dev) when no API key is available.
+// Prefers NVIDIA Chatterbox when NVIDIA_API_KEY is set; falls back to OpenAI.
 async function createSceneSpeechAudio(narration: string, outputPath: string, fallbackDurationSeconds: number) {
+  const input = narration.length > TTS_MAX_CHARS
+    ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
+    : narration
+
+  // NVIDIA Chatterbox: highest priority when key is available
+  if (isNvidiaTtsAvailable()) {
+    console.log('[TTS] NVIDIA Chatterbox 사용 중')
+    const wavBytes = await synthesizeWithNvidia(input, 'ko')
+    // Convert WAV → MP3 via ffmpeg so downstream pipeline stays uniform
+    const wavPath = outputPath.replace(/\.mp3$/, '.wav')
+    await fs.writeFile(wavPath, wavBytes)
+    await runFfmpeg(['-y', '-i', wavPath, '-codec:a', 'libmp3lame', '-q:a', '4', outputPath])
+    await fs.unlink(wavPath).catch(() => undefined)
+    return
+  }
+
+  // OpenAI fallback
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey || apiKey.length < 10) {
     await createSilentAudio(outputPath, fallbackDurationSeconds)
@@ -280,9 +299,6 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
     apiKey,
     ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
   })
-  const input = narration.length > TTS_MAX_CHARS
-    ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
-    : narration
   const response = await openai.audio.speech.create({
     model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
     voice: (process.env.OPENAI_TTS_VOICE || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
