@@ -73,7 +73,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       key: 'free',
       name: 'Free',
       price: isEn ? '$0' : '₩0',
-      priceNote: isEn ? 'Free for everyone' : '무료로 시작',
+      priceNote: isEn ? 'free' : '무료',
       features: isEn
         ? ['2 card news in total', 'Video card news not included', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results']
         : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
@@ -83,8 +83,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       key: 'youtube',
       name: PRICING_PLANS.YOUTUBE_PROMO.name,
-      price: isEn ? PRICING_PLANS.YOUTUBE_PROMO.price_en : PRICING_PLANS.YOUTUBE_PROMO.price,
-      priceNote: isEn ? 'per month' : '/ 월',
+      price: '₩9,900',
+      priceNote: isEn ? '/ mo' : '/ 월',
       features: isEn
         ? ['YouTube automation only', '30-day Shorts title calendar', 'Up to 3 saved work histories', '30-day work history retention', 'Card news generation not included']
         : ['유튜브 자동화 전용', '30일 쇼츠 제목 캘린더 생성', '작업 히스토리 최대 3개', '작업 히스토리 30일 보관', '카드뉴스 생성 미포함'],
@@ -95,8 +95,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       key: 'creator',
       name: 'Creator',
-      price: isEn ? PRICING_PLANS.PRO.price_en : PRICING_PLANS.PRO.price,
-      priceNote: isEn ? 'per month' : '/ 월',
+      price: '₩25,000',
+      priceNote: isEn ? '/ mo' : '/ 월',
       features: isEn
         ? ['20 card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
         : ['월 20회 카드뉴스 생성', '작업 히스토리 90일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
@@ -107,8 +107,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     {
       key: 'studio',
       name: 'Studio',
-      price: isEn ? PRICING_PLANS.UNLIMITED.price_en : PRICING_PLANS.UNLIMITED.price,
-      priceNote: isEn ? 'per month' : '/ 월',
+      price: '₩39,000',
+      priceNote: isEn ? '/ mo' : '/ 월',
       features: isEn
         ? ['30 card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results']
         : ['월 30회 카드뉴스 생성', '작업 히스토리 365일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
@@ -119,7 +119,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       key: 'enterprise',
       name: 'Enterprise',
       price: isEn ? 'Custom' : '별도 문의',
-      priceNote: isEn ? 'Annual billing' : '연간 계약',
+      priceNote: isEn ? 'annual' : '연간',
       features: isEn
         ? ['All Studio features +', 'Custom volume', 'Priority support', 'Migration & onboarding', 'Account management']
         : ['Studio 기능 전체 포함', '대량 제작 맞춤 설정', '우선 지원', '온보딩 및 마이그레이션', '전담 계정 관리'],
@@ -173,11 +173,11 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
                   {/* Price */}
                   <div className="mt-4">
-                    <div className="flex items-baseline">
-                      <span className={`text-[38px] font-black tracking-[-0.045em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                    <div className="flex min-h-[44px] items-baseline gap-2 whitespace-nowrap">
+                      <span className={`text-[clamp(28px,2.35vw,38px)] font-black tracking-[-0.035em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                         {plan.price}
                       </span>
-                      <span className={`ml-2 text-[13px] ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
+                      <span className={`shrink-0 text-[13px] font-semibold leading-none ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
                         {plan.priceNote}
                       </span>
                     </div>

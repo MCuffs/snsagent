@@ -13,8 +13,8 @@ const plans = [
     {
         name: PRICING_PLANS.FREE.name,
         tagline: '체험 시작',
-        price: PRICING_PLANS.FREE.price,
-        period: '',
+        price: '₩0',
+        period: '무료',
         desc: PRICING_PLANS.FREE.description,
         cta: '무료로 시작하기',
         features: ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
@@ -23,8 +23,8 @@ const plans = [
     {
         name: PRICING_PLANS.YOUTUBE_PROMO.name,
         tagline: '유튜브 자동화',
-        price: PRICING_PLANS.YOUTUBE_PROMO.price,
-        period: '',
+        price: '₩9,900',
+        period: '/ 월',
         desc: PRICING_PLANS.YOUTUBE_PROMO.description,
         cta: 'Google Login',
         features: [
@@ -39,8 +39,8 @@ const plans = [
     {
         name: PRICING_PLANS.PRO.name,
         tagline: '브랜드 운영',
-        price: PRICING_PLANS.PRO.price,
-        period: '',
+        price: '₩25,000',
+        period: '/ 월',
         desc: PRICING_PLANS.PRO.description,
         cta: 'Google Login',
         features: [
@@ -57,8 +57,8 @@ const plans = [
     {
         name: PRICING_PLANS.UNLIMITED.name,
         tagline: '콘텐츠 팀',
-        price: PRICING_PLANS.UNLIMITED.price,
-        period: '',
+        price: '₩39,000',
+        period: '/ 월',
         desc: PRICING_PLANS.UNLIMITED.description,
         cta: 'Google Login',
         features: [
@@ -170,12 +170,12 @@ export default async function PricingPage() {
                                     <p className={`mt-2 text-[13px] leading-[1.5] min-h-[40px] ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                                         {plan.desc}
                                     </p>
-                                    <div className="mt-7 flex items-baseline gap-1">
-                                        <span className={`text-[40px] font-black tracking-[-0.04em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                                    <div className="mt-7 flex min-h-[46px] items-baseline gap-2 whitespace-nowrap">
+                                        <span className={`text-[clamp(30px,3vw,40px)] font-black tracking-[-0.035em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                                             {plan.price}
                                         </span>
                                         {plan.period && (
-                                            <span className={`text-[14px] font-medium ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
+                                            <span className={`shrink-0 text-[14px] font-semibold leading-none ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                                                 {plan.period}
                                             </span>
                                         )}
