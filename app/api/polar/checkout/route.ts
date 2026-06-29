@@ -6,7 +6,9 @@ import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
 export const runtime = 'nodejs'
 
 const CHECKOUT_LINKS: Record<'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED', string | undefined> = {
-  YOUTUBE_PROMO: process.env.POLAR_CHECKOUT_YOUTUBE_PROMO?.trim(),
+  YOUTUBE_PROMO:
+    process.env.POLAR_CHECKOUT_YOUTUBE_PROMO?.trim() ||
+    'https://buy.polar.sh/polar_cl_62mnwxsB2lNUWKjKfL7nYKwakXkITwblgF25j3xiz0P',
   PRO: process.env.POLAR_CHECKOUT_PRO?.trim(),
   UNLIMITED: process.env.POLAR_CHECKOUT_UNLIMITED?.trim(),
 }
