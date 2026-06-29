@@ -20,6 +20,8 @@ interface RenderYouTubeShortsParams {
   scenes: YouTubeScenePlan[]
   sourceClips: StockVideoCandidate[]
   template?: YouTubeShortsTemplateRecord
+  onProgress?: (progress: number, stage: string) => Promise<void>
+  shouldCancel?: () => Promise<boolean>
 }
 
 interface StoredRenderedAsset {
@@ -48,6 +50,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
 
   try {
+    await reportProgress(params, 3, '렌더링 준비 중')
     const fontsDir = path.join(workDir, 'fonts')
     await fs.mkdir(fontsDir, { recursive: true })
     await copyFontIfAvailable(fontsDir)
@@ -60,6 +63,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const actualDurations: number[] = []
 
     for (let index = 0; index < params.scenes.length; index += 1) {
+      await ensureNotCancelled(params)
       const scene = params.scenes[index]
       const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
       await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
@@ -68,12 +72,14 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
       sceneAudioPaths.push(sceneSpeechPath)
       actualDurations.push(paddedDuration)
+      await reportProgress(params, 8 + Math.round(((index + 1) / params.scenes.length) * 22), `음성 생성 ${index + 1}/${params.scenes.length}`)
       console.log(`[YouTubeRender] Scene ${index + 1}: narration="${scene.narration.slice(0, 40)}..." tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s planned=${scene.durationSeconds}s`)
     }
 
     // ── Step 2: Download and cut each video clip to match actual TTS duration ──
     const normalizedClips: string[] = []
     for (let index = 0; index < params.scenes.length; index += 1) {
+      await ensureNotCancelled(params)
       const clip = usableClips[index % usableClips.length]
       const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
       const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
@@ -85,11 +91,13 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         template: params.template,
       })
       normalizedClips.push(normalizedPath)
+      await reportProgress(params, 30 + Math.round(((index + 1) / params.scenes.length) * 35), `영상 장면 제작 ${index + 1}/${params.scenes.length}`)
     }
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
     const speechPath = path.join(workDir, 'speech.mp3')
     await concatenateAudio(sceneAudioPaths, speechPath, workDir)
+    await reportProgress(params, 70, '음성과 장면 결합 중')
 
     // ── Step 4: Build subtitles timed to actual TTS durations ──
     const subtitlePath = path.join(workDir, 'subtitles.ass')
@@ -98,6 +106,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       buildAssSubtitlesWithDurations(params.scenes, actualDurations, params.title, params.template),
       'utf8',
     )
+    await reportProgress(params, 76, '자막과 제목 적용 중')
     const hookOverlayPath = params.template
       ? await renderHookOverlay({
         title: params.title,
@@ -138,7 +147,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       '-movflags', '+faststart',
       outputPath,
     ]
+    await ensureNotCancelled(params)
+    await reportProgress(params, 82, '최종 영상 렌더링 중')
     await runFfmpeg(renderArgs, workDir)
+    await ensureNotCancelled(params)
+    await reportProgress(params, 94, '미리보기 생성 중')
 
     const thumbnailPath = path.join(workDir, 'thumbnail.jpg')
     await runFfmpeg([
@@ -172,6 +185,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         buffer: await fs.readFile(speechPath),
       }).catch(() => null),
     ])
+    await reportProgress(params, 99, '영상 저장 중')
 
     // Build accurate subtitle timings from actual TTS durations for the API response
     let subtitleCursor = 0
@@ -402,6 +416,21 @@ function buildAssSubtitlesWithDurations(
     ...headerEvent,
     ...events,
   ].join('\n')
+}
+
+export class YouTubeRenderCancelledError extends Error {
+  constructor() {
+    super('영상 제작이 중단되었습니다.')
+    this.name = 'YouTubeRenderCancelledError'
+  }
+}
+
+async function ensureNotCancelled(params: RenderYouTubeShortsParams) {
+  if (await params.shouldCancel?.()) throw new YouTubeRenderCancelledError()
+}
+
+async function reportProgress(params: RenderYouTubeShortsParams, progress: number, stage: string) {
+  await params.onProgress?.(progress, stage)
 }
 
 function assColor(hex: string, alpha = '00') {

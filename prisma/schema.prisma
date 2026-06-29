@@ -162,6 +162,9 @@ model YouTubeAutomationDay {
   subtitleJson   String?
   mp4Url         String?
   thumbnailUrl   String?
+  renderProgress Int                      @default(0)
+  renderStage    String?
+  renderCancelRequested Boolean           @default(false)
   selectedTemplateKey  String?
   templateVersion      Int?
   templateSnapshotJson String?

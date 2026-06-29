@@ -36,6 +36,9 @@ function serializeProject(project: Record<string, unknown>) {
         ttsAudioUrl: day.ttsAudioUrl,
         subtitles: safeJsonArray(day.subtitleJson),
         mp4Url: day.mp4Url,
+        renderProgress: day.renderProgress,
+        renderStage: day.renderStage,
+        renderCancelRequested: day.renderCancelRequested,
         uploadedAt: day.uploadedAt instanceof Date ? day.uploadedAt.toISOString() : day.uploadedAt,
       })),
   }
