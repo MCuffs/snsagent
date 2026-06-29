@@ -56,44 +56,52 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     await fs.mkdir(fontsDir, { recursive: true })
     await copyFontIfAvailable(fontsDir)
 
-    // ── Step 1: Generate per-scene TTS and measure actual audio durations ──
-    // This is the key to sync: we let TTS dictate scene duration,
-    // then cut the video clip and set subtitle timing to match.
+    // ── Step 1: Generate all TTS in parallel + pre-download all clips in parallel ──
     const ttsProvider = await getTtsProvider()
-    const sceneAudioPaths: string[] = []
-    const actualDurations: number[] = []
+    await ensureNotCancelled(params)
 
-    for (let index = 0; index < params.scenes.length; index += 1) {
-      await ensureNotCancelled(params)
-      const scene = params.scenes[index]
-      const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
-      await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
-      const actualDuration = await probeAudioDuration(sceneSpeechPath)
-      // Add a small gap after each scene so speech doesn't feel rushed
-      const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
-      sceneAudioPaths.push(sceneSpeechPath)
-      actualDurations.push(paddedDuration)
-      await reportProgress(params, 8 + Math.round(((index + 1) / params.scenes.length) * 22), `음성 생성 ${index + 1}/${params.scenes.length}`)
-      console.log(`[YouTubeRender] Scene ${index + 1}: narration="${scene.narration.slice(0, 40)}..." tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s planned=${scene.durationSeconds}s`)
-    }
+    const [ttsResults, rawClipPaths] = await Promise.all([
+      // TTS: all scenes at once
+      Promise.all(
+        params.scenes.map(async (scene, index) => {
+          const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
+          await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
+          const actualDuration = await probeAudioDuration(sceneSpeechPath)
+          const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
+          console.log(`[YouTubeRender] Scene ${index + 1}: tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s`)
+          return { sceneSpeechPath, paddedDuration }
+        }),
+      ),
+      // Video download: all scenes at once (normalize happens after TTS durations are known)
+      Promise.all(
+        params.scenes.map(async (_, index) => {
+          const clip = usableClips[index % usableClips.length]
+          const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
+          await downloadVideo(clip.videoUrl!, rawPath)
+          return rawPath
+        }),
+      ),
+    ])
+    await reportProgress(params, 45, 'TTS 녹음 및 영상 소스 준비 완료')
 
-    // ── Step 2: Download and cut each video clip to match actual TTS duration ──
-    const normalizedClips: string[] = []
-    for (let index = 0; index < params.scenes.length; index += 1) {
-      await ensureNotCancelled(params)
-      const clip = usableClips[index % usableClips.length]
-      const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
-      const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
-      await downloadVideo(clip.videoUrl!, rawPath)
-      await normalizeClip({
-        inputPath: rawPath,
-        outputPath: normalizedPath,
-        durationSeconds: actualDurations[index],
-        template: params.template,
-      })
-      normalizedClips.push(normalizedPath)
-      await reportProgress(params, 30 + Math.round(((index + 1) / params.scenes.length) * 35), `영상 장면 제작 ${index + 1}/${params.scenes.length}`)
-    }
+    const sceneAudioPaths = ttsResults.map(r => r.sceneSpeechPath)
+    const actualDurations = ttsResults.map(r => r.paddedDuration)
+
+    // ── Step 2: Normalize each clip to actual TTS duration (parallel) ──
+    await ensureNotCancelled(params)
+    const normalizedClips = await Promise.all(
+      params.scenes.map(async (_, index) => {
+        const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
+        await normalizeClip({
+          inputPath: rawClipPaths[index],
+          outputPath: normalizedPath,
+          durationSeconds: actualDurations[index],
+          template: params.template,
+        })
+        return normalizedPath
+      }),
+    )
+    await reportProgress(params, 68, '씬별 영상 컷 완료')
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
     const speechPath = path.join(workDir, 'speech.mp3')
