@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -12,9 +12,18 @@ interface MobileHeaderProps {
 }
 
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
 
   const prefix = locale ? `/${locale}` : ''
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
 
   return (
     <>
@@ -52,7 +61,7 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 right-0 z-50 flex w-[min(280px,85vw)] flex-col border-l border-[#e4e4e7] bg-[#fafafa] shadow-xl lg:hidden"
+              className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-[#fafafa] shadow-xl lg:hidden"
               style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
               {/* Close Button */}
