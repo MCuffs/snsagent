@@ -144,17 +144,17 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
         <main>
           {/* HEADER */}
-          <section className="mx-auto max-w-[1300px] px-6 pb-14 pt-24 lg:px-10 lg:pt-32">
-            <h1 className="text-[52px] font-black tracking-[-0.05em] leading-none md:text-[72px]">
+          <section className="mx-auto max-w-[1300px] px-6 pb-8 pt-10 md:pb-14 md:pt-24 lg:px-10 lg:pt-32">
+            <h1 className="text-[42px] font-black tracking-[-0.045em] leading-none md:text-[72px]">
               {isEn ? 'Pricing' : '요금제'}
             </h1>
-            <p className="mt-5 text-[17px] text-[#525252] max-w-sm">
+            <p className="mt-3 max-w-sm text-[15px] leading-6 text-[#525252] md:mt-5 md:text-[17px]">
               {isEn ? 'Start free. Upgrade as you grow.' : '무료로 시작하고, 필요한 만큼 업그레이드하세요.'}
             </p>
           </section>
 
           {/* PLANS GRID */}
-          <section className="mx-auto max-w-[1300px] px-6 pb-24 lg:px-10">
+          <section className="mx-auto max-w-[1300px] px-6 pb-16 md:pb-24 lg:px-10">
             <div className="mb-3 flex items-center justify-between md:hidden">
               <p className="text-[12px] font-bold text-[#71717a]">
                 {isEn ? 'Swipe to compare plans' : '옆으로 넘겨 요금제 비교'}
@@ -168,7 +168,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               {plans.map((plan) => (
                 <div
                   key={plan.key}
-                  className={`relative flex min-h-[620px] w-[82vw] max-w-[360px] shrink-0 snap-center flex-col rounded-[20px] border border-black/[0.07] p-8 md:min-h-0 md:w-auto md:max-w-none md:shrink md:rounded-none md:border-0 ${
+                  className={`relative flex min-h-[455px] w-[76vw] max-w-[320px] shrink-0 snap-center flex-col rounded-[20px] border border-black/[0.07] p-5 md:min-h-0 md:w-auto md:max-w-none md:shrink md:rounded-none md:border-0 md:p-8 ${
                     plan.mobileOrderClass
                   } ${
                     plan.highlight
@@ -177,20 +177,20 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   }`}
                 >
                   {plan.badge && (
-                    <span className="absolute right-6 top-6 rounded-full bg-[#ff6b35] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                    <span className="absolute right-5 top-5 rounded-full bg-[#ff6b35] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white md:right-6 md:top-6">
                       {plan.badge}
                     </span>
                   )}
 
                   {/* Plan name */}
-                  <p className={`text-[22px] font-black tracking-[-0.03em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                  <p className={`pr-16 text-[20px] font-black tracking-[-0.03em] md:pr-0 md:text-[22px] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                     {plan.name}
                   </p>
 
                   {/* Price */}
                   <div className="mt-4">
-                    <div className="flex min-h-[44px] items-baseline gap-2 whitespace-nowrap">
-                      <span className={`text-[clamp(28px,2.35vw,38px)] font-black tracking-[-0.035em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                    <div className="flex min-h-[34px] items-baseline gap-2 whitespace-nowrap md:min-h-[44px]">
+                      <span className={`text-[clamp(28px,8vw,34px)] font-black tracking-[-0.035em] leading-none md:text-[clamp(28px,2.35vw,38px)] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                         {plan.price}
                       </span>
                       <span className={`shrink-0 text-[13px] font-semibold leading-none ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
@@ -205,14 +205,14 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   </div>
 
                   {/* Divider */}
-                  <div className={`my-6 h-px ${plan.highlight ? 'bg-white/10' : 'bg-black/[0.07]'}`} />
+                  <div className={`my-4 h-px md:my-6 ${plan.highlight ? 'bg-white/10' : 'bg-black/[0.07]'}`} />
 
                   {/* Features */}
-                  <ul className="flex-1 space-y-3">
+                  <ul className="flex-1 space-y-2.5 md:space-y-3">
                     {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-[13.5px]">
+                      <li key={i} className="flex items-start gap-2 text-[12.5px] leading-5 md:gap-2.5 md:text-[13.5px]">
                         <Check
-                          className={`mt-0.5 h-4 w-4 shrink-0 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 md:h-4 md:w-4 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
                           strokeWidth={2.8}
                         />
                         <span className={plan.highlight ? 'text-white/80' : 'text-[#525252]'}>{feature}</span>
@@ -223,7 +223,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   {/* CTA */}
                   <a
                     href={plan.isEnterprise ? 'mailto:admin@shuffla.io' : plan.key === 'free' ? (authenticated ? `/${locale}/concept` : '/api/auth/google/start') : accessHref}
-                    className={`mt-8 flex h-11 w-full items-center justify-center rounded-full text-[14px] font-bold transition-all ${
+                    className={`mt-5 flex h-10 w-full items-center justify-center rounded-full text-[13px] font-bold transition-all md:mt-8 md:h-11 md:text-[14px] ${
                       plan.highlight
                         ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
                         : plan.isEnterprise

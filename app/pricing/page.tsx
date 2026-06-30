@@ -134,21 +134,21 @@ export default async function PricingPage() {
 
             <main className="flex-1">
                 {/* HEADER */}
-                <section className="relative overflow-hidden pt-20 pb-16 lg:pt-28 lg:pb-20">
+                <section className="relative overflow-hidden pt-10 pb-8 md:pt-20 md:pb-16 lg:pt-28 lg:pb-20">
                     <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[900px] rounded-full bg-gradient-to-br from-[#ff6b35]/8 to-transparent blur-3xl" />
                     <div className="relative mx-auto max-w-7xl px-6 lg:px-8 text-center">
                         <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#ff6b35]">Pricing</p>
-                        <h1 className="mt-5 text-[44px] md:text-[60px] font-black tracking-[-0.045em] leading-[1.05] text-[#0a0a0a]">
+                        <h1 className="mt-3 text-[36px] font-black tracking-[-0.04em] leading-[1.05] text-[#0a0a0a] md:mt-5 md:text-[60px]">
                             필요한 만큼 선택하고<br />카드뉴스를 제작하세요
                         </h1>
-                        <p className="mt-7 text-[17px] text-[#525252] max-w-md mx-auto">
+                        <p className="mx-auto mt-4 max-w-md text-[15px] leading-6 text-[#525252] md:mt-7 md:text-[17px]">
                             무료로 최초 2회를 만들고,<br />운영이 필요해지면 Creator로 확장하세요.
                         </p>
                     </div>
                 </section>
 
                 {/* PLANS */}
-                <section className="pb-20">
+                <section className="pb-16 md:pb-20">
                     <div className="mx-auto max-w-7xl px-6 lg:px-8">
                         <div className="mb-3 flex items-center justify-between md:hidden">
                             <p className="text-[12px] font-bold text-[#71717a]">옆으로 넘겨 요금제 비교</p>
@@ -161,7 +161,7 @@ export default async function PricingPage() {
                             {plans.map((plan) => (
                                 <div
                                     key={plan.name}
-                                    className={`relative flex min-h-[620px] w-[82vw] max-w-[360px] shrink-0 snap-center flex-col rounded-[22px] p-8 transition-all md:min-h-0 md:w-auto md:max-w-none md:shrink ${
+                                    className={`relative flex min-h-[455px] w-[76vw] max-w-[320px] shrink-0 snap-center flex-col rounded-[22px] p-5 transition-all md:min-h-0 md:w-auto md:max-w-none md:shrink md:p-8 ${
                                         plan.mobileOrderClass
                                     } ${
                                         plan.highlight
@@ -177,14 +177,14 @@ export default async function PricingPage() {
                                     <p className={`text-[12px] font-bold uppercase tracking-[0.1em] ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#8a8a8a]'}`}>
                                         {plan.tagline}
                                     </p>
-                                    <h3 className={`mt-3 text-[24px] font-black tracking-[-0.025em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                                    <h3 className={`mt-3 pr-16 text-[20px] font-black tracking-[-0.025em] md:pr-0 md:text-[24px] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                                         {plan.name}
                                     </h3>
-                                    <p className={`mt-2 text-[13px] leading-[1.5] min-h-[40px] ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
+                                    <p className={`mt-2 hidden min-h-[40px] text-[13px] leading-[1.5] md:block ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                                         {plan.desc}
                                     </p>
-                                    <div className="mt-7 flex min-h-[46px] items-baseline gap-2 whitespace-nowrap">
-                                        <span className={`text-[clamp(30px,3vw,40px)] font-black tracking-[-0.035em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                                    <div className="mt-5 flex min-h-[34px] items-baseline gap-2 whitespace-nowrap md:mt-7 md:min-h-[46px]">
+                                        <span className={`text-[clamp(28px,8vw,34px)] font-black tracking-[-0.035em] leading-none md:text-[clamp(30px,3vw,40px)] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                                             {plan.price}
                                         </span>
                                         {plan.period && (
@@ -193,11 +193,11 @@ export default async function PricingPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <ul className="mt-7 flex-1 space-y-3">
+                                    <ul className="mt-5 flex-1 space-y-2.5 md:mt-7 md:space-y-3">
                                         {plan.features.map((feature, idx) => (
-                                            <li key={idx} className="flex items-start gap-2.5 text-[13.5px]">
+                                            <li key={idx} className="flex items-start gap-2 text-[12.5px] leading-5 md:gap-2.5 md:text-[13.5px]">
                                                 <Check
-                                                    className={`h-4 w-4 shrink-0 mt-0.5 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
+                                                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 md:h-4 md:w-4 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
                                                     strokeWidth={2.8}
                                                 />
                                                 <span className={plan.highlight ? 'text-white/85' : 'text-[#525252]'}>{feature}</span>
@@ -206,7 +206,7 @@ export default async function PricingPage() {
                                     </ul>
                                     <a
                                         href={accessHref}
-                                        className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
+                                        className={`mt-5 flex h-10 items-center justify-center rounded-full text-[13px] font-bold transition-all md:mt-7 md:h-11 md:text-[14px] ${
                                             plan.highlight
                                                 ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
                                                 : 'bg-[#0a0a0a] text-white hover:bg-[#1a1a1a]'
