@@ -79,6 +79,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '무료로 시작하기',
       highlight: false,
+      mobileOrderClass: 'order-3 md:order-none',
     },
     {
       key: 'youtube',
@@ -91,6 +92,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       cta: isEn ? 'Get started' : '시작하기',
       highlight: false,
       badge: isEn ? 'Promo' : '프로모션',
+      mobileOrderClass: 'order-2 md:order-none',
     },
     {
       key: 'creator',
@@ -103,6 +105,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       cta: isEn ? 'Get started' : '시작하기',
       highlight: true,
       badge: isEn ? 'Most Popular' : '가장 인기',
+      mobileOrderClass: 'order-1 md:order-none',
     },
     {
       key: 'studio',
@@ -114,6 +117,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         : ['월 30회 카드뉴스 생성', '작업 히스토리 365일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드'],
       cta: isEn ? 'Get started' : '시작하기',
       highlight: false,
+      mobileOrderClass: 'order-4 md:order-none',
     },
     {
       key: 'enterprise',
@@ -126,6 +130,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       cta: isEn ? 'Contact sales' : '도입 문의하기',
       highlight: false,
       isEnterprise: true,
+      mobileOrderClass: 'order-5 md:order-none',
     },
   ]
 
@@ -150,11 +155,13 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
           {/* PLANS GRID */}
           <section className="mx-auto max-w-[1300px] px-6 pb-24 lg:px-10">
-            <div className="grid gap-px bg-black/[0.07] border border-black/[0.07] rounded-[20px] overflow-hidden md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-px md:overflow-hidden md:rounded-[20px] md:border md:border-black/[0.07] md:bg-black/[0.07] md:p-0 lg:grid-cols-3 xl:grid-cols-5">
               {plans.map((plan) => (
                 <div
                   key={plan.key}
-                  className={`relative flex flex-col p-8 ${
+                  className={`relative flex min-h-[620px] w-[82vw] max-w-[360px] shrink-0 snap-center flex-col rounded-[20px] border border-black/[0.07] p-8 md:min-h-0 md:w-auto md:max-w-none md:shrink md:rounded-none md:border-0 ${
+                    plan.mobileOrderClass
+                  } ${
                     plan.highlight
                       ? 'bg-[#0a0a0a] text-white'
                       : 'bg-white text-[#0a0a0a]'

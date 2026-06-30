@@ -19,6 +19,7 @@ const plans = [
         cta: '무료로 시작하기',
         features: ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
+        mobileOrderClass: 'order-3 md:order-none',
     },
     {
         name: PRICING_PLANS.YOUTUBE_PROMO.name,
@@ -35,6 +36,7 @@ const plans = [
             '카드뉴스/영상 카드뉴스 생성 미포함',
         ],
         highlight: false,
+        mobileOrderClass: 'order-2 md:order-none',
     },
     {
         name: PRICING_PLANS.PRO.name,
@@ -53,6 +55,7 @@ const plans = [
             '결과 편집 및 다운로드',
         ],
         highlight: true,
+        mobileOrderClass: 'order-1 md:order-none',
     },
     {
         name: PRICING_PLANS.UNLIMITED.name,
@@ -71,6 +74,7 @@ const plans = [
             '결과 편집 및 다운로드',
         ],
         highlight: false,
+        mobileOrderClass: 'order-4 md:order-none',
     },
 ]
 
@@ -146,11 +150,13 @@ export default async function PricingPage() {
                 {/* PLANS */}
                 <section className="pb-20">
                     <div className="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4 items-start">
+                        <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:p-0 xl:grid-cols-4">
                             {plans.map((plan) => (
                                 <div
                                     key={plan.name}
-                                    className={`relative rounded-[22px] p-8 transition-all ${
+                                    className={`relative flex min-h-[620px] w-[82vw] max-w-[360px] shrink-0 snap-center flex-col rounded-[22px] p-8 transition-all md:min-h-0 md:w-auto md:max-w-none md:shrink ${
+                                        plan.mobileOrderClass
+                                    } ${
                                         plan.highlight
                                             ? 'bg-[#0a0a0a] text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.4)]'
                                             : 'bg-white border border-black/[0.06] hover:border-black/[0.12]'
@@ -180,17 +186,7 @@ export default async function PricingPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <a
-                                        href={accessHref}
-                                        className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
-                                            plan.highlight
-                                                ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
-                                                : 'bg-[#0a0a0a] text-white hover:bg-[#1a1a1a]'
-                                        }`}
-                                    >
-                                        {plan.cta}
-                                    </a>
-                                    <ul className="mt-7 space-y-3">
+                                    <ul className="mt-7 flex-1 space-y-3">
                                         {plan.features.map((feature, idx) => (
                                             <li key={idx} className="flex items-start gap-2.5 text-[13.5px]">
                                                 <Check
@@ -201,6 +197,16 @@ export default async function PricingPage() {
                                             </li>
                                         ))}
                                     </ul>
+                                    <a
+                                        href={accessHref}
+                                        className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
+                                            plan.highlight
+                                                ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
+                                                : 'bg-[#0a0a0a] text-white hover:bg-[#1a1a1a]'
+                                        }`}
+                                    >
+                                        {plan.cta}
+                                    </a>
                                 </div>
                             ))}
                         </div>
