@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 
 interface MobileHeaderProps {
   children?: React.ReactNode
@@ -12,9 +13,16 @@ interface MobileHeaderProps {
 }
 
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const pathname = usePathname()
+  const billingPath = locale ? `/${locale}/billing` : '/billing'
+  const shouldOpenByDefault = pathname !== billingPath
+  const [isOpen, setIsOpen] = useState(shouldOpenByDefault)
 
   const prefix = locale ? `/${locale}` : ''
+
+  useEffect(() => {
+    setIsOpen(shouldOpenByDefault)
+  }, [shouldOpenByDefault])
 
   useEffect(() => {
     if (!isOpen) return
