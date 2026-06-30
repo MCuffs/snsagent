@@ -81,6 +81,7 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
               <div
                 className="min-h-0 flex-1 overflow-y-auto"
                 onClick={(e) => {
+                  if (e.defaultPrevented) return
                   // Only close drawer when clicking an actual navigation link, not upgrade modals
                   if ((e.target as HTMLElement).closest('a[href]')) {
                     setIsOpen(false)
