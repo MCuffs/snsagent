@@ -1,6 +1,6 @@
 import { MarketingNav } from '../../components/MarketingNav'
 import { MarketingFooter } from '../../components/MarketingFooter'
-import { Check, Mail } from 'lucide-react'
+import { ArrowRight, Check, Mail } from 'lucide-react'
 import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
@@ -155,6 +155,15 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
           {/* PLANS GRID */}
           <section className="mx-auto max-w-[1300px] px-6 pb-24 lg:px-10">
+            <div className="mb-3 flex items-center justify-between md:hidden">
+              <p className="text-[12px] font-bold text-[#71717a]">
+                {isEn ? 'Swipe to compare plans' : '옆으로 넘겨 요금제 비교'}
+              </p>
+              <span className="inline-flex items-center gap-1 text-[12px] font-black text-[#ff6b35]">
+                {isEn ? 'More' : '더 보기'}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </div>
             <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-px md:overflow-hidden md:rounded-[20px] md:border md:border-black/[0.07] md:bg-black/[0.07] md:p-0 lg:grid-cols-3 xl:grid-cols-5">
               {plans.map((plan) => (
                 <div
@@ -225,6 +234,14 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                     {plan.cta}
                   </a>
                 </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+              {plans.map((plan) => (
+                <span
+                  key={plan.key}
+                  className={`h-1.5 rounded-full ${plan.highlight ? 'w-6 bg-[#0a0a0a]' : 'w-1.5 bg-black/20'}`}
+                />
               ))}
             </div>
           </section>

@@ -150,6 +150,13 @@ export default async function PricingPage() {
                 {/* PLANS */}
                 <section className="pb-20">
                     <div className="mx-auto max-w-7xl px-6 lg:px-8">
+                        <div className="mb-3 flex items-center justify-between md:hidden">
+                            <p className="text-[12px] font-bold text-[#71717a]">옆으로 넘겨 요금제 비교</p>
+                            <span className="inline-flex items-center gap-1 text-[12px] font-black text-[#ff6b35]">
+                                더 보기
+                                <ArrowRight className="h-3.5 w-3.5" />
+                            </span>
+                        </div>
                         <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:p-0 xl:grid-cols-4">
                             {plans.map((plan) => (
                                 <div
@@ -208,6 +215,14 @@ export default async function PricingPage() {
                                         {plan.cta}
                                     </a>
                                 </div>
+                            ))}
+                        </div>
+                        <div className="mt-4 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+                            {plans.map((plan) => (
+                                <span
+                                    key={plan.name}
+                                    className={`h-1.5 rounded-full ${plan.highlight ? 'w-6 bg-[#0a0a0a]' : 'w-1.5 bg-black/20'}`}
+                                />
                             ))}
                         </div>
 
