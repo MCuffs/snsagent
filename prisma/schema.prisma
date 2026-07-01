@@ -121,6 +121,9 @@ model Campaign {
   posts                      Post[]
   qualityScoreLogs           QualityScoreLog[]
   youtubeAutomationDays      YouTubeAutomationDay[]
+
+  @@index([userId, createdAt])
+  @@index([userId, mediaType, createdAt])
 }
 
 model YouTubeAutomationProject {

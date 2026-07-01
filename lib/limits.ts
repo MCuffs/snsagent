@@ -17,8 +17,6 @@ function isSuperUser(email?: string | null): boolean {
 export async function checkCampaignCreationLimit(userId: string): Promise<{ allowed: boolean; current: number; limit: number; period: 'day' | 'month' | 'lifetime' }> {
   const user = await dbService.getUser(userId)
   const plan = normalizePlan(user?.plan || 'FREE')
-  const campaigns = await dbService.getCampaigns(userId)
-  const imageCampaigns = campaigns.filter(c => (c as { mediaType?: string }).mediaType !== 'video')
 
   if (isSuperUser(user?.email)) {
     return {
@@ -30,7 +28,8 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
   }
 
   if (plan === 'FREE') {
-    const current = imageCampaigns.length
+    const usage = await dbService.getCampaignUsageSummary(userId, null, 0)
+    const current = usage.imageUsed
     const limit = 2
     return {
       allowed: current < limit,
@@ -41,14 +40,13 @@ export async function checkCampaignCreationLimit(userId: string): Promise<{ allo
   }
 
   const periodStart = getCampaignUsagePeriodStart(plan)
-  const currentCampaigns = imageCampaigns.filter(
-    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
-  )
+  const usage = await dbService.getCampaignUsageSummary(userId, periodStart, 0)
+  const current = usage.imageUsed
   const limit = PRICING_PLANS[plan].monthlyCardLimit
 
   return {
-    allowed: currentCampaigns.length < limit,
-    current: currentCampaigns.length,
+    allowed: current < limit,
+    current,
     limit,
     period: 'month',
   }
@@ -92,28 +90,26 @@ export async function checkVideoCardNewsLimit(userId: string): Promise<{ allowed
     return { allowed: true, current: 0, limit: 999999, period: 'month' }
   }
 
-  const allCampaigns = await dbService.getCampaigns(userId)
-  const videoCampaigns = allCampaigns.filter(c => (c as { mediaType?: string }).mediaType === 'video')
-
   if (plan === 'FREE') {
+    const usage = await dbService.getCampaignUsageSummary(userId, null, 0)
+    const current = usage.videoUsed
     const limit = PRICING_PLANS.FREE.monthlyVideoCardLimit
     return {
-      allowed: videoCampaigns.length < limit,
-      current: videoCampaigns.length,
+      allowed: current < limit,
+      current,
       limit,
       period: 'lifetime',
     }
   }
 
   const periodStart = getCampaignUsagePeriodStart(plan)
-  const recentVideo = videoCampaigns.filter(
-    c => new Date(c.createdAt).getTime() >= periodStart.getTime()
-  )
+  const usage = await dbService.getCampaignUsageSummary(userId, periodStart, 0)
+  const current = usage.videoUsed
   const limit = PRICING_PLANS[plan].monthlyVideoCardLimit
 
   return {
-    allowed: recentVideo.length < limit,
-    current: recentVideo.length,
+    allowed: current < limit,
+    current,
     limit,
     period: 'month',
   }

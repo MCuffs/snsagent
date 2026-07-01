@@ -28,35 +28,24 @@ export async function getUsageSummaryForUser(user: User): Promise<UsageSummary> 
   const plan = normalizePlan(user.plan || 'FREE')
   const planFeatures = PRICING_PLANS[plan]
   const superUser = isSuperUser(user.email)
-  const campaigns = await dbService.getCampaigns(user.id)
-
-  const periodStart = plan === 'FREE' ? new Date(0) : getCampaignUsagePeriodStart(plan)
-  const periodCampaigns = plan === 'FREE'
-    ? campaigns
-    : campaigns.filter(campaign => campaign.createdAt.getTime() >= periodStart.getTime())
-
-  const imageCampaigns = periodCampaigns.filter(
-    campaign => !(campaign as { mediaType?: string }).mediaType || (campaign as { mediaType?: string }).mediaType !== 'video',
-  )
-  const videoCampaigns = periodCampaigns.filter(
-    campaign => (campaign as { mediaType?: string }).mediaType === 'video',
-  )
+  const periodStart = plan === 'FREE' ? null : getCampaignUsagePeriodStart(plan)
+  const usage = await dbService.getCampaignUsageSummary(user.id, periodStart)
 
   return {
     plan: superUser ? 'ADMIN' : plan,
     period: plan === 'FREE' && !superUser ? 'lifetime' : 'month',
     image: {
-      used: imageCampaigns.length,
+      used: usage.imageUsed,
       limit: superUser ? 999999 : planFeatures.monthlyCardLimit,
     },
     video: {
-      used: videoCampaigns.length,
+      used: usage.videoUsed,
       limit: superUser ? 999999 : planFeatures.monthlyVideoCardLimit,
     },
-    history: campaigns.slice(0, 30).map(campaign => ({
+    history: usage.history.map(campaign => ({
       id: campaign.id,
       title: campaign.title,
-      mediaType: (campaign as { mediaType?: string }).mediaType === 'video' ? 'video' : 'image',
+      mediaType: campaign.mediaType,
       createdAt: campaign.createdAt.toISOString(),
       status: campaign.status,
     })),

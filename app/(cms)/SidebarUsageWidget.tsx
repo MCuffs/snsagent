@@ -89,18 +89,20 @@ const i18n = {
 }
 
 export function SidebarUsageWidget({ initialData = null }: { initialData?: UsageData | null }) {
-  const [data, setData] = useState<UsageData | null>(initialData)
+  const [data, setData] = useState<UsageData | null>(() => initialData)
   const [open, setOpen] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const locale = useLocale()
   const t = locale === 'en' ? i18n.en : i18n.ko
 
   useEffect(() => {
+    if (initialData) return
+
     fetch('/api/usage')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setData(d as UsageData) })
       .catch(() => {})
-  }, [])
+  }, [initialData])
 
   useEffect(() => {
     if (!open) return
