@@ -51,7 +51,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   const { locale } = await params
   const isEn = locale === 'en'
   const authenticated = Boolean(await getSessionUser())
-  const accessHref = `/${locale}/concept`
+  const accessHref = authenticated ? `/${locale}/concept` : `/${locale}/login`
   const t = await getTranslations('landing')
   const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.shuffla.io'
 
@@ -144,7 +144,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           </div>
         </FadeUp>
 
-        <ProductShowcase authenticated={authenticated} />
+        <ProductShowcase authenticated={authenticated} locale={locale} />
         <CapabilityObjects />
         <ConnectedWorkflow />
 

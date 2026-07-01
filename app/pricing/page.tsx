@@ -126,7 +126,7 @@ const compareFeatures = [
 
 export default async function PricingPage() {
     const authenticated = Boolean(await getSessionUser())
-    const accessHref = authenticated ? '/billing' : '/api/auth/google/start'
+    const accessHref = authenticated ? '/billing' : '/login'
 
     return (
         <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">

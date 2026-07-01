@@ -17,7 +17,7 @@ export async function generateMetadata() {
 
 export default async function LandingPage() {
   const authenticated = Boolean(await getSessionUser())
-  const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
+  const accessHref = authenticated ? '/concept' : '/login'
   const t = await getTranslations('hero')
   const tLanding = await getTranslations('landing')
 

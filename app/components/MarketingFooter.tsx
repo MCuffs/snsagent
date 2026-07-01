@@ -9,7 +9,7 @@ interface MarketingFooterProps {
 
 export async function MarketingFooter({ authenticated = false, locale }: MarketingFooterProps) {
   const prefix = locale ? `/${locale}` : ''
-  const accessHref = `${prefix}/concept`
+  const accessHref = authenticated ? `${prefix}/concept` : `${prefix}/login`
 
   let t: Awaited<ReturnType<typeof getTranslations>> | null = null
   try {

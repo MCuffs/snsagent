@@ -54,7 +54,7 @@ const faqs = {
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const authenticated = Boolean(await getSessionUser())
-  const accessHref = authenticated ? `/${locale}/billing` : '/api/auth/google/start'
+  const accessHref = authenticated ? `/${locale}/billing` : `/${locale}/login`
   const t = await getTranslations('pricing')
   const isEn = locale === 'en'
 
@@ -222,7 +222,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
                   {/* CTA */}
                   <a
-                    href={plan.isEnterprise ? 'mailto:admin@shuffla.io' : plan.key === 'free' ? (authenticated ? `/${locale}/concept` : '/api/auth/google/start') : accessHref}
+                    href={plan.isEnterprise ? 'mailto:admin@shuffla.io' : plan.key === 'free' ? (authenticated ? `/${locale}/concept` : `/${locale}/login`) : accessHref}
                     className={`mt-5 flex h-10 w-full items-center justify-center rounded-full text-[13px] font-bold transition-all md:mt-8 md:h-11 md:text-[14px] ${
                       plan.highlight
                         ? 'bg-white text-[#0a0a0a] hover:bg-white/90'

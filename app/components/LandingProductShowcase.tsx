@@ -42,9 +42,10 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a
 }
 
-export function ProductShowcase({ authenticated = false }: { authenticated?: boolean }) {
+export function ProductShowcase({ authenticated = false, locale }: { authenticated?: boolean; locale?: string }) {
   const t = useTranslations('landing')
-  const accessHref = authenticated ? '/concept' : '/api/auth/google/start'
+  const prefix = locale ? `/${locale}` : ''
+  const accessHref = authenticated ? `${prefix}/concept` : `${prefix}/login`
 
   return (
     <section id="product" className="border-t border-slate-100 bg-white py-24 md:py-32">
