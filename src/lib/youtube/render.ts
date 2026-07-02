@@ -162,7 +162,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       '-map', hookOverlayPath ? '[v]' : '0:v:0',
       '-map', '1:a:0',
       '-c:v', 'libx264',
-      '-preset', 'veryfast',
+      '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
       '-b:a', '128k',
@@ -293,7 +293,7 @@ async function normalizeClip(params: {
     '-vf', filter,
     '-an',
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
+    '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
     '-pix_fmt', 'yuv420p',
     params.outputPath,
   ], undefined, params.shouldCancel)
