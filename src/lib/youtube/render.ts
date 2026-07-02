@@ -10,6 +10,7 @@ const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).defaul
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 import { fitHookText, renderHookOverlay } from './hookRenderer'
+import { logYouTubeAutomation, summarizeYouTubeAutomationError } from './logging'
 
 interface RenderYouTubeShortsParams {
   userId: string
@@ -55,7 +56,14 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   const deadlineAt = Date.now() + TOTAL_RENDER_TIMEOUT_MS
 
   try {
-    await reportProgress(params, 3, '렌더링 준비 중')
+    logYouTubeAutomation('info', 'render_workdir_created', renderLogContext(params), {
+      sceneCount: params.scenes.length,
+      usableClipCount: usableClips.length,
+      downloadConcurrency: DOWNLOAD_CONCURRENCY,
+      ttsConcurrency: TTS_CONCURRENCY,
+      ffmpegConcurrency: FFMPEG_CONCURRENCY,
+    })
+    await reportProgress(params, 31, '렌더링 준비 중')
     const fontsDir = path.join(workDir, 'fonts')
     await fs.mkdir(fontsDir, { recursive: true })
     await copyFontIfAvailable(fontsDir)
@@ -67,26 +75,96 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const sceneClips = params.scenes.map(scene => (
       selectClipForScene(scene, preferFastSourceClips(clipsForScene(scene, usableClips)))
     ))
+    let completedTtsCount = 0
+    let completedDownloadCount = 0
+    const reportAssetPreparationProgress = async () => {
+      const totalUnits = Math.max(1, params.scenes.length * 2)
+      const doneUnits = completedTtsCount + completedDownloadCount
+      await reportProgress(
+        params,
+        Math.min(44, 31 + Math.round((doneUnits / totalUnits) * 13)),
+        `TTS/영상 소스 준비 중 (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length})`,
+      )
+    }
+    logYouTubeAutomation('info', 'render_asset_prepare_start', renderLogContext(params), {
+      sceneCount: params.scenes.length,
+      ttsProvider,
+    })
     const [ttsResults, rawClipPaths] = await Promise.all([
       mapWithConcurrency(params.scenes, TTS_CONCURRENCY, async (scene, index) => {
+          const sceneStartedAt = Date.now()
           await ensureCanContinue(params, deadlineAt)
           const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
-          await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
-          await ensureCanContinue(params, deadlineAt)
-          const actualDuration = await probeAudioDuration(sceneSpeechPath)
-          await ensureCanContinue(params, deadlineAt)
-          console.log(`[YouTubeRender] Scene ${index + 1}: tts=${actualDuration.toFixed(2)}s`)
-          return { sceneSpeechPath, actualDuration }
+          logYouTubeAutomation('info', 'render_tts_scene_start', renderLogContext(params), {
+            sceneNumber: scene.sceneNumber,
+            sceneIndex: index + 1,
+            narrationLength: scene.narration.length,
+          })
+          try {
+            await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
+            await ensureCanContinue(params, deadlineAt)
+            const actualDuration = await probeAudioDuration(sceneSpeechPath)
+            await ensureCanContinue(params, deadlineAt)
+            completedTtsCount += 1
+            logYouTubeAutomation('info', 'render_tts_scene_done', renderLogContext(params), {
+              sceneNumber: scene.sceneNumber,
+              sceneIndex: index + 1,
+              actualDuration,
+              durationMs: Date.now() - sceneStartedAt,
+            })
+            await reportAssetPreparationProgress()
+            return { sceneSpeechPath, actualDuration }
+          } catch (error) {
+            logYouTubeAutomation('error', 'render_tts_scene_failed', renderLogContext(params), {
+              sceneNumber: scene.sceneNumber,
+              sceneIndex: index + 1,
+              durationMs: Date.now() - sceneStartedAt,
+              ...summarizeYouTubeAutomationError(error),
+            })
+            throw error
+          }
         }),
       mapWithConcurrency(params.scenes, DOWNLOAD_CONCURRENCY, async (_, index) => {
+          const sceneStartedAt = Date.now()
           await ensureCanContinue(params, deadlineAt)
           const clip = sceneClips[index]
           const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
-          await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
-          await ensureCanContinue(params, deadlineAt)
-          return rawPath
+          logYouTubeAutomation('info', 'render_download_scene_start', renderLogContext(params), {
+            sceneNumber: params.scenes[index]?.sceneNumber,
+            sceneIndex: index + 1,
+            provider: clip.provider,
+            clipId: clip.id,
+          })
+          try {
+            await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
+            await ensureCanContinue(params, deadlineAt)
+            completedDownloadCount += 1
+            logYouTubeAutomation('info', 'render_download_scene_done', renderLogContext(params), {
+              sceneNumber: params.scenes[index]?.sceneNumber,
+              sceneIndex: index + 1,
+              provider: clip.provider,
+              clipId: clip.id,
+              durationMs: Date.now() - sceneStartedAt,
+            })
+            await reportAssetPreparationProgress()
+            return rawPath
+          } catch (error) {
+            logYouTubeAutomation('error', 'render_download_scene_failed', renderLogContext(params), {
+              sceneNumber: params.scenes[index]?.sceneNumber,
+              sceneIndex: index + 1,
+              provider: clip.provider,
+              clipId: clip.id,
+              durationMs: Date.now() - sceneStartedAt,
+              ...summarizeYouTubeAutomationError(error),
+            })
+            throw error
+          }
         }),
     ])
+    logYouTubeAutomation('info', 'render_asset_prepare_done', renderLogContext(params), {
+      ttsCount: ttsResults.length,
+      downloadCount: rawClipPaths.length,
+    })
     await reportProgress(params, 45, 'TTS 녹음 및 영상 소스 준비 완료')
 
     const sceneAudioPaths = ttsResults.map(r => r.sceneSpeechPath)
@@ -801,4 +879,12 @@ function safeFilePart(value: string) {
     .replace(/[^a-zA-Z0-9가-힣._-]+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 40) || 'shorts'
+}
+
+function renderLogContext(params: RenderYouTubeShortsParams) {
+  return {
+    userId: params.userId,
+    dayId: params.dayId,
+    title: params.title,
+  }
 }
