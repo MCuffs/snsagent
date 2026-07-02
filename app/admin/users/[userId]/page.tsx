@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import prisma from '../../../../lib/db'
+import { getSubscription, type PolarSubscription } from '../../../../lib/polar'
 import {
   addAdminNoteAction,
   addCreditsAction,
@@ -48,6 +49,9 @@ export default async function AdminUserDetailPage({
 
   const creditBalance = creditBalanceResult._sum.amount || 0
   const accountStatus = user.accountStatus || 'active'
+  const polarSubscription = user.polarSubscriptionId
+    ? await loadPolarSubscription(user.polarSubscriptionId)
+    : null
 
   return (
     <>
@@ -93,11 +97,15 @@ export default async function AdminUserDetailPage({
           </Section>
 
           <Section title="내부 결제 기록">
-            {user.paymentRecords.length === 0 ? <EmptyState>결제 내역이 없습니다.</EmptyState> : (
+            {user.paymentRecords.length === 0 ? (
+              <EmptyState>
+                결제 내역이 없습니다. Polar에서 결제했는데 비어 있으면 webhook이 저장되지 않았거나 가입 이메일과 결제 이메일이 달라 유저 매칭에 실패한 상태입니다.
+              </EmptyState>
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[620px] text-left">
+                <table className="w-full min-w-[1120px] text-left">
                   <thead className="border-b border-[#f0f0f0]">
-                    <tr><Th>주문 ID</Th><Th>공급자</Th><Th>금액</Th><Th>환불액</Th><Th>상태</Th><Th>결제일</Th><Th>환불일</Th></tr>
+                    <tr><Th>주문 ID</Th><Th>공급자</Th><Th>금액</Th><Th>환불액</Th><Th>PG 거래 ID</Th><Th>Polar 구독 ID</Th><Th>Polar 상품 ID</Th><Th>Polar 고객 이메일</Th><Th>상태</Th><Th>결제일</Th><Th>환불일</Th></tr>
                   </thead>
                   <tbody className="divide-y divide-[#f5f5f5]">
                     {user.paymentRecords.map(p => (
@@ -106,6 +114,10 @@ export default async function AdminUserDetailPage({
                         <Td>{p.provider}</Td>
                         <Td className="font-semibold">{formatCurrency(p.amount, p.currency)}</Td>
                         <Td className="font-semibold text-red-600">{p.refundedAmount > 0 ? formatCurrency(p.refundedAmount, p.currency) : '-'}</Td>
+                        <Td className="font-mono text-xs text-[#888]">{p.pgTransactionId || '-'}</Td>
+                        <Td className="font-mono text-xs text-[#888]">{p.providerSubscriptionId || '-'}</Td>
+                        <Td className="font-mono text-xs text-[#888]">{p.providerProductId || '-'}</Td>
+                        <Td className="text-[#888]">{p.customerEmail || '-'}</Td>
                         <Td><span className={statusPill(p.status)}>{p.status}</span></Td>
                         <Td className="text-[#888]">{formatDate(p.paidAt)}</Td>
                         <Td className="text-[#888]">{formatDate(p.refundedAt)}</Td>
@@ -160,6 +172,24 @@ export default async function AdminUserDetailPage({
                 userId={user.id}
                 subscriptionId={user.polarSubscriptionId}
               />
+            </Section>
+          )}
+
+          {user.polarSubscriptionId && (
+            <Section title="Polar 원본 구독 정보">
+              {polarSubscription ? (
+                <dl className="space-y-2 text-xs">
+                  <Info label="Status" value={polarSubscription.status} />
+                  <Info label="Product ID" value={polarSubscription.product_id} />
+                  <Info label="Customer ID" value={polarSubscription.customer_id} />
+                  <Info label="Customer Email" value={polarSubscription.customer?.email || '-'} />
+                  <Info label="Cancel At Period End" value={polarSubscription.cancel_at_period_end ? 'true' : 'false'} />
+                  <Info label="Period Start" value={formatDate(polarSubscription.current_period_start)} />
+                  <Info label="Period End" value={formatDate(polarSubscription.current_period_end)} />
+                </dl>
+              ) : (
+                <EmptyState>Polar API 원본 구독 정보를 불러오지 못했습니다.</EmptyState>
+              )}
             </Section>
           )}
 
@@ -234,4 +264,13 @@ function Info({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-semibold">{value}</dd>
     </div>
   )
+}
+
+async function loadPolarSubscription(subscriptionId: string): Promise<PolarSubscription | null> {
+  try {
+    return await getSubscription(subscriptionId)
+  } catch (error) {
+    console.warn('[Admin] Failed to load Polar subscription', error)
+    return null
+  }
 }
