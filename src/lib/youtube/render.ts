@@ -41,7 +41,7 @@ const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
 const TOTAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TOTAL_TIMEOUT_MS || 8 * 60_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
-const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 2, 1, 3)
+const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 1, 1, 3)
 const TTS_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_TTS_CONCURRENCY, 2, 1, 3)
 const FFMPEG_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_FFMPEG_CONCURRENCY, 2, 1, 2)
 const TTS_MAX_CHARS = 3900
@@ -151,6 +151,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
                 provider: clip.provider,
                 clipId: clip.id,
               })
+              await reportProgress(
+                params,
+                Math.min(44, 31 + Math.round(((completedTtsCount + completedDownloadCount) / Math.max(1, params.scenes.length * 2)) * 13)),
+                `TTS/source prep (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length}) - downloading scene ${index + 1}/${params.scenes.length}, attempt ${attempt + 1}/${attempts}`,
+              )
               try {
                 await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel, boundedTimeout(deadlineAt, DOWNLOAD_TIMEOUT_MS))
                 await ensureCanContinue(params, deadlineAt)
@@ -179,11 +184,29 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
                   durationMs: Date.now() - attemptStartedAt,
                   ...summarizeYouTubeAutomationError(error),
                 })
+                await reportProgress(
+                  params,
+                  Math.min(44, 31 + Math.round(((completedTtsCount + completedDownloadCount) / Math.max(1, params.scenes.length * 2)) * 13)),
+                  `TTS/source prep (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length}) - retrying scene ${index + 1}/${params.scenes.length} after attempt ${attempt + 1}/${attempts}`,
+                )
               }
             }
-            throw lastError instanceof Error
-              ? lastError
-              : new Error(`씬 ${index + 1} 영상 소스 다운로드에 실패했습니다.`)
+            const fallbackPath = path.join(workDir, `source-${index + 1}-generated.mp4`)
+            logYouTubeAutomation('warn', 'render_download_scene_using_generated_fallback', renderLogContext(params), {
+              sceneNumber: scene.sceneNumber,
+              sceneIndex: index + 1,
+              attempts,
+              ...summarizeYouTubeAutomationError(lastError),
+            })
+            await createGeneratedSourceClip(
+              fallbackPath,
+              Math.max(2, scene.durationSeconds),
+              params.shouldCancel,
+              boundedTimeout(deadlineAt, NORMALIZE_TIMEOUT_MS),
+            )
+            completedDownloadCount += 1
+            await reportAssetPreparationProgress()
+            return fallbackPath
           } catch (error) {
             logYouTubeAutomation('error', 'render_download_scene_failed', renderLogContext(params), {
               sceneNumber: scene.sceneNumber,
@@ -217,6 +240,9 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         await ensureCanContinue(params, deadlineAt)
         const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
         await normalizeClipWithFallback({
+          userId: params.userId,
+          dayId: params.dayId,
+          title: params.title,
           scene,
           sceneIndex: index,
           initialInputPath: rawClipPaths[index],
@@ -391,9 +417,10 @@ async function downloadVideo(
           await reader.cancel()
           throw new YouTubeRenderCancelledError()
         }
-        const { done, value } = await readStreamChunk(reader, DOWNLOAD_IDLE_TIMEOUT_MS).catch(error => {
+        const { done, value } = await readStreamChunk(reader, DOWNLOAD_IDLE_TIMEOUT_MS).catch(async error => {
           idleTimedOut = true
           controller.abort()
+          await reader.cancel().catch(() => undefined)
           throw error
         })
         if (done) break
@@ -413,6 +440,7 @@ async function downloadVideo(
     }
   } catch (error) {
     if (error instanceof YouTubeRenderCancelledError) throw error
+    await fs.rm(outputPath, { force: true }).catch(() => undefined)
     if (controller.signal.aborted) {
       if (idleTimedOut) throw new Error(`무료 영상 다운로드 응답이 ${DOWNLOAD_IDLE_TIMEOUT_MS / 1000}초 동안 멈췄습니다.`)
       if (timedOut) throw new Error(`무료 영상 다운로드가 ${timeoutMs / 1000}초를 초과했습니다.`)
@@ -461,6 +489,24 @@ async function normalizeClip(params: {
   ], undefined, params.shouldCancel, params.timeoutMs ?? NORMALIZE_TIMEOUT_MS)
 }
 
+async function createGeneratedSourceClip(
+  outputPath: string,
+  durationSeconds: number,
+  shouldCancel?: () => Promise<boolean>,
+  timeoutMs = NORMALIZE_TIMEOUT_MS,
+) {
+  await runFfmpeg([
+    '-y',
+    '-f', 'lavfi',
+    '-i', 'color=c=0x101828:s=1080x1920:r=30',
+    '-t', String(Math.max(1, durationSeconds)),
+    '-c:v', 'libx264',
+    '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
+    '-pix_fmt', 'yuv420p',
+    outputPath,
+  ], undefined, shouldCancel, timeoutMs)
+}
+
 function preferFastSourceClips(clips: StockVideoCandidate[]) {
   const fastClips = clips.filter(clip => {
     const url = clip.videoUrl || ''
@@ -474,6 +520,9 @@ function isKnownSlowSourceVideo(url: string) {
 }
 
 async function normalizeClipWithFallback(params: {
+  userId: string
+  dayId: string
+  title: string
   scene: YouTubeScenePlan
   sceneIndex: number
   initialInputPath: string
@@ -495,11 +544,11 @@ async function normalizeClipWithFallback(params: {
       if (cancel) throw new YouTubeRenderCancelledError()
     })
 
-    const inputPath = attempt === 0
-      ? params.initialInputPath
-      : await downloadFallbackClip(params, sceneClips[attempt], attempt)
-
     try {
+      const inputPath = attempt === 0
+        ? params.initialInputPath
+        : await downloadFallbackClip(params, sceneClips[attempt], attempt)
+
       await normalizeClip({
         inputPath,
         outputPath: params.outputPath,
@@ -516,19 +565,32 @@ async function normalizeClipWithFallback(params: {
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`씬 ${params.sceneIndex + 1} 영상 렌더링에 실패했습니다.`)
+  logYouTubeAutomation('warn', 'render_normalize_scene_using_generated_fallback', {
+    userId: params.userId,
+    dayId: params.dayId,
+    title: params.title,
+  }, {
+    sceneIndex: params.sceneIndex + 1,
+    attempts,
+    ...summarizeYouTubeAutomationError(lastError),
+  })
+  await createGeneratedSourceClip(
+    params.outputPath,
+    Math.max(1, params.durationSeconds),
+    params.shouldCancel,
+    boundedTimeout(params.deadlineAt, NORMALIZE_TIMEOUT_MS),
+  )
 }
 
 async function downloadFallbackClip(params: {
   sceneIndex: number
   workDir: string
   shouldCancel?: () => Promise<boolean>
+  deadlineAt: number
 }, clip: StockVideoCandidate, attempt: number) {
   if (!clip?.videoUrl) throw new Error('대체 영상 클립을 찾을 수 없습니다.')
   const rawPath = path.join(params.workDir, `source-${params.sceneIndex + 1}-fallback-${attempt}.mp4`)
-  await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel)
+  await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel, boundedTimeout(params.deadlineAt, DOWNLOAD_TIMEOUT_MS))
   return rawPath
 }
 
