@@ -650,6 +650,29 @@ function DayProductionModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (day.id !== resultDay.id) return
+    setResultDay(current => ({ ...current, ...day }))
+    if (day.status === 'completed' || day.mp4Url) {
+      setPhase('done')
+      setStepLabel('완료!')
+      setPct(100)
+      return
+    }
+    if (day.status === 'failed') {
+      setPhase('error')
+      setErrorMsg('영상 제작에 실패했습니다. 다시 시도해 주세요.')
+      return
+    }
+    if (day.status === 'rendering') {
+      setPhase('rendering')
+      if (day.renderStage) setStepLabel(day.renderStage)
+      if (typeof day.renderProgress === 'number') {
+        setPct(prev => Math.max(prev, Math.min(99, day.renderProgress!)))
+      }
+    }
+  }, [day, resultDay.id])
+
   const runPipeline = async () => {
     try {
       if (!day.script) {
