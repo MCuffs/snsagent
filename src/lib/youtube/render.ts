@@ -34,8 +34,11 @@ interface StoredRenderedAsset {
   subtitles: Array<{ start: number; end: number; text: string }>
 }
 
-const MAX_SOURCE_VIDEO_BYTES = 180 * 1024 * 1024
+const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 90_000
+const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 90_000)
+const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
+const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
 const TTS_MAX_CHARS = 3900
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(MODULE_DIR, '../../..')
@@ -105,12 +108,16 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         `씬별 영상 렌더링 중 (${index + 1}/${params.scenes.length})`,
       )
       const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
-      await normalizeClip({
-        inputPath: rawClipPaths[index],
+      await normalizeClipWithFallback({
+        sceneIndex: index,
+        initialInputPath: rawClipPaths[index],
         outputPath: normalizedPath,
         durationSeconds: actualDurations[index],
         template: params.template,
         shouldCancel: params.shouldCancel,
+        usableClips,
+        workDir,
+        onProgress: stage => reportProgress(params, Math.min(67, 45 + Math.round(((index + 1) / params.scenes.length) * 22)), stage),
       })
       normalizedClips.push(normalizedPath)
     }
@@ -171,7 +178,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     ]
     await ensureNotCancelled(params)
     await reportProgress(params, 82, '최종 영상 렌더링 중')
-    await runFfmpeg(renderArgs, workDir, params.shouldCancel)
+    await runFfmpeg(renderArgs, workDir, params.shouldCancel, FINAL_RENDER_TIMEOUT_MS)
     await ensureNotCancelled(params)
     await reportProgress(params, 94, '미리보기 생성 중')
 
@@ -296,7 +303,69 @@ async function normalizeClip(params: {
     '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
     '-pix_fmt', 'yuv420p',
     params.outputPath,
-  ], undefined, params.shouldCancel)
+  ], undefined, params.shouldCancel, NORMALIZE_TIMEOUT_MS)
+}
+
+async function normalizeClipWithFallback(params: {
+  sceneIndex: number
+  initialInputPath: string
+  outputPath: string
+  durationSeconds: number
+  template?: YouTubeShortsTemplateRecord
+  shouldCancel?: () => Promise<boolean>
+  usableClips: StockVideoCandidate[]
+  workDir: string
+  onProgress?: (stage: string) => Promise<void>
+}) {
+  const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, params.usableClips.length))
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    await params.onProgress?.(
+      attempt === 0
+        ? `씬별 영상 렌더링 중 (${params.sceneIndex + 1})`
+        : `씬별 영상 대체 클립 렌더링 중 (${params.sceneIndex + 1}, ${attempt + 1}/${attempts})`,
+    )
+    await params.shouldCancel?.().then(cancel => {
+      if (cancel) throw new YouTubeRenderCancelledError()
+    })
+
+    const inputPath = attempt === 0
+      ? params.initialInputPath
+      : await downloadFallbackClip(params, attempt)
+
+    try {
+      await normalizeClip({
+        inputPath,
+        outputPath: params.outputPath,
+        durationSeconds: params.durationSeconds,
+        template: params.template,
+        shouldCancel: params.shouldCancel,
+      })
+      return
+    } catch (error) {
+      if (error instanceof YouTubeRenderCancelledError) throw error
+      lastError = error
+      console.warn(`[YouTubeRender] Scene ${params.sceneIndex + 1} normalize attempt ${attempt + 1} failed`, error)
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`씬 ${params.sceneIndex + 1} 영상 렌더링에 실패했습니다.`)
+}
+
+async function downloadFallbackClip(params: {
+  sceneIndex: number
+  usableClips: StockVideoCandidate[]
+  workDir: string
+  shouldCancel?: () => Promise<boolean>
+}, attempt: number) {
+  const clip = params.usableClips[(params.sceneIndex + attempt) % params.usableClips.length]
+  if (!clip?.videoUrl) throw new Error('대체 영상 클립을 찾을 수 없습니다.')
+  const rawPath = path.join(params.workDir, `source-${params.sceneIndex + 1}-fallback-${attempt}.mp4`)
+  await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel)
+  return rawPath
 }
 
 async function getTtsProvider(): Promise<string> {
@@ -523,13 +592,21 @@ async function copyFontIfAvailable(fontsDir: string) {
   }
 }
 
-async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Promise<boolean>) {
+async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Promise<boolean>, timeoutMs?: number) {
   const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
   await new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { cwd, windowsHide: true })
     let stderr = ''
     let cancelled = false
+    let timedOut = false
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined
+    const timeoutTimer = timeoutMs
+      ? setTimeout(() => {
+        timedOut = true
+        child.kill('SIGTERM')
+        forceKillTimer = setTimeout(() => child.kill('SIGKILL'), 2000)
+      }, timeoutMs)
+      : undefined
     const cancelPoll = shouldCancel
       ? setInterval(() => {
         void shouldCancel().then(cancel => {
@@ -545,14 +622,20 @@ async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Prom
     })
     child.on('error', error => {
       if (cancelPoll) clearInterval(cancelPoll)
+      if (timeoutTimer) clearTimeout(timeoutTimer)
       if (forceKillTimer) clearTimeout(forceKillTimer)
       reject(error)
     })
     child.on('close', code => {
       if (cancelPoll) clearInterval(cancelPoll)
+      if (timeoutTimer) clearTimeout(timeoutTimer)
       if (forceKillTimer) clearTimeout(forceKillTimer)
       if (cancelled) {
         reject(new YouTubeRenderCancelledError())
+        return
+      }
+      if (timedOut) {
+        reject(new Error(`ffmpeg timed out after ${Math.round((timeoutMs || 0) / 1000)}s`))
         return
       }
       if (code === 0) {
