@@ -5,6 +5,7 @@ import {
   type YouTubeShortsTemplateRecord,
 } from '../../../lib/youtube-shorts-templates/types'
 import type { YouTubePlanStrategy } from '../../../lib/youtube-plan-strategies'
+import { logYouTubeAutomation } from './logging'
 
 export interface PlannerDay {
   dayNumber: number
@@ -150,8 +151,31 @@ export async function generateDayProductionPlan(params: {
     },
   )
 
+  logYouTubeAutomation('info', 'day_plan_llm_done', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    scriptLength: String(result.script || '').length,
+    rawSceneCount: Array.isArray(result.scenes) ? result.scenes.length : 0,
+  })
   const scenes = normalizeScenes(result.scenes, result.script, params.template, params.planStrategy)
+  logYouTubeAutomation('info', 'stock_video_collection_start', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    sceneCount: scenes.length,
+    keywords: scenes.map(scene => scene.searchKeyword),
+  })
   const sourceClips = await collectStockVideoCandidates(scenes)
+  logYouTubeAutomation('info', 'stock_video_collection_done', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    sceneCount: scenes.length,
+    sourceClipCount: sourceClips.length,
+    usableSourceClipCount: sourceClips.filter(clip => clip.videoUrl).length,
+    providerCounts: countBy(sourceClips.map(clip => clip.provider)),
+  })
   const productionPlan: DayProductionPlan = {
     script: String(result.script || fallback().script).trim(),
     description: String(result.description || fallback().description).trim(),
@@ -203,6 +227,11 @@ export async function classifyShortsContent(params: {
 async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
   const results: StockVideoCandidate[] = []
   for (const scene of scenes.slice(0, 6)) {
+    const startedAt = Date.now()
+    logYouTubeAutomation('info', 'stock_video_scene_search_start', {}, {
+      sceneNumber: scene.sceneNumber,
+      keyword: scene.searchKeyword,
+    })
     const candidates = await searchPexelsVideos(scene.searchKeyword, 2)
     if (candidates.length > 0) {
       results.push(...candidates.map(candidate => ({
@@ -210,6 +239,13 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
         sceneNumber: scene.sceneNumber,
         keyword: scene.searchKeyword,
       })))
+      logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+        provider: 'pexels',
+        candidateCount: candidates.length,
+        durationMs: Date.now() - startedAt,
+      })
       continue
     }
 
@@ -220,6 +256,13 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
         sceneNumber: scene.sceneNumber,
         keyword: scene.searchKeyword,
       })))
+      logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+        provider: 'pixabay',
+        candidateCount: pixabay.length,
+        durationMs: Date.now() - startedAt,
+      })
       continue
     }
 
@@ -232,6 +275,11 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
       previewUrl: null,
       sourceUrl: null,
       keyword: scene.searchKeyword,
+    })
+    logYouTubeAutomation('warn', 'stock_video_scene_search_empty', {}, {
+      sceneNumber: scene.sceneNumber,
+      keyword: scene.searchKeyword,
+      durationMs: Date.now() - startedAt,
     })
   }
   return results
@@ -542,4 +590,11 @@ function isUsableRenderVideoFile(file: { width?: number; height?: number }) {
   if (height > 1920) return false
   if (width > 1080) return false
   return true
+}
+
+function countBy(values: string[]) {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] || 0) + 1
+    return acc
+  }, {})
 }
