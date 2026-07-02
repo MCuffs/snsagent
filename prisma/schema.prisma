@@ -357,6 +357,10 @@ model PaymentRecord {
   currency        String    @default("krw")
   refundedAmount  Int       @default(0)
   pgTransactionId String?
+  providerSubscriptionId String?
+  providerProductId      String?
+  customerEmail          String?
+  providerMetadata       String?
   status          String    @default("paid") // paid, cancelled, partial_refund, failed
   paidAt          DateTime?
   refundedAt      DateTime?
@@ -369,6 +373,8 @@ model PaymentRecord {
   @@index([userId, createdAt])
   @@index([status])
   @@index([paidAt])
+  @@index([provider])
+  @@index([providerSubscriptionId])
 }
 
 model AdminActionLog {

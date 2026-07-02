@@ -165,6 +165,8 @@ async function syncPolarOrder(
   const occurredAt = polarOrderTimestamp(order, eventTimestamp)
   const status = paymentStatusFromPolarOrder(order)
   const currency = (order.currency || 'krw').toLowerCase()
+  const productId = order.product_id || order.product?.id || null
+  const providerMetadata = order.metadata ? JSON.stringify(order.metadata) : null
 
   await prisma.paymentRecord.upsert({
     where: { orderId: order.id },
@@ -176,6 +178,10 @@ async function syncPolarOrder(
       currency,
       refundedAmount,
       pgTransactionId: order.checkout_id || order.id,
+      providerSubscriptionId: order.subscription_id || null,
+      providerProductId: productId,
+      customerEmail,
+      providerMetadata,
       status,
       paidAt: type === 'order.paid'
         ? occurredAt
@@ -189,6 +195,10 @@ async function syncPolarOrder(
       currency,
       refundedAmount,
       pgTransactionId: order.checkout_id || order.id,
+      providerSubscriptionId: order.subscription_id || null,
+      providerProductId: productId,
+      customerEmail,
+      providerMetadata,
       status,
       ...(type === 'order.paid' ? { paidAt: occurredAt } : {}),
       refundedAt: refundedAmount > 0 ? occurredAt : null,
