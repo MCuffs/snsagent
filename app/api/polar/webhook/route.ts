@@ -11,6 +11,19 @@ import {
 
 export const runtime = 'nodejs'
 
+type PaidPlan = 'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED'
+const PAID_PLANS: PaidPlan[] = ['YOUTUBE_PROMO', 'PRO', 'UNLIMITED']
+
+function planFromMetadata(metadata?: Record<string, unknown> | null): PaidPlan | null {
+  const plan = typeof metadata?.plan === 'string' ? metadata.plan : null
+  return PAID_PLANS.includes(plan as PaidPlan) ? plan as PaidPlan : null
+}
+
+function planFromOrder(order: PolarOrderWebhookData): PaidPlan | null {
+  const productId = order.product_id || order.product?.id || null
+  return (productId ? planFromPolarProductId(productId) : null) || planFromMetadata(order.metadata)
+}
+
 export async function POST(request: NextRequest) {
   let rawBody: string
   try {
@@ -50,12 +63,12 @@ export async function POST(request: NextRequest) {
       const customerEmail = (data.customer as { email?: string } | undefined)?.email
       const userId = (data.metadata as Record<string, string> | undefined)?.userId
 
-      if (!subscriptionId || !productId || !customerEmail) {
+      if (!subscriptionId || !customerEmail) {
         console.warn('[Polar Webhook] Missing required fields', { subscriptionId, productId, customerEmail })
         return NextResponse.json({ received: true })
       }
 
-      const plan = planFromPolarProductId(productId)
+      const plan = (productId ? planFromPolarProductId(productId) : null) || planFromMetadata(data.metadata as Record<string, unknown> | undefined)
       if (!plan) {
         console.warn('[Polar Webhook] Unknown product id', productId)
         return NextResponse.json({ received: true })
@@ -181,6 +194,23 @@ async function syncPolarOrder(
       refundedAt: refundedAmount > 0 ? occurredAt : null,
     },
   })
+
+  if (type === 'order.paid') {
+    const plan = planFromOrder(order)
+    if (plan) {
+      await dbService.updateUserPolar(user.id, {
+        polarSubscriptionId: order.subscription_id || undefined,
+        polarSubscriptionStatus: order.subscription_id ? 'active' : undefined,
+        plan,
+      })
+      console.log(`[Polar Webhook] Activated ${plan} from paid order ${order.id} for user ${user.id}`)
+    } else {
+      console.warn('[Polar Webhook] Paid order synced without plan mapping', {
+        orderId: order.id,
+        productId: order.product_id || order.product?.id,
+      })
+    }
+  }
 
   console.log(`[Polar Webhook] Synced ${type} for order ${order.id}`)
 }

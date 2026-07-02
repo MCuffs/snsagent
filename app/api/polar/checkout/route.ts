@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
+import { createCheckoutSession, POLAR_PRODUCT_IDS } from '../../../../lib/polar'
 
 export const runtime = 'nodejs'
 
@@ -41,6 +42,22 @@ export async function POST(request: NextRequest) {
   }
 
   const { plan } = parsed.data
+  const productId = POLAR_PRODUCT_IDS[plan]
+  if (productId && process.env.POLAR_API_KEY?.trim()) {
+    const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
+    const checkout = await createCheckoutSession({
+      productId,
+      customerEmail: user.email,
+      successUrl: `${origin.replace(/\/$/, '')}/youtube-automation?checkout=success`,
+      metadata: {
+        userId: user.id,
+        plan,
+      },
+    })
+
+    return NextResponse.json({ url: checkout.url })
+  }
+
   const checkoutUrl = CHECKOUT_LINKS[plan]
   if (!checkoutUrl) {
     return NextResponse.json({ error: `Polar checkout link for ${plan} is not configured.` }, { status: 503 })
