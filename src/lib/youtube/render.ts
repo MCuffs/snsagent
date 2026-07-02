@@ -105,6 +105,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         outputPath: normalizedPath,
         durationSeconds: actualDurations[index],
         template: params.template,
+        shouldCancel: params.shouldCancel,
       })
       normalizedClips.push(normalizedPath)
     }
@@ -112,7 +113,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
     const speechPath = path.join(workDir, 'speech.mp3')
-    await concatenateAudio(sceneAudioPaths, speechPath, workDir)
+    await concatenateAudio(sceneAudioPaths, speechPath, workDir, params.shouldCancel)
     await reportProgress(params, 70, '음성과 장면 결합 중')
 
     // ── Step 4: Build subtitles timed to actual TTS durations ──
@@ -165,7 +166,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     ]
     await ensureNotCancelled(params)
     await reportProgress(params, 82, '최종 영상 렌더링 중')
-    await runFfmpeg(renderArgs, workDir)
+    await runFfmpeg(renderArgs, workDir, params.shouldCancel)
     await ensureNotCancelled(params)
     await reportProgress(params, 94, '미리보기 생성 중')
 
@@ -177,7 +178,10 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       '-frames:v', '1',
       '-q:v', '3',
       thumbnailPath,
-    ], workDir).catch(() => undefined)
+    ], workDir, params.shouldCancel).catch(error => {
+      if (error instanceof YouTubeRenderCancelledError) throw error
+      return undefined
+    })
 
     const [mp4Url, thumbnailUrl, ttsAudioUrl] = await Promise.all([
       storeAsset({
@@ -243,6 +247,7 @@ async function normalizeClip(params: {
   outputPath: string
   durationSeconds: number
   template?: YouTubeShortsTemplateRecord
+  shouldCancel?: () => Promise<boolean>
 }) {
   const layout = params.template?.config.layout
   const headerHeight = layout?.headerEnabled ? layout.headerHeight : 0
@@ -269,7 +274,7 @@ async function normalizeClip(params: {
     '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p',
     params.outputPath,
-  ])
+  ], undefined, params.shouldCancel)
 }
 
 async function getTtsProvider(): Promise<string> {
@@ -332,7 +337,12 @@ async function probeAudioDuration(filePath: string): Promise<number> {
 }
 
 // Concatenate multiple MP3 files into one using ffmpeg concat demuxer.
-async function concatenateAudio(inputPaths: string[], outputPath: string, workDir: string) {
+async function concatenateAudio(
+  inputPaths: string[],
+  outputPath: string,
+  workDir: string,
+  shouldCancel?: () => Promise<boolean>,
+) {
   if (inputPaths.length === 1) {
     await fs.copyFile(inputPaths[0], outputPath)
     return
@@ -350,7 +360,7 @@ async function concatenateAudio(inputPaths: string[], outputPath: string, workDi
     '-i', listPath,
     '-c', 'copy',
     outputPath,
-  ], workDir)
+  ], workDir, shouldCancel)
 }
 
 async function createSilentAudio(outputPath: string, durationSeconds: number) {
@@ -491,16 +501,38 @@ async function copyFontIfAvailable(fontsDir: string) {
   }
 }
 
-async function runFfmpeg(args: string[], cwd?: string) {
+async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Promise<boolean>) {
   const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
   await new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { cwd, windowsHide: true })
     let stderr = ''
+    let cancelled = false
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined
+    const cancelPoll = shouldCancel
+      ? setInterval(() => {
+        void shouldCancel().then(cancel => {
+          if (!cancel || cancelled) return
+          cancelled = true
+          child.kill('SIGTERM')
+          forceKillTimer = setTimeout(() => child.kill('SIGKILL'), 2000)
+        }).catch(() => undefined)
+      }, 1000)
+      : undefined
     child.stderr.on('data', chunk => {
       stderr += String(chunk)
     })
-    child.on('error', reject)
+    child.on('error', error => {
+      if (cancelPoll) clearInterval(cancelPoll)
+      if (forceKillTimer) clearTimeout(forceKillTimer)
+      reject(error)
+    })
     child.on('close', code => {
+      if (cancelPoll) clearInterval(cancelPoll)
+      if (forceKillTimer) clearTimeout(forceKillTimer)
+      if (cancelled) {
+        reject(new YouTubeRenderCancelledError())
+        return
+      }
       if (code === 0) {
         resolve()
         return
