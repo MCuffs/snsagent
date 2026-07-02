@@ -3,12 +3,10 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import OpenAI from 'openai'
 // @ffmpeg-installer/ffmpeg has no bundled type declarations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
-import { synthesizeWithNvidia, isNvidiaTtsAvailable } from './tts-nvidia'
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 import { fitHookText, renderHookOverlay } from './hookRenderer'
@@ -38,10 +36,13 @@ const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 90_000
 const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 90_000)
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
+const TOTAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TOTAL_TIMEOUT_MS || 8 * 60_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
+const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 3, 1, 4)
+const TTS_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_TTS_CONCURRENCY, 3, 1, 4)
+const FFMPEG_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_FFMPEG_CONCURRENCY, 2, 1, 2)
 const TTS_MAX_CHARS = 3900
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = path.resolve(MODULE_DIR, '../../..')
+const PUBLIC_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), 'public')
 
 export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsParams): Promise<StoredRenderedAsset> {
   const usableClips = params.sourceClips.filter(clip => clip.videoUrl)
@@ -52,6 +53,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
   await fs.mkdir(workRoot, { recursive: true })
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
+  const deadlineAt = Date.now() + TOTAL_RENDER_TIMEOUT_MS
 
   try {
     await reportProgress(params, 3, '렌더링 준비 중')
@@ -63,64 +65,65 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const ttsProvider = await getTtsProvider()
     await ensureNotCancelled(params)
 
+    const sceneClips = params.scenes.map(scene => selectClipForScene(scene, usableClips))
     const [ttsResults, rawClipPaths] = await Promise.all([
-      // TTS: all scenes at once
-      Promise.all(
-        params.scenes.map(async (scene, index) => {
-          await ensureNotCancelled(params)
+      mapWithConcurrency(params.scenes, TTS_CONCURRENCY, async (scene, index) => {
+          await ensureCanContinue(params, deadlineAt)
           const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
           await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
-          await ensureNotCancelled(params)
+          await ensureCanContinue(params, deadlineAt)
           const actualDuration = await probeAudioDuration(sceneSpeechPath)
-          await ensureNotCancelled(params)
-          const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
-          console.log(`[YouTubeRender] Scene ${index + 1}: tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s`)
-          return { sceneSpeechPath, paddedDuration }
+          await ensureCanContinue(params, deadlineAt)
+          console.log(`[YouTubeRender] Scene ${index + 1}: tts=${actualDuration.toFixed(2)}s`)
+          return { sceneSpeechPath, actualDuration }
         }),
-      ),
-      // Video download: all scenes at once (normalize happens after TTS durations are known)
-      Promise.all(
-        params.scenes.map(async (_, index) => {
-          await ensureNotCancelled(params)
-          const clip = usableClips[index % usableClips.length]
+      mapWithConcurrency(params.scenes, DOWNLOAD_CONCURRENCY, async (_, index) => {
+          await ensureCanContinue(params, deadlineAt)
+          const clip = sceneClips[index]
           const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
           await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
-          await ensureNotCancelled(params)
+          await ensureCanContinue(params, deadlineAt)
           return rawPath
         }),
-      ),
     ])
     await reportProgress(params, 45, 'TTS 녹음 및 영상 소스 준비 완료')
 
     const sceneAudioPaths = ttsResults.map(r => r.sceneSpeechPath)
-    const actualDurations = ttsResults.map(r => r.paddedDuration)
+    const actualDurations = ttsResults.map(r => r.actualDuration)
+    const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
 
     // ── Step 2: Normalize each clip to actual TTS duration ──
     // FFmpeg is CPU-bound. On Vercel's small vCPU functions, running one per scene is
     // usually faster and more stable than spawning all scene encodes at once.
-    await ensureNotCancelled(params)
-    const normalizedClips: string[] = []
-    for (const [index] of params.scenes.entries()) {
-      await ensureNotCancelled(params)
-      await reportProgress(
-        params,
-        Math.min(67, 45 + Math.round(((index + 1) / params.scenes.length) * 22)),
-        `씬별 영상 렌더링 중 (${index + 1}/${params.scenes.length})`,
-      )
-      const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
-      await normalizeClipWithFallback({
-        sceneIndex: index,
-        initialInputPath: rawClipPaths[index],
-        outputPath: normalizedPath,
-        durationSeconds: actualDurations[index],
-        template: params.template,
-        shouldCancel: params.shouldCancel,
-        usableClips,
-        workDir,
-        onProgress: stage => reportProgress(params, Math.min(67, 45 + Math.round(((index + 1) / params.scenes.length) * 22)), stage),
-      })
-      normalizedClips.push(normalizedPath)
-    }
+    await ensureCanContinue(params, deadlineAt)
+    let normalizedCount = 0
+    const normalizedClips = await mapWithConcurrency(
+      params.scenes,
+      FFMPEG_CONCURRENCY,
+      async (scene, index) => {
+        await ensureCanContinue(params, deadlineAt)
+        const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
+        await normalizeClipWithFallback({
+          scene,
+          sceneIndex: index,
+          initialInputPath: rawClipPaths[index],
+          outputPath: normalizedPath,
+          durationSeconds: actualDurations[index],
+          template: params.template,
+          shouldCancel: params.shouldCancel,
+          usableClips,
+          workDir,
+          deadlineAt,
+        })
+        normalizedCount += 1
+        await reportProgress(
+          params,
+          Math.min(67, 45 + Math.round((normalizedCount / params.scenes.length) * 22)),
+          `씬별 영상 렌더링 중 (${normalizedCount}/${params.scenes.length})`,
+        )
+        return normalizedPath
+      },
+    )
     await reportProgress(params, 68, '씬별 영상 컷 완료')
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
@@ -141,7 +144,6 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         title: params.title,
         template: params.template,
         outputPath: path.join(workDir, 'hook-overlay.png'),
-        repoRoot: REPO_ROOT,
       })
       : null
 
@@ -165,21 +167,22 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       ...(hookOverlayPath
         ? ['-filter_complex', '[0:v][2:v]overlay=0:0:format=auto[decorated];[decorated]subtitles=subtitles.ass:fontsdir=fonts[v]']
         : ['-vf', 'subtitles=subtitles.ass:fontsdir=fonts']),
-      '-shortest',
+      '-t', String(totalDuration),
       '-map', hookOverlayPath ? '[v]' : '0:v:0',
       '-map', '1:a:0',
       '-c:v', 'libx264',
       '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
+      '-af', 'apad',
       '-b:a', '128k',
       '-movflags', '+faststart',
       outputPath,
     ]
     await ensureNotCancelled(params)
     await reportProgress(params, 82, '최종 영상 렌더링 중')
-    await runFfmpeg(renderArgs, workDir, params.shouldCancel, FINAL_RENDER_TIMEOUT_MS)
-    await ensureNotCancelled(params)
+    await runFfmpeg(renderArgs, workDir, params.shouldCancel, boundedTimeout(deadlineAt, FINAL_RENDER_TIMEOUT_MS))
+    await ensureCanContinue(params, deadlineAt)
     await reportProgress(params, 94, '미리보기 생성 중')
 
     const thumbnailPath = path.join(workDir, 'thumbnail.jpg')
@@ -237,7 +240,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
 async function downloadVideo(url: string, outputPath: string, shouldCancel?: () => Promise<boolean>) {
   if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, DOWNLOAD_TIMEOUT_MS)
   const cancelPoll = shouldCancel
     ? setInterval(() => {
       void shouldCancel().then(cancel => {
@@ -245,30 +252,53 @@ async function downloadVideo(url: string, outputPath: string, shouldCancel?: () 
       }).catch(() => undefined)
     }, 1000)
     : undefined
-  const response = await fetch(url, {
-    redirect: 'follow',
-    cache: 'no-store',
-    signal: controller.signal,
-  }).catch(error => {
-    if (controller.signal.aborted) throw new YouTubeRenderCancelledError()
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
+    if (!response.ok) throw new Error(`무료 영상 다운로드 실패: HTTP ${response.status}`)
+    const declaredSize = Number(response.headers.get('content-length') || 0)
+    if (declaredSize > MAX_SOURCE_VIDEO_BYTES) throw new Error('무료 영상 파일이 너무 큽니다.')
+    if (!response.body) throw new Error('무료 영상 다운로드 응답이 비어 있습니다.')
+    const reader = response.body.getReader()
+    const file = await fs.open(outputPath, 'w')
+    let received = 0
+    try {
+      while (true) {
+        if (await shouldCancel?.()) {
+          await reader.cancel()
+          throw new YouTubeRenderCancelledError()
+        }
+        const { done, value } = await reader.read()
+        if (done) break
+        received += value.byteLength
+        if (received > MAX_SOURCE_VIDEO_BYTES) {
+          await reader.cancel()
+          throw new Error('무료 영상 파일이 너무 큽니다.')
+        }
+        await file.write(value)
+      }
+    } finally {
+      await file.close()
+    }
+    if (received === 0) {
+      await fs.rm(outputPath, { force: true }).catch(() => undefined)
+      throw new Error('무료 영상 파일 크기가 올바르지 않습니다.')
+    }
+  } catch (error) {
+    if (error instanceof YouTubeRenderCancelledError) throw error
+    if (controller.signal.aborted) {
+      if (timedOut) throw new Error(`무료 영상 다운로드가 ${DOWNLOAD_TIMEOUT_MS / 1000}초를 초과했습니다.`)
+      throw new YouTubeRenderCancelledError()
+    }
     throw error
-  }).finally(() => {
+  } finally {
     clearTimeout(timeout)
     if (cancelPoll) clearInterval(cancelPoll)
-  })
-  if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
-  if (!response.ok) {
-    throw new Error(`무료 영상 다운로드 실패: HTTP ${response.status}`)
   }
-  const declaredSize = Number(response.headers.get('content-length') || 0)
-  if (declaredSize > MAX_SOURCE_VIDEO_BYTES) {
-    throw new Error('무료 영상 파일이 너무 큽니다.')
-  }
-  const buffer = Buffer.from(await response.arrayBuffer())
-  if (buffer.byteLength === 0 || buffer.byteLength > MAX_SOURCE_VIDEO_BYTES) {
-    throw new Error('무료 영상 파일 크기가 올바르지 않습니다.')
-  }
-  await fs.writeFile(outputPath, buffer)
 }
 
 async function normalizeClip(params: {
@@ -277,6 +307,7 @@ async function normalizeClip(params: {
   durationSeconds: number
   template?: YouTubeShortsTemplateRecord
   shouldCancel?: () => Promise<boolean>
+  timeoutMs?: number
 }) {
   const layout = params.template?.config.layout
   const headerHeight = layout?.headerEnabled ? layout.headerHeight : 0
@@ -294,7 +325,7 @@ async function normalizeClip(params: {
   ].join(',')
   await runFfmpeg([
     '-y',
-    '-stream_loop', '2',
+    '-stream_loop', '-1',
     '-i', params.inputPath,
     '-t', String(params.durationSeconds),
     '-vf', filter,
@@ -303,10 +334,11 @@ async function normalizeClip(params: {
     '-preset', process.env.YOUTUBE_RENDER_FFMPEG_PRESET || 'ultrafast',
     '-pix_fmt', 'yuv420p',
     params.outputPath,
-  ], undefined, params.shouldCancel, NORMALIZE_TIMEOUT_MS)
+  ], undefined, params.shouldCancel, params.timeoutMs ?? NORMALIZE_TIMEOUT_MS)
 }
 
 async function normalizeClipWithFallback(params: {
+  scene: YouTubeScenePlan
   sceneIndex: number
   initialInputPath: string
   outputPath: string
@@ -315,24 +347,21 @@ async function normalizeClipWithFallback(params: {
   shouldCancel?: () => Promise<boolean>
   usableClips: StockVideoCandidate[]
   workDir: string
-  onProgress?: (stage: string) => Promise<void>
+  deadlineAt: number
 }) {
-  const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, params.usableClips.length))
+  const sceneClips = clipsForScene(params.scene, params.usableClips)
+  const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
   let lastError: unknown
 
   for (let attempt = 0; attempt < attempts; attempt++) {
-    await params.onProgress?.(
-      attempt === 0
-        ? `씬별 영상 렌더링 중 (${params.sceneIndex + 1})`
-        : `씬별 영상 대체 클립 렌더링 중 (${params.sceneIndex + 1}, ${attempt + 1}/${attempts})`,
-    )
+    if (Date.now() >= params.deadlineAt) throw new YouTubeRenderTimeoutError()
     await params.shouldCancel?.().then(cancel => {
       if (cancel) throw new YouTubeRenderCancelledError()
     })
 
     const inputPath = attempt === 0
       ? params.initialInputPath
-      : await downloadFallbackClip(params, attempt)
+      : await downloadFallbackClip(params, sceneClips[attempt], attempt)
 
     try {
       await normalizeClip({
@@ -341,6 +370,7 @@ async function normalizeClipWithFallback(params: {
         durationSeconds: params.durationSeconds,
         template: params.template,
         shouldCancel: params.shouldCancel,
+        timeoutMs: boundedTimeout(params.deadlineAt, NORMALIZE_TIMEOUT_MS),
       })
       return
     } catch (error) {
@@ -357,11 +387,9 @@ async function normalizeClipWithFallback(params: {
 
 async function downloadFallbackClip(params: {
   sceneIndex: number
-  usableClips: StockVideoCandidate[]
   workDir: string
   shouldCancel?: () => Promise<boolean>
-}, attempt: number) {
-  const clip = params.usableClips[(params.sceneIndex + attempt) % params.usableClips.length]
+}, clip: StockVideoCandidate, attempt: number) {
   if (!clip?.videoUrl) throw new Error('대체 영상 클립을 찾을 수 없습니다.')
   const rawPath = path.join(params.workDir, `source-${params.sceneIndex + 1}-fallback-${attempt}.mp4`)
   await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel)
@@ -379,8 +407,7 @@ async function getTtsProvider(): Promise<string> {
   return process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts'
 }
 
-// Generate TTS for a single scene narration.
-// Prefers NVIDIA Chatterbox when NVIDIA_API_KEY is set; falls back to OpenAI.
+// Generate TTS for a single scene narration with OpenAI.
 async function createSceneSpeechAudio(narration: string, outputPath: string, fallbackDurationSeconds: number) {
   const input = narration.length > TTS_MAX_CHARS
     ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
@@ -395,6 +422,8 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
 
   const openai = new OpenAI({
     apiKey,
+    timeout: 60_000,
+    maxRetries: 2,
     ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
   })
   const response = await openai.audio.speech.create({
@@ -410,11 +439,20 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
 // This is the source of truth for sync: TTS determines scene length.
 async function probeAudioDuration(filePath: string): Promise<number> {
   const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     let stderr = ''
     const child = spawn(ffmpegPath, ['-i', filePath, '-f', 'null', '-'], { windowsHide: true })
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(new Error('TTS 길이 확인 시간이 초과되었습니다.'))
+    }, 15_000)
     child.stderr.on('data', (chunk: Buffer) => { stderr += String(chunk) })
+    child.on('error', error => {
+      clearTimeout(timeout)
+      reject(error)
+    })
     child.on('close', () => {
+      clearTimeout(timeout)
       const match = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/)
       if (match) {
         const duration = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3])
@@ -544,8 +582,20 @@ export class YouTubeRenderCancelledError extends Error {
   }
 }
 
+class YouTubeRenderTimeoutError extends Error {
+  constructor() {
+    super('전체 영상 렌더링 제한 시간을 초과했습니다.')
+    this.name = 'YouTubeRenderTimeoutError'
+  }
+}
+
 async function ensureNotCancelled(params: RenderYouTubeShortsParams) {
   if (await params.shouldCancel?.()) throw new YouTubeRenderCancelledError()
+}
+
+async function ensureCanContinue(params: RenderYouTubeShortsParams, deadlineAt: number) {
+  if (Date.now() >= deadlineAt) throw new YouTubeRenderTimeoutError()
+  await ensureNotCancelled(params)
 }
 
 async function reportProgress(params: RenderYouTubeShortsParams, progress: number, stage: string) {
@@ -583,7 +633,7 @@ function escapeAssText(text: string) {
 
 async function copyFontIfAvailable(fontsDir: string) {
   for (const fileName of ['Pretendard-Bold.otf', 'Pretendard-ExtraBold.otf', 'Pretendard-Black.otf']) {
-    const source = path.join(REPO_ROOT, 'public', 'fonts', fileName)
+    const source = path.join(PUBLIC_DIR, 'fonts', fileName)
     try {
       await fs.copyFile(source, path.join(fontsDir, fileName))
     } catch {
@@ -592,7 +642,12 @@ async function copyFontIfAvailable(fontsDir: string) {
   }
 }
 
-async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Promise<boolean>, timeoutMs?: number) {
+async function runFfmpeg(
+  args: string[],
+  cwd?: string,
+  shouldCancel?: () => Promise<boolean>,
+  timeoutMs = NORMALIZE_TIMEOUT_MS,
+) {
   const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
   await new Promise<void>((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { cwd, windowsHide: true })
@@ -600,13 +655,11 @@ async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Prom
     let cancelled = false
     let timedOut = false
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined
-    const timeoutTimer = timeoutMs
-      ? setTimeout(() => {
+    const timeoutTimer = setTimeout(() => {
         timedOut = true
         child.kill('SIGTERM')
         forceKillTimer = setTimeout(() => child.kill('SIGKILL'), 2000)
       }, timeoutMs)
-      : undefined
     const cancelPoll = shouldCancel
       ? setInterval(() => {
         void shouldCancel().then(cancel => {
@@ -622,20 +675,20 @@ async function runFfmpeg(args: string[], cwd?: string, shouldCancel?: () => Prom
     })
     child.on('error', error => {
       if (cancelPoll) clearInterval(cancelPoll)
-      if (timeoutTimer) clearTimeout(timeoutTimer)
+      clearTimeout(timeoutTimer)
       if (forceKillTimer) clearTimeout(forceKillTimer)
       reject(error)
     })
     child.on('close', code => {
       if (cancelPoll) clearInterval(cancelPoll)
-      if (timeoutTimer) clearTimeout(timeoutTimer)
+      clearTimeout(timeoutTimer)
       if (forceKillTimer) clearTimeout(forceKillTimer)
       if (cancelled) {
         reject(new YouTubeRenderCancelledError())
         return
       }
       if (timedOut) {
-        reject(new Error(`ffmpeg timed out after ${Math.round((timeoutMs || 0) / 1000)}s`))
+        reject(new Error(`ffmpeg timed out after ${Math.round(timeoutMs / 1000)}s`))
         return
       }
       if (code === 0) {
@@ -668,7 +721,7 @@ async function storeAsset(params: {
     throw new Error('렌더링 결과 저장을 위한 BLOB_READ_WRITE_TOKEN이 설정되어 있지 않습니다.')
   }
 
-  const directory = path.join(REPO_ROOT, 'public', 'generated', 'youtube', params.userId)
+  const directory = path.join(PUBLIC_DIR, 'generated', 'youtube', params.userId)
   await fs.mkdir(directory, { recursive: true })
   const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
   await fs.writeFile(path.join(directory, safeName), params.buffer)
@@ -681,6 +734,52 @@ async function readIfExists(filePath: string) {
   } catch {
     return null
   }
+}
+
+function clipsForScene(scene: YouTubeScenePlan, clips: StockVideoCandidate[]) {
+  const bySceneNumber = clips.filter(clip => clip.sceneNumber === scene.sceneNumber)
+  if (bySceneNumber.length > 0) return bySceneNumber
+  const byKeyword = clips.filter(clip => clip.keyword === scene.searchKeyword)
+  if (byKeyword.length > 0) return byKeyword
+  return clips
+}
+
+function selectClipForScene(scene: YouTubeScenePlan, clips: StockVideoCandidate[]) {
+  const matches = clipsForScene(scene, clips)
+  const clip = matches[0]
+  if (!clip?.videoUrl) throw new Error(`씬 ${scene.sceneNumber}에 사용할 영상 클립이 없습니다.`)
+  return clip
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++
+      results[index] = await worker(items[index], index)
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker()),
+  )
+  return results
+}
+
+function positiveInteger(value: string | undefined, fallback: number, min: number, max: number) {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed)) return fallback
+  return Math.max(min, Math.min(max, parsed))
+}
+
+function boundedTimeout(deadlineAt: number, preferredMs: number) {
+  const remaining = deadlineAt - Date.now()
+  if (remaining <= 0) throw new YouTubeRenderTimeoutError()
+  return Math.max(1_000, Math.min(preferredMs, remaining))
 }
 
 function safeFilePart(value: string) {

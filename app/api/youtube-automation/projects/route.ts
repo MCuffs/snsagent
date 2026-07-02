@@ -6,8 +6,10 @@ import {
   isYouTubeAutomationUpgradeLockedDay,
 } from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
+import { isYouTubeDayUnlockDue } from '../../../../lib/youtube-automation-schedule'
 
 export const runtime = 'nodejs'
+const STALE_PRODUCTION_MS = 12 * 60 * 1000
 
 function serializeProject(project: Record<string, unknown>, user?: { plan?: string | null; email?: string | null }) {
   const days = Array.isArray(project.days) ? project.days as Record<string, unknown>[] : []
@@ -40,6 +42,9 @@ function serializeProject(project: Record<string, unknown>, user?: { plan?: stri
         renderStage: day.renderStage,
         renderCancelRequested: day.renderCancelRequested,
         uploadedAt: day.uploadedAt instanceof Date ? day.uploadedAt.toISOString() : day.uploadedAt,
+        completedAt: day.status === 'completed'
+          ? day.updatedAt instanceof Date ? day.updatedAt.toISOString() : day.updatedAt
+          : null,
       })),
   }
 }
@@ -72,6 +77,59 @@ async function pruneExpiredProjects(userId: string, retentionDays: number | null
   })
 }
 
+async function recoverStaleProductions(userId: string) {
+  const staleBefore = new Date(Date.now() - STALE_PRODUCTION_MS)
+  await prisma.youTubeAutomationDay.updateMany({
+    where: {
+      userId,
+      status: { in: ['planning', 'rendering'] },
+      updatedAt: { lt: staleBefore },
+    },
+    data: {
+      status: 'failed',
+      renderProgress: 0,
+      renderStage: '영상 제작 시간이 초과되었습니다. 다시 시도해 주세요.',
+      renderCancelRequested: false,
+    },
+  })
+}
+
+async function unlockEligibleProjectDays(projects: Array<Record<string, unknown>>) {
+  const now = new Date()
+
+  for (const project of projects) {
+    const days = Array.isArray(project.days) ? project.days as Array<Record<string, unknown>> : []
+    const currentOpenDay = Number(project.currentOpenDay)
+    const currentDay = days.find(day => Number(day.dayNumber) === currentOpenDay)
+    const completedAt = currentDay?.updatedAt
+
+    if (
+      currentOpenDay >= 30 ||
+      currentDay?.status !== 'completed' ||
+      !(completedAt instanceof Date) ||
+      !isYouTubeDayUnlockDue(completedAt, now)
+    ) {
+      continue
+    }
+
+    const nextOpenDay = currentOpenDay + 1
+    await prisma.$transaction([
+      prisma.youTubeAutomationProject.update({
+        where: { id: String(project.id) },
+        data: { currentOpenDay: nextOpenDay, status: 'in_progress' },
+      }),
+      prisma.youTubeAutomationDay.updateMany({
+        where: { projectId: String(project.id), dayNumber: nextOpenDay, status: 'locked' },
+        data: { status: 'open' },
+      }),
+    ])
+
+    project.currentOpenDay = nextOpenDay
+    const nextDay = days.find(day => Number(day.dayNumber) === nextOpenDay)
+    if (nextDay?.status === 'locked') nextDay.status = 'open'
+  }
+}
+
 export async function GET() {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
@@ -79,6 +137,7 @@ export async function GET() {
   const policy = getYouTubeAutomationHistoryPolicy(user)
   const cutoff = retentionCutoff(policy.retentionDays)
   await pruneExpiredProjects(user.id, policy.retentionDays)
+  await recoverStaleProductions(user.id)
 
   const projects = await prisma.youTubeAutomationProject.findMany({
     where: {
@@ -89,6 +148,7 @@ export async function GET() {
     take: policy.limit,
     include: { days: true },
   })
+  await unlockEligibleProjectDays(projects)
 
   return NextResponse.json({ projects: projects.map(project => serializeProject(project, user)), historyPolicy: policy })
 }

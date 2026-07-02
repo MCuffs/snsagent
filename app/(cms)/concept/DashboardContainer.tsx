@@ -365,7 +365,7 @@ export default function DashboardContainer({
             description="월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다."
           />
         ) : (
-          <YouTubeAutomationDashboard />
+          <YouTubeAutomationDashboard isActive={activeTab === 'youtube-automation'} />
         )}
       </div>
 

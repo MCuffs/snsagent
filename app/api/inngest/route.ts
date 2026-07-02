@@ -4,6 +4,9 @@ import { crawlTrendsFunction } from '../../../src/lib/inngest/functions/crawlTre
 import { analyzeContentFunction } from '../../../src/lib/inngest/functions/analyzeContent'
 import { updateTrendVectorsFunction } from '../../../src/lib/inngest/functions/updateTrendVectors'
 import { compressMemoryFunction, compressBrandMemoryFunction } from '../../../src/lib/inngest/functions/compressMemory'
+import { produceYouTubeShortsFunction } from '../../../src/lib/inngest/functions/produceYouTubeShorts'
+
+export const maxDuration = 800
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -13,5 +16,6 @@ export const { GET, POST, PUT } = serve({
     updateTrendVectorsFunction,
     compressMemoryFunction,
     compressBrandMemoryFunction,
+    produceYouTubeShortsFunction,
   ],
 })

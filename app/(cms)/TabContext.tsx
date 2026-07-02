@@ -10,17 +10,18 @@ interface TabContextType {
 }
 
 const TabContext = createContext<TabContextType | null>(null)
+const DEFAULT_CONSOLE_TAB = 'youtube-automation'
 
 export function TabProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams()
-  const initialTab = searchParams.get('tab') || 'concept'
+  const initialTab = searchParams.get('tab') || DEFAULT_CONSOLE_TAB
   const [activeTab, setActiveTabState] = useState(initialTab)
 
   const setActiveTab = (tab: string) => {
     const prevTab = activeTab
     setActiveTabState(tab)
     const params = new URLSearchParams(window.location.search)
-    if (tab === 'concept') {
+    if (tab === DEFAULT_CONSOLE_TAB) {
       params.delete('tab')
     } else {
       params.set('tab', tab)

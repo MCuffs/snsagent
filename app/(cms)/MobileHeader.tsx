@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -10,6 +10,12 @@ import { usePathname } from 'next/navigation'
 interface MobileHeaderProps {
   children?: React.ReactNode
   locale?: string
+}
+
+const CloseMobileMenuContext = createContext<() => void>(() => undefined)
+
+export function useCloseMobileMenu() {
+  return useContext(CloseMobileMenuContext)
 }
 
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
@@ -96,7 +102,9 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
                   }
                 }}
               >
-                {children}
+                <CloseMobileMenuContext.Provider value={() => setIsOpen(false)}>
+                  {children}
+                </CloseMobileMenuContext.Provider>
               </div>
             </motion.div>
           </>

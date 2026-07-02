@@ -6,7 +6,6 @@ export async function renderHookOverlay(params: {
   title: string
   template: YouTubeShortsTemplateRecord
   outputPath: string
-  repoRoot: string
 }) {
   const hook = params.template.config.hookDesign
   const layout = params.template.config.layout

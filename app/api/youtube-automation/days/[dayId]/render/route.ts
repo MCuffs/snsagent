@@ -1,13 +1,8 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
-import type { StockVideoCandidate, YouTubeScenePlan } from '../../../../../../src/lib/youtube/automation'
-import {
-  renderYouTubeShortsFromStock,
-  YouTubeRenderCancelledError,
-} from '../../../../../../src/lib/youtube/render'
-import { shortsTemplateInputSchema, type YouTubeShortsTemplateRecord } from '../../../../../../lib/youtube-shorts-templates/types'
+import { inngest } from '../../../../../../src/lib/inngest/client'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -20,23 +15,24 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
   const day = await prisma.youTubeAutomationDay.findFirst({
     where: { id: dayId, userId: user.id },
   })
-  if (!day) return NextResponse.json({ error: '캘린더 항목을 찾을 수 없습니다.' }, { status: 404 })
-  if (!canUseYouTubeAutomationDay(user, day.dayNumber)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
-  if (!day.script || !day.scenesJson) {
-    return NextResponse.json({ error: '먼저 제목을 클릭해 제작안을 생성해 주세요.' }, { status: 400 })
+  if (!day) return NextResponse.json({ error: '제작할 영상을 찾을 수 없습니다.' }, { status: 404 })
+  if (!canUseYouTubeAutomationDay(user, day.dayNumber)) {
+    return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   }
 
-  const sourceClips = parseJsonArray<StockVideoCandidate>(day.sourceClipsJson)
-  if (!sourceClips.some(clip => clip.videoUrl)) {
-    return NextResponse.json({ error: '사용 가능한 영상 클립이 없습니다. 제작안을 다시 생성해 주세요.' }, { status: 400 })
-  }
-
+  const hasPlan = Boolean(day.script && day.scenesJson && day.sourceClipsJson)
+  const status = hasPlan ? 'rendering' : 'planning'
+  const renderStage = hasPlan ? '영상 제작 준비 중' : '스크립트 생성 준비 중'
   const claimed = await prisma.youTubeAutomationDay.updateMany({
-    where: { id: day.id, status: { not: 'rendering' } },
+    where: {
+      id: day.id,
+      status: { notIn: ['planning', 'rendering'] },
+      renderCancelRequested: false,
+    },
     data: {
-      status: 'rendering',
+      status,
       renderProgress: 1,
-      renderStage: '영상 제작 준비 중',
+      renderStage,
       renderCancelRequested: false,
     },
   })
@@ -44,67 +40,26 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
     return NextResponse.json({ error: '이미 영상 제작이 진행 중입니다.' }, { status: 409 })
   }
 
-  after(async () => {
-    try {
-      const rendered = await renderYouTubeShortsFromStock({
-        userId: user.id,
-        dayId: day.id,
-        title: day.title,
-        script: day.script!,
-        scenes: parseJsonArray<YouTubeScenePlan>(day.scenesJson),
-        sourceClips,
-        template: parseTemplateSnapshot(day.templateSnapshotJson),
-        onProgress: async (renderProgress, renderStage) => {
-          await prisma.youTubeAutomationDay.update({
-            where: { id: day.id },
-            data: { renderProgress, renderStage },
-          })
-        },
-        shouldCancel: async () => {
-          const current = await prisma.youTubeAutomationDay.findUnique({
-            where: { id: day.id },
-            select: { renderCancelRequested: true },
-          })
-          return current?.renderCancelRequested ?? true
-        },
-      })
-
-      await prisma.youTubeAutomationDay.update({
-        where: { id: day.id },
-        data: {
-          status: 'completed',
-          mp4Url: rendered.mp4Url,
-          thumbnailUrl: rendered.thumbnailUrl,
-          ttsAudioUrl: rendered.ttsAudioUrl,
-          ttsProvider: rendered.ttsProvider,
-          subtitleJson: JSON.stringify(rendered.subtitles),
-          renderProgress: 100,
-          renderStage: '영상 제작 완료',
-          renderCancelRequested: false,
-        },
-      })
-    } catch (error) {
-      const cancelled = error instanceof YouTubeRenderCancelledError
-      await prisma.youTubeAutomationDay.update({
-        where: { id: day.id },
-        data: {
-          status: cancelled ? 'ready' : 'failed',
-          renderProgress: 0,
-          renderStage: cancelled ? '영상 제작 중단됨' : '영상 제작 실패',
-          renderCancelRequested: false,
-        },
-      }).catch(() => undefined)
-      console.error(`[YouTubeRender] Background render ${cancelled ? 'cancelled' : 'failed'} for ${day.id}:`, error)
-    }
-  })
+  try {
+    await inngest.send({
+      name: 'youtube/shorts.render.requested',
+      data: { dayId: day.id, userId: user.id },
+    })
+  } catch (error) {
+    await prisma.youTubeAutomationDay.update({
+      where: { id: day.id },
+      data: {
+        status: day.status,
+        renderProgress: 0,
+        renderStage: '영상 제작 작업을 등록하지 못했습니다. 다시 시도해 주세요.',
+      },
+    }).catch(() => undefined)
+    console.error('[YouTubeRender] Failed to enqueue render', error)
+    return NextResponse.json({ error: '영상 제작 작업을 등록하지 못했습니다.' }, { status: 503 })
+  }
 
   return NextResponse.json({
-    day: {
-      id: day.id,
-      status: 'rendering',
-      renderProgress: 1,
-      renderStage: '영상 제작 준비 중',
-    },
+    day: { id: day.id, status, renderProgress: 1, renderStage },
   }, { status: 202 })
 }
 
@@ -114,34 +69,16 @@ export async function DELETE(_request: Request, context: { params: Promise<{ day
 
   const { dayId } = await context.params
   const result = await prisma.youTubeAutomationDay.updateMany({
-    where: { id: dayId, userId: user.id, status: 'rendering' },
+    where: { id: dayId, userId: user.id, status: { in: ['planning', 'rendering'] } },
     data: {
+      status: 'ready',
       renderCancelRequested: true,
-      renderStage: '중단 요청 처리 중',
+      renderProgress: 0,
+      renderStage: '영상 제작 중단됨',
     },
   })
   if (result.count === 0) {
     return NextResponse.json({ error: '진행 중인 영상 제작을 찾을 수 없습니다.' }, { status: 404 })
   }
   return NextResponse.json({ ok: true })
-}
-
-function parseJsonArray<T>(value: string | null): T[] {
-  if (!value) return []
-  try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed as T[] : []
-  } catch {
-    return []
-  }
-}
-
-function parseTemplateSnapshot(value: string | null): YouTubeShortsTemplateRecord | undefined {
-  if (!value) return undefined
-  try {
-    const parsed = JSON.parse(value) as YouTubeShortsTemplateRecord
-    return shortsTemplateInputSchema.safeParse(parsed).success ? parsed : undefined
-  } catch {
-    return undefined
-  }
 }

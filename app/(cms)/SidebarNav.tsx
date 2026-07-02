@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -8,6 +8,7 @@ import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X, Tv
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
+import { useCloseMobileMenu } from './MobileHeader'
 
 interface NavItem {
   key: string
@@ -36,10 +37,15 @@ interface SidebarNavProps {
 export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
+  const closeMobileMenu = useCloseMobileMenu()
   const t = useTranslations('cms')
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const [upgradeFeatureName, setUpgradeFeatureName] = useState('영상 카드뉴스')
-  const [portalReady, setPortalReady] = useState(false)
+  const portalReady = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
   const pricingPath = `${prefix}/pricing`
@@ -47,10 +53,6 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
   const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
   const isYouTubeUpgradePrompt = upgradeFeatureName === '유튜브 자동화'
-
-  useEffect(() => {
-    setPortalReady(true)
-  }, [])
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     const blockedVideoFeature = item.key === 'video-cardnews' && !canUseVideoFeatures
@@ -72,6 +74,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
       e.preventDefault()
       setActiveTab(item.key)
     }
+    closeMobileMenu()
 
     window.setTimeout(() => {
       analytics.sidebarClick(item.key, {
@@ -88,7 +91,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
         {navItems.map((item) => {
         const Icon = item.icon
         const disabled = false
-        const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`
+        const href = item.key === 'concept' ? `${conceptPath}?tab=concept` : `${conceptPath}${item.href.replace('/concept', '')}`
         const isActive = pathname === conceptPath && activeTab === item.key
 
         if (disabled) {

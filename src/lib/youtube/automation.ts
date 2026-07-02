@@ -20,6 +20,7 @@ export interface YouTubeScenePlan {
 }
 
 export interface StockVideoCandidate {
+  sceneNumber?: number
   provider: 'pexels' | 'pixabay' | 'mock'
   id: string
   title: string
@@ -204,17 +205,26 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
   for (const scene of scenes.slice(0, 6)) {
     const candidates = await searchPexelsVideos(scene.searchKeyword, 2)
     if (candidates.length > 0) {
-      results.push(...candidates.map(candidate => ({ ...candidate, keyword: scene.searchKeyword })))
+      results.push(...candidates.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      })))
       continue
     }
 
     const pixabay = await searchPixabayVideos(scene.searchKeyword, 2)
     if (pixabay.length > 0) {
-      results.push(...pixabay.map(candidate => ({ ...candidate, keyword: scene.searchKeyword })))
+      results.push(...pixabay.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      })))
       continue
     }
 
     results.push({
+      sceneNumber: scene.sceneNumber,
       provider: 'mock',
       id: `mock-${scene.sceneNumber}`,
       title: scene.searchKeyword,
