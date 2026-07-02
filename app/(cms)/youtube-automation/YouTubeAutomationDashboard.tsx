@@ -287,8 +287,18 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
     setCancellingDayId(day.id)
     try {
       const res = await fetch(`/api/youtube-automation/days/${day.id}/render`, { method: 'DELETE' })
-      const data = await readApiJson<{ error?: string }>(res)
+      const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
       if (!res.ok) throw new Error(data.error || '영상 제작을 중단하지 못했습니다.')
+      if (data.day) {
+        setProject(current => current ? {
+          ...current,
+          days: current.days.map(item => item.id === day.id ? { ...item, ...data.day } : item),
+        } : current)
+        setHistory(current => current.map(item => ({
+          ...item,
+          days: item.days.map(entry => entry.id === day.id ? { ...entry, ...data.day } : entry),
+        })))
+      }
       analytics.youtubeRenderCancel(project.id, day.id, day.dayNumber, true)
       await refreshProjects()
     } catch (err) {
