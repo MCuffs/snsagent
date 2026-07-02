@@ -6,10 +6,7 @@ import { createCheckoutSession, POLAR_PRODUCT_IDS } from '../../../../lib/polar'
 
 export const runtime = 'nodejs'
 
-const CHECKOUT_LINKS: Record<'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED', string | undefined> = {
-  YOUTUBE_PROMO:
-    process.env.POLAR_CHECKOUT_YOUTUBE_PROMO?.trim() ||
-    'https://buy.polar.sh/polar_cl_62mnwxsB2lNUWKjKfL7nYKwakXkITwblgF25j3xiz0P',
+const CHECKOUT_LINKS: Record<'PRO' | 'UNLIMITED', string | undefined> = {
   PRO: process.env.POLAR_CHECKOUT_PRO?.trim(),
   UNLIMITED: process.env.POLAR_CHECKOUT_UNLIMITED?.trim(),
 }
@@ -45,17 +42,36 @@ export async function POST(request: NextRequest) {
   const productId = POLAR_PRODUCT_IDS[plan]
   if (productId && process.env.POLAR_API_KEY?.trim()) {
     const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
-    const checkout = await createCheckoutSession({
-      productId,
-      customerEmail: user.email,
-      successUrl: `${origin.replace(/\/$/, '')}/youtube-automation?checkout=success`,
-      metadata: {
-        userId: user.id,
-        plan,
-      },
-    })
+    try {
+      const checkout = await createCheckoutSession({
+        productId,
+        customerEmail: user.email,
+        successUrl: `${origin.replace(/\/$/, '')}/youtube-automation?checkout=success`,
+        metadata: {
+          userId: user.id,
+          plan,
+        },
+      })
 
-    return NextResponse.json({ url: checkout.url })
+      return NextResponse.json({ url: checkout.url })
+    } catch (error) {
+      console.error('[Polar Checkout] Failed to create checkout', {
+        plan,
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return NextResponse.json({ error: '결제 페이지를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 502 })
+    }
+  }
+
+  // YouTube Promo must always use a user-bound checkout. A static link does
+  // not carry the Shuffla userId and can leave a successful payment unassigned.
+  if (plan === 'YOUTUBE_PROMO') {
+    console.error('[Polar Checkout] YouTube Promo dynamic checkout is not configured', {
+      hasProductId: Boolean(productId),
+      hasApiKey: Boolean(process.env.POLAR_API_KEY?.trim()),
+    })
+    return NextResponse.json({ error: 'YouTube 프로모 결제가 아직 구성되지 않았습니다.' }, { status: 503 })
   }
 
   const checkoutUrl = CHECKOUT_LINKS[plan]

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     if (type === 'order.paid' || type === 'order.refunded') {
       await syncPolarOrder(type, data as PolarOrderWebhookData, event.timestamp)
-    } else if (type === 'subscription.active' || type === 'subscription.created') {
+    } else if (type === 'subscription.active') {
       const subscriptionId = data.id as string | undefined
       const productId = (data.product_id ?? (data.product as { id?: string } | undefined)?.id) as string | undefined
       const customerEmail = (data.customer as { email?: string } | undefined)?.email
@@ -93,6 +93,13 @@ export async function POST(request: NextRequest) {
         plan,
       })
       console.log(`[Polar Webhook] Activated ${plan} for user ${user.id}`)
+    } else if (type === 'subscription.created') {
+      // Polar documents that a newly created subscription may still be
+      // incomplete. Access is granted only by order.paid/subscription.active.
+      console.log('[Polar Webhook] Subscription created; awaiting payment confirmation', {
+        subscriptionId: data.id,
+        status: data.status,
+      })
     } else if (
       type === 'subscription.canceled' ||
       type === 'subscription.revoked'
@@ -142,18 +149,27 @@ async function syncPolarOrder(
   const customerEmail = order.customer.email || null
 
   let user = metadataUserId
-    ? await prisma.user.findUnique({ where: { id: metadataUserId }, select: { id: true } })
+    ? await prisma.user.findUnique({
+        where: { id: metadataUserId },
+        select: { id: true, polarSubscriptionId: true },
+      })
     : null
   if (!user && externalUserId) {
-    user = await prisma.user.findUnique({ where: { id: externalUserId }, select: { id: true } })
+    user = await prisma.user.findUnique({
+      where: { id: externalUserId },
+      select: { id: true, polarSubscriptionId: true },
+    })
   }
   if (!user && customerEmail) {
-    user = await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } })
+    user = await prisma.user.findUnique({
+      where: { email: customerEmail },
+      select: { id: true, polarSubscriptionId: true },
+    })
   }
   if (!user && order.subscription_id) {
     user = await prisma.user.findUnique({
       where: { polarSubscriptionId: order.subscription_id },
-      select: { id: true },
+      select: { id: true, polarSubscriptionId: true },
     })
   }
   if (!user) {
@@ -218,6 +234,24 @@ async function syncPolarOrder(
       console.warn('[Polar Webhook] Paid order synced without plan mapping', {
         orderId: order.id,
         productId: order.product_id || order.product?.id,
+      })
+    }
+  } else if (status === 'cancelled') {
+    const sameSubscription = !order.subscription_id
+      || !user.polarSubscriptionId
+      || user.polarSubscriptionId === order.subscription_id
+    if (sameSubscription) {
+      await dbService.updateUserPolar(user.id, {
+        polarSubscriptionId: null,
+        polarSubscriptionStatus: 'refunded',
+        plan: 'FREE',
+      })
+      console.log(`[Polar Webhook] Downgraded fully refunded order ${order.id} for user ${user.id}`)
+    } else {
+      console.warn('[Polar Webhook] Full refund belongs to an older subscription; active plan preserved', {
+        orderId: order.id,
+        orderSubscriptionId: order.subscription_id,
+        userId: user.id,
       })
     }
   }
