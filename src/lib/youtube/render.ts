@@ -34,13 +34,15 @@ interface StoredRenderedAsset {
 }
 
 const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
-const DOWNLOAD_TIMEOUT_MS = 90_000
+const DOWNLOAD_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_TIMEOUT_MS || 45_000)
+const DOWNLOAD_IDLE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_IDLE_TIMEOUT_MS || 12_000)
+const TTS_SCENE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TTS_SCENE_TIMEOUT_MS || 75_000)
 const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 45_000)
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
 const TOTAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TOTAL_TIMEOUT_MS || 8 * 60_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
-const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 3, 1, 4)
-const TTS_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_TTS_CONCURRENCY, 3, 1, 4)
+const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 2, 1, 3)
+const TTS_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_TTS_CONCURRENCY, 2, 1, 3)
 const FFMPEG_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_FFMPEG_CONCURRENCY, 2, 1, 2)
 const TTS_MAX_CHARS = 3900
 const PUBLIC_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), 'public')
@@ -72,9 +74,6 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const ttsProvider = await getTtsProvider()
     await ensureNotCancelled(params)
 
-    const sceneClips = params.scenes.map(scene => (
-      selectClipForScene(scene, preferFastSourceClips(clipsForScene(scene, usableClips)))
-    ))
     let completedTtsCount = 0
     let completedDownloadCount = 0
     const reportAssetPreparationProgress = async () => {
@@ -101,7 +100,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
             narrationLength: scene.narration.length,
           })
           try {
-            await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
+            await withTimeout(
+              createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds),
+              boundedTimeout(deadlineAt, TTS_SCENE_TIMEOUT_MS),
+              `씬 ${index + 1} TTS 생성이 ${Math.round(TTS_SCENE_TIMEOUT_MS / 1000)}초를 초과했습니다.`,
+            )
             await ensureCanContinue(params, deadlineAt)
             const actualDuration = await probeAudioDuration(sceneSpeechPath)
             await ensureCanContinue(params, deadlineAt)
@@ -127,33 +130,60 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       mapWithConcurrency(params.scenes, DOWNLOAD_CONCURRENCY, async (_, index) => {
           const sceneStartedAt = Date.now()
           await ensureCanContinue(params, deadlineAt)
-          const clip = sceneClips[index]
-          const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
-          logYouTubeAutomation('info', 'render_download_scene_start', renderLogContext(params), {
-            sceneNumber: params.scenes[index]?.sceneNumber,
-            sceneIndex: index + 1,
-            provider: clip.provider,
-            clipId: clip.id,
-          })
+          const scene = params.scenes[index]
+          const sceneClips = preferFastSourceClips(clipsForScene(scene, usableClips))
+          const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
+          let lastError: unknown
           try {
-            await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
-            await ensureCanContinue(params, deadlineAt)
-            completedDownloadCount += 1
-            logYouTubeAutomation('info', 'render_download_scene_done', renderLogContext(params), {
-              sceneNumber: params.scenes[index]?.sceneNumber,
-              sceneIndex: index + 1,
-              provider: clip.provider,
-              clipId: clip.id,
-              durationMs: Date.now() - sceneStartedAt,
-            })
-            await reportAssetPreparationProgress()
-            return rawPath
+            for (let attempt = 0; attempt < attempts; attempt += 1) {
+              const clip = sceneClips[attempt]
+              if (!clip?.videoUrl) continue
+              const attemptStartedAt = Date.now()
+              const rawPath = path.join(workDir, `source-${index + 1}-${attempt + 1}.mp4`)
+              logYouTubeAutomation('info', 'render_download_scene_start', renderLogContext(params), {
+                sceneNumber: scene.sceneNumber,
+                sceneIndex: index + 1,
+                attempt: attempt + 1,
+                provider: clip.provider,
+                clipId: clip.id,
+              })
+              try {
+                await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel, boundedTimeout(deadlineAt, DOWNLOAD_TIMEOUT_MS))
+                await ensureCanContinue(params, deadlineAt)
+                completedDownloadCount += 1
+                logYouTubeAutomation('info', 'render_download_scene_done', renderLogContext(params), {
+                  sceneNumber: scene.sceneNumber,
+                  sceneIndex: index + 1,
+                  attempt: attempt + 1,
+                  provider: clip.provider,
+                  clipId: clip.id,
+                  durationMs: Date.now() - attemptStartedAt,
+                })
+                await reportAssetPreparationProgress()
+                return rawPath
+              } catch (error) {
+                if (error instanceof YouTubeRenderCancelledError) throw error
+                lastError = error
+                await fs.rm(rawPath, { force: true }).catch(() => undefined)
+                logYouTubeAutomation(attempt + 1 >= attempts ? 'error' : 'warn', 'render_download_scene_attempt_failed', renderLogContext(params), {
+                  sceneNumber: scene.sceneNumber,
+                  sceneIndex: index + 1,
+                  attempt: attempt + 1,
+                  attempts,
+                  provider: clip.provider,
+                  clipId: clip.id,
+                  durationMs: Date.now() - attemptStartedAt,
+                  ...summarizeYouTubeAutomationError(error),
+                })
+              }
+            }
+            throw lastError instanceof Error
+              ? lastError
+              : new Error(`씬 ${index + 1} 영상 소스 다운로드에 실패했습니다.`)
           } catch (error) {
             logYouTubeAutomation('error', 'render_download_scene_failed', renderLogContext(params), {
-              sceneNumber: params.scenes[index]?.sceneNumber,
+              sceneNumber: scene.sceneNumber,
               sceneIndex: index + 1,
-              provider: clip.provider,
-              clipId: clip.id,
               durationMs: Date.now() - sceneStartedAt,
               ...summarizeYouTubeAutomationError(error),
             })
@@ -316,14 +346,20 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   }
 }
 
-async function downloadVideo(url: string, outputPath: string, shouldCancel?: () => Promise<boolean>) {
+async function downloadVideo(
+  url: string,
+  outputPath: string,
+  shouldCancel?: () => Promise<boolean>,
+  timeoutMs = DOWNLOAD_TIMEOUT_MS,
+) {
   if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
   const controller = new AbortController()
   let timedOut = false
+  let idleTimedOut = false
   const timeout = setTimeout(() => {
     timedOut = true
     controller.abort()
-  }, DOWNLOAD_TIMEOUT_MS)
+  }, timeoutMs)
   const cancelPoll = shouldCancel
     ? setInterval(() => {
       void shouldCancel().then(cancel => {
@@ -351,7 +387,11 @@ async function downloadVideo(url: string, outputPath: string, shouldCancel?: () 
           await reader.cancel()
           throw new YouTubeRenderCancelledError()
         }
-        const { done, value } = await reader.read()
+        const { done, value } = await readStreamChunk(reader, DOWNLOAD_IDLE_TIMEOUT_MS).catch(error => {
+          idleTimedOut = true
+          controller.abort()
+          throw error
+        })
         if (done) break
         received += value.byteLength
         if (received > MAX_SOURCE_VIDEO_BYTES) {
@@ -370,7 +410,8 @@ async function downloadVideo(url: string, outputPath: string, shouldCancel?: () 
   } catch (error) {
     if (error instanceof YouTubeRenderCancelledError) throw error
     if (controller.signal.aborted) {
-      if (timedOut) throw new Error(`무료 영상 다운로드가 ${DOWNLOAD_TIMEOUT_MS / 1000}초를 초과했습니다.`)
+      if (idleTimedOut) throw new Error(`무료 영상 다운로드 응답이 ${DOWNLOAD_IDLE_TIMEOUT_MS / 1000}초 동안 멈췄습니다.`)
+      if (timedOut) throw new Error(`무료 영상 다운로드가 ${timeoutMs / 1000}초를 초과했습니다.`)
       throw new YouTubeRenderCancelledError()
     }
     throw error
@@ -835,13 +876,6 @@ function clipsForScene(scene: YouTubeScenePlan, clips: StockVideoCandidate[]) {
   return clips
 }
 
-function selectClipForScene(scene: YouTubeScenePlan, clips: StockVideoCandidate[]) {
-  const matches = clipsForScene(scene, clips)
-  const clip = matches[0]
-  if (!clip?.videoUrl) throw new Error(`씬 ${scene.sceneNumber}에 사용할 영상 클립이 없습니다.`)
-  return clip
-}
-
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -873,6 +907,20 @@ function boundedTimeout(deadlineAt: number, preferredMs: number) {
   return Math.max(1_000, Math.min(preferredMs, remaining))
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
+}
+
 function safeFilePart(value: string) {
   return value
     .normalize('NFKD')
@@ -886,5 +934,22 @@ function renderLogContext(params: RenderYouTubeShortsParams) {
     userId: params.userId,
     dayId: params.dayId,
     title: params.title,
+  }
+}
+
+async function readStreamChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  idleTimeoutMs: number,
+) {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`stream idle timeout after ${idleTimeoutMs}ms`)), idleTimeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeout) clearTimeout(timeout)
   }
 }
