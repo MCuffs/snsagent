@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { start } from 'workflow/api'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
@@ -10,10 +10,13 @@ import {
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
-import { youtubeShortsProductionWorkflow } from '../../../../../../src/workflows/youtube-shorts'
+import { youtubeShortsProductionWorkflow } from '../../../../../workflows/youtube-shorts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
+
+const WORKFLOW_START_FALLBACK_DELAY_MS = readWorkflowStartFallbackDelayMs()
+const WORKFLOW_FALLBACK_STAGE = 'Workflow 시작 대기 초과 - 서버 fallback 실행 중'
 
 export async function POST(request: Request, context: { params: Promise<{ dayId: string }> }) {
   const startedAt = Date.now()
@@ -178,22 +181,152 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   try {
     const run = await start(youtubeShortsProductionWorkflow, [day.id, user.id, requestId])
     logYouTubeAutomation('info', 'render_workflow_started', logContext, { runId: run.runId })
+    scheduleWorkflowStartFallback({
+      dayId: day.id,
+      userId: user.id,
+      requestId,
+      logContext,
+      claimedStatus: status,
+      claimedRenderProgress: initialProgress,
+      claimedRenderStage: renderStage,
+    })
   } catch (error) {
-    await prisma.youTubeAutomationDay.updateMany({
-      where: { id: day.id, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
-      data: {
-        status: day.status,
-        renderProgress: 0,
-        renderStage: '영상 제작 작업 등록에 실패했습니다. 다시 시도해 주세요.',
-      },
-    }).catch(() => undefined)
     logYouTubeAutomation('error', 'render_workflow_start_failed', logContext, summarizeYouTubeAutomationError(error))
-    return NextResponse.json({ error: '영상 제작 작업 등록에 실패했습니다.' }, { status: 503 })
+    scheduleWorkflowStartFallback({
+      dayId: day.id,
+      userId: user.id,
+      requestId,
+      logContext,
+      claimedStatus: status,
+      claimedRenderProgress: initialProgress,
+      claimedRenderStage: renderStage,
+      fallbackDelayMs: 0,
+    })
   }
 
   return NextResponse.json({
     day: { id: day.id, status, renderProgress: initialProgress, renderStage, renderCancelRequested: false },
   }, { status: 202 })
+}
+
+type WorkflowStartFallbackInput = {
+  dayId: string
+  userId: string
+  requestId: string | null
+  logContext: {
+    requestId: string | null
+    route: string
+    userId: string
+    dayId: string
+  }
+  claimedStatus: 'planning' | 'rendering'
+  claimedRenderProgress: number
+  claimedRenderStage: string
+  fallbackDelayMs?: number
+}
+
+function scheduleWorkflowStartFallback(input: WorkflowStartFallbackInput) {
+  const delayMs = input.fallbackDelayMs ?? WORKFLOW_START_FALLBACK_DELAY_MS
+  logYouTubeAutomation('info', 'render_workflow_fallback_scheduled', input.logContext, {
+    delayMs,
+    claimedStatus: input.claimedStatus,
+    claimedRenderProgress: input.claimedRenderProgress,
+    claimedRenderStage: input.claimedRenderStage,
+  })
+
+  after(async () => {
+    await sleep(delayMs)
+    await runWorkflowStartFallback(input)
+  })
+}
+
+async function runWorkflowStartFallback(input: WorkflowStartFallbackInput) {
+  const startedAt = Date.now()
+  const delayMs = input.fallbackDelayMs ?? WORKFLOW_START_FALLBACK_DELAY_MS
+  try {
+    const claimed = await prisma.youTubeAutomationDay.updateMany({
+      where: {
+        id: input.dayId,
+        userId: input.userId,
+        status: input.claimedStatus,
+        renderProgress: input.claimedRenderProgress,
+        renderStage: input.claimedRenderStage,
+        renderCancelRequested: false,
+      },
+      data: {
+        status: input.claimedStatus,
+        renderProgress: Math.max(input.claimedRenderProgress, 2),
+        renderStage: WORKFLOW_FALLBACK_STAGE,
+      },
+    })
+
+    if (claimed.count === 0) {
+      const current = await prisma.youTubeAutomationDay.findFirst({
+        where: { id: input.dayId, userId: input.userId },
+        select: {
+          status: true,
+          renderProgress: true,
+          renderStage: true,
+          renderCancelRequested: true,
+          updatedAt: true,
+        },
+      })
+      logYouTubeAutomation('info', 'render_workflow_fallback_skipped', input.logContext, {
+        reason: current ? 'state_changed' : 'day_missing',
+        currentStatus: current?.status,
+        currentRenderProgress: current?.renderProgress,
+        currentRenderStage: current?.renderStage,
+        currentRenderCancelRequested: current?.renderCancelRequested,
+        currentUpdatedAt: current?.updatedAt?.toISOString(),
+        delayMs,
+        durationMs: Date.now() - startedAt,
+      })
+      return
+    }
+
+    logYouTubeAutomation('warn', 'render_workflow_fallback_started', input.logContext, {
+      delayMs,
+      claimedStatus: input.claimedStatus,
+      claimedRenderProgress: input.claimedRenderProgress,
+      claimedRenderStage: input.claimedRenderStage,
+    })
+
+    const { produceYouTubeShorts } = await import('../../../../../../src/lib/youtube/produce')
+    await produceYouTubeShorts({
+      dayId: input.dayId,
+      userId: input.userId,
+      requestId: input.requestId,
+      throwOnFailure: true,
+    })
+
+    logYouTubeAutomation('info', 'render_workflow_fallback_done', input.logContext, {
+      durationMs: Date.now() - startedAt,
+    })
+  } catch (error) {
+    await prisma.youTubeAutomationDay.updateMany({
+      where: { id: input.dayId, userId: input.userId, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
+      data: {
+        status: 'failed',
+        renderProgress: 0,
+        renderStage: '영상 제작 fallback 실행에 실패했습니다. 다시 시도해 주세요.',
+        renderCancelRequested: false,
+      },
+    }).catch(() => undefined)
+    logYouTubeAutomation('error', 'render_workflow_fallback_failed', input.logContext, {
+      durationMs: Date.now() - startedAt,
+      ...summarizeYouTubeAutomationError(error),
+    })
+  }
+}
+
+function readWorkflowStartFallbackDelayMs() {
+  const parsed = Number(process.env.YOUTUBE_WORKFLOW_START_FALLBACK_DELAY_MS)
+  if (!Number.isFinite(parsed)) return 10_000
+  return Math.min(Math.max(Math.trunc(parsed), 3_000), 120_000)
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ dayId: string }> }) {
