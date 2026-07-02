@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
-import { inngest } from '../../../../../../src/lib/inngest/client'
+import { produceYouTubeShorts } from '../../../../../../src/lib/youtube/produce'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -40,23 +40,7 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
     return NextResponse.json({ error: '이미 영상 제작이 진행 중입니다.' }, { status: 409 })
   }
 
-  try {
-    await inngest.send({
-      name: 'youtube/shorts.render.requested',
-      data: { dayId: day.id, userId: user.id },
-    })
-  } catch (error) {
-    await prisma.youTubeAutomationDay.update({
-      where: { id: day.id },
-      data: {
-        status: day.status,
-        renderProgress: 0,
-        renderStage: '영상 제작 작업을 등록하지 못했습니다. 다시 시도해 주세요.',
-      },
-    }).catch(() => undefined)
-    console.error('[YouTubeRender] Failed to enqueue render', error)
-    return NextResponse.json({ error: '영상 제작 작업을 등록하지 못했습니다.' }, { status: 503 })
-  }
+  after(() => produceYouTubeShorts({ dayId: day.id, userId: user.id }))
 
   return NextResponse.json({
     day: { id: day.id, status, renderProgress: 1, renderStage },
