@@ -263,6 +263,7 @@ async function searchPexelsVideos(query: string, limit: number): Promise<Omit<St
     return (data.videos || []).map(video => {
       const file = [...(video.video_files || [])]
         .filter(item => item.link)
+        .filter(isUsableRenderVideoFile)
         .sort((a, b) => scoreVideoFile(b) - scoreVideoFile(a))[0]
       return {
         provider: 'pexels' as const,
@@ -523,7 +524,22 @@ function stockKeywordFor(topic: string, suffix: string) {
 
 function scoreVideoFile(file: { quality?: string; width?: number; height?: number }) {
   const ratio = file.width && file.height ? file.height / file.width : 0
-  const portrait = ratio > 1.2 ? 20 : 0
-  const quality = file.quality === 'hd' ? 10 : 0
-  return portrait + quality + Math.min(10, Math.round((file.height || 0) / 200))
+  const portrait = ratio > 1.2 ? 30 : 0
+  const quality = file.quality === 'hd' ? 20 : 0
+  const height = file.height || 0
+  const practicalHeight =
+    height >= 720 && height <= 1280 ? 25 :
+      height > 1280 && height <= 1920 ? 10 :
+        height > 1920 ? -30 : 0
+  const practicalWidth = (file.width || 0) <= 1080 ? 10 : -10
+  return portrait + quality + practicalHeight + practicalWidth
+}
+
+function isUsableRenderVideoFile(file: { width?: number; height?: number }) {
+  const width = file.width || 0
+  const height = file.height || 0
+  if (!width || !height) return true
+  if (height > 1920) return false
+  if (width > 1080) return false
+  return true
 }

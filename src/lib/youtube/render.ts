@@ -34,7 +34,7 @@ interface StoredRenderedAsset {
 
 const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 90_000
-const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 90_000)
+const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 45_000)
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
 const TOTAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TOTAL_TIMEOUT_MS || 8 * 60_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
@@ -49,7 +49,6 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   if (usableClips.length === 0) {
     throw new Error('Pexels/Pixabay 영상 후보가 없습니다. API 키 또는 검색 키워드를 확인해 주세요.')
   }
-
   const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
   await fs.mkdir(workRoot, { recursive: true })
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
@@ -65,7 +64,9 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const ttsProvider = await getTtsProvider()
     await ensureNotCancelled(params)
 
-    const sceneClips = params.scenes.map(scene => selectClipForScene(scene, usableClips))
+    const sceneClips = params.scenes.map(scene => (
+      selectClipForScene(scene, preferFastSourceClips(clipsForScene(scene, usableClips)))
+    ))
     const [ttsResults, rawClipPaths] = await Promise.all([
       mapWithConcurrency(params.scenes, TTS_CONCURRENCY, async (scene, index) => {
           await ensureCanContinue(params, deadlineAt)
@@ -337,6 +338,18 @@ async function normalizeClip(params: {
   ], undefined, params.shouldCancel, params.timeoutMs ?? NORMALIZE_TIMEOUT_MS)
 }
 
+function preferFastSourceClips(clips: StockVideoCandidate[]) {
+  const fastClips = clips.filter(clip => {
+    const url = clip.videoUrl || ''
+    return !isKnownSlowSourceVideo(url)
+  })
+  return fastClips.length > 0 ? fastClips : clips
+}
+
+function isKnownSlowSourceVideo(url: string) {
+  return /[_-]1080_20\d{2}[_-]/.test(url) || /[_-]1440_/.test(url) || /[_-]2160_/.test(url)
+}
+
 async function normalizeClipWithFallback(params: {
   scene: YouTubeScenePlan
   sceneIndex: number
@@ -349,7 +362,7 @@ async function normalizeClipWithFallback(params: {
   workDir: string
   deadlineAt: number
 }) {
-  const sceneClips = clipsForScene(params.scene, params.usableClips)
+  const sceneClips = preferFastSourceClips(clipsForScene(params.scene, params.usableClips))
   const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
   let lastError: unknown
 
