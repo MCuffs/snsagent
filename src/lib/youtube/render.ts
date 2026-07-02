@@ -34,8 +34,8 @@ interface StoredRenderedAsset {
 }
 
 const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
-const DOWNLOAD_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_TIMEOUT_MS || 45_000)
-const DOWNLOAD_IDLE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_IDLE_TIMEOUT_MS || 12_000)
+const DOWNLOAD_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_TIMEOUT_MS || 12_000)
+const DOWNLOAD_IDLE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_DOWNLOAD_IDLE_TIMEOUT_MS || 6_000)
 const TTS_SCENE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TTS_SCENE_TIMEOUT_MS || 75_000)
 const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 45_000)
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
@@ -131,7 +131,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
           const sceneStartedAt = Date.now()
           await ensureCanContinue(params, deadlineAt)
           const scene = params.scenes[index]
-          const sceneClips = preferFastSourceClips(clipsForScene(scene, usableClips))
+          const sceneMatches = preferFastSourceClips(clipsForScene(scene, usableClips))
+          const sceneClipKeys = new Set(sceneMatches.map(clip => `${clip.provider}:${clip.id}`))
+          const fallbackClips = preferFastSourceClips(usableClips)
+            .filter(clip => !sceneClipKeys.has(`${clip.provider}:${clip.id}`))
+          const sceneClips = [...sceneMatches, ...fallbackClips]
           const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
           let lastError: unknown
           try {

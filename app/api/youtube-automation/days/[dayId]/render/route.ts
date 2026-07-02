@@ -1,4 +1,5 @@
-import { NextResponse, after } from 'next/server'
+import { NextResponse } from 'next/server'
+import { start } from 'workflow/api'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
@@ -9,7 +10,7 @@ import {
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
-import { produceYouTubeShorts } from '../../../../../../src/lib/youtube/produce'
+import { youtubeShortsProductionWorkflow } from '../../../../../../src/workflows/youtube-shorts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -174,16 +175,21 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     durationMs: Date.now() - startedAt,
   })
 
-  after(async () => {
-    logYouTubeAutomation('info', 'render_after_start', logContext)
-    try {
-      await produceYouTubeShorts({ dayId: day.id, userId: user.id, requestId })
-      logYouTubeAutomation('info', 'render_after_done', logContext)
-    } catch (error) {
-      logYouTubeAutomation('error', 'render_after_unhandled_error', logContext, summarizeYouTubeAutomationError(error))
-      throw error
-    }
-  })
+  try {
+    const run = await start(youtubeShortsProductionWorkflow, [day.id, user.id, requestId])
+    logYouTubeAutomation('info', 'render_workflow_started', logContext, { runId: run.runId })
+  } catch (error) {
+    await prisma.youTubeAutomationDay.updateMany({
+      where: { id: day.id, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
+      data: {
+        status: day.status,
+        renderProgress: 0,
+        renderStage: '영상 제작 작업 등록에 실패했습니다. 다시 시도해 주세요.',
+      },
+    }).catch(() => undefined)
+    logYouTubeAutomation('error', 'render_workflow_start_failed', logContext, summarizeYouTubeAutomationError(error))
+    return NextResponse.json({ error: '영상 제작 작업 등록에 실패했습니다.' }, { status: 503 })
+  }
 
   return NextResponse.json({
     day: { id: day.id, status, renderProgress: initialProgress, renderStage, renderCancelRequested: false },

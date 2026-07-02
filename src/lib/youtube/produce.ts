@@ -185,6 +185,7 @@ export async function produceYouTubeShorts({
     const sourceClips = parseJsonArray<StockVideoCandidate>(day.sourceClipsJson)
     if (!sourceClips.some(clip => clip.videoUrl)) throw new Error('사용 가능한 영상 소스가 없습니다.')
     const scenes = parseJsonArray<YouTubeScenePlan>(day.scenesJson)
+    const shouldCancel = createThrottledCancellationCheck(dayId, logContext)
 
     logYouTubeAutomation('info', 'render_start', logContext, {
       sceneCount: scenes.length,
@@ -213,13 +214,7 @@ export async function produceYouTubeShorts({
         })
         if (updated.count === 0) throw new YouTubeRenderCancelledError()
       },
-      shouldCancel: async () => {
-        const current = await prisma.youTubeAutomationDay.findUnique({
-          where: { id: dayId },
-          select: { renderCancelRequested: true },
-        })
-        return current?.renderCancelRequested ?? true
-      },
+      shouldCancel,
     })
 
     const completed = await prisma.youTubeAutomationDay.updateMany({
@@ -265,6 +260,39 @@ export async function produceYouTubeShorts({
       ...summarizeYouTubeAutomationError(error),
     })
     if (throwOnFailure && !cancelled) throw error
+  }
+}
+
+function createThrottledCancellationCheck(
+  dayId: string,
+  logContext: { requestId?: string | null; userId: string; dayId: string },
+) {
+  let lastCheckedAt = 0
+  let cachedCancelled = false
+  let inFlight: Promise<boolean> | null = null
+
+  return async () => {
+    if (cachedCancelled) return true
+    if (Date.now() - lastCheckedAt < 5_000) return false
+    if (inFlight) return inFlight
+
+    inFlight = prisma.youTubeAutomationDay.findUnique({
+      where: { id: dayId },
+      select: { renderCancelRequested: true, status: true },
+    }).then(current => {
+      lastCheckedAt = Date.now()
+      cachedCancelled = !current
+        || current.renderCancelRequested
+        || !YOUTUBE_PRODUCTION_ACTIVE_STATUSES.includes(current.status as typeof YOUTUBE_PRODUCTION_ACTIVE_STATUSES[number])
+      return cachedCancelled
+    }).catch(error => {
+      lastCheckedAt = Date.now()
+      logYouTubeAutomation('warn', 'production_cancel_check_failed', logContext, summarizeYouTubeAutomationError(error))
+      return cachedCancelled
+    }).finally(() => {
+      inFlight = null
+    })
+    return inFlight
   }
 }
 

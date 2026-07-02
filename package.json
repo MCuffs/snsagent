@@ -31,6 +31,7 @@
     "react-dom": "19.2.4",
     "sharp": "^0.34.5",
     "thinkingdata-browser": "^2.5.0",
+    "workflow": "^4.5.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },
