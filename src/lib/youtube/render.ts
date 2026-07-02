@@ -310,9 +310,13 @@ async function normalizeClip(params: {
 function preferFastSourceClips(clips: StockVideoCandidate[]) {
   const fastClips = clips.filter(clip => {
     const url = clip.videoUrl || ''
-    return !url.includes('_1080_2048_') && !url.includes('-hd_1080_2048_')
+    return !isKnownSlowSourceVideo(url)
   })
   return fastClips.length > 0 ? fastClips : clips
+}
+
+function isKnownSlowSourceVideo(url: string) {
+  return /[_-]1080_20\d{2}[_-]/.test(url) || /[_-]1440_/.test(url) || /[_-]2160_/.test(url)
 }
 
 async function normalizeClipWithFallback(params: {
