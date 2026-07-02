@@ -27,7 +27,6 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
     where: {
       id: day.id,
       status: { notIn: ['planning', 'rendering'] },
-      renderCancelRequested: false,
     },
     data: {
       status,

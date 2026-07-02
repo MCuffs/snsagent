@@ -644,10 +644,10 @@ function DayCard({
               <button
                 type="button"
                 onClick={onCancel}
-                disabled={starting || cancelling || day.renderCancelRequested}
+                disabled={starting || cancelling}
                 className="shrink-0 rounded-lg bg-[#fff1f0] px-2 py-1 text-[10px] font-black text-[#dc2626] hover:bg-[#fee2e2] disabled:opacity-50"
               >
-                {starting ? '시작 중' : cancelling || day.renderCancelRequested ? '중단 중' : '중단'}
+                {starting ? '시작 중' : cancelling ? '중단 중' : day.renderCancelRequested ? '중단 재시도' : '중단'}
               </button>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
