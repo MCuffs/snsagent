@@ -36,7 +36,7 @@ interface StoredRenderedAsset {
 
 const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 90_000
-const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 90_000)
+const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT_MS || 45_000)
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
 const TTS_MAX_CHARS = 3900
@@ -48,6 +48,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   if (usableClips.length === 0) {
     throw new Error('Pexels/Pixabay 영상 후보가 없습니다. API 키 또는 검색 키워드를 확인해 주세요.')
   }
+  const renderClips = preferFastSourceClips(usableClips)
 
   const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
   await fs.mkdir(workRoot, { recursive: true })
@@ -82,7 +83,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       Promise.all(
         params.scenes.map(async (_, index) => {
           await ensureNotCancelled(params)
-          const clip = usableClips[index % usableClips.length]
+          const clip = renderClips[index % renderClips.length]
           const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
           await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
           await ensureNotCancelled(params)
@@ -115,7 +116,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
         durationSeconds: actualDurations[index],
         template: params.template,
         shouldCancel: params.shouldCancel,
-        usableClips,
+        usableClips: renderClips,
         workDir,
         onProgress: stage => reportProgress(params, Math.min(67, 45 + Math.round(((index + 1) / params.scenes.length) * 22)), stage),
       })
@@ -304,6 +305,14 @@ async function normalizeClip(params: {
     '-pix_fmt', 'yuv420p',
     params.outputPath,
   ], undefined, params.shouldCancel, NORMALIZE_TIMEOUT_MS)
+}
+
+function preferFastSourceClips(clips: StockVideoCandidate[]) {
+  const fastClips = clips.filter(clip => {
+    const url = clip.videoUrl || ''
+    return !url.includes('_1080_2048_') && !url.includes('-hd_1080_2048_')
+  })
+  return fastClips.length > 0 ? fastClips : clips
 }
 
 async function normalizeClipWithFallback(params: {
