@@ -1,20 +1,26 @@
-import prisma from '../../lib/db'
-import { produceYouTubeShorts } from '../lib/youtube/produce'
+const WORKFLOW_FALLBACK_STAGE = 'Workflow 시작 대기 초과 - 서버 fallback 실행 중'
 
 export async function youtubeShortsProductionWorkflow(dayId: string, userId: string, requestId?: string | null) {
-  'use workflow'
+  "use workflow"
+
   await produceYouTubeShortsStep(dayId, userId, requestId)
   return { dayId, status: 'completed' }
 }
 
 async function produceYouTubeShortsStep(dayId: string, userId: string, requestId?: string | null) {
-  'use step'
+  "use step"
+
+  const [{ default: prisma }, { produceYouTubeShorts }] = await Promise.all([
+    import('../../lib/db'),
+    import('../../src/lib/youtube/produce'),
+  ])
 
   const resumed = await prisma.youTubeAutomationDay.updateMany({
     where: {
       id: dayId,
       userId,
       status: { not: 'completed' },
+      renderStage: { not: WORKFLOW_FALLBACK_STAGE },
       renderCancelRequested: false,
     },
     data: {
