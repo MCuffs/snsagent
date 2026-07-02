@@ -46,7 +46,6 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   const isFreePlan = !userPlan || userPlan === 'FREE'
   const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
   const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
-  const canUseYouTubeAutomation = !isFreePlan
   const isYouTubeUpgradePrompt = upgradeFeatureName === '유튜브 자동화'
 
   useEffect(() => {
@@ -55,8 +54,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     const blockedVideoFeature = item.key === 'video-cardnews' && !canUseVideoFeatures
-    const blockedYouTubeAutomation = item.key === 'youtube-automation' && !canUseYouTubeAutomation
-    if (blockedVideoFeature || blockedYouTubeAutomation) {
+    if (blockedVideoFeature) {
       e.preventDefault()
       setUpgradeFeatureName(item.key === 'youtube-automation' ? '유튜브 자동화' : '영상 카드뉴스')
       setShowVideoUpgradePrompt(true)
@@ -126,7 +124,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
-                {((item.key === 'video-cardnews' && !canUseVideoFeatures) || (item.key === 'youtube-automation' && !canUseYouTubeAutomation)) && (
+                {item.key === 'video-cardnews' && !canUseVideoFeatures && (
                   <Lock className={`h-3 w-3 ${isActive ? 'text-white/70' : 'text-[#9ca3af]'}`} />
                 )}
                 {item.badge && (

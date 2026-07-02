@@ -95,10 +95,9 @@ export default function DashboardContainer({
   const pricingPath = `${localePrefix}/pricing`
   const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
   const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
-  const canUseYouTubeAutomation = !isFreePlan
+  const canUseYouTubeAutomation = true
   const activeCreatorTabBlocked =
-    ((activeTab === 'video-cardnews' || activeTab === 'video') && !canUseVideoFeatures) ||
-    (activeTab === 'youtube-automation' && !canUseYouTubeAutomation)
+    ((activeTab === 'video-cardnews' || activeTab === 'video') && !canUseVideoFeatures)
   const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeCreatorTabBlocked && !dismissedVideoUpgradePrompt)
   const closeVideoUpgradePrompt = () => {
     setShowVideoUpgradePrompt(false)
