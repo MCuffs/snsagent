@@ -178,7 +178,7 @@ export default async function AdminUserDetailPage({
               <input type="hidden" name="userId" value={user.id} />
               <input type="hidden" name="returnTo" value={`/admin/users/${user.id}`} />
               <select name="plan" defaultValue={user.plan} className={inputCls}>
-                {['FREE', 'PRO', 'UNLIMITED'].map(p => <option key={p} value={p}>{formatPlan(p, true)}</option>)}
+                {['FREE', 'YOUTUBE_PROMO', 'PRO', 'UNLIMITED'].map(p => <option key={p} value={p}>{formatPlan(p, true)}</option>)}
               </select>
               <input name="reason" placeholder="변경 사유" className={inputCls} />
               <AdminSubmitButton className={`${btnCls} w-full`}>플랜 변경</AdminSubmitButton>

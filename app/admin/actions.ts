@@ -7,7 +7,7 @@ import prisma from '../../lib/db'
 import { requireAdminUser } from '../../lib/admin'
 import { cancelSubscription } from '../../lib/polar'
 
-const VALID_PLANS = new Set(['FREE', 'PRO', 'UNLIMITED'])
+const VALID_PLANS = new Set(['FREE', 'YOUTUBE_PROMO', 'PRO', 'UNLIMITED'])
 const VALID_PAYMENT_STATUSES = new Set(['paid', 'cancelled', 'partial_refund', 'failed'])
 const VALID_ACCOUNT_STATUSES = new Set(['active', 'blocked'])
 
