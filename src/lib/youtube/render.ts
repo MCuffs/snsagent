@@ -87,20 +87,27 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     const sceneAudioPaths = ttsResults.map(r => r.sceneSpeechPath)
     const actualDurations = ttsResults.map(r => r.paddedDuration)
 
-    // ── Step 2: Normalize each clip to actual TTS duration (parallel) ──
+    // ── Step 2: Normalize each clip to actual TTS duration ──
+    // FFmpeg is CPU-bound. On Vercel's small vCPU functions, running one per scene is
+    // usually faster and more stable than spawning all scene encodes at once.
     await ensureNotCancelled(params)
-    const normalizedClips = await Promise.all(
-      params.scenes.map(async (_, index) => {
-        const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
-        await normalizeClip({
-          inputPath: rawClipPaths[index],
-          outputPath: normalizedPath,
-          durationSeconds: actualDurations[index],
-          template: params.template,
-        })
-        return normalizedPath
-      }),
-    )
+    const normalizedClips: string[] = []
+    for (const [index] of params.scenes.entries()) {
+      await ensureNotCancelled(params)
+      await reportProgress(
+        params,
+        Math.min(67, 45 + Math.round(((index + 1) / params.scenes.length) * 22)),
+        `씬별 영상 렌더링 중 (${index + 1}/${params.scenes.length})`,
+      )
+      const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
+      await normalizeClip({
+        inputPath: rawClipPaths[index],
+        outputPath: normalizedPath,
+        durationSeconds: actualDurations[index],
+        template: params.template,
+      })
+      normalizedClips.push(normalizedPath)
+    }
     await reportProgress(params, 68, '씬별 영상 컷 완료')
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
