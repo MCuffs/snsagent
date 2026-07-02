@@ -56,7 +56,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
     const blockedVideoFeature = item.key === 'video-cardnews' && !canUseVideoFeatures
     if (blockedVideoFeature) {
       e.preventDefault()
-      setUpgradeFeatureName(item.key === 'youtube-automation' ? '유튜브 자동화' : '영상 카드뉴스')
+      setUpgradeFeatureName('영상 카드뉴스')
       setShowVideoUpgradePrompt(true)
       window.setTimeout(() => {
         analytics.sidebarClick(item.key, {
@@ -167,6 +167,11 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
                   ? '월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다.'
                   : '월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.'}
               </p>
+              {isYouTubeUpgradePrompt && (
+                <p className="rounded-xl bg-[#f5f7ff] px-3 py-2 text-xs font-bold leading-5 text-[#4252ff]">
+                  Day 1 영상 제작은 무료로 체험할 수 있습니다. Day 2부터 플랜 업그레이드가 필요합니다.
+                </p>
+              )}
             </div>
             <div className="mt-5 flex gap-2">
               <Link
@@ -190,3 +195,4 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
     </>
   )
 }
+
