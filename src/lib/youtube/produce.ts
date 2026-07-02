@@ -1,4 +1,5 @@
 import prisma from '../../../lib/db'
+import { YOUTUBE_PRODUCTION_ACTIVE_STATUSES } from '../../../lib/youtube-automation-production-state'
 import { selectPlanStrategy } from '../../../lib/youtube-plan-strategies'
 import { selectShortsTemplate } from '../../../lib/youtube-shorts-templates/select'
 import { shortsTemplateInputSchema, type YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
@@ -42,10 +43,11 @@ export async function produceYouTubeShorts({
       renderStage,
       durationMs: Date.now() - startedAt,
     })
-    await prisma.youTubeAutomationDay.update({
-      where: { id: dayId },
+    const updated = await prisma.youTubeAutomationDay.updateMany({
+      where: { id: dayId, renderCancelRequested: false, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
       data: { status, renderProgress, renderStage },
     })
+    if (updated.count === 0) throw new YouTubeRenderCancelledError()
   }
 
   try {
@@ -136,7 +138,7 @@ export async function produceYouTubeShorts({
       })
 
       const planned = await prisma.youTubeAutomationDay.updateMany({
-        where: { id: dayId, renderCancelRequested: false },
+        where: { id: dayId, renderCancelRequested: false, status: 'planning' },
         data: {
           status: 'rendering',
           script: plan.script,
@@ -206,7 +208,7 @@ export async function produceYouTubeShorts({
           durationMs: Date.now() - startedAt,
         })
         const updated = await prisma.youTubeAutomationDay.updateMany({
-          where: { id: dayId, renderCancelRequested: false },
+          where: { id: dayId, renderCancelRequested: false, status: 'rendering' },
           data: { status: 'rendering', renderProgress, renderStage },
         })
         if (updated.count === 0) throw new YouTubeRenderCancelledError()
@@ -220,8 +222,8 @@ export async function produceYouTubeShorts({
       },
     })
 
-    await prisma.youTubeAutomationDay.update({
-      where: { id: dayId },
+    const completed = await prisma.youTubeAutomationDay.updateMany({
+      where: { id: dayId, renderCancelRequested: false, status: 'rendering' },
       data: {
         status: 'completed',
         mp4Url: rendered.mp4Url,
@@ -234,6 +236,7 @@ export async function produceYouTubeShorts({
         renderCancelRequested: false,
       },
     })
+    if (completed.count === 0) throw new YouTubeRenderCancelledError()
     logYouTubeAutomation('info', 'production_complete', logContext, {
       durationMs: Date.now() - startedAt,
       hasMp4: Boolean(rendered.mp4Url),

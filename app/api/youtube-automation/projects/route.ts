@@ -7,9 +7,14 @@ import {
 } from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
 import { isYouTubeDayUnlockDue } from '../../../../lib/youtube-automation-schedule'
+import {
+  YOUTUBE_CANCEL_SETTLE_MS,
+  YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_STALE_MS,
+} from '../../../../lib/youtube-automation-production-state'
+import { logYouTubeAutomation } from '../../../../src/lib/youtube/logging'
 
 export const runtime = 'nodejs'
-const STALE_PRODUCTION_MS = 12 * 60 * 1000
 
 function serializeProject(project: Record<string, unknown>, user?: { plan?: string | null; email?: string | null }) {
   const days = Array.isArray(project.days) ? project.days as Record<string, unknown>[] : []
@@ -78,11 +83,12 @@ async function pruneExpiredProjects(userId: string, retentionDays: number | null
 }
 
 async function recoverStaleProductions(userId: string) {
-  const staleBefore = new Date(Date.now() - STALE_PRODUCTION_MS)
-  await prisma.youTubeAutomationDay.updateMany({
+  const staleBefore = new Date(Date.now() - YOUTUBE_PRODUCTION_STALE_MS)
+  const cancelSettledBefore = new Date(Date.now() - YOUTUBE_CANCEL_SETTLE_MS)
+  const staleResult = await prisma.youTubeAutomationDay.updateMany({
     where: {
       userId,
-      status: { in: ['planning', 'rendering'] },
+      status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
       updatedAt: { lt: staleBefore },
     },
     data: {
@@ -92,6 +98,32 @@ async function recoverStaleProductions(userId: string) {
       renderCancelRequested: false,
     },
   })
+  if (staleResult.count > 0) {
+    logYouTubeAutomation('warn', 'stale_productions_recovered', { userId }, {
+      count: staleResult.count,
+      staleMs: YOUTUBE_PRODUCTION_STALE_MS,
+    })
+  }
+
+  const cancelResult = await prisma.youTubeAutomationDay.updateMany({
+    where: {
+      userId,
+      status: { notIn: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+      renderCancelRequested: true,
+      updatedAt: { lt: cancelSettledBefore },
+    },
+    data: {
+      renderCancelRequested: false,
+      renderProgress: 0,
+      renderStage: '영상 제작 중단됨',
+    },
+  })
+  if (cancelResult.count > 0) {
+    logYouTubeAutomation('warn', 'settled_cancel_flags_cleared', { userId }, {
+      count: cancelResult.count,
+      settleMs: YOUTUBE_CANCEL_SETTLE_MS,
+    })
+  }
 }
 
 async function unlockEligibleProjectDays(projects: Array<Record<string, unknown>>) {
