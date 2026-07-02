@@ -2,15 +2,14 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../actions'
 import prisma from '../../../../lib/db'
 import {
-  canUseYouTubeAutomation,
   getYouTubeAutomationHistoryPolicy,
-  youtubeAutomationUpgradeResponse,
+  isYouTubeAutomationUpgradeLockedDay,
 } from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
 
 export const runtime = 'nodejs'
 
-function serializeProject(project: Record<string, unknown>) {
+function serializeProject(project: Record<string, unknown>, user?: { plan?: string | null; email?: string | null }) {
   const days = Array.isArray(project.days) ? project.days as Record<string, unknown>[] : []
   return {
     id: project.id,
@@ -23,6 +22,7 @@ function serializeProject(project: Record<string, unknown>) {
       .map(day => ({
         id: day.id,
         dayNumber: day.dayNumber,
+        requiresUpgrade: user ? isYouTubeAutomationUpgradeLockedDay(user, Number(day.dayNumber)) : false,
         scheduledDate: day.scheduledDate instanceof Date ? day.scheduledDate.toISOString() : day.scheduledDate,
         title: day.title,
         status: day.status,
@@ -74,7 +74,6 @@ async function pruneExpiredProjects(userId: string, retentionDays: number | null
 
 export async function GET() {
   const user = await getSessionUser()
-  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const policy = getYouTubeAutomationHistoryPolicy(user)
@@ -91,12 +90,11 @@ export async function GET() {
     include: { days: true },
   })
 
-  return NextResponse.json({ projects: projects.map(serializeProject), historyPolicy: policy })
+  return NextResponse.json({ projects: projects.map(project => serializeProject(project, user)), historyPolicy: policy })
 }
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
-  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const policy = getYouTubeAutomationHistoryPolicy(user)
@@ -149,12 +147,11 @@ export async function POST(request: Request) {
     include: { days: true },
   })
 
-  return NextResponse.json({ project: serializeProject(project) })
+  return NextResponse.json({ project: serializeProject(project, user) })
 }
 
 export async function DELETE(request: Request) {
   const user = await getSessionUser()
-  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' }, { status: 401 })
 
   const body = await request.json().catch(() => null) as { projectId?: string } | null

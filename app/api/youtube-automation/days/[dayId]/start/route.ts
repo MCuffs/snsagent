@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
-import { canUseYouTubeAutomation, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
+import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
 import { classifyShortsContent, generateDayProductionPlan } from '../../../../../../src/lib/youtube/automation'
 import { selectShortsTemplate } from '../../../../../../lib/youtube-shorts-templates/select'
 import { selectPlanStrategy } from '../../../../../../lib/youtube-plan-strategies'
@@ -10,7 +10,6 @@ export const runtime = 'nodejs'
 
 export async function POST(_request: Request, context: { params: Promise<{ dayId: string }> }) {
   const user = await getSessionUser()
-  if (user && !canUseYouTubeAutomation(user)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const { dayId } = await context.params
@@ -20,6 +19,7 @@ export async function POST(_request: Request, context: { params: Promise<{ dayId
   })
 
   if (!day) return NextResponse.json({ error: '캘린더 항목을 찾을 수 없습니다.' }, { status: 404 })
+  if (!canUseYouTubeAutomationDay(user, day.dayNumber)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
   if (day.dayNumber > day.project.currentOpenDay || day.status === 'locked') {
     return NextResponse.json({ error: '아직 오픈되지 않은 날짜입니다.' }, { status: 403 })
   }

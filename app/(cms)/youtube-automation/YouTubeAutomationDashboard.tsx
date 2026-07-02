@@ -29,6 +29,7 @@ type SourceClip = {
 type PlannerDay = {
   id: string
   dayNumber: number
+  requiresUpgrade?: boolean
   scheduledDate: string
   title: string
   status: string
@@ -175,8 +176,13 @@ export default function YouTubeAutomationDashboard() {
     }
   }
 
-  const handleDayClick = (day: PlannerDay, effectiveLocked: boolean) => {
+  const handleDayClick = (day: PlannerDay, effectiveLocked: boolean, upgradeLocked: boolean) => {
+    if (upgradeLocked) {
+      setError('Day 1은 무료로 제작할 수 있습니다. Day 2부터는 YouTube Promo 이상 플랜 업그레이드가 필요합니다.')
+      return
+    }
     if (effectiveLocked) return
+    setError(null)
     setModalDay(day)
   }
 
@@ -427,18 +433,20 @@ export default function YouTubeAutomationDashboard() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {sortedDays.map(day => {
             const dbLocked = day.status === 'locked'
+            const upgradeLocked = day.requiresUpgrade === true
             const isNextAfterCompleted = day.dayNumber === nextAfterCompletedDayNumber
             const timeLocked = isNextAfterCompleted && msUntilUnlock > 0
-            const effectiveLocked = dbLocked || timeLocked
+            const effectiveLocked = dbLocked || timeLocked || upgradeLocked
 
             return (
               <DayCard
                 key={day.id}
                 day={day}
                 effectiveLocked={effectiveLocked}
+                upgradeLocked={upgradeLocked}
                 timeLocked={timeLocked}
                 msUntilUnlock={timeLocked ? msUntilUnlock : 0}
-                onClick={() => handleDayClick(day, effectiveLocked)}
+                onClick={() => handleDayClick(day, effectiveLocked, upgradeLocked)}
                 onCancel={() => void handleCancelRender(day)}
                 cancelling={cancellingDayId === day.id}
               />
@@ -467,6 +475,7 @@ export default function YouTubeAutomationDashboard() {
 function DayCard({
   day,
   effectiveLocked,
+  upgradeLocked,
   timeLocked,
   msUntilUnlock,
   onClick,
@@ -475,6 +484,7 @@ function DayCard({
 }: {
   day: PlannerDay
   effectiveLocked: boolean
+  upgradeLocked: boolean
   timeLocked: boolean
   msUntilUnlock: number
   onClick: () => void
@@ -500,18 +510,20 @@ function DayCard({
     >
       <div
         role="button"
-        tabIndex={effectiveLocked && !timeLocked ? -1 : 0}
+        tabIndex={effectiveLocked && !timeLocked && !upgradeLocked ? -1 : 0}
         onClick={timeLocked ? () => setShowInfo(v => !v) : onClick}
         onKeyDown={event => {
-          if ((event.key === 'Enter' || event.key === ' ') && !(effectiveLocked && !timeLocked)) {
+          if ((event.key === 'Enter' || event.key === ' ') && (!(effectiveLocked && !timeLocked) || upgradeLocked)) {
             event.preventDefault()
             if (timeLocked) setShowInfo(value => !value)
             else onClick()
           }
         }}
-        aria-disabled={effectiveLocked && !timeLocked}
+        aria-disabled={effectiveLocked && !timeLocked && !upgradeLocked}
         className={`min-h-[110px] w-full rounded-2xl border p-4 text-left transition-all ${
-          effectiveLocked
+          upgradeLocked
+            ? 'cursor-pointer border-amber-200 bg-amber-50/70 opacity-90 hover:bg-amber-50'
+            : effectiveLocked
             ? 'cursor-not-allowed border-white/54 bg-white/38 opacity-55'
             : 'border-white/70 bg-white/68 shadow-[0_12px_30px_rgba(87,119,185,0.08)] hover:border-[#c7d2fe] hover:bg-white active:scale-[0.98]'
         }`}
@@ -550,7 +562,9 @@ function DayCard({
         )}
         <p className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#94a3b8]">
           {effectiveLocked ? <Lock className="h-3 w-3" /> : day.mp4Url ? <Video className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-          {timeLocked
+          {upgradeLocked
+            ? 'Day 2부터 플랜 업그레이드가 필요합니다'
+            : timeLocked
             ? <><Clock className="h-3 w-3 ml-0.5" />{msToHHMM(remaining)} 후 오픈</>
             : effectiveLocked ? '하루에 하나씩 오픈됩니다'
             : day.mp4Url ? '영상 완성 — 클릭해서 보기'
