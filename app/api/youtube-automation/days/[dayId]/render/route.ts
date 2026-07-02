@@ -36,7 +36,6 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     where: {
       id: day.id,
       status: { notIn: ['planning', 'rendering'] },
-      renderCancelRequested: false,
     },
     data: {
       status,
@@ -50,6 +49,7 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
       status: day.status,
       renderProgress: day.renderProgress,
       renderStage: day.renderStage,
+      renderCancelRequested: day.renderCancelRequested,
       durationMs: Date.now() - startedAt,
     })
     return NextResponse.json({ error: '이미 영상 제작이 진행 중입니다.' }, { status: 409 })
