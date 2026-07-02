@@ -62,14 +62,44 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   }
 
   if (isYouTubeProductionActiveStatus(day.status) && day.renderCancelRequested) {
-    logYouTubeAutomation('warn', 'render_request_active_cancel_settling', logContext, {
-      status: day.status,
-      renderProgress: day.renderProgress,
-      renderStage: day.renderStage,
-      updatedAgeMs: Date.now() - day.updatedAt.getTime(),
-      durationMs: Date.now() - startedAt,
-    })
-    return NextResponse.json({ error: '이전 영상 제작 중단을 처리 중입니다. 잠시 후 다시 시도해 주세요.' }, { status: 409 })
+    const cancelAgeMs = Date.now() - day.updatedAt.getTime()
+    if (cancelAgeMs >= YOUTUBE_CANCEL_SETTLE_MS) {
+      const settled = await prisma.youTubeAutomationDay.updateMany({
+        where: {
+          id: day.id,
+          userId: user.id,
+          status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+          renderCancelRequested: true,
+          updatedAt: { lt: new Date(Date.now() - YOUTUBE_CANCEL_SETTLE_MS) },
+        },
+        data: {
+          status: 'ready',
+          renderProgress: 0,
+          renderStage: '영상 제작 중단됨',
+          renderCancelRequested: false,
+        },
+      })
+      if (settled.count > 0) {
+        logYouTubeAutomation('warn', 'render_request_settled_active_cancel', logContext, {
+          previousStatus: day.status,
+          previousRenderProgress: day.renderProgress,
+          previousRenderStage: day.renderStage,
+          cancelAgeMs,
+          settleMs: YOUTUBE_CANCEL_SETTLE_MS,
+        })
+        day = await prisma.youTubeAutomationDay.findFirstOrThrow({ where: { id: day.id } })
+      }
+    } else {
+      logYouTubeAutomation('warn', 'render_request_active_cancel_settling', logContext, {
+        status: day.status,
+        renderProgress: day.renderProgress,
+        renderStage: day.renderStage,
+        cancelAgeMs,
+        settleMs: YOUTUBE_CANCEL_SETTLE_MS,
+        durationMs: Date.now() - startedAt,
+      })
+      return NextResponse.json({ error: '이전 영상 제작 중단을 처리 중입니다. 잠시 후 다시 시도해 주세요.' }, { status: 409 })
+    }
   }
 
   if (!isYouTubeProductionActiveStatus(day.status) && day.renderCancelRequested) {

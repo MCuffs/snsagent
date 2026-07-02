@@ -85,10 +85,32 @@ async function pruneExpiredProjects(userId: string, retentionDays: number | null
 async function recoverStaleProductions(userId: string) {
   const staleBefore = new Date(Date.now() - YOUTUBE_PRODUCTION_STALE_MS)
   const cancelSettledBefore = new Date(Date.now() - YOUTUBE_CANCEL_SETTLE_MS)
+  const activeCancelResult = await prisma.youTubeAutomationDay.updateMany({
+    where: {
+      userId,
+      status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+      renderCancelRequested: true,
+      updatedAt: { lt: cancelSettledBefore },
+    },
+    data: {
+      status: 'ready',
+      renderProgress: 0,
+      renderStage: '영상 제작 중단됨',
+      renderCancelRequested: false,
+    },
+  })
+  if (activeCancelResult.count > 0) {
+    logYouTubeAutomation('warn', 'active_cancel_productions_settled', { userId }, {
+      count: activeCancelResult.count,
+      settleMs: YOUTUBE_CANCEL_SETTLE_MS,
+    })
+  }
+
   const staleResult = await prisma.youTubeAutomationDay.updateMany({
     where: {
       userId,
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+      renderCancelRequested: false,
       updatedAt: { lt: staleBefore },
     },
     data: {
