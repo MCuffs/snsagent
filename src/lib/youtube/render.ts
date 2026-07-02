@@ -64,9 +64,12 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       // TTS: all scenes at once
       Promise.all(
         params.scenes.map(async (scene, index) => {
+          await ensureNotCancelled(params)
           const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
           await createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds)
+          await ensureNotCancelled(params)
           const actualDuration = await probeAudioDuration(sceneSpeechPath)
+          await ensureNotCancelled(params)
           const paddedDuration = Math.max(actualDuration + 0.4, scene.durationSeconds * 0.5)
           console.log(`[YouTubeRender] Scene ${index + 1}: tts=${actualDuration.toFixed(2)}s padded=${paddedDuration.toFixed(2)}s`)
           return { sceneSpeechPath, paddedDuration }
@@ -75,9 +78,11 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       // Video download: all scenes at once (normalize happens after TTS durations are known)
       Promise.all(
         params.scenes.map(async (_, index) => {
+          await ensureNotCancelled(params)
           const clip = usableClips[index % usableClips.length]
           const rawPath = path.join(workDir, `source-${index + 1}.mp4`)
-          await downloadVideo(clip.videoUrl!, rawPath)
+          await downloadVideo(clip.videoUrl!, rawPath, params.shouldCancel)
+          await ensureNotCancelled(params)
           return rawPath
         }),
       ),
@@ -222,12 +227,29 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   }
 }
 
-async function downloadVideo(url: string, outputPath: string) {
+async function downloadVideo(url: string, outputPath: string, shouldCancel?: () => Promise<boolean>) {
+  if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+  const cancelPoll = shouldCancel
+    ? setInterval(() => {
+      void shouldCancel().then(cancel => {
+        if (cancel) controller.abort()
+      }).catch(() => undefined)
+    }, 1000)
+    : undefined
   const response = await fetch(url, {
     redirect: 'follow',
     cache: 'no-store',
-    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    signal: controller.signal,
+  }).catch(error => {
+    if (controller.signal.aborted) throw new YouTubeRenderCancelledError()
+    throw error
+  }).finally(() => {
+    clearTimeout(timeout)
+    if (cancelPoll) clearInterval(cancelPoll)
   })
+  if (await shouldCancel?.()) throw new YouTubeRenderCancelledError()
   if (!response.ok) {
     throw new Error(`무료 영상 다운로드 실패: HTTP ${response.status}`)
   }

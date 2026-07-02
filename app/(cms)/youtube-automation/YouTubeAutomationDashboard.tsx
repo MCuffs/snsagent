@@ -668,7 +668,7 @@ function DayProductionModal({
       setPhase('rendering')
       if (day.renderStage) setStepLabel(day.renderStage)
       if (typeof day.renderProgress === 'number') {
-        setPct(prev => Math.max(prev, Math.min(99, day.renderProgress!)))
+        setPct(Math.min(99, day.renderProgress))
       }
     }
   }, [day, resultDay.id])
