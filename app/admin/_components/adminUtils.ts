@@ -13,6 +13,7 @@ export function formatCurrency(value?: number | null, currency = 'krw') {
 
 const PLAN_LABELS: Record<string, string> = {
   FREE: 'Free',
+  YOUTUBE_PROMO: 'YouTube',
   PRO: 'Creator',
   UNLIMITED: 'Studio',
   ENTERPRISE: 'Enterprise',

@@ -139,7 +139,7 @@ function PricingGrid({
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
         {plansList.map((planKey) => {
           const plan = PRICING_PLANS[planKey]
           const isCurrentPlan = currentPlan === planKey
@@ -150,13 +150,13 @@ function PricingGrid({
           return (
             <article
               key={planKey}
-              className={`group relative overflow-hidden rounded-xl border bg-white transition-all duration-200 ${
+              className={`group relative flex flex-col overflow-hidden rounded-xl border bg-white transition-all duration-200 ${
                 isCurrentPlan
                   ? 'border-[#111827] shadow-md ring-1 ring-[#111827]/10'
                   : 'border-[#e5e7eb] hover:border-[#d1d5db] hover:shadow-sm'
               }`}
             >
-              <div className="p-8">
+              <div className="flex flex-1 flex-col p-8">
                 <div className="mb-6">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -177,7 +177,7 @@ function PricingGrid({
                   </div>
                 </div>
 
-                <div className="space-y-3 border-t border-slate-100 py-6">
+                <div className="flex-1 space-y-3 border-t border-slate-100 py-6">
                   {planFeatures.map((feature, idx) => (
                     <Feature key={idx}>{feature}</Feature>
                   ))}

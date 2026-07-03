@@ -85,6 +85,18 @@ export interface CampaignSummary {
   thumbnail: string | null
 }
 
+export interface CampaignUsageSummary {
+  imageUsed: number
+  videoUsed: number
+  history: {
+    id: string
+    title: string
+    mediaType: 'image' | 'video'
+    createdAt: Date
+    status: string
+  }[]
+}
+
 export interface CarouselSlide {
   id: string
   campaignId: string
@@ -1044,6 +1056,85 @@ export const dbService = {
           .filter(slide => slide.campaignId === campaign.id)
           .sort((a, b) => a.slideNumber - b.slideNumber)[0]?.imageUrl ?? null,
       }))
+  },
+
+  async getCampaignUsageSummary(userId: string, periodStart: Date | null, historyLimit = 30): Promise<CampaignUsageSummary> {
+    if (!isMock()) {
+      try {
+        const periodWhere = {
+          userId,
+          ...(periodStart ? { createdAt: { gte: periodStart } } : {}),
+        }
+
+        const historyPromise = historyLimit > 0
+          ? prisma.campaign.findMany({
+              where: { userId },
+              orderBy: { createdAt: 'desc' },
+              take: historyLimit,
+              select: {
+                id: true,
+                title: true,
+                mediaType: true,
+                createdAt: true,
+                status: true,
+              },
+            })
+          : Promise.resolve([])
+
+        const [imageUsed, videoUsed, history] = await Promise.all([
+          prisma.campaign.count({
+            where: {
+              ...periodWhere,
+              OR: [{ mediaType: null }, { mediaType: 'image' }],
+            },
+          }),
+          prisma.campaign.count({
+            where: {
+              ...periodWhere,
+              mediaType: 'video',
+            },
+          }),
+          historyPromise,
+        ])
+
+        return {
+          imageUsed,
+          videoUsed,
+          history: history.map(campaign => ({
+            id: campaign.id,
+            title: campaign.title,
+            mediaType: campaign.mediaType === 'video' ? 'video' : 'image',
+            createdAt: campaign.createdAt,
+            status: campaign.status,
+          })),
+        }
+      } catch (err) {
+        console.warn('Prisma getCampaignUsageSummary failed, falling back to mock database', err)
+        if (process.env.DATABASE_MOCK_FALLBACK === 'false') {
+          throw err
+        }
+      }
+    }
+
+    const db = initMockDb()
+    const campaigns = db.campaigns
+      .filter(campaign => campaign.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    const periodCampaigns = periodStart
+      ? campaigns.filter(campaign => campaign.createdAt.getTime() >= periodStart.getTime())
+      : campaigns
+
+    return {
+      imageUsed: periodCampaigns.filter(campaign => (campaign as { mediaType?: string }).mediaType !== 'video').length,
+      videoUsed: periodCampaigns.filter(campaign => (campaign as { mediaType?: string }).mediaType === 'video').length,
+      history: campaigns.slice(0, historyLimit).map(campaign => ({
+        id: campaign.id,
+        title: campaign.title,
+        mediaType: (campaign as { mediaType?: string }).mediaType === 'video' ? 'video' : 'image',
+        createdAt: campaign.createdAt,
+        status: campaign.status,
+      })),
+    }
   },
 
   async deleteCampaign(userId: string, campaignId: string): Promise<boolean> {

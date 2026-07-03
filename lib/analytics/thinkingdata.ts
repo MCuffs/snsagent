@@ -348,6 +348,134 @@ export const analytics = {
   campaignView: (campaignId: string, props?: Record<string, unknown>) =>
     track('campaign_view', { campaign_id: campaignId, ...props }),
 
+  // YouTube automation
+  youtubeAutomationView: (props?: Record<string, unknown>) => track('youtube_automation_view', props),
+  youtubePlannerCreateStart: (topicLength: number, historyCount: number) =>
+    track('youtube_planner_create_start', { topic_length: topicLength, history_count: historyCount }),
+  youtubePlannerCreateComplete: (projectId: string, dayCount: number, durationMs: number) =>
+    track('youtube_planner_create_complete', {
+      project_id: projectId, day_count: dayCount, duration_ms: durationMs,
+    }),
+  youtubePlannerCreateFailed: (durationMs: number, reason: string) =>
+    track('youtube_planner_create_failed', { duration_ms: durationMs, reason }),
+  youtubeProjectOpen: (
+    projectId: string,
+    projectStatus: string,
+    completedDayCount: number,
+    source: 'created' | 'history',
+  ) => track('youtube_project_open', {
+    project_id: projectId,
+    project_status: projectStatus,
+    completed_day_count: completedDayCount,
+    source,
+  }),
+  youtubeProjectDelete: (projectId: string, success: boolean, reason?: string) =>
+    track('youtube_project_delete', { project_id: projectId, success, reason }),
+  youtubeDaySelect: (props: {
+    projectId: string
+    dayId: string
+    dayNumber: number
+    dayStatus: string
+    isLocked: boolean
+    hasVideo: boolean
+  }) => track('youtube_day_select', {
+    project_id: props.projectId,
+    day_id: props.dayId,
+    day_number: props.dayNumber,
+    day_status: props.dayStatus,
+    is_locked: props.isLocked,
+    has_video: props.hasVideo,
+  }),
+  youtubeProductionStart: (props: {
+    projectId: string
+    dayId: string
+    dayNumber: number
+    resumed: boolean
+    retry: boolean
+  }) => track('youtube_production_start', {
+    project_id: props.projectId,
+    day_id: props.dayId,
+    day_number: props.dayNumber,
+    resumed: props.resumed,
+    retry: props.retry,
+  }),
+  youtubePlanComplete: (props: {
+    projectId: string
+    dayId: string
+    dayNumber: number
+    sceneCount: number
+    durationMs: number
+  }) => track('youtube_plan_complete', {
+    project_id: props.projectId,
+    day_id: props.dayId,
+    day_number: props.dayNumber,
+    scene_count: props.sceneCount,
+    duration_ms: props.durationMs,
+  }),
+  youtubeRenderStart: (props: {
+    projectId: string
+    dayId: string
+    dayNumber: number
+    sceneCount: number
+  }) => track('youtube_render_start', {
+    project_id: props.projectId,
+    day_id: props.dayId,
+    day_number: props.dayNumber,
+    scene_count: props.sceneCount,
+  }),
+  youtubeRenderRequested: (projectId: string, dayId: string, dayNumber: number, durationMs: number) =>
+    track('youtube_render_requested', {
+      project_id: projectId, day_id: dayId, day_number: dayNumber, duration_ms: durationMs,
+    }),
+  youtubeRenderComplete: (projectId: string, dayId: string, dayNumber: number, sceneCount: number) =>
+    track('youtube_render_complete', {
+      project_id: projectId, day_id: dayId, day_number: dayNumber, scene_count: sceneCount,
+    }),
+  youtubeProductionFailed: (
+    projectId: string,
+    dayId: string,
+    dayNumber: number,
+    phase: string,
+    reason: string,
+  ) => track('youtube_production_failed', {
+    project_id: projectId, day_id: dayId, day_number: dayNumber, phase, reason,
+  }),
+  youtubeRenderCancel: (
+    projectId: string,
+    dayId: string,
+    dayNumber: number,
+    success: boolean,
+    reason?: string,
+  ) => track('youtube_render_cancel', {
+    project_id: projectId, day_id: dayId, day_number: dayNumber, success, reason,
+  }),
+  youtubeVideoDownload: (props: {
+    projectId: string
+    dayId: string
+    dayNumber: number
+    success: boolean
+    durationMs: number
+    fileSizeBytes?: number
+    reason?: string
+  }) => track('youtube_video_download', {
+    project_id: props.projectId,
+    day_id: props.dayId,
+    day_number: props.dayNumber,
+    success: props.success,
+    duration_ms: props.durationMs,
+    file_size_bytes: props.fileSizeBytes,
+    reason: props.reason,
+  }),
+  youtubeUploadMarked: (
+    projectId: string,
+    dayId: string,
+    dayNumber: number,
+    success: boolean,
+    reason?: string,
+  ) => track('youtube_upload_marked', {
+    project_id: projectId, day_id: dayId, day_number: dayNumber, success, reason,
+  }),
+
   // Billing
   billingPageView: (currentPlan: string, props?: Record<string, unknown>) =>
     track('billing_page_view', { current_plan: currentPlan, ...props }),

@@ -5,6 +5,8 @@ import { analyzeContentFunction } from '../../../src/lib/inngest/functions/analy
 import { updateTrendVectorsFunction } from '../../../src/lib/inngest/functions/updateTrendVectors'
 import { compressMemoryFunction, compressBrandMemoryFunction } from '../../../src/lib/inngest/functions/compressMemory'
 
+export const maxDuration = 800
+
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [

@@ -8,6 +8,10 @@ export interface PolarOrderWebhookData {
   currency?: string
   subscription_id?: string | null
   checkout_id?: string | null
+  product_id?: string | null
+  product?: {
+    id?: string | null
+  } | null
   metadata?: Record<string, unknown>
   customer?: {
     email?: string | null

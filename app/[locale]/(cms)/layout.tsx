@@ -21,17 +21,23 @@ export default async function CmsLayout({
   children: React.ReactNode
   params: Promise<{ locale: string }>
 }) {
-  const { locale } = await params
-  const user = await getSessionUser()
+  const [{ locale }, user, t] = await Promise.all([
+    params,
+    getSessionUser(),
+    getTranslations('cms'),
+  ])
 
-  const t = await getTranslations('cms')
-  const brands = user ? await getCachedBrands(user.id) : []
+  const [brands, usageSummary] = user
+    ? await Promise.all([
+        getCachedBrands(user.id),
+        getUsageSummaryForUser(user),
+      ])
+    : [[], null]
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
   const hasSubscription = Boolean(user?.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
   const isAdminUser = isAdminEmail(user?.email)
   const planLabel = isAdminUser ? 'ADMIN' : user?.plan
   const navAccessPlan = isAdminUser ? 'ADMIN' : user ? normalizePlan(user.plan || 'FREE') : null
-  const usageSummary = user ? await getUsageSummaryForUser(user) : null
 
   return (
     <TabProvider>

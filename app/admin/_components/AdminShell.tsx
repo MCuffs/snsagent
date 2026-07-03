@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ReactNode } from 'react'
-import { BarChart2, CreditCard, LayoutDashboard, LayoutTemplate, Users, Zap } from 'lucide-react'
+import { BarChart2, CreditCard, LayoutDashboard, LayoutTemplate, Smartphone, Users, Zap } from 'lucide-react'
 
 const navItems = [
+  { href: '/admin/youtube-shorts-templates', label: 'YouTube Shorts 템플릿', icon: Smartphone },
   { href: '/admin', label: '대시보드', icon: LayoutDashboard, exact: true },
   { href: '/admin/users', label: '사용자', icon: Users },
   { href: '/admin/generations', label: '생성 내역', icon: Zap },

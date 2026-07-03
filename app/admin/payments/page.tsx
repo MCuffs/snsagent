@@ -63,10 +63,11 @@ export default async function AdminPaymentsPage({
   ])
 
   const statusOptions = ['paid', 'cancelled', 'partial_refund', 'failed']
+  const totalPolar = provider === 'polar' ? total : await prisma.paymentRecord.count({ where: { provider: 'polar' } })
 
   return (
     <>
-      <AdminPageHeader title="결제 운영 기록" description="Polar 결제·환불 웹훅 기록과 내부 수동 기록을 함께 조회합니다." />
+      <AdminPageHeader title="결제 운영 기록" description={`Polar 결제 ${totalPolar.toLocaleString()}건 포함. Polar webhook으로 저장된 주문/구독 정보를 조회합니다.`} />
       <AdminFlash message={params?.message} error={params?.error} />
 
       <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -120,7 +121,7 @@ export default async function AdminPaymentsPage({
           <EmptyState>결제 기록이 없습니다.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-left">
+            <table className="w-full min-w-[1380px] text-left">
               <thead className="border-b border-[#f0f0f0]">
                 <tr>
                   <Th>주문 ID</Th>
@@ -129,9 +130,14 @@ export default async function AdminPaymentsPage({
                   <Th>금액</Th>
                   <Th>환불액</Th>
                   <Th>PG 거래 ID</Th>
+                  <Th>Polar 구독 ID</Th>
+                  <Th>Polar 상품 ID</Th>
+                  <Th>Polar 고객 이메일</Th>
                   <Th>상태</Th>
                   <Th>결제일</Th>
                   <Th>환불일</Th>
+                  <Th>기록 생성</Th>
+                  <Th>메모/메타데이터</Th>
                   <Th>내부 기록 수정</Th>
                 </tr>
               </thead>
@@ -148,9 +154,16 @@ export default async function AdminPaymentsPage({
                     <Td className="font-semibold">{formatCurrency(payment.amount, payment.currency)}</Td>
                     <Td className="font-semibold text-red-600">{payment.refundedAmount > 0 ? formatCurrency(payment.refundedAmount, payment.currency) : '-'}</Td>
                     <Td className="text-[#888]">{payment.pgTransactionId || '-'}</Td>
+                    <Td className="font-mono text-xs text-[#888]">{payment.providerSubscriptionId || '-'}</Td>
+                    <Td className="font-mono text-xs text-[#888]">{payment.providerProductId || '-'}</Td>
+                    <Td className="text-[#888]">{payment.customerEmail || '-'}</Td>
                     <Td><span className={statusPill(payment.status)}>{payment.status}</span></Td>
                     <Td className="text-[#888]">{formatDate(payment.paidAt)}</Td>
                     <Td className="text-[#888]">{formatDate(payment.refundedAt)}</Td>
+                    <Td className="text-[#888]">{formatDate(payment.createdAt)}</Td>
+                    <Td className="max-w-[240px] break-all text-xs text-[#888]">
+                      {payment.internalNote || payment.providerMetadata || '-'}
+                    </Td>
                     <Td>
                       {payment.provider === 'manual' ? (
                         <form action={updatePaymentStatusAction} className="flex flex-col gap-1.5 min-w-[220px]">

@@ -121,6 +121,9 @@ model Campaign {
   posts                      Post[]
   qualityScoreLogs           QualityScoreLog[]
   youtubeAutomationDays      YouTubeAutomationDay[]
+
+  @@index([userId, createdAt])
+  @@index([userId, mediaType, createdAt])
 }
 
 model YouTubeAutomationProject {
@@ -162,6 +165,21 @@ model YouTubeAutomationDay {
   subtitleJson   String?
   mp4Url         String?
   thumbnailUrl   String?
+  renderProgress Int                      @default(0)
+  renderStage    String?
+  renderCancelRequested Boolean           @default(false)
+  selectedTemplateKey  String?
+  templateVersion      Int?
+  templateSnapshotJson String?
+  classifierResultJson String?
+  usedDefaultTemplate  Boolean                  @default(false)
+  selectionReason      String?
+  videoStructureJson   String?
+  selectedPlanStrategyKey String?
+  planStrategySnapshotJson String?
+  sceneRoleSequenceJson String?
+  hookPattern          String?
+  endingPattern        String?
   uploadedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -170,6 +188,29 @@ model YouTubeAutomationDay {
   @@index([userId, scheduledDate])
   @@index([status])
   @@index([campaignId])
+}
+
+model YouTubeShortsTemplate {
+  id               String   @id @default(uuid())
+  templateName     String
+  templateKey      String   @unique
+  category         String
+  description      String?
+  isActive         Boolean  @default(false)
+  isDefault        Boolean  @default(false)
+  layoutConfig     String   @default("{}")
+  headerStyle      String   @default("{}")
+  captionStyle     String   @default("{}")
+  videoRules       String   @default("{}")
+  ctaConfig        String   @default("{}")
+  aiMatchingConfig String   @default("{}")
+  overlayConfig    String   @default("{}")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive, category])
+  @@index([isDefault])
 }
 
 model CarouselSlide {
@@ -316,6 +357,10 @@ model PaymentRecord {
   currency        String    @default("krw")
   refundedAmount  Int       @default(0)
   pgTransactionId String?
+  providerSubscriptionId String?
+  providerProductId      String?
+  customerEmail          String?
+  providerMetadata       String?
   status          String    @default("paid") // paid, cancelled, partial_refund, failed
   paidAt          DateTime?
   refundedAt      DateTime?
@@ -328,6 +373,8 @@ model PaymentRecord {
   @@index([userId, createdAt])
   @@index([status])
   @@index([paidAt])
+  @@index([provider])
+  @@index([providerSubscriptionId])
 }
 
 model AdminActionLog {

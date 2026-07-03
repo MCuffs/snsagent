@@ -86,14 +86,18 @@ export default function DashboardContainer({
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const [dismissedVideoUpgradePrompt, setDismissedVideoUpgradePrompt] = useState(false)
-  const isFreePlan = userPlan === 'FREE'
+  const isFreePlan = !userPlan || userPlan === 'FREE'
   const localePrefix = pathname?.startsWith('/ko/') || pathname === '/ko'
     ? '/ko'
     : pathname?.startsWith('/en/') || pathname === '/en'
       ? '/en'
       : ''
   const pricingPath = `${localePrefix}/pricing`
-  const activeCreatorTabBlocked = (activeTab === 'video-cardnews' || activeTab === 'video' || activeTab === 'youtube-automation') && isFreePlan
+  const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
+  const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
+  const canUseYouTubeAutomation = true
+  const activeCreatorTabBlocked =
+    ((activeTab === 'video-cardnews' || activeTab === 'video') && !canUseVideoFeatures)
   const shouldShowVideoUpgradePrompt = showVideoUpgradePrompt || (activeCreatorTabBlocked && !dismissedVideoUpgradePrompt)
   const closeVideoUpgradePrompt = () => {
     setShowVideoUpgradePrompt(false)
@@ -329,7 +333,7 @@ export default function DashboardContainer({
         </div>
 
       <div className={tabPanelClass('video')} aria-hidden={activeTab !== 'video'}>
-        {isFreePlan ? (
+        {!canUseVideoFeatures ? (
           <VideoUpgradeEmptyState pricingPath={pricingPath} />
         ) : brandToPass ? (
           <VideoCardNewsForm
@@ -353,20 +357,21 @@ export default function DashboardContainer({
       </div>
 
       <div className={tabPanelClass('youtube-automation')} aria-hidden={activeTab !== 'youtube-automation'}>
-        {isFreePlan ? (
+        {!canUseYouTubeAutomation ? (
           <VideoUpgradeEmptyState
             pricingPath={pricingPath}
             featureName="유튜브 자동화"
-            description="월 25,000원 Creator 이상 플랜에서 30일 플래너 생성, 기획, TTS, MP4 렌더링을 시작할 수 있습니다."
+            title="유튜브 자동화는 YouTube Promo 플랜부터 사용할 수 있습니다."
+            description="월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다."
           />
         ) : (
-          <YouTubeAutomationDashboard />
+          <YouTubeAutomationDashboard isActive={activeTab === 'youtube-automation'} />
         )}
       </div>
 
       {brandToPass && (
         <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
-          {isFreePlan ? (
+          {!canUseVideoFeatures ? (
             <VideoUpgradeEmptyState pricingPath={pricingPath} />
           ) : (
             <VideoCardNewsForm
@@ -615,10 +620,12 @@ function ProfileSelectAmbientBackdrop() {
 function VideoUpgradeEmptyState({
   pricingPath,
   featureName = '영상 카드뉴스',
+  title,
   description = '월 25,000원 Creator 이상 플랜에서 고급 영상 제작 기능을 사용할 수 있습니다.',
 }: {
   pricingPath: string
   featureName?: string
+  title?: string
   description?: string
 }) {
   return (
@@ -627,7 +634,9 @@ function VideoUpgradeEmptyState({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f5f7ff] text-[#4252ff]">
           <Lock className="h-6 w-6" />
         </div>
-        <h2 className="mt-5 text-lg font-black text-[#111827]">{featureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
+        <h2 className="mt-5 text-lg font-black text-[#111827]">
+          {title || `${featureName}는 Creator 플랜부터 사용할 수 있습니다.`}
+        </h2>
         <p className="mt-3 text-sm font-medium leading-6 text-[#6b7280]">
           {description}
         </p>

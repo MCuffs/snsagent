@@ -11,6 +11,19 @@ import {
 
 export const runtime = 'nodejs'
 
+type PaidPlan = 'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED'
+const PAID_PLANS: PaidPlan[] = ['YOUTUBE_PROMO', 'PRO', 'UNLIMITED']
+
+function planFromMetadata(metadata?: Record<string, unknown> | null): PaidPlan | null {
+  const plan = typeof metadata?.plan === 'string' ? metadata.plan : null
+  return PAID_PLANS.includes(plan as PaidPlan) ? plan as PaidPlan : null
+}
+
+function planFromOrder(order: PolarOrderWebhookData): PaidPlan | null {
+  const productId = order.product_id || order.product?.id || null
+  return (productId ? planFromPolarProductId(productId) : null) || planFromMetadata(order.metadata)
+}
+
 export async function POST(request: NextRequest) {
   let rawBody: string
   try {
@@ -44,18 +57,18 @@ export async function POST(request: NextRequest) {
   try {
     if (type === 'order.paid' || type === 'order.refunded') {
       await syncPolarOrder(type, data as PolarOrderWebhookData, event.timestamp)
-    } else if (type === 'subscription.active' || type === 'subscription.created') {
+    } else if (type === 'subscription.active') {
       const subscriptionId = data.id as string | undefined
       const productId = (data.product_id ?? (data.product as { id?: string } | undefined)?.id) as string | undefined
       const customerEmail = (data.customer as { email?: string } | undefined)?.email
       const userId = (data.metadata as Record<string, string> | undefined)?.userId
 
-      if (!subscriptionId || !productId || !customerEmail) {
+      if (!subscriptionId || !customerEmail) {
         console.warn('[Polar Webhook] Missing required fields', { subscriptionId, productId, customerEmail })
         return NextResponse.json({ received: true })
       }
 
-      const plan = planFromPolarProductId(productId)
+      const plan = (productId ? planFromPolarProductId(productId) : null) || planFromMetadata(data.metadata as Record<string, unknown> | undefined)
       if (!plan) {
         console.warn('[Polar Webhook] Unknown product id', productId)
         return NextResponse.json({ received: true })
@@ -80,6 +93,13 @@ export async function POST(request: NextRequest) {
         plan,
       })
       console.log(`[Polar Webhook] Activated ${plan} for user ${user.id}`)
+    } else if (type === 'subscription.created') {
+      // Polar documents that a newly created subscription may still be
+      // incomplete. Access is granted only by order.paid/subscription.active.
+      console.log('[Polar Webhook] Subscription created; awaiting payment confirmation', {
+        subscriptionId: data.id,
+        status: data.status,
+      })
     } else if (
       type === 'subscription.canceled' ||
       type === 'subscription.revoked'
@@ -129,18 +149,27 @@ async function syncPolarOrder(
   const customerEmail = order.customer.email || null
 
   let user = metadataUserId
-    ? await prisma.user.findUnique({ where: { id: metadataUserId }, select: { id: true } })
+    ? await prisma.user.findUnique({
+        where: { id: metadataUserId },
+        select: { id: true, polarSubscriptionId: true },
+      })
     : null
   if (!user && externalUserId) {
-    user = await prisma.user.findUnique({ where: { id: externalUserId }, select: { id: true } })
+    user = await prisma.user.findUnique({
+      where: { id: externalUserId },
+      select: { id: true, polarSubscriptionId: true },
+    })
   }
   if (!user && customerEmail) {
-    user = await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } })
+    user = await prisma.user.findUnique({
+      where: { email: customerEmail },
+      select: { id: true, polarSubscriptionId: true },
+    })
   }
   if (!user && order.subscription_id) {
     user = await prisma.user.findUnique({
       where: { polarSubscriptionId: order.subscription_id },
-      select: { id: true },
+      select: { id: true, polarSubscriptionId: true },
     })
   }
   if (!user) {
@@ -152,6 +181,8 @@ async function syncPolarOrder(
   const occurredAt = polarOrderTimestamp(order, eventTimestamp)
   const status = paymentStatusFromPolarOrder(order)
   const currency = (order.currency || 'krw').toLowerCase()
+  const productId = order.product_id || order.product?.id || null
+  const providerMetadata = order.metadata ? JSON.stringify(order.metadata) : null
 
   await prisma.paymentRecord.upsert({
     where: { orderId: order.id },
@@ -163,6 +194,10 @@ async function syncPolarOrder(
       currency,
       refundedAmount,
       pgTransactionId: order.checkout_id || order.id,
+      providerSubscriptionId: order.subscription_id || null,
+      providerProductId: productId,
+      customerEmail,
+      providerMetadata,
       status,
       paidAt: type === 'order.paid'
         ? occurredAt
@@ -176,11 +211,50 @@ async function syncPolarOrder(
       currency,
       refundedAmount,
       pgTransactionId: order.checkout_id || order.id,
+      providerSubscriptionId: order.subscription_id || null,
+      providerProductId: productId,
+      customerEmail,
+      providerMetadata,
       status,
       ...(type === 'order.paid' ? { paidAt: occurredAt } : {}),
       refundedAt: refundedAmount > 0 ? occurredAt : null,
     },
   })
+
+  if (type === 'order.paid') {
+    const plan = planFromOrder(order)
+    if (plan) {
+      await dbService.updateUserPolar(user.id, {
+        polarSubscriptionId: order.subscription_id || undefined,
+        polarSubscriptionStatus: order.subscription_id ? 'active' : undefined,
+        plan,
+      })
+      console.log(`[Polar Webhook] Activated ${plan} from paid order ${order.id} for user ${user.id}`)
+    } else {
+      console.warn('[Polar Webhook] Paid order synced without plan mapping', {
+        orderId: order.id,
+        productId: order.product_id || order.product?.id,
+      })
+    }
+  } else if (status === 'cancelled') {
+    const sameSubscription = !order.subscription_id
+      || !user.polarSubscriptionId
+      || user.polarSubscriptionId === order.subscription_id
+    if (sameSubscription) {
+      await dbService.updateUserPolar(user.id, {
+        polarSubscriptionId: null,
+        polarSubscriptionStatus: 'refunded',
+        plan: 'FREE',
+      })
+      console.log(`[Polar Webhook] Downgraded fully refunded order ${order.id} for user ${user.id}`)
+    } else {
+      console.warn('[Polar Webhook] Full refund belongs to an older subscription; active plan preserved', {
+        orderId: order.id,
+        orderSubscriptionId: order.subscription_id,
+        userId: user.id,
+      })
+    }
+  }
 
   console.log(`[Polar Webhook] Synced ${type} for order ${order.id}`)
 }

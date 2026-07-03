@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BookOpen, Zap, Grid3X3, LucideIcon, Clapperboard, Lock, Sparkles, X, TvMinimalPlay } from 'lucide-react'
 import { useTab } from './TabContext'
 import { analytics } from '../../lib/analytics/thinkingdata'
 import { useTranslations } from 'next-intl'
+import { useCloseMobileMenu } from './MobileHeader'
 
 interface NavItem {
   key: string
@@ -35,18 +37,28 @@ interface SidebarNavProps {
 export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
+  const closeMobileMenu = useCloseMobileMenu()
   const t = useTranslations('cms')
   const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false)
   const [upgradeFeatureName, setUpgradeFeatureName] = useState('영상 카드뉴스')
+  const portalReady = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
   const prefix = locale ? `/${locale}` : ''
   const conceptPath = `${prefix}/concept`
   const pricingPath = `${prefix}/pricing`
-  const isFreePlan = userPlan === 'FREE'
+  const isFreePlan = !userPlan || userPlan === 'FREE'
+  const isYouTubePromoPlan = userPlan === 'YOUTUBE_PROMO'
+  const canUseVideoFeatures = !isFreePlan && !isYouTubePromoPlan
+  const isYouTubeUpgradePrompt = upgradeFeatureName === '유튜브 자동화'
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    if ((item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan) {
+    const blockedVideoFeature = item.key === 'video-cardnews' && !canUseVideoFeatures
+    if (blockedVideoFeature) {
       e.preventDefault()
-      setUpgradeFeatureName(item.key === 'youtube-automation' ? '유튜브 자동화' : '영상 카드뉴스')
+      setUpgradeFeatureName('영상 카드뉴스')
       setShowVideoUpgradePrompt(true)
       window.setTimeout(() => {
         analytics.sidebarClick(item.key, {
@@ -62,6 +74,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
       e.preventDefault()
       setActiveTab(item.key)
     }
+    closeMobileMenu()
 
     window.setTimeout(() => {
       analytics.sidebarClick(item.key, {
@@ -78,7 +91,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
         {navItems.map((item) => {
         const Icon = item.icon
         const disabled = false
-        const href = item.key === 'concept' ? conceptPath : `${conceptPath}${item.href.replace('/concept', '')}`
+        const href = item.key === 'concept' ? `${conceptPath}?tab=concept` : `${conceptPath}${item.href.replace('/concept', '')}`
         const isActive = pathname === conceptPath && activeTab === item.key
 
         if (disabled) {
@@ -114,7 +127,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium leading-none">{t(item.labelKey as Parameters<typeof t>[0])}</p>
-                {(item.key === 'video-cardnews' || item.key === 'youtube-automation') && isFreePlan && (
+                {item.key === 'video-cardnews' && !canUseVideoFeatures && (
                   <Lock className={`h-3 w-3 ${isActive ? 'text-white/70' : 'text-[#9ca3af]'}`} />
                 )}
                 {item.badge && (
@@ -130,7 +143,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
         })}
       </nav>
 
-      {showVideoUpgradePrompt && (
+      {portalReady && showVideoUpgradePrompt && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
           <div className="w-full max-w-[360px] rounded-2xl border border-white/70 bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
             <div className="flex items-start justify-between gap-3">
@@ -147,10 +160,21 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
               </button>
             </div>
             <div className="mt-4 space-y-2">
-              <h2 className="text-base font-black text-[#111827]">{upgradeFeatureName}는 Creator 플랜부터 사용할 수 있습니다.</h2>
+              <h2 className="text-base font-black text-[#111827]">
+                {isYouTubeUpgradePrompt
+                  ? '유튜브 자동화는 YouTube Promo 플랜부터 사용할 수 있습니다.'
+                  : `${upgradeFeatureName}는 Creator 플랜부터 사용할 수 있습니다.`}
+              </h2>
               <p className="text-sm font-medium leading-6 text-[#6b7280]">
-                월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.
+                {isYouTubeUpgradePrompt
+                  ? '월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다.'
+                  : '월 25,000원 Creator 이상 플랜에서 사용할 수 있습니다. Free 플랜에서는 기본 카드뉴스 체험만 제공됩니다.'}
               </p>
+              {isYouTubeUpgradePrompt && (
+                <p className="rounded-xl bg-[#f5f7ff] px-3 py-2 text-xs font-bold leading-5 text-[#4252ff]">
+                  Day 1 영상 제작은 무료로 체험할 수 있습니다. Day 2부터 플랜 업그레이드가 필요합니다.
+                </p>
+              )}
             </div>
             <div className="mt-5 flex gap-2">
               <Link
@@ -168,8 +192,10 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )
 }
+

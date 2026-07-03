@@ -1,20 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 
 interface MobileHeaderProps {
   children?: React.ReactNode
   locale?: string
 }
 
+const CloseMobileMenuContext = createContext<() => void>(() => undefined)
+
+export function useCloseMobileMenu() {
+  return useContext(CloseMobileMenuContext)
+}
+
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
+  const billingPath = locale ? `/${locale}/billing` : '/billing'
+  const shouldOpenByDefault = pathname !== billingPath
+  const [isOpen, setIsOpen] = useState(shouldOpenByDefault)
 
   const prefix = locale ? `/${locale}` : ''
+
+  useEffect(() => {
+    setIsOpen(shouldOpenByDefault)
+  }, [shouldOpenByDefault])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
 
   return (
     <>
@@ -52,7 +75,7 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 right-0 z-50 flex w-[min(280px,85vw)] flex-col border-l border-[#e4e4e7] bg-[#fafafa] shadow-xl lg:hidden"
+              className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-[#fafafa] shadow-xl lg:hidden"
               style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
               {/* Close Button */}
@@ -69,8 +92,19 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
               </div>
 
               {/* Drawer Content */}
-              <div className="min-h-0 flex-1 overflow-y-auto" onClick={() => setIsOpen(false)}>
-                {children}
+              <div
+                className="min-h-0 flex-1 overflow-y-auto"
+                onClick={(e) => {
+                  if (e.defaultPrevented) return
+                  // Only close drawer when clicking an actual navigation link, not upgrade modals
+                  if ((e.target as HTMLElement).closest('a[href]')) {
+                    setIsOpen(false)
+                  }
+                }}
+              >
+                <CloseMobileMenuContext.Provider value={() => setIsOpen(false)}>
+                  {children}
+                </CloseMobileMenuContext.Provider>
               </div>
             </motion.div>
           </>

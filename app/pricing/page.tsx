@@ -13,18 +13,36 @@ const plans = [
     {
         name: PRICING_PLANS.FREE.name,
         tagline: '체험 시작',
-        price: PRICING_PLANS.FREE.price,
-        period: '',
+        price: '₩0',
+        period: '무료',
         desc: PRICING_PLANS.FREE.description,
         cta: '무료로 시작하기',
         features: ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', 'AI 재생성 미포함'],
         highlight: false,
+        mobileOrderClass: 'order-3 md:order-none',
+    },
+    {
+        name: PRICING_PLANS.YOUTUBE_PROMO.name,
+        tagline: '유튜브 자동화',
+        price: '₩9,900',
+        period: '/ 월',
+        desc: PRICING_PLANS.YOUTUBE_PROMO.description,
+        cta: 'Google Login',
+        features: [
+            '유튜브 자동화 전용',
+            '30일 쇼츠 제목 캘린더 생성',
+            '작업 히스토리 최대 3개',
+            '작업 히스토리 30일 보관',
+            '카드뉴스/영상 카드뉴스 생성 미포함',
+        ],
+        highlight: false,
+        mobileOrderClass: 'order-2 md:order-none',
     },
     {
         name: PRICING_PLANS.PRO.name,
         tagline: '브랜드 운영',
-        price: PRICING_PLANS.PRO.price,
-        period: '',
+        price: '₩25,000',
+        period: '/ 월',
         desc: PRICING_PLANS.PRO.description,
         cta: 'Google Login',
         features: [
@@ -37,12 +55,13 @@ const plans = [
             '결과 편집 및 다운로드',
         ],
         highlight: true,
+        mobileOrderClass: 'order-1 md:order-none',
     },
     {
         name: PRICING_PLANS.UNLIMITED.name,
         tagline: '콘텐츠 팀',
-        price: PRICING_PLANS.UNLIMITED.price,
-        period: '',
+        price: '₩39,000',
+        period: '/ 월',
         desc: PRICING_PLANS.UNLIMITED.description,
         cta: 'Google Login',
         features: [
@@ -55,6 +74,7 @@ const plans = [
             '결과 편집 및 다운로드',
         ],
         highlight: false,
+        mobileOrderClass: 'order-4 md:order-none',
     },
 ]
 
@@ -77,7 +97,7 @@ const faqs = [
     },
     {
         q: '플랜 간 차이는 무엇인가요?',
-        a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공하며 유료 플랜에는 AI 배경 재생성이 포함됩니다.',
+        a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. YouTube Promo는 유튜브 자동화만 사용할 수 있고 작업 히스토리는 3개까지 30일 보관됩니다. Creator는 월 20회 생성과 90일 보관, Studio는 월 30회 생성과 365일 보관을 제공합니다.',
     },
     {
         q: '로그인만 하면 바로 생성할 수 있나요?',
@@ -94,18 +114,19 @@ const faqs = [
 ]
 
 const compareFeatures = [
-    { feature: '카드뉴스 생성 수', free: '최초 2회', creator: '월 20회', studio: '월 30회' },
-    { feature: '작업 히스토리 보관', free: '30일', creator: '90일', studio: '365일' },
-    { feature: '브랜드 URL 분석', free: '✓', creator: '✓', studio: '✓' },
-    { feature: 'AI 문구·이미지 생성', free: '✓', creator: '✓', studio: '✓' },
-    { feature: '상품 참고 이미지 입력', free: '최대 4장', creator: '최대 4장', studio: '최대 4장' },
-    { feature: 'AI 배경 재생성', free: '3,000원 / 1회', creator: '1회분/건', studio: '1회분/건' },
-    { feature: '결과 편집 및 다운로드', free: '✓', creator: '✓', studio: '✓' },
+    { feature: '카드뉴스 생성 수', free: '최초 2회', youtube: '미포함', creator: '월 20회', studio: '월 30회' },
+    { feature: '유튜브 자동화', free: '미포함', youtube: '✓', creator: '✓', studio: '✓' },
+    { feature: '작업 히스토리 보관', free: '30일', youtube: '30일 / 최대 3개', creator: '90일', studio: '365일' },
+    { feature: '브랜드 URL 분석', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
+    { feature: 'AI 문구·이미지 생성', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
+    { feature: '상품 참고 이미지 입력', free: '최대 4장', youtube: '미포함', creator: '최대 4장', studio: '최대 4장' },
+    { feature: 'AI 배경 재생성', free: '3,000원 / 1회', youtube: '미포함', creator: '1회분/건', studio: '1회분/건' },
+    { feature: '결과 편집 및 다운로드', free: '✓', youtube: '미포함', creator: '✓', studio: '✓' },
 ]
 
 export default async function PricingPage() {
     const authenticated = Boolean(await getSessionUser())
-    const accessHref = authenticated ? '/billing' : '/api/auth/google/start'
+    const accessHref = authenticated ? '/billing' : '/login'
 
     return (
         <div className="min-h-screen bg-[#fafaf7] text-[#0a0a0a] flex flex-col selection:bg-[#ff6b35]/20">
@@ -113,27 +134,36 @@ export default async function PricingPage() {
 
             <main className="flex-1">
                 {/* HEADER */}
-                <section className="relative overflow-hidden pt-20 pb-16 lg:pt-28 lg:pb-20">
+                <section className="relative overflow-hidden pt-10 pb-8 md:pt-20 md:pb-16 lg:pt-28 lg:pb-20">
                     <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[900px] rounded-full bg-gradient-to-br from-[#ff6b35]/8 to-transparent blur-3xl" />
                     <div className="relative mx-auto max-w-7xl px-6 lg:px-8 text-center">
                         <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#ff6b35]">Pricing</p>
-                        <h1 className="mt-5 text-[44px] md:text-[60px] font-black tracking-[-0.045em] leading-[1.05] text-[#0a0a0a]">
+                        <h1 className="mt-3 text-[36px] font-black tracking-[-0.04em] leading-[1.05] text-[#0a0a0a] md:mt-5 md:text-[60px]">
                             필요한 만큼 선택하고<br />카드뉴스를 제작하세요
                         </h1>
-                        <p className="mt-7 text-[17px] text-[#525252] max-w-md mx-auto">
+                        <p className="mx-auto mt-4 max-w-md text-[15px] leading-6 text-[#525252] md:mt-7 md:text-[17px]">
                             무료로 최초 2회를 만들고,<br />운영이 필요해지면 Creator로 확장하세요.
                         </p>
                     </div>
                 </section>
 
                 {/* PLANS */}
-                <section className="pb-20">
+                <section className="pb-16 md:pb-20">
                     <div className="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div className="grid gap-5 md:grid-cols-3 items-start">
+                        <div className="mb-3 flex items-center justify-between md:hidden">
+                            <p className="text-[12px] font-bold text-[#71717a]">옆으로 넘겨 요금제 비교</p>
+                            <span className="inline-flex items-center gap-1 text-[12px] font-black text-[#ff6b35]">
+                                더 보기
+                                <ArrowRight className="h-3.5 w-3.5" />
+                            </span>
+                        </div>
+                        <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:p-0 xl:grid-cols-4">
                             {plans.map((plan) => (
                                 <div
                                     key={plan.name}
-                                    className={`relative rounded-[22px] p-8 transition-all ${
+                                    className={`relative flex min-h-[455px] w-[76vw] max-w-[320px] shrink-0 snap-center flex-col rounded-[22px] p-5 transition-all md:min-h-0 md:w-auto md:max-w-none md:shrink md:p-8 ${
+                                        plan.mobileOrderClass
+                                    } ${
                                         plan.highlight
                                             ? 'bg-[#0a0a0a] text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.4)]'
                                             : 'bg-white border border-black/[0.06] hover:border-black/[0.12]'
@@ -147,25 +177,36 @@ export default async function PricingPage() {
                                     <p className={`text-[12px] font-bold uppercase tracking-[0.1em] ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#8a8a8a]'}`}>
                                         {plan.tagline}
                                     </p>
-                                    <h3 className={`mt-3 text-[24px] font-black tracking-[-0.025em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                                    <h3 className={`mt-3 pr-16 text-[20px] font-black tracking-[-0.025em] md:pr-0 md:text-[24px] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                                         {plan.name}
                                     </h3>
-                                    <p className={`mt-2 text-[13px] leading-[1.5] min-h-[40px] ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
+                                    <p className={`mt-2 hidden min-h-[40px] text-[13px] leading-[1.5] md:block ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                                         {plan.desc}
                                     </p>
-                                    <div className="mt-7 flex items-baseline gap-1">
-                                        <span className={`text-[40px] font-black tracking-[-0.04em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                                    <div className="mt-5 flex min-h-[34px] items-baseline gap-2 whitespace-nowrap md:mt-7 md:min-h-[46px]">
+                                        <span className={`text-[clamp(28px,8vw,34px)] font-black tracking-[-0.035em] leading-none md:text-[clamp(30px,3vw,40px)] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                                             {plan.price}
                                         </span>
                                         {plan.period && (
-                                            <span className={`text-[14px] font-medium ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
+                                            <span className={`shrink-0 text-[14px] font-semibold leading-none ${plan.highlight ? 'text-white/60' : 'text-[#8a8a8a]'}`}>
                                                 {plan.period}
                                             </span>
                                         )}
                                     </div>
+                                    <ul className="mt-5 flex-1 space-y-2.5 md:mt-7 md:space-y-3">
+                                        {plan.features.map((feature, idx) => (
+                                            <li key={idx} className="flex items-start gap-2 text-[12.5px] leading-5 md:gap-2.5 md:text-[13.5px]">
+                                                <Check
+                                                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 md:h-4 md:w-4 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
+                                                    strokeWidth={2.8}
+                                                />
+                                                <span className={plan.highlight ? 'text-white/85' : 'text-[#525252]'}>{feature}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
                                     <a
                                         href={accessHref}
-                                        className={`mt-7 flex h-11 items-center justify-center rounded-full text-[14px] font-bold transition-all ${
+                                        className={`mt-5 flex h-10 items-center justify-center rounded-full text-[13px] font-bold transition-all md:mt-7 md:h-11 md:text-[14px] ${
                                             plan.highlight
                                                 ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
                                                 : 'bg-[#0a0a0a] text-white hover:bg-[#1a1a1a]'
@@ -173,18 +214,15 @@ export default async function PricingPage() {
                                     >
                                         {plan.cta}
                                     </a>
-                                    <ul className="mt-7 space-y-3">
-                                        {plan.features.map((feature, idx) => (
-                                            <li key={idx} className="flex items-start gap-2.5 text-[13.5px]">
-                                                <Check
-                                                    className={`h-4 w-4 shrink-0 mt-0.5 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
-                                                    strokeWidth={2.8}
-                                                />
-                                                <span className={plan.highlight ? 'text-white/85' : 'text-[#525252]'}>{feature}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
                                 </div>
+                            ))}
+                        </div>
+                        <div className="mt-4 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+                            {plans.map((plan) => (
+                                <span
+                                    key={plan.name}
+                                    className={`h-1.5 rounded-full ${plan.highlight ? 'w-6 bg-[#0a0a0a]' : 'w-1.5 bg-black/20'}`}
+                                />
                             ))}
                         </div>
 
@@ -223,6 +261,7 @@ export default async function PricingPage() {
                                         <tr className="border-b border-black/[0.06] bg-[#fafaf7]">
                                             <th className="text-left py-4 px-6 font-bold text-[#525252]">기능</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#525252]">Free</th>
+                                            <th className="text-center py-4 px-4 font-bold text-[#525252]">YouTube Promo</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#ff6b35]">Creator</th>
                                             <th className="text-center py-4 px-4 font-bold text-[#525252]">Studio</th>
                                         </tr>
@@ -232,6 +271,7 @@ export default async function PricingPage() {
                                             <tr key={i}>
                                                 <td className="py-4 px-6 font-medium text-[#0a0a0a]">{row.feature}</td>
                                                 <td className="text-center py-4 px-4 text-[#525252]">{row.free}</td>
+                                                <td className="text-center py-4 px-4 text-[#525252]">{row.youtube}</td>
                                                 <td className="text-center py-4 px-4 text-[#0a0a0a] font-bold">{row.creator}</td>
                                                 <td className="text-center py-4 px-4 text-[#525252]">{row.studio}</td>
                                             </tr>

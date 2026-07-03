@@ -4,8 +4,10 @@ import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarDays, Check, Clock, Download, Folder, FolderOpen,
-  Info, Loader2, Lock, Mic2, Play, Sparkles, Upload, Video, X,
+  Info, Loader2, Lock, Mic2, Play, Sparkles, Trash2, Upload, Video, X,
 } from 'lucide-react'
+import { analytics } from '../../../lib/analytics/thinkingdata'
+import { YOUTUBE_AUTOMATION_UNLOCK_MS } from '../../../lib/youtube-automation-schedule'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,7 +44,11 @@ type PlannerDay = {
   ttsAudioUrl?: string | null
   mp4Url?: string | null
   thumbnailUrl?: string | null
+  renderProgress?: number
+  renderStage?: string | null
+  renderCancelRequested?: boolean
   uploadedAt?: string | null
+  completedAt?: string | null
 }
 
 type Project = {
@@ -58,8 +64,7 @@ type ModalPhase = 'planning' | 'rendering' | 'done' | 'error'
 
 // localStorage key for completed-day timestamps
 const LS_COMPLETED = 'yt-completed-days'
-const MAX_HISTORY_FOLDERS = 5
-const LOCK_HOURS = 24
+const MAX_HISTORY_FOLDERS = 3
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -90,10 +95,11 @@ function msToHHMM(ms: number) {
 }
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
+function currentTimeMs() { return Date.now() }
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function YouTubeAutomationDashboard() {
+export default function YouTubeAutomationDashboard({ isActive = true }: { isActive?: boolean }) {
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [modalDay, setModalDay] = useState<PlannerDay | null>(null)
@@ -102,25 +108,52 @@ export default function YouTubeAutomationDashboard() {
   const [history, setHistory] = useState<Project[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [openFolderId, setOpenFolderId] = useState<string | null>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+  const [cancellingDayId, setCancellingDayId] = useState<string | null>(null)
+  const [startingDayId, setStartingDayId] = useState<string | null>(null)
 
-  // Completed-day timestamps for 24h countdown
+  // Completed-day timestamps for the 12-hour countdown
   const [completedTimes, setCompletedTimes] = useState<Record<string, number>>({})
 
   useEffect(() => {
     setCompletedTimes(getCompletedTimes())
   }, [])
 
-  // Load history on mount
   useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch('/api/youtube-automation/projects')
-        const data = await readApiJson<{ projects?: Project[]; error?: string }>(res)
-        if (data.projects) setHistory(data.projects.slice(0, MAX_HISTORY_FOLDERS))
-      } catch {}
-      finally { setHistoryLoading(false) }
-    })()
+    if (isActive) analytics.youtubeAutomationView()
+  }, [isActive])
+
+  const refreshProjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/youtube-automation/projects', { cache: 'no-store' })
+      const data = await readApiJson<{ projects?: Project[]; error?: string }>(res)
+      if (!data.projects) return
+      const projects = data.projects.slice(0, MAX_HISTORY_FOLDERS)
+      setHistory(projects)
+      setProject(current => current ? projects.find(item => item.id === current.id) || current : current)
+      setModalDay(current => {
+        if (!current) return current
+        return projects.flatMap(item => item.days).find(day => day.id === current.id) || current
+      })
+    } catch {}
   }, [])
+
+  // Load history on mount.
+  useEffect(() => {
+    void refreshProjects().finally(() => setHistoryLoading(false))
+  }, [refreshProjects])
+
+  const hasActiveRender = useMemo(
+    () => [project, ...history].some(item => item?.days.some(day => day.status === 'planning' || day.status === 'rendering')),
+    [project, history],
+  )
+
+  // Rendering runs on the server; polling keeps progress visible even after the modal closes.
+  useEffect(() => {
+    if (!hasActiveRender) return
+    const interval = setInterval(() => { void refreshProjects() }, 5000)
+    return () => clearInterval(interval)
+  }, [hasActiveRender, refreshProjects])
 
   const sortedDays = useMemo(
     () => [...(project?.days || [])].sort((a, b) => a.dayNumber - b.dayNumber),
@@ -129,7 +162,9 @@ export default function YouTubeAutomationDashboard() {
 
   const createPlanner = async () => {
     const clean = topic.trim()
+    const startedAt = Date.now()
     if (!clean) { setError('주제를 입력해 주세요.'); return }
+    analytics.youtubePlannerCreateStart(clean.length, history.length)
     setCreating(true)
     setError(null)
     try {
@@ -140,19 +175,99 @@ export default function YouTubeAutomationDashboard() {
       })
       const data = await readApiJson<{ project?: Project; error?: string }>(res)
       if (!res.ok || !data.project) throw new Error(data.error || '30일 플래너를 만들지 못했습니다.')
+      analytics.youtubePlannerCreateComplete(data.project.id, data.project.days.length, Date.now() - startedAt)
+      analytics.youtubeProjectOpen(
+        data.project.id,
+        data.project.status,
+        data.project.days.filter(day => day.mp4Url || day.status === 'uploaded').length,
+        'created',
+      )
       setProject(data.project)
       setHistory(prev => [data.project!, ...prev].slice(0, MAX_HISTORY_FOLDERS))
       setTopic('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '30일 플래너를 만들지 못했습니다.')
+      const reason = err instanceof Error ? err.message : '30일 플래너를 만들지 못했습니다.'
+      analytics.youtubePlannerCreateFailed(Date.now() - startedAt, reason)
+      setError(reason)
     } finally {
       setCreating(false)
     }
   }
 
-  const handleDayClick = (day: PlannerDay, effectiveLocked: boolean) => {
+  const handleDayClick = async (day: PlannerDay, effectiveLocked: boolean) => {
+    if (!project) return
+    analytics.youtubeDaySelect({
+      projectId: project.id,
+      dayId: day.id,
+      dayNumber: day.dayNumber,
+      dayStatus: day.status,
+      isLocked: effectiveLocked,
+      hasVideo: Boolean(day.mp4Url),
+    })
     if (effectiveLocked) return
-    setModalDay(day)
+    if (day.mp4Url) {
+      setModalDay(day)
+      return
+    }
+    if (day.status === 'planning' || day.status === 'rendering') return
+
+    setStartingDayId(day.id)
+    setError(null)
+    const optimistic = {
+      ...day,
+      status: day.script ? 'rendering' : 'planning',
+      renderProgress: 1,
+      renderStage: day.script ? '영상 제작 준비 중' : '스크립트 생성 준비 중',
+    }
+    setProject(current => current ? {
+      ...current,
+      days: current.days.map(item => item.id === day.id ? optimistic : item),
+    } : current)
+    try {
+      const res = await fetch(`/api/youtube-automation/days/${day.id}/render`, { method: 'POST' })
+      const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
+      if (!res.ok || !data.day) throw new Error(data.error || '영상 제작을 시작하지 못했습니다.')
+      const updated = { ...optimistic, ...data.day }
+      setProject(current => current ? {
+        ...current,
+        days: current.days.map(item => item.id === day.id ? updated : item),
+      } : current)
+      setHistory(current => current.map(item => item.id === project.id ? {
+        ...item,
+        days: item.days.map(entry => entry.id === day.id ? updated : entry),
+      } : item))
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : '영상 제작을 시작하지 못했습니다.'
+      setError(reason)
+      void refreshProjects()
+    } finally {
+      setStartingDayId(null)
+    }
+  }
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('이 작업 히스토리를 삭제할까요?')) return
+    setDeletingProjectId(projectId)
+    setError(null)
+    try {
+      const res = await fetch('/api/youtube-automation/projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const data = await readApiJson<{ error?: string }>(res)
+      if (!res.ok) throw new Error(data.error || '작업 히스토리를 삭제하지 못했습니다.')
+      analytics.youtubeProjectDelete(projectId, true)
+      setHistory(prev => prev.filter(p => p.id !== projectId))
+      setOpenFolderId(prev => (prev === projectId ? null : prev))
+      setProject(prev => (prev?.id === projectId ? null : prev))
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : '작업 히스토리를 삭제하지 못했습니다.'
+      analytics.youtubeProjectDelete(projectId, false, reason)
+      setError(reason)
+    } finally {
+      setDeletingProjectId(null)
+    }
   }
 
   const handleModalDone = useCallback((updatedDay: Partial<PlannerDay>) => {
@@ -160,15 +275,43 @@ export default function YouTubeAutomationDashboard() {
     const days = project.days.map(d => d.id === updatedDay.id ? { ...d, ...updatedDay } : d)
     setProject({ ...project, days })
     setModalDay(prev => prev ? { ...prev, ...updatedDay } : prev)
-    // Persist completion time for 24h countdown
+    // Persist completion time for the 12-hour countdown
     if (updatedDay.id) {
       saveCompletedTime(updatedDay.id)
       setCompletedTimes(getCompletedTimes())
     }
   }, [project])
 
-  const handleMarkUploaded = async (day: PlannerDay) => {
+  const handleCancelRender = async (day: PlannerDay) => {
     if (!project) return
+    setCancellingDayId(day.id)
+    try {
+      const res = await fetch(`/api/youtube-automation/days/${day.id}/render`, { method: 'DELETE' })
+      const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
+      if (!res.ok) throw new Error(data.error || '영상 제작을 중단하지 못했습니다.')
+      if (data.day) {
+        setProject(current => current ? {
+          ...current,
+          days: current.days.map(item => item.id === day.id ? { ...item, ...data.day } : item),
+        } : current)
+        setHistory(current => current.map(item => ({
+          ...item,
+          days: item.days.map(entry => entry.id === day.id ? { ...entry, ...data.day } : entry),
+        })))
+      }
+      analytics.youtubeRenderCancel(project.id, day.id, day.dayNumber, true)
+      await refreshProjects()
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : '영상 제작을 중단하지 못했습니다.'
+      analytics.youtubeRenderCancel(project.id, day.id, day.dayNumber, false, reason)
+      setError(reason)
+    } finally {
+      setCancellingDayId(null)
+    }
+  }
+
+  const handleMarkUploaded = async (day: PlannerDay): Promise<boolean> => {
+    if (!project) return false
     try {
       const res = await fetch(`/api/youtube-automation/days/${day.id}/upload-check`, { method: 'PATCH' })
       const data = await readApiJson<{ currentOpenDay?: number; days?: Partial<PlannerDay>[]; error?: string }>(res)
@@ -183,30 +326,49 @@ export default function YouTubeAutomationDashboard() {
         const updated = updatedDays.find(d => d.id === prev.id)
         return updated ? { ...prev, ...updated } : prev
       })
+      analytics.youtubeUploadMarked(project.id, day.id, day.dayNumber, true)
+      return true
     } catch (err) {
+      const reason = err instanceof Error ? err.message : '업로드 체크를 저장하지 못했습니다.'
+      analytics.youtubeUploadMarked(project.id, day.id, day.dayNumber, false, reason)
       console.error(err)
+      return false
     }
   }
 
   // Find the most recent completed day (mp4Url set) to calculate countdown
-  const lastCompletedDayId = useMemo(() => {
+  const lastCompletedDay = useMemo(() => {
     if (!project) return null
-    const done = sortedDays.filter(d => d.mp4Url && completedTimes[d.id])
+    const done = sortedDays.filter(d => d.mp4Url && (d.completedAt || completedTimes[d.id]))
     if (!done.length) return null
-    return done.reduce((a, b) => (completedTimes[a.id] > completedTimes[b.id] ? a : b)).id
+    return done.reduce((a, b) => {
+      const aTime = a.completedAt ? new Date(a.completedAt).getTime() : completedTimes[a.id]
+      const bTime = b.completedAt ? new Date(b.completedAt).getTime() : completedTimes[b.id]
+      return aTime > bTime ? a : b
+    })
   }, [project, sortedDays, completedTimes])
 
-  const lastCompletedAt = lastCompletedDayId ? completedTimes[lastCompletedDayId] : null
-  const unlockAt = lastCompletedAt ? lastCompletedAt + LOCK_HOURS * 3_600_000 : null
+  const lastCompletedAt = lastCompletedDay
+    ? lastCompletedDay.completedAt
+      ? new Date(lastCompletedDay.completedAt).getTime()
+      : completedTimes[lastCompletedDay.id]
+    : null
+  const unlockAt = lastCompletedAt ? lastCompletedAt + YOUTUBE_AUTOMATION_UNLOCK_MS : null
   const now = Date.now()
   const msUntilUnlock = unlockAt && unlockAt > now ? unlockAt - now : 0
 
+  useEffect(() => {
+    if (msUntilUnlock <= 0) return
+    const timeout = window.setTimeout(() => {
+      void refreshProjects()
+    }, msUntilUnlock + 1000)
+    return () => window.clearTimeout(timeout)
+  }, [msUntilUnlock, refreshProjects])
+
   // Determine which day is "next after last completed"
   const nextAfterCompletedDayNumber = useMemo(() => {
-    if (!lastCompletedDayId) return null
-    const last = sortedDays.find(d => d.id === lastCompletedDayId)
-    return last ? last.dayNumber + 1 : null
-  }, [lastCompletedDayId, sortedDays])
+    return lastCompletedDay ? lastCompletedDay.dayNumber + 1 : null
+  }, [lastCompletedDay])
 
   // ── Welcome screen ─────────────────────────────────────────────────────────
   if (!project) {
@@ -223,7 +385,7 @@ export default function YouTubeAutomationDashboard() {
             </div>
             <h1 className="mt-5 text-[22px] font-black tracking-tight text-[#111827] sm:text-[28px] md:text-[34px]">유튜브 자동화</h1>
             <p className="mx-auto mt-3 max-w-[560px] text-sm font-semibold leading-6 text-[#64748b]">
-              주제 하나를 입력하면 30일치 쇼츠 제목 캘린더를 만들고, 하루에 하나씩 제작을 시작합니다.
+              주제 하나를 입력하면 30일치 쇼츠 제목 캘린더를 만들고, 12시간마다 다음 영상을 제작할 수 있습니다.
             </p>
           </div>
 
@@ -269,10 +431,11 @@ export default function YouTubeAutomationDashboard() {
                   const completedCount = p.days.filter(d => d.mp4Url || d.status === 'uploaded').length
                   return (
                     <div key={p.id} className="overflow-hidden rounded-2xl border border-white/70 bg-white/72 shadow-[0_8px_24px_rgba(87,119,185,0.07)]">
+                      <div className="flex items-center gap-2 px-4 py-3 hover:bg-[#f8fafc] transition-colors">
                       <button
                         type="button"
                         onClick={() => setOpenFolderId(isOpen ? null : p.id)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[#f8fafc] transition-colors"
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         {isOpen
                           ? <FolderOpen className="h-4 w-4 shrink-0 text-[#4252ff]" />
@@ -285,11 +448,30 @@ export default function YouTubeAutomationDashboard() {
                           </p>
                         </div>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteProject(p.id)}
+                        disabled={deletingProjectId === p.id}
+                        aria-label="작업 히스토리 삭제"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#94a3b8] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {deletingProjectId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                      </div>
                       {isOpen && (
                         <div className="border-t border-[#f1f5f9] p-3">
                           <button
                             type="button"
-                            onClick={() => { setProject(p); setOpenFolderId(null) }}
+                            onClick={() => {
+                              analytics.youtubeProjectOpen(
+                                p.id,
+                                p.status,
+                                p.days.filter(day => day.mp4Url || day.status === 'uploaded').length,
+                                'history',
+                              )
+                              setProject(p)
+                              setOpenFolderId(null)
+                            }}
                             className="w-full rounded-xl bg-[#4252ff] px-3 py-2 text-xs font-black text-white hover:bg-[#3443d4] transition-colors"
                           >
                             이 플래너 열기
@@ -341,13 +523,13 @@ export default function YouTubeAutomationDashboard() {
 
       {/* Day Grid */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">
-        {/* 24h info banner — shown when a video was just completed */}
+        {/* 12-hour info banner — shown when a video was just completed */}
         {msUntilUnlock > 0 && (
           <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <p className="text-xs font-semibold leading-5 text-amber-700">
               <span className="font-black">다음 영상까지 {msToHHMM(msUntilUnlock)} 남았습니다.</span>{' '}
-              유튜브 알고리즘은 하루에 하나씩 꾸준히 올릴 때 채널을 더 잘 성장시켜 줍니다.
+              다음 영상은 이전 영상 제작 후 12시간이 지나면 열립니다.
             </p>
           </div>
         )}
@@ -367,6 +549,9 @@ export default function YouTubeAutomationDashboard() {
                 timeLocked={timeLocked}
                 msUntilUnlock={timeLocked ? msUntilUnlock : 0}
                 onClick={() => handleDayClick(day, effectiveLocked)}
+                onCancel={() => void handleCancelRender(day)}
+                cancelling={cancellingDayId === day.id}
+                starting={startingDayId === day.id}
               />
             )
           })}
@@ -377,6 +562,8 @@ export default function YouTubeAutomationDashboard() {
       {/* Production Modal */}
       {modalDay && (
         <DayProductionModal
+          key={modalDay.id}
+          projectId={project.id}
           day={modalDay}
           onClose={() => setModalDay(null)}
           onDone={handleModalDone}
@@ -395,12 +582,18 @@ function DayCard({
   timeLocked,
   msUntilUnlock,
   onClick,
+  onCancel,
+  cancelling,
+  starting,
 }: {
   day: PlannerDay
   effectiveLocked: boolean
   timeLocked: boolean
   msUntilUnlock: number
   onClick: () => void
+  onCancel: () => void
+  cancelling: boolean
+  starting: boolean
 }) {
   const [showInfo, setShowInfo] = useState(false)
   const [remaining, setRemaining] = useState(msUntilUnlock)
@@ -413,17 +606,31 @@ function DayCard({
     return () => clearInterval(id)
   }, [timeLocked, showInfo, msUntilUnlock])
 
+  const isProducing = starting || day.status === 'planning' || day.status === 'rendering'
+  const progress = Math.max(1, Math.min(100, day.renderProgress ?? 1))
+
   return (
     <div
       className="relative"
       onMouseEnter={() => timeLocked && setShowInfo(true)}
       onMouseLeave={() => setShowInfo(false)}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={effectiveLocked && !timeLocked ? -1 : 0}
         onClick={timeLocked ? () => setShowInfo(v => !v) : onClick}
-        disabled={effectiveLocked && !timeLocked}
-        className={`min-h-[110px] w-full rounded-2xl border p-4 text-left transition-all ${
+        onKeyDown={event => {
+          if ((event.key === 'Enter' || event.key === ' ') && !(effectiveLocked && !timeLocked)) {
+            event.preventDefault()
+            if (timeLocked) setShowInfo(value => !value)
+            else onClick()
+          }
+        }}
+        aria-disabled={effectiveLocked && !timeLocked}
+        className={`min-h-[110px] w-full rounded-2xl border p-4 text-left transition-all duration-300 ${
+          isProducing
+            ? 'relative z-10 scale-[1.025] border-[#a5b4fc] bg-white shadow-[0_20px_48px_rgba(66,82,255,0.20)]'
+            :
           effectiveLocked
             ? 'cursor-not-allowed border-white/54 bg-white/38 opacity-55'
             : 'border-white/70 bg-white/68 shadow-[0_12px_30px_rgba(87,119,185,0.08)] hover:border-[#c7d2fe] hover:bg-white active:scale-[0.98]'
@@ -438,15 +645,38 @@ function DayCard({
           <StatusPill status={day.status} hasMp4={!!day.mp4Url} />
         </div>
         <p className="line-clamp-2 text-sm font-black leading-5 text-[#111827]">{day.title}</p>
+        {isProducing && (
+          <div className="mt-3" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-[11px] font-black text-[#4252ff]">
+                영상 제작 중 {progress}% · {day.renderStage || '준비 중'}
+              </span>
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={starting || cancelling}
+                className="shrink-0 rounded-lg bg-[#fff1f0] px-2 py-1 text-[10px] font-black text-[#dc2626] hover:bg-[#fee2e2] disabled:opacity-50"
+              >
+                {starting ? '시작 중' : cancelling ? '중단 중' : day.renderCancelRequested ? '중단 재시도' : '중단'}
+              </button>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
+              <div
+                className="h-full rounded-full bg-[#4252ff] transition-[width] duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
         <p className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#94a3b8]">
           {effectiveLocked ? <Lock className="h-3 w-3" /> : day.mp4Url ? <Video className="h-3 w-3" /> : <Play className="h-3 w-3" />}
           {timeLocked
             ? <><Clock className="h-3 w-3 ml-0.5" />{msToHHMM(remaining)} 후 오픈</>
-            : effectiveLocked ? '하루에 하나씩 오픈됩니다'
+            : effectiveLocked ? '12시간마다 오픈됩니다'
             : day.mp4Url ? '영상 완성 — 클릭해서 보기'
             : '클릭해서 영상 제작 시작'}
         </p>
-      </button>
+      </div>
 
       {/* Countdown tooltip — hover on desktop, tap-toggle on mobile */}
       {timeLocked && showInfo && (
@@ -457,7 +687,7 @@ function DayCard({
               <p className="text-xs font-black">{msToHHMM(remaining)} 후 오픈</p>
             </div>
             <p className="mt-1 text-[11px] font-semibold leading-4 text-amber-600">
-              유튜브 알고리즘 특성상 하루에 여러 개를 올리면 노출에 불리합니다. 하루 1편을 꾸준히 올리는 게 가장 효과적입니다.
+              다음 Day는 이전 영상 제작 후 12시간이 지나면 열립니다. 하루 최대 2편의 쇼츠를 제작할 수 있습니다.
             </p>
           </div>
         </div>
@@ -477,18 +707,20 @@ const STEPS = [
 ]
 
 function DayProductionModal({
+  projectId,
   day,
   onClose,
   onDone,
   onUploaded,
 }: {
+  projectId: string
   day: PlannerDay
   onClose: () => void
   onDone: (updated: Partial<PlannerDay>) => void
-  onUploaded: () => void
+  onUploaded: () => Promise<boolean>
 }) {
-  const [phase, setPhase] = useState<ModalPhase>(() => day.mp4Url ? 'done' : 'planning')
-  const [pct, setPct] = useState(() => day.mp4Url ? 100 : 0)
+  const [phase, setPhase] = useState<ModalPhase>(() => day.mp4Url ? 'done' : day.status === 'rendering' ? 'rendering' : 'planning')
+  const [pct, setPct] = useState(() => day.mp4Url ? 100 : day.renderProgress ?? 0)
   const [stepLabel, setStepLabel] = useState('준비 중...')
   const [resultDay, setResultDay] = useState<PlannerDay>(day)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -496,33 +728,73 @@ function DayProductionModal({
   const [uploadedDone, setUploadedDone] = useState(day.status === 'uploaded')
 
   const renderStartedAt = useRef<number | null>(null)
-  const pctRef = useRef(pct)
-  pctRef.current = pct
-
-  // Smooth progress ticker during rendering
-  useEffect(() => {
-    if (phase !== 'rendering') return
-    const sceneCount = resultDay.scenes?.length || 6
-    const estimatedMs = sceneCount * 28_000
-
-    const interval = setInterval(() => {
-      const elapsed = renderStartedAt.current ? Date.now() - renderStartedAt.current : 0
-      const renderPct = Math.min(88, (elapsed / estimatedMs) * 65)
-      const total = 30 + renderPct
-      if (pctRef.current < total) setPct(Math.min(Math.floor(total), 88))
-    }, 600)
-    return () => clearInterval(interval)
-  }, [phase, resultDay.scenes?.length])
+  const renderCompleteTracked = useRef(Boolean(day.mp4Url))
+  const isRetry = useRef(false)
 
   useEffect(() => {
-    if (day.mp4Url) { setResultDay(day); setPhase('done'); setPct(100); return }
+    if (day.mp4Url) {
+      setResultDay(day)
+      setPhase('done')
+      setPct(100)
+      return
+    }
+    if (day.status === 'rendering') return
+    if (day.status === 'failed') {
+      setPhase('error')
+      setErrorMsg('영상 제작에 실패했습니다. 다시 시도해 주세요.')
+      return
+    }
     void runPipeline()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setResultDay(current => ({ ...current, ...day }))
+      if (typeof day.renderProgress === 'number') setPct(day.renderProgress)
+      if (day.renderStage) setStepLabel(day.renderStage)
+      if (day.status === 'completed' || day.mp4Url) {
+        setPhase('done')
+        setPct(100)
+        return
+      }
+      if (day.status === 'failed') {
+        setPhase('error')
+        setErrorMsg(day.renderStage || '영상 제작에 실패했습니다. 다시 시도해 주세요.')
+        return
+      }
+      if (day.status === 'planning' || day.status === 'rendering') {
+        setPhase(day.status)
+      }
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [day])
+
+  useEffect(() => {
+    if (!day.mp4Url) return
+    if (renderCompleteTracked.current) return
+    renderCompleteTracked.current = true
+    analytics.youtubeRenderComplete(
+      projectId,
+      day.id,
+      day.dayNumber,
+      day.scenes?.length || 0,
+    )
+  }, [day, projectId])
+
   const runPipeline = async () => {
+    let failurePhase = day.script ? 'rendering' : 'planning'
+    analytics.youtubeProductionStart({
+      projectId,
+      dayId: day.id,
+      dayNumber: day.dayNumber,
+      resumed: Boolean(day.script),
+      retry: isRetry.current,
+    })
+    isRetry.current = false
     try {
       if (!day.script) {
+        const planningStartedAt = currentTimeMs()
         setPhase('planning')
         setStepLabel('스크립트 생성 중...')
         setPct(5)
@@ -532,19 +804,36 @@ function DayProductionModal({
         const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
         if (!res.ok || !data.day) throw new Error(data.error || '제작안을 만들지 못했습니다.')
         const planned = { ...day, ...data.day } as PlannerDay
+        analytics.youtubePlanComplete({
+          projectId,
+          dayId: day.id,
+          dayNumber: day.dayNumber,
+          sceneCount: planned.scenes?.length || 0,
+          durationMs: currentTimeMs() - planningStartedAt,
+        })
         setResultDay(planned)
         setStepLabel('영상 소스 검색 완료')
         setPct(30)
         await sleep(400)
+        failurePhase = 'rendering'
         await runRender(planned)
       } else {
         setResultDay(day)
         setPct(30)
+        failurePhase = 'rendering'
         await runRender(day)
       }
     } catch (err) {
+      const reason = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      analytics.youtubeProductionFailed(
+        projectId,
+        day.id,
+        day.dayNumber,
+        failurePhase,
+        reason,
+      )
       setPhase('error')
-      setErrorMsg(err instanceof Error ? err.message : '오류가 발생했습니다.')
+      setErrorMsg(reason)
     }
   }
 
@@ -552,6 +841,12 @@ function DayProductionModal({
     setPhase('rendering')
     renderStartedAt.current = Date.now()
     const sceneCount = dayData.scenes?.length || 6
+    analytics.youtubeRenderStart({
+      projectId,
+      dayId: dayData.id,
+      dayNumber: dayData.dayNumber,
+      sceneCount,
+    })
 
     let labelTimer: ReturnType<typeof setTimeout> | undefined
     const labelSteps = [
@@ -575,13 +870,17 @@ function DayProductionModal({
       const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
       if (!res.ok || !data.day) throw new Error(data.error || '렌더링을 완료하지 못했습니다.')
 
-      const finished = { ...dayData, ...data.day } as PlannerDay
-      setResultDay(finished)
-      onDone(finished)
-      setStepLabel('완료!')
-      setPct(100)
-      await sleep(300)
-      setPhase('done')
+      const queued = { ...dayData, ...data.day } as PlannerDay
+      analytics.youtubeRenderRequested(
+        projectId,
+        dayData.id,
+        dayData.dayNumber,
+        Date.now() - (renderStartedAt.current || Date.now()),
+      )
+      setResultDay(queued)
+      onDone(queued)
+      setStepLabel(queued.renderStage || '영상 제작 작업이 등록되었습니다.')
+      setPct(queued.renderProgress ?? 1)
     } catch (err) {
       clearTimeout(labelTimer)
       throw err
@@ -590,6 +889,8 @@ function DayProductionModal({
 
   const handleDownload = async () => {
     if (!resultDay.mp4Url) return
+    const startedAt = Date.now()
+    let received = 0
     try {
       setDownloadPct(0)
       const res = await fetch(resultDay.mp4Url)
@@ -598,7 +899,6 @@ function DayProductionModal({
       if (!reader) throw new Error('스트림을 열 수 없습니다.')
 
       const chunks: Uint8Array<ArrayBuffer>[] = []
-      let received = 0
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -620,12 +920,31 @@ function DayProductionModal({
       URL.revokeObjectURL(objUrl)
       await sleep(600)
       setDownloadPct(null)
-    } catch { setDownloadPct(null) }
+      analytics.youtubeVideoDownload({
+        projectId,
+        dayId: resultDay.id,
+        dayNumber: resultDay.dayNumber,
+        success: true,
+        durationMs: Date.now() - startedAt,
+        fileSizeBytes: received,
+      })
+    } catch (err) {
+      analytics.youtubeVideoDownload({
+        projectId,
+        dayId: resultDay.id,
+        dayNumber: resultDay.dayNumber,
+        success: false,
+        durationMs: Date.now() - startedAt,
+        fileSizeBytes: received || undefined,
+        reason: err instanceof Error ? err.message : 'download_failed',
+      })
+      setDownloadPct(null)
+    }
   }
 
   const handleUploaded = async () => {
-    await onUploaded()
-    setUploadedDone(true)
+    const success = await onUploaded()
+    if (success) setUploadedDone(true)
   }
 
   const providers = useMemo(() => {
@@ -711,7 +1030,13 @@ function DayProductionModal({
               <p className="mt-2 max-w-[380px] text-xs font-semibold leading-5 text-[#64748b]">{errorMsg}</p>
               <button
                 type="button"
-                onClick={() => { setPhase('planning'); setPct(0); setErrorMsg(null); void runPipeline() }}
+                onClick={() => {
+                  isRetry.current = true
+                  setPhase('planning')
+                  setPct(0)
+                  setErrorMsg(null)
+                  void runPipeline()
+                }}
                 className="mt-6 inline-flex h-10 items-center gap-2 rounded-xl bg-[#111827] px-5 text-xs font-black text-white hover:bg-[#1f2937]"
               >
                 다시 시도

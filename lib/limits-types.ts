@@ -1,7 +1,7 @@
-export type SubscriptionPlan = 'FREE' | 'PRO' | 'UNLIMITED'
+export type SubscriptionPlan = 'FREE' | 'YOUTUBE_PROMO' | 'PRO' | 'UNLIMITED'
 
-export const SUBSCRIPTION_PLANS = ['FREE', 'PRO', 'UNLIMITED'] as const
-export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['PRO', 'UNLIMITED']
+export const SUBSCRIPTION_PLANS = ['FREE', 'YOUTUBE_PROMO', 'PRO', 'UNLIMITED'] as const
+export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = ['YOUTUBE_PROMO', 'PRO', 'UNLIMITED']
 
 export function isSubscriptionPlan(plan: string): plan is SubscriptionPlan {
   return SUBSCRIPTION_PLANS.includes(plan as SubscriptionPlan)
@@ -43,6 +43,31 @@ export const PRICING_PLANS: Record<SubscriptionPlan, PlanFeature> = {
       'Video card news requires Creator or above',
       '30-day history retention',
       'Basic editing tools',
+    ],
+  },
+  YOUTUBE_PROMO: {
+    name: 'YouTube Promo',
+    monthlyCardLimit: 0,
+    monthlyVideoCardLimit: 0,
+    historyRetentionDays: 30,
+    hasWatermark: false,
+    description: '유튜브 자동화 기능만 사용하는 프로모션 플랜',
+    description_en: 'A promotional plan for YouTube automation only.',
+    price: '₩9,900 / 월',
+    price_en: '₩9,900 / mo',
+    features: [
+      '유튜브 자동화 전용',
+      '30일 쇼츠 제목 캘린더 생성',
+      '작업 히스토리 최대 3개',
+      '작업 히스토리 30일 보관',
+      '카드뉴스/영상 카드뉴스 생성 미포함',
+    ],
+    features_en: [
+      'YouTube automation only',
+      '30-day Shorts title calendar',
+      'Up to 3 saved work histories',
+      '30-day work history retention',
+      'Card news and video card news generation not included',
     ],
   },
   PRO: {

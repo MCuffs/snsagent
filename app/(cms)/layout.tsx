@@ -14,16 +14,22 @@ import { getUsageSummaryForUser } from '../../lib/usage-summary'
 import { normalizePlan } from '../../lib/limits-types'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser()
+  const [user, t] = await Promise.all([
+    getSessionUser(),
+    getTranslations('cms_layout'),
+  ])
 
-  const brands = user ? await getCachedBrands(user.id) : []
+  const [brands, usageSummary] = user
+    ? await Promise.all([
+        getCachedBrands(user.id),
+        getUsageSummaryForUser(user),
+      ])
+    : [[], null]
   const hasCompleteBrand = brands.length > 0 && Boolean(brands[0].websiteUrl)
   const hasSubscription = Boolean(user?.polarSubscriptionId && user.polarSubscriptionStatus === 'active')
   const isAdminUser = isAdminEmail(user?.email)
   const planLabel = isAdminUser ? 'ADMIN' : user?.plan
   const navAccessPlan = isAdminUser ? 'ADMIN' : user ? normalizePlan(user.plan || 'FREE') : null
-  const usageSummary = user ? await getUsageSummaryForUser(user) : null
-  const t = await getTranslations('cms_layout')
 
   return (
     <TabProvider>

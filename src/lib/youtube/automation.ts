@@ -1,4 +1,11 @@
 import { getLightClient } from '../ai/llmClient'
+import {
+  classifierResultSchema,
+  type ShortsClassifierResult,
+  type YouTubeShortsTemplateRecord,
+} from '../../../lib/youtube-shorts-templates/types'
+import type { YouTubePlanStrategy } from '../../../lib/youtube-plan-strategies'
+import { logYouTubeAutomation } from './logging'
 
 export interface PlannerDay {
   dayNumber: number
@@ -7,12 +14,14 @@ export interface PlannerDay {
 
 export interface YouTubeScenePlan {
   sceneNumber: number
+  sceneRole?: string
   narration: string
   searchKeyword: string
   durationSeconds: number
 }
 
 export interface StockVideoCandidate {
+  sceneNumber?: number
   provider: 'pexels' | 'pixabay' | 'mock'
   id: string
   title: string
@@ -31,6 +40,26 @@ export interface DayProductionPlan {
   sourceClips: StockVideoCandidate[]
   ttsProvider: string
   subtitles: Array<{ start: number; end: number; text: string }>
+  videoStructure: {
+    selectedTemplateKey: string
+    usedDefaultTemplate: boolean
+    title: string
+    hook: string
+    totalDuration: number
+    scenes: Array<{
+      sceneIndex: number
+      sceneRole: string
+      start: number
+      end: number
+      visualInstruction: string
+      caption: string
+      captionEmphasis: string[]
+      emotion: string
+      transition: string
+      zoomEffect: string
+    }>
+    cta: { enabled: boolean; text: string; start: number; end: number }
+  } | null
 }
 
 interface PlannerResponse {
@@ -84,9 +113,22 @@ export async function generateDayProductionPlan(params: {
   topic: string
   title: string
   userId?: string
+  template?: YouTubeShortsTemplateRecord
+  usedDefaultTemplate?: boolean
+  planStrategy?: YouTubePlanStrategy
 }): Promise<DayProductionPlan> {
   const fallback = () => buildFallbackDayPlan(params.topic, params.title)
+  const strategyInstructions = params.planStrategy ? [
+    `Narrative strategy: ${params.planStrategy.key} (${params.planStrategy.name})`,
+    `Hook pattern: ${params.planStrategy.hookPattern}`,
+    `Ending pattern: ${params.planStrategy.endingPattern}`,
+    `Pacing: ${params.planStrategy.pacing}`,
+    `Narration direction: ${params.planStrategy.narrationStyle}`,
+    `Create exactly ${params.planStrategy.targetSceneCount} scenes in this role order: ${params.planStrategy.sceneRoles.join(' -> ')}`,
+    'Every scene must include sceneRole matching that order. Vary sentence rhythm and visual keyword per role.',
+  ] : []
   const prompt = [
+    ...strategyInstructions,
     `채널 주제: ${params.topic}`,
     `오늘 제목: ${params.title}`,
     '',
@@ -95,7 +137,7 @@ export async function generateDayProductionPlan(params: {
     '영상 생성 AI를 쓰지 않습니다. 기존 무료 영상을 잘라 붙이고, TTS 음성과 자막을 얹는 전제입니다.',
     '스크립트는 TTS로 읽기 쉽게 짧은 문장으로 작성하세요.',
     'JSON 형식:',
-    '{"script":"...","description":"...","tags":["..."],"pinnedComment":"...","scenes":[{"sceneNumber":1,"narration":"...","searchKeyword":"english stock video keyword","durationSeconds":8}]}',
+    '{"script":"...","description":"...","tags":["..."],"pinnedComment":"...","scenes":[{"sceneNumber":1,"sceneRole":"question_hook","narration":"...","searchKeyword":"english stock video keyword","durationSeconds":8}]}',
   ].join('\n')
 
   const result = await getLightClient().generateJson<DayPlanResponse>(
@@ -109,9 +151,32 @@ export async function generateDayProductionPlan(params: {
     },
   )
 
-  const scenes = normalizeScenes(result.scenes, result.script)
+  logYouTubeAutomation('info', 'day_plan_llm_done', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    scriptLength: String(result.script || '').length,
+    rawSceneCount: Array.isArray(result.scenes) ? result.scenes.length : 0,
+  })
+  const scenes = normalizeScenes(result.scenes, result.script, params.template, params.planStrategy)
+  logYouTubeAutomation('info', 'stock_video_collection_start', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    sceneCount: scenes.length,
+    keywords: scenes.map(scene => scene.searchKeyword),
+  })
   const sourceClips = await collectStockVideoCandidates(scenes)
-  return {
+  logYouTubeAutomation('info', 'stock_video_collection_done', {
+    userId: params.userId,
+    title: params.title,
+  }, {
+    sceneCount: scenes.length,
+    sourceClipCount: sourceClips.length,
+    usableSourceClipCount: sourceClips.filter(clip => clip.videoUrl).length,
+    providerCounts: countBy(sourceClips.map(clip => clip.provider)),
+  })
+  const productionPlan: DayProductionPlan = {
     script: String(result.script || fallback().script).trim(),
     description: String(result.description || fallback().description).trim(),
     tags: normalizeTags(result.tags, params.topic),
@@ -120,25 +185,89 @@ export async function generateDayProductionPlan(params: {
     sourceClips,
     ttsProvider: process.env.OPENAI_API_KEY ? 'openai-tts-ready' : 'tts-not-configured',
     subtitles: buildSubtitles(scenes),
+    videoStructure: null,
+  }
+  productionPlan.videoStructure = params.template
+    ? buildVideoStructure(params.title, scenes, params.template, Boolean(params.usedDefaultTemplate))
+    : null
+  return productionPlan
+}
+
+export async function classifyShortsContent(params: {
+  topic: string
+  title: string
+  userId?: string
+}): Promise<ShortsClassifierResult | null> {
+  const prompt = [
+    `Topic: ${params.topic}`,
+    `Video title: ${params.title}`,
+    'Classify this YouTube Shorts content.',
+    'Return JSON only with contentType, tone, recommendedTemplateKey, confidenceScore, and reason.',
+    'contentType: drama_highlight | news | knowledge | sports | anime | entertainment | default',
+    'tone: emotional | serious | funny | informative | dramatic | neutral',
+  ].join('\n')
+  const fallback = () => deterministicClassification(`${params.topic} ${params.title}`)
+  try {
+    const result = await getLightClient().generateJson<ShortsClassifierResult>(
+      'youtube-shorts-template-classifier',
+      prompt,
+      fallback,
+      {
+        temperature: 0.1,
+        diagnostics: { userId: params.userId, metadata: { topic: params.topic, title: params.title } },
+        systemPrompt: 'You classify Korean YouTube Shorts content. Return valid JSON only.',
+      },
+    )
+    return classifierResultSchema.parse(result)
+  } catch {
+    return classifierResultSchema.parse(fallback())
   }
 }
 
 async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
   const results: StockVideoCandidate[] = []
   for (const scene of scenes.slice(0, 6)) {
+    const startedAt = Date.now()
+    logYouTubeAutomation('info', 'stock_video_scene_search_start', {}, {
+      sceneNumber: scene.sceneNumber,
+      keyword: scene.searchKeyword,
+    })
     const candidates = await searchPexelsVideos(scene.searchKeyword, 2)
     if (candidates.length > 0) {
-      results.push(...candidates.map(candidate => ({ ...candidate, keyword: scene.searchKeyword })))
+      results.push(...candidates.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      })))
+      logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+        provider: 'pexels',
+        candidateCount: candidates.length,
+        durationMs: Date.now() - startedAt,
+      })
       continue
     }
 
     const pixabay = await searchPixabayVideos(scene.searchKeyword, 2)
     if (pixabay.length > 0) {
-      results.push(...pixabay.map(candidate => ({ ...candidate, keyword: scene.searchKeyword })))
+      results.push(...pixabay.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      })))
+      logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+        provider: 'pixabay',
+        candidateCount: pixabay.length,
+        durationMs: Date.now() - startedAt,
+      })
       continue
     }
 
     results.push({
+      sceneNumber: scene.sceneNumber,
       provider: 'mock',
       id: `mock-${scene.sceneNumber}`,
       title: scene.searchKeyword,
@@ -146,6 +275,11 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
       previewUrl: null,
       sourceUrl: null,
       keyword: scene.searchKeyword,
+    })
+    logYouTubeAutomation('warn', 'stock_video_scene_search_empty', {}, {
+      sceneNumber: scene.sceneNumber,
+      keyword: scene.searchKeyword,
+      durationMs: Date.now() - startedAt,
     })
   }
   return results
@@ -177,6 +311,7 @@ async function searchPexelsVideos(query: string, limit: number): Promise<Omit<St
     return (data.videos || []).map(video => {
       const file = [...(video.video_files || [])]
         .filter(item => item.link)
+        .filter(isUsableRenderVideoFile)
         .sort((a, b) => scoreVideoFile(b) - scoreVideoFile(a))[0]
       return {
         provider: 'pexels' as const,
@@ -245,21 +380,92 @@ function normalizePlannerDays(days: PlannerDay[] | undefined, topic: string) {
   return normalized
 }
 
-function normalizeScenes(scenes: YouTubeScenePlan[] | undefined, script: string) {
+function normalizeScenes(
+  scenes: YouTubeScenePlan[] | undefined,
+  script: string,
+  template?: YouTubeShortsTemplateRecord,
+  strategy?: YouTubePlanStrategy,
+) {
   const source = Array.isArray(scenes) ? scenes : []
   const fallbackLines = script.split(/[.!?\n]/).map(line => line.trim()).filter(Boolean)
-  const normalized = source.length >= 3 ? source : fallbackLines.slice(0, 5).map((line, index) => ({
+  const normalized: YouTubeScenePlan[] = source.length >= 3 ? source : fallbackLines.slice(0, 5).map((line, index) => ({
     sceneNumber: index + 1,
     narration: line,
     searchKeyword: `vertical ${line.split(/\s+/).slice(0, 4).join(' ')}`,
     durationSeconds: 8,
   }))
-  return normalized.slice(0, 8).map((scene, index) => ({
+  const min = template?.config.videoRules.sceneDurationMin ?? 4
+  const max = template?.config.videoRules.sceneDurationMax ?? 12
+  const targetCount = strategy?.targetSceneCount ?? Math.min(12, normalized.length)
+  const sourceForTarget = normalized.slice(0, targetCount)
+  return sourceForTarget.slice(0, 12).map((scene, index) => ({
     sceneNumber: index + 1,
+    sceneRole: strategy?.sceneRoles[index] ?? scene.sceneRole ?? `scene_${index + 1}`,
     narration: String(scene.narration || '').trim().slice(0, 220),
     searchKeyword: sanitizeSearchKeyword(scene.searchKeyword),
-    durationSeconds: Math.max(4, Math.min(12, Number(scene.durationSeconds) || 8)),
+    durationSeconds: Math.max(min, Math.min(max, Number(scene.durationSeconds) || (min + max) / 2)),
   })).filter(scene => scene.narration && scene.searchKeyword)
+}
+
+function deterministicClassification(text: string): ShortsClassifierResult {
+  const normalized = text.toLowerCase()
+  const rules: Array<[RegExp, ShortsClassifierResult['contentType'], ShortsClassifierResult['tone']]> = [
+    [/축구|야구|농구|스포츠|감독|선수/, 'sports', 'serious'],
+    [/뉴스|속보|정치|경제|사건|화제/, 'news', 'serious'],
+    [/애니|만화|진격의 거인|캐릭터/, 'anime', 'dramatic'],
+    [/드라마|영화|명장면|배우/, 'drama_highlight', 'emotional'],
+    [/예능|웃긴|연예|아이돌|유머/, 'entertainment', 'funny'],
+    [/지식|이유|방법|사실|건강|과학|역사/, 'knowledge', 'informative'],
+  ]
+  const matched = rules.find(([pattern]) => pattern.test(normalized))
+  return {
+    contentType: matched?.[1] ?? 'default',
+    tone: matched?.[2] ?? 'neutral',
+    recommendedTemplateKey: null,
+    confidenceScore: matched ? 0.72 : 0.35,
+    reason: matched ? 'Keyword-based fallback classification.' : 'No reliable category signal.',
+  }
+}
+
+function buildVideoStructure(
+  title: string,
+  scenes: YouTubeScenePlan[],
+  template: YouTubeShortsTemplateRecord,
+  usedDefaultTemplate: boolean,
+) {
+  let cursor = 0
+  const structuredScenes = scenes.map((scene, index) => {
+    const start = cursor
+    cursor += scene.durationSeconds
+    return {
+      sceneIndex: index + 1,
+      sceneRole: scene.sceneRole ?? `scene_${index + 1}`,
+      start,
+      end: cursor,
+      visualInstruction: scene.searchKeyword,
+      caption: scene.narration,
+      captionEmphasis: [],
+      emotion: template.config.aiMatching.tones[0] ?? 'neutral',
+      transition: template.config.videoRules.transitionType,
+      zoomEffect: template.config.videoRules.zoomEffect,
+    }
+  })
+  const totalDuration = Math.min(template.config.videoRules.totalDuration, cursor)
+  const ctaDuration = Math.min(template.config.cta.ctaDuration, totalDuration)
+  return {
+    selectedTemplateKey: template.templateKey,
+    usedDefaultTemplate,
+    title,
+    hook: title,
+    totalDuration,
+    scenes: structuredScenes,
+    cta: {
+      enabled: template.config.cta.ctaEnabled,
+      text: template.config.cta.ctaText,
+      start: Math.max(0, totalDuration - ctaDuration),
+      end: totalDuration,
+    },
+  }
 }
 
 function normalizeTags(tags: unknown, topic: string) {
@@ -366,7 +572,29 @@ function stockKeywordFor(topic: string, suffix: string) {
 
 function scoreVideoFile(file: { quality?: string; width?: number; height?: number }) {
   const ratio = file.width && file.height ? file.height / file.width : 0
-  const portrait = ratio > 1.2 ? 20 : 0
-  const quality = file.quality === 'hd' ? 10 : 0
-  return portrait + quality + Math.min(10, Math.round((file.height || 0) / 200))
+  const portrait = ratio > 1.2 ? 30 : 0
+  const quality = file.quality === 'hd' ? 20 : 0
+  const height = file.height || 0
+  const practicalHeight =
+    height >= 720 && height <= 1280 ? 25 :
+      height > 1280 && height <= 1920 ? 10 :
+        height > 1920 ? -30 : 0
+  const practicalWidth = (file.width || 0) <= 1080 ? 10 : -10
+  return portrait + quality + practicalHeight + practicalWidth
+}
+
+function isUsableRenderVideoFile(file: { width?: number; height?: number }) {
+  const width = file.width || 0
+  const height = file.height || 0
+  if (!width || !height) return true
+  if (height > 1920) return false
+  if (width > 1080) return false
+  return true
+}
+
+function countBy(values: string[]) {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] || 0) + 1
+    return acc
+  }, {})
 }

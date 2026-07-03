@@ -1,6 +1,6 @@
 import { MarketingNav } from '../../components/MarketingNav'
 import { MarketingFooter } from '../../components/MarketingFooter'
-import { Check, Mail } from 'lucide-react'
+import { ArrowRight, Check, Mail } from 'lucide-react'
 import { PRICING_PLANS } from '../../../lib/limits-types'
 import { getSessionUser } from '../../../lib/auth/user'
 import { getTranslations } from 'next-intl/server'
@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title: t('meta_title'),
     description: isEn
-      ? 'Shuffla pricing: Free plan with 2 card news, Creator at ₩25,000/mo for 20/month, Studio at ₩39,000/mo for 30/month.'
-      : 'Shuffla 요금제: 무료 2회, Creator 월 25,000원(월 20회), Studio 월 39,000원(월 30회).',
+      ? 'Shuffla pricing: Free plan with 2 card news, YouTube Promo at ₩9,900/mo, Creator at ₩25,000/mo, Studio at ₩39,000/mo.'
+      : 'Shuffla 요금제: 무료 2회, YouTube Promo 월 9,900원, Creator 월 25,000원, Studio 월 39,000원.',
     alternates: {
       canonical: `${base}/${locale}/pricing`,
       languages: { ko: `${base}/ko/pricing`, en: `${base}/en/pricing` },
@@ -37,7 +37,8 @@ const faqs = {
     { q: '유튜브 자동화로 만들어진 영상의 저작권은 누구에게 있나요?', a: 'Shuffla가 생성·합성한 영상의 저작권은 사용자에게 있습니다. 스톡 영상은 Pexels의 무료 라이선스를 기반으로 제공됩니다.' },
     { q: 'AI가 만든 카드뉴스를 직접 수정할 수 있나요?', a: '네. 생성된 문구와 레이아웃은 직접 편집할 수 있습니다.' },
     { q: '브랜드가 여러 개인 경우에도 사용할 수 있나요?', a: '현재는 계정당 브랜드 1개를 지원합니다. 여러 브랜드 도입은 별도 문의로 확인해 주세요.' },
-    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 카드뉴스 2회 생성과 유튜브 자동화 1일차 체험이 포함됩니다. Creator는 카드뉴스 월 20회 + 유튜브 자동화 30일 전체, Studio는 카드뉴스 월 30회 + 유튜브 자동화 30일 전체가 포함됩니다.' },
+    { q: '플랜 간 차이는 무엇인가요?', a: '무료 사용자는 최초 2회 생성과 30일 보관을 이용합니다. YouTube Promo는 유튜브 자동화만 사용할 수 있고 작업 히스토리는 3개까지 30일 보관됩니다. Creator는 월 20회, Studio는 월 30회 카드뉴스 생성이 가능합니다.' },
+    { q: '로그인만 하면 바로 생성할 수 있나요?', a: 'Google Login으로 브랜드 설정을 시작하면 결제 없이 최초 2회의 카드뉴스를 생성할 수 있습니다.' },
     { q: '플랜은 언제든지 변경할 수 있나요?', a: '현재 구독을 취소하면 즉시 이용권 없는 상태로 전환됩니다. 이후 원하는 새 플랜을 선택할 수 있습니다.' },
     { q: '결제는 어디에서 진행되나요?', a: 'Google Login 후 브랜드를 설정하면 요금제 화면에서 결제를 진행할 수 있습니다.' },
   ],
@@ -47,7 +48,8 @@ const faqs = {
     { q: 'Who owns the copyright on AI-generated videos?', a: 'Copyright of the videos generated and composited by Shuffla belongs to the user. Stock footage is provided under the Pexels free license.' },
     { q: 'Can I edit the AI-generated card news?', a: 'Yes. You can edit the copy and layout directly after generation.' },
     { q: 'Can I use it with multiple brands?', a: 'Currently one brand per account is supported. Contact us for multi-brand inquiries.' },
-    { q: 'What are the differences between plans?', a: 'Free includes 2 card news generations and a 1-video YouTube automation trial. Creator adds 20 card news/month plus full 30-day YouTube automation. Studio adds 30 card news/month plus full 30-day YouTube automation.' },
+    { q: 'What are the differences between plans?', a: 'Free users get 2 generations in total and 30-day history retention. YouTube Promo is for YouTube automation only with up to 3 saved histories for 30 days. Creator offers 20 card news/month and Studio offers 30/month.' },
+    { q: 'Can I start creating immediately after logging in?', a: 'Yes. After Google Login and brand setup, you can create 2 card news in total without payment.' },
     { q: 'Can I change plans at any time?', a: 'Canceling your current subscription reverts access immediately. You can then choose a new plan.' },
     { q: 'Where do I complete payment?', a: 'After Google Login and brand setup, the billing screen lets you select and pay for your plan.' },
   ],
@@ -56,7 +58,7 @@ const faqs = {
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const authenticated = Boolean(await getSessionUser())
-  const accessHref = authenticated ? `/${locale}/billing` : '/api/auth/google/start'
+  const accessHref = authenticated ? `/${locale}/billing` : `/${locale}/login`
   const t = await getTranslations('pricing')
   const isEn = locale === 'en'
 
@@ -75,47 +77,64 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       key: 'free',
       name: 'Free',
       price: isEn ? '$0' : '₩0',
-      priceNote: isEn ? 'Free for everyone' : '무료로 시작',
+      priceNote: isEn ? 'free' : '무료',
       features: isEn
         ? ['2 card news in total', 'Video card news not included', '30-day history', 'Brand URL analysis', 'Up to 4 reference images', 'Edit & download results', 'YouTube Shorts trial (day 1 only)']
         : ['최초 2회 카드뉴스 생성', '영상 카드뉴스 미포함', '작업 히스토리 30일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', '결과 편집 및 다운로드', '유튜브 자동화 체험 (1일차 1편)'],
       cta: isEn ? 'Get started' : '무료로 시작하기',
       highlight: false,
+      mobileOrderClass: 'order-3 md:order-none',
+    },
+    {
+      key: 'youtube',
+      name: PRICING_PLANS.YOUTUBE_PROMO.name,
+      price: '₩9,900',
+      priceNote: isEn ? '/ mo' : '/ 월',
+      features: isEn
+        ? ['YouTube automation only', '30-day Shorts title calendar', 'Up to 3 saved work histories', '30-day work history retention', 'Card news generation not included']
+        : ['유튜브 자동화 전용', '30일 쇼츠 제목 캘린더 생성', '작업 히스토리 최대 3개', '작업 히스토리 30일 보관', '카드뉴스 생성 미포함'],
+      cta: isEn ? 'Get started' : '시작하기',
+      highlight: false,
+      badge: isEn ? 'Promo' : '프로모션',
+      mobileOrderClass: 'order-2 md:order-none',
     },
     {
       key: 'creator',
       name: 'Creator',
-      price: isEn ? PRICING_PLANS.PRO.price_en : PRICING_PLANS.PRO.price,
-      priceNote: isEn ? 'per month' : '/ 월',
+      price: '₩25,000',
+      priceNote: isEn ? '/ mo' : '/ 월',
       features: isEn
         ? ['20 card news per month', '90-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results', 'YouTube Shorts automation (30 days)']
         : ['월 20회 카드뉴스 생성', '작업 히스토리 90일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드', '유튜브 쇼츠 자동화 30일 전체'],
       cta: isEn ? 'Get started' : '시작하기',
       highlight: true,
       badge: isEn ? 'Most Popular' : '가장 인기',
+      mobileOrderClass: 'order-1 md:order-none',
     },
     {
       key: 'studio',
       name: 'Studio',
-      price: isEn ? PRICING_PLANS.UNLIMITED.price_en : PRICING_PLANS.UNLIMITED.price,
-      priceNote: isEn ? 'per month' : '/ 월',
+      price: '₩39,000',
+      priceNote: isEn ? '/ mo' : '/ 월',
       features: isEn
         ? ['30 card news per month', '365-day history', 'Brand URL analysis', 'Up to 4 reference images', 'AI copy & image generation', '1 AI background regen/campaign', 'Edit & download results', 'YouTube Shorts automation (30 days)']
         : ['월 30회 카드뉴스 생성', '작업 히스토리 365일 보관', '브랜드 URL 분석', '상품 참고 이미지 최대 4장', 'AI 문구·이미지 생성', '캠페인별 AI 배경 재생성 1회분', '결과 편집 및 다운로드', '유튜브 쇼츠 자동화 30일 전체'],
       cta: isEn ? 'Get started' : '시작하기',
       highlight: false,
+      mobileOrderClass: 'order-4 md:order-none',
     },
     {
       key: 'enterprise',
       name: 'Enterprise',
       price: isEn ? 'Custom' : '별도 문의',
-      priceNote: isEn ? 'Annual billing' : '연간 계약',
+      priceNote: isEn ? 'annual' : '연간',
       features: isEn
         ? ['All Studio features +', 'Custom volume', 'Priority support', 'Migration & onboarding', 'Account management', 'YouTube automation included']
         : ['Studio 기능 전체 포함', '대량 제작 맞춤 설정', '우선 지원', '온보딩 및 마이그레이션', '전담 계정 관리', '유튜브 자동화 포함'],
       cta: isEn ? 'Contact sales' : '도입 문의하기',
       highlight: false,
       isEnterprise: true,
+      mobileOrderClass: 'order-5 md:order-none',
     },
   ]
 
@@ -145,45 +164,56 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
         <main>
           {/* HEADER */}
-          <section className="mx-auto max-w-[1300px] px-6 pb-14 pt-24 lg:px-10 lg:pt-32">
-            <h1 className="text-[52px] font-black tracking-[-0.05em] leading-none md:text-[72px]">
+          <section className="mx-auto max-w-[1300px] px-6 pb-8 pt-10 md:pb-14 md:pt-24 lg:px-10 lg:pt-32">
+            <h1 className="text-[42px] font-black tracking-[-0.045em] leading-none md:text-[72px]">
               {isEn ? 'Pricing' : '요금제'}
             </h1>
-            <p className="mt-5 text-[17px] text-[#525252] max-w-sm">
+            <p className="mt-3 max-w-sm text-[15px] leading-6 text-[#525252] md:mt-5 md:text-[17px]">
               {isEn ? 'Start free. Upgrade as you grow.' : '무료로 시작하고, 필요한 만큼 업그레이드하세요.'}
             </p>
           </section>
 
           {/* PLANS GRID */}
-          <section className="mx-auto max-w-[1300px] px-6 pb-24 lg:px-10">
-            <div className="grid gap-px bg-black/[0.07] border border-black/[0.07] rounded-[20px] overflow-hidden md:grid-cols-2 lg:grid-cols-4">
+          <section className="mx-auto max-w-[1300px] px-6 pb-16 md:pb-24 lg:px-10">
+            <div className="mb-3 flex items-center justify-between md:hidden">
+              <p className="text-[12px] font-bold text-[#71717a]">
+                {isEn ? 'Swipe to compare plans' : '옆으로 넘겨 요금제 비교'}
+              </p>
+              <span className="inline-flex items-center gap-1 text-[12px] font-black text-[#ff6b35]">
+                {isEn ? 'More' : '더 보기'}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </div>
+            <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-px md:overflow-hidden md:rounded-[20px] md:border md:border-black/[0.07] md:bg-black/[0.07] md:p-0 lg:grid-cols-3 xl:grid-cols-5">
               {plans.map((plan) => (
                 <div
                   key={plan.key}
-                  className={`relative flex flex-col p-8 ${
+                  className={`relative flex min-h-[455px] w-[76vw] max-w-[320px] shrink-0 snap-center flex-col rounded-[20px] border border-black/[0.07] p-5 md:min-h-0 md:w-auto md:max-w-none md:shrink md:rounded-none md:border-0 md:p-8 ${
+                    plan.mobileOrderClass
+                  } ${
                     plan.highlight
                       ? 'bg-[#0a0a0a] text-white'
                       : 'bg-white text-[#0a0a0a]'
                   }`}
                 >
                   {plan.badge && (
-                    <span className="absolute right-6 top-6 rounded-full bg-[#ff6b35] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                    <span className="absolute right-5 top-5 rounded-full bg-[#ff6b35] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white md:right-6 md:top-6">
                       {plan.badge}
                     </span>
                   )}
 
                   {/* Plan name */}
-                  <p className={`text-[22px] font-black tracking-[-0.03em] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                  <p className={`pr-16 text-[20px] font-black tracking-[-0.03em] md:pr-0 md:text-[22px] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                     {plan.name}
                   </p>
 
                   {/* Price */}
                   <div className="mt-4">
-                    <div className="flex items-baseline">
-                      <span className={`text-[38px] font-black tracking-[-0.045em] leading-none ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
+                    <div className="flex min-h-[34px] items-baseline gap-2 whitespace-nowrap md:min-h-[44px]">
+                      <span className={`text-[clamp(28px,8vw,34px)] font-black tracking-[-0.035em] leading-none md:text-[clamp(28px,2.35vw,38px)] ${plan.highlight ? 'text-white' : 'text-[#0a0a0a]'}`}>
                         {plan.price}
                       </span>
-                      <span className={`ml-2 text-[13px] ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
+                      <span className={`shrink-0 text-[13px] font-semibold leading-none ${plan.highlight ? 'text-white/50' : 'text-[#8a8a8a]'}`}>
                         {plan.priceNote}
                       </span>
                     </div>
@@ -195,14 +225,14 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                   </div>
 
                   {/* Divider */}
-                  <div className={`my-6 h-px ${plan.highlight ? 'bg-white/10' : 'bg-black/[0.07]'}`} />
+                  <div className={`my-4 h-px md:my-6 ${plan.highlight ? 'bg-white/10' : 'bg-black/[0.07]'}`} />
 
                   {/* Features */}
-                  <ul className="flex-1 space-y-3">
+                  <ul className="flex-1 space-y-2.5 md:space-y-3">
                     {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-[13.5px]">
+                      <li key={i} className="flex items-start gap-2 text-[12.5px] leading-5 md:gap-2.5 md:text-[13.5px]">
                         <Check
-                          className={`mt-0.5 h-4 w-4 shrink-0 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 md:h-4 md:w-4 ${plan.highlight ? 'text-[#ff6b35]' : 'text-[#0a0a0a]'}`}
                           strokeWidth={2.8}
                         />
                         <span className={plan.highlight ? 'text-white/80' : 'text-[#525252]'}>{feature}</span>
@@ -212,8 +242,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
                   {/* CTA */}
                   <a
-                    href={plan.isEnterprise ? 'mailto:admin@shuffla.io' : plan.key === 'free' ? (authenticated ? `/${locale}/concept` : '/api/auth/google/start') : accessHref}
-                    className={`mt-8 flex h-11 w-full items-center justify-center rounded-full text-[14px] font-bold transition-all ${
+                    href={plan.isEnterprise ? 'mailto:admin@shuffla.io' : plan.key === 'free' ? (authenticated ? `/${locale}/concept` : `/${locale}/login`) : accessHref}
+                    className={`mt-5 flex h-10 w-full items-center justify-center rounded-full text-[13px] font-bold transition-all md:mt-8 md:h-11 md:text-[14px] ${
                       plan.highlight
                         ? 'bg-white text-[#0a0a0a] hover:bg-white/90'
                         : plan.isEnterprise
@@ -224,6 +254,14 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                     {plan.cta}
                   </a>
                 </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+              {plans.map((plan) => (
+                <span
+                  key={plan.key}
+                  className={`h-1.5 rounded-full ${plan.highlight ? 'w-6 bg-[#0a0a0a]' : 'w-1.5 bg-black/20'}`}
+                />
               ))}
             </div>
           </section>

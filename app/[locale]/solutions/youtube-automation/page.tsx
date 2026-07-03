@@ -74,8 +74,8 @@ const STEPS = [
     num: '04',
     ko: '매일 업로드',
     en: 'Upload daily',
-    desc: '24시간 알고리즘 친화적 리듬으로 매일 새 영상을 제작해 유튜브 채널을 성장시킵니다.',
-    descEn: 'Produce a new video every 24 hours in an algorithm-friendly cadence to grow your YouTube channel.',
+    desc: '12시간 간격으로 새 영상을 제작해 더 빠르게 유튜브 채널을 성장시킵니다.',
+    descEn: 'Produce a new video every 12 hours to grow your YouTube channel faster.',
   },
 ]
 
@@ -86,7 +86,7 @@ const INCLUDED = {
     '스톡 영상 자동 선택 (Pexels)',
     'TTS 나레이션 & 씬별 자막 싱크',
     'MP4 내보내기 (9:16 쇼츠 최적화)',
-    '유튜브 알고리즘 친화적 24시간 업로드 리듬',
+    '12시간 간격의 빠른 업로드 리듬',
     '작업 히스토리 & 진행 상황 관리',
   ],
   en: [
@@ -95,7 +95,7 @@ const INCLUDED = {
     'Auto stock video selection (Pexels)',
     'TTS narration & per-scene subtitle sync',
     'MP4 export (9:16 Shorts-optimized)',
-    'Algorithm-friendly 24-hour upload cadence',
+    'Fast 12-hour upload cadence',
     'Work history & progress tracking',
   ],
 }
@@ -116,7 +116,7 @@ const FAQ = {
     },
     {
       q: '하루에 몇 개의 유튜브 쇼츠를 만들 수 있나요?',
-      a: '유튜브 알고리즘 특성상 하루 1편 업로드가 가장 효과적입니다. Shuffla는 24시간 간격으로 다음 영상을 제작할 수 있도록 설계되어 있습니다.',
+      a: 'Shuffla는 12시간 간격으로 다음 영상을 제작할 수 있도록 설계되어 하루 최대 2편의 쇼츠 제작 흐름을 지원합니다.',
     },
     {
       q: '무료로 유튜브 자동화를 사용할 수 있나요?',
@@ -142,7 +142,7 @@ const FAQ = {
     },
     {
       q: 'How many YouTube Shorts can I produce per day?',
-      a: 'One video per day is the most algorithm-friendly cadence for YouTube. Shuffla is designed for a 24-hour production rhythm between videos.',
+      a: 'Shuffla opens the next video every 12 hours, supporting a production rhythm of up to two Shorts per day.',
     },
     {
       q: 'Can I use YouTube automation for free?',
@@ -189,8 +189,8 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
           contactPoint: { '@type': 'ContactPoint', email: 'admin@shuffla.io', contactType: 'customer support' },
         },
         featureList: isEn
-          ? ['30-day YouTube Shorts content planning', 'AI script writing', 'Stock video auto-selection', 'TTS narration', 'Subtitle sync', 'MP4 export 9:16', 'Algorithm-friendly 24-hour upload cadence']
-          : ['30일 유튜브 쇼츠 콘텐츠 기획', 'AI 스크립트 자동 작성', '스톡 영상 자동 선택', 'TTS 나레이션', '자막 싱크', 'MP4 9:16 내보내기', '유튜브 알고리즘 친화적 24시간 업로드 리듬'],
+          ? ['30-day YouTube Shorts content planning', 'AI script writing', 'Stock video auto-selection', 'TTS narration', 'Subtitle sync', 'MP4 export 9:16', 'Fast 12-hour upload cadence']
+          : ['30일 유튜브 쇼츠 콘텐츠 기획', 'AI 스크립트 자동 작성', '스톡 영상 자동 선택', 'TTS 나레이션', '자막 싱크', 'MP4 9:16 내보내기', '12시간 간격의 빠른 업로드 리듬'],
         keywords: isEn
           ? 'YouTube Shorts AI, YouTube automation, YouTube Shorts automation, AI Shorts generator'
           : '유튜브 쇼츠 AI, 유튜브 자동화, 유튜브 쇼츠 자동화, AI 쇼츠 생성기, 쇼츠 자동 제작',
@@ -340,11 +340,11 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
               {(isEn ? [
                 { stat: '30', label: 'Days of content planned in seconds' },
                 { stat: '1-click', label: 'Per-video production — no editing' },
-                { stat: '24h', label: 'Algorithm-friendly upload cadence' },
+                { stat: '12h', label: 'Fast upload cadence' },
               ] : [
                 { stat: '30일', label: '몇 초 만에 콘텐츠 기획 완성' },
                 { stat: '원클릭', label: '영상 제작 — 편집 불필요' },
-                { stat: '24시간', label: '유튜브 알고리즘 최적 업로드 주기' },
+                { stat: '12시간', label: '다음 쇼츠 오픈 주기' },
               ]).map(({ stat, label }) => (
                 <div key={stat} className="rounded-2xl border border-[#e6dfd5] bg-[#faf8f5] px-6 py-8">
                   <p className="text-[2.5rem] font-bold tracking-[-0.04em] text-[#171714]">{stat}</p>
