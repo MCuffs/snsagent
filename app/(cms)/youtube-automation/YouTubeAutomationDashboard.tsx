@@ -47,6 +47,7 @@ type PlannerDay = {
   renderProgress?: number
   renderStage?: string | null
   renderCancelRequested?: boolean
+  qualityNotes?: Array<{ type: string; sceneNumber?: number }>
   uploadedAt?: string | null
   completedAt?: string | null
 }
@@ -84,6 +85,26 @@ function saveCompletedTime(dayId: string) {
   const map = getCompletedTimes()
   map[dayId] = Date.now()
   try { localStorage.setItem(LS_COMPLETED, JSON.stringify(map)) } catch {}
+}
+
+function describeQualityNotes(notes: Array<{ type: string; sceneNumber?: number }>): string[] {
+  const messages: string[] = []
+  if (notes.some(note => note.type === 'generic_plan')) {
+    messages.push('AI 대본 생성이 실패해 기본 대본으로 제작되었습니다. 다시 제작하면 새 대본이 생성됩니다.')
+  }
+  const generatedScenes = notes
+    .filter(note => note.type === 'generated_clip')
+    .map(note => note.sceneNumber)
+    .filter((sceneNumber): sceneNumber is number => typeof sceneNumber === 'number')
+  if (generatedScenes.length > 0) {
+    messages.push(`씬 ${generatedScenes.join(', ')}에 어울리는 스톡 영상을 찾지 못해 단색 배경으로 렌더링되었습니다.`)
+  } else if (notes.some(note => note.type === 'generated_clip')) {
+    messages.push('일부 장면이 스톡 영상을 찾지 못해 단색 배경으로 렌더링되었습니다.')
+  }
+  if (notes.some(note => note.type === 'tts_probe_failed')) {
+    messages.push('일부 장면의 음성 길이 측정에 실패해 자막 싱크가 어긋날 수 있습니다.')
+  }
+  return messages
 }
 
 function msToHHMM(ms: number) {
@@ -837,7 +858,7 @@ function DayProductionModal({
     }
   }
 
-  const runRender = async (dayData: PlannerDay) => {
+  const runRender = async (dayData: PlannerDay, options?: { regeneratePlan?: boolean }) => {
     setPhase('rendering')
     renderStartedAt.current = Date.now()
     const sceneCount = dayData.scenes?.length || 6
@@ -865,7 +886,12 @@ function DayProductionModal({
     scheduleLabels(labelSteps)
 
     try {
-      const res = await fetch(`/api/youtube-automation/days/${dayData.id}/render`, { method: 'POST' })
+      const res = await fetch(`/api/youtube-automation/days/${dayData.id}/render`, {
+        method: 'POST',
+        ...(options?.regeneratePlan
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regeneratePlan: true }) }
+          : {}),
+      })
       clearTimeout(labelTimer)
       const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
       if (!res.ok || !data.day) throw new Error(data.error || '렌더링을 완료하지 못했습니다.')
@@ -1060,6 +1086,33 @@ function DayProductionModal({
                   style={{ maxHeight: '48dvh', maxWidth: 360 }}
                 />
               </div>
+
+              {(resultDay.qualityNotes?.length ?? 0) > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-xs font-black text-amber-800">제작 중 품질 이슈가 발생했습니다</p>
+                  <ul className="mt-1.5 space-y-1 text-[11px] font-semibold leading-4 text-amber-700">
+                    {describeQualityNotes(resultDay.qualityNotes || []).map(message => (
+                      <li key={message}>· {message}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      isRetry.current = true
+                      const regeneratePlan = (resultDay.qualityNotes || []).some(note => note.type === 'generic_plan')
+                      setPct(regeneratePlan ? 1 : 30)
+                      void runRender(resultDay, { regeneratePlan }).catch(err => {
+                        setPhase('error')
+                        setErrorMsg(err instanceof Error ? err.message : '재제작 요청에 실패했습니다.')
+                      })
+                    }}
+                    className="mt-2.5 inline-flex h-9 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-[11px] font-black text-white transition-colors hover:bg-amber-700"
+                    style={{ touchAction: 'manipulation' }}
+                  >
+                    무료로 다시 제작하기
+                  </button>
+                </div>
+              )}
 
               <button
                 type="button"

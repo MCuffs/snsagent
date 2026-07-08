@@ -72,10 +72,10 @@ const STEPS = [
   },
   {
     num: '04',
-    ko: '매일 업로드',
-    en: 'Upload daily',
-    desc: '12시간 간격으로 새 영상을 제작해 더 빠르게 유튜브 채널을 성장시킵니다.',
-    descEn: 'Produce a new video every 12 hours to grow your YouTube channel faster.',
+    ko: '다운로드 후 업로드',
+    en: 'Download & upload',
+    desc: '완성된 MP4를 다운로드해 채널에 올리기만 하면 됩니다. 12시간 간격으로 다음 영상이 열려 꾸준한 업로드 루틴을 만들 수 있습니다.',
+    descEn: 'Download the finished MP4 and post it to your channel. The next video unlocks every 12 hours to keep a consistent upload routine.',
   },
 ]
 
@@ -86,7 +86,7 @@ const INCLUDED = {
     '스톡 영상 자동 선택 (Pexels)',
     'TTS 나레이션 & 씬별 자막 싱크',
     'MP4 내보내기 (9:16 쇼츠 최적화)',
-    '12시간 간격의 빠른 업로드 리듬',
+    '12시간 간격의 빠른 제작 리듬',
     '작업 히스토리 & 진행 상황 관리',
   ],
   en: [
@@ -95,7 +95,7 @@ const INCLUDED = {
     'Auto stock video selection (Pexels)',
     'TTS narration & per-scene subtitle sync',
     'MP4 export (9:16 Shorts-optimized)',
-    'Fast 12-hour upload cadence',
+    'Fast 12-hour production cadence',
     'Work history & progress tracking',
   ],
 }
@@ -124,7 +124,7 @@ const FAQ = {
     },
     {
       q: 'Shuffla 유튜브 자동화와 다른 AI 영상 도구의 차이는?',
-      a: 'Shuffla는 단순 영상 생성이 아닌 30일 콘텐츠 기획→스크립트→스톡 영상 선택→TTS→자막까지 전체 파이프라인을 원클릭으로 제공합니다. 채널 운영에 필요한 모든 과정을 자동화합니다.',
+      a: 'Shuffla는 단순 영상 생성이 아닌 30일 콘텐츠 기획→스크립트→스톡 영상 선택→TTS→자막까지 전체 제작 파이프라인을 원클릭으로 제공합니다. 완성된 MP4를 다운로드해 채널에 업로드하기만 하면 됩니다.',
     },
   ],
   en: [
@@ -150,7 +150,7 @@ const FAQ = {
     },
     {
       q: 'How is Shuffla different from other AI video tools?',
-      a: 'Shuffla offers an end-to-end pipeline — 30-day content planning → script → stock video selection → TTS → subtitles — all in one click. It automates the entire channel operation, not just a single step.',
+      a: 'Shuffla offers an end-to-end production pipeline — 30-day content planning → script → stock video selection → TTS → subtitles — all in one click. You simply download the finished MP4 and upload it to your channel.',
     },
   ],
 }
@@ -189,8 +189,8 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
           contactPoint: { '@type': 'ContactPoint', email: 'admin@shuffla.io', contactType: 'customer support' },
         },
         featureList: isEn
-          ? ['30-day YouTube Shorts content planning', 'AI script writing', 'Stock video auto-selection', 'TTS narration', 'Subtitle sync', 'MP4 export 9:16', 'Fast 12-hour upload cadence']
-          : ['30일 유튜브 쇼츠 콘텐츠 기획', 'AI 스크립트 자동 작성', '스톡 영상 자동 선택', 'TTS 나레이션', '자막 싱크', 'MP4 9:16 내보내기', '12시간 간격의 빠른 업로드 리듬'],
+          ? ['30-day YouTube Shorts content planning', 'AI script writing', 'Stock video auto-selection', 'TTS narration', 'Subtitle sync', 'MP4 export 9:16', 'Fast 12-hour production cadence']
+          : ['30일 유튜브 쇼츠 콘텐츠 기획', 'AI 스크립트 자동 작성', '스톡 영상 자동 선택', 'TTS 나레이션', '자막 싱크', 'MP4 9:16 내보내기', '12시간 간격의 빠른 제작 리듬'],
         keywords: isEn
           ? 'YouTube Shorts AI, YouTube automation, YouTube Shorts automation, AI Shorts generator'
           : '유튜브 쇼츠 AI, 유튜브 자동화, 유튜브 쇼츠 자동화, AI 쇼츠 생성기, 쇼츠 자동 제작',
@@ -207,8 +207,8 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
         '@type': 'HowTo',
         name: isEn ? 'How to automate YouTube Shorts with AI' : 'AI로 유튜브 쇼츠 자동화하는 방법',
         description: isEn
-          ? 'Use Shuffla to plan, produce, and publish YouTube Shorts automatically with AI.'
-          : 'Shuffla를 사용해 유튜브 쇼츠를 AI로 자동 기획·제작·게시하는 방법.',
+          ? 'Use Shuffla to plan and produce YouTube Shorts automatically with AI, then download upload-ready MP4s.'
+          : 'Shuffla를 사용해 유튜브 쇼츠를 AI로 자동 기획·제작하고 업로드 준비된 MP4를 받는 방법.',
         step: STEPS.map(({ num, ko, en, desc, descEn }) => ({
           '@type': 'HowToStep',
           position: parseInt(num),
@@ -340,7 +340,7 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
               {(isEn ? [
                 { stat: '30', label: 'Days of content planned in seconds' },
                 { stat: '1-click', label: 'Per-video production — no editing' },
-                { stat: '12h', label: 'Fast upload cadence' },
+                { stat: '12h', label: 'Next Short unlock cycle' },
               ] : [
                 { stat: '30일', label: '몇 초 만에 콘텐츠 기획 완성' },
                 { stat: '원클릭', label: '영상 제작 — 편집 불필요' },
@@ -363,7 +363,7 @@ export default async function YouTubeAutomationSolutionPage({ params }: { params
                 {isEn ? 'How YouTube Shorts automation works' : '유튜브 쇼츠 자동화 작동 방식'}
               </p>
               <h2 className="mt-5 text-[clamp(2rem,5vw,4rem)] font-bold leading-[1.05] tracking-[-0.065em]">
-                {isEn ? '4 steps to daily uploads' : '4단계, 매일 업로드'}
+                {isEn ? '4 steps to a daily video' : '4단계, 매일 새 영상'}
               </h2>
             </FadeUp>
 

@@ -7,8 +7,20 @@ export const YOUTUBE_PROMO_HISTORY_LIMIT = 3
 export const YOUTUBE_PROMO_RETENTION_DAYS = 30
 export const YOUTUBE_AUTOMATION_FREE_DAY_LIMIT = 1
 
+// QA/test accounts that bypass plan gating; comma-separated emails, empty by default.
+const BYPASS_EMAILS = new Set(
+  (process.env.YOUTUBE_TEST_BYPASS_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean),
+)
+
+function isBypassEmail(email?: string | null) {
+  return Boolean(email && BYPASS_EMAILS.has(email.toLowerCase()))
+}
+
 export function canUseYouTubeAutomation(user: { plan?: string | null; email?: string | null }) {
-  if (isAdminEmail(user.email) || user.email?.toLowerCase() === 'test@test.com') return true
+  if (isAdminEmail(user.email) || isBypassEmail(user.email)) return true
   return normalizePlan(user.plan || 'FREE') !== 'FREE'
 }
 
@@ -32,7 +44,7 @@ export function isYouTubePromoPlan(plan?: string | null) {
 }
 
 export function getYouTubeAutomationHistoryPolicy(user: { plan?: string | null; email?: string | null }) {
-  if (isYouTubePromoPlan(user.plan) && !isAdminEmail(user.email) && user.email?.toLowerCase() !== 'test@test.com') {
+  if (isYouTubePromoPlan(user.plan) && !isAdminEmail(user.email) && !isBypassEmail(user.email)) {
     return { limit: YOUTUBE_PROMO_HISTORY_LIMIT, retentionDays: YOUTUBE_PROMO_RETENTION_DAYS }
   }
   return { limit: 10, retentionDays: null as number | null }

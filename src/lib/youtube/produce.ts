@@ -11,6 +11,7 @@ import {
 } from './automation'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from './logging'
 import { renderYouTubeShortsFromStock, YouTubeRenderCancelledError } from './render'
+import { resolveProjectTtsVoice } from './ttsVoice'
 
 export async function produceYouTubeShorts({
   dayId,
@@ -161,6 +162,7 @@ export async function produceYouTubeShorts({
           sceneRoleSequenceJson: JSON.stringify(plan.scenes.map(scene => scene.sceneRole)),
           hookPattern: planStrategy.hookPattern,
           endingPattern: planStrategy.endingPattern,
+          qualityNotesJson: JSON.stringify(plan.usedFallbackPlan ? [{ type: 'generic_plan' }] : []),
           renderProgress: 30,
           renderStage: '영상 소스 준비 완료',
         },
@@ -200,6 +202,7 @@ export async function produceYouTubeShorts({
       scenes,
       sourceClips,
       template: parseTemplateSnapshot(day.templateSnapshotJson),
+      ttsVoice: resolveProjectTtsVoice(day.projectId, day.project.ttsVoice),
       onProgress: async (renderProgress, renderStage) => {
         lastProgress = renderProgress
         lastStage = renderStage
@@ -217,6 +220,9 @@ export async function produceYouTubeShorts({
       shouldCancel,
     })
 
+    // Keep plan-phase notes (generic_plan), replace render-phase notes with this render's outcome
+    const planPhaseNotes = parseJsonArray<{ type?: string }>(day.qualityNotesJson)
+      .filter(note => note?.type === 'generic_plan')
     const completed = await prisma.youTubeAutomationDay.updateMany({
       where: { id: dayId, renderCancelRequested: false, status: 'rendering' },
       data: {
@@ -226,6 +232,7 @@ export async function produceYouTubeShorts({
         ttsAudioUrl: rendered.ttsAudioUrl,
         ttsProvider: rendered.ttsProvider,
         subtitleJson: JSON.stringify(rendered.subtitles),
+        qualityNotesJson: JSON.stringify([...planPhaseNotes, ...rendered.qualityNotes]),
         renderProgress: 100,
         renderStage: '영상 제작 완료',
         renderCancelRequested: false,

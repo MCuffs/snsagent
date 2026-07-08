@@ -11,6 +11,7 @@ import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 import { fitHookText, renderHookOverlay } from './hookRenderer'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from './logging'
+import type { YouTubeTtsVoice } from './ttsVoice'
 
 interface RenderYouTubeShortsParams {
   userId: string
@@ -20,8 +21,14 @@ interface RenderYouTubeShortsParams {
   scenes: YouTubeScenePlan[]
   sourceClips: StockVideoCandidate[]
   template?: YouTubeShortsTemplateRecord
+  ttsVoice?: YouTubeTtsVoice
   onProgress?: (progress: number, stage: string) => Promise<void>
   shouldCancel?: () => Promise<boolean>
+}
+
+export interface RenderQualityNote {
+  type: 'generated_clip' | 'tts_probe_failed'
+  sceneNumber?: number
 }
 
 interface StoredRenderedAsset {
@@ -31,6 +38,8 @@ interface StoredRenderedAsset {
   ttsProvider: string
   // Actual subtitle timings derived from real TTS audio durations (replaces plan-based estimate)
   subtitles: Array<{ start: number; end: number; text: string }>
+  // Degradations that occurred while rendering (e.g. a scene fell back to a generated placeholder clip)
+  qualityNotes: RenderQualityNote[]
 }
 
 const MAX_SOURCE_VIDEO_BYTES = 100 * 1024 * 1024
@@ -56,6 +65,12 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   await fs.mkdir(workRoot, { recursive: true })
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
   const deadlineAt = Date.now() + TOTAL_RENDER_TIMEOUT_MS
+  const qualityNotes: RenderQualityNote[] = []
+  const addQualityNote = (note: RenderQualityNote) => {
+    if (!qualityNotes.some(existing => existing.type === note.type && existing.sceneNumber === note.sceneNumber)) {
+      qualityNotes.push(note)
+    }
+  }
 
   try {
     logYouTubeAutomation('info', 'render_workdir_created', renderLogContext(params), {
@@ -101,12 +116,14 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
           })
           try {
             await withTimeout(
-              createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds),
+              createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds, params.ttsVoice),
               boundedTimeout(deadlineAt, TTS_SCENE_TIMEOUT_MS),
               `씬 ${index + 1} TTS 생성이 ${Math.round(TTS_SCENE_TIMEOUT_MS / 1000)}초를 초과했습니다.`,
             )
             await ensureCanContinue(params, deadlineAt)
-            const actualDuration = await probeAudioDuration(sceneSpeechPath)
+            const actualDuration = await probeAudioDuration(sceneSpeechPath, () => {
+              addQualityNote({ type: 'tts_probe_failed', sceneNumber: scene.sceneNumber })
+            })
             await ensureCanContinue(params, deadlineAt)
             completedTtsCount += 1
             logYouTubeAutomation('info', 'render_tts_scene_done', renderLogContext(params), {
@@ -204,6 +221,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
               params.shouldCancel,
               boundedTimeout(deadlineAt, NORMALIZE_TIMEOUT_MS),
             )
+            addQualityNote({ type: 'generated_clip', sceneNumber: scene.sceneNumber })
             completedDownloadCount += 1
             await reportAssetPreparationProgress()
             return fallbackPath
@@ -253,6 +271,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
           usableClips,
           workDir,
           deadlineAt,
+          onGeneratedFallback: () => addQualityNote({ type: 'generated_clip', sceneNumber: scene.sceneNumber }),
         })
         normalizedCount += 1
         await reportProgress(
@@ -370,7 +389,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       return { start, end: subtitleCursor, text: scene.narration }
     })
 
-    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider, subtitles }
+    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider, subtitles, qualityNotes }
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -533,6 +552,7 @@ async function normalizeClipWithFallback(params: {
   usableClips: StockVideoCandidate[]
   workDir: string
   deadlineAt: number
+  onGeneratedFallback?: () => void
 }) {
   const sceneClips = preferFastSourceClips(clipsForScene(params.scene, params.usableClips))
   const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
@@ -574,6 +594,7 @@ async function normalizeClipWithFallback(params: {
     attempts,
     ...summarizeYouTubeAutomationError(lastError),
   })
+  params.onGeneratedFallback?.()
   await createGeneratedSourceClip(
     params.outputPath,
     Math.max(1, params.durationSeconds),
@@ -606,7 +627,7 @@ async function getTtsProvider(): Promise<string> {
 }
 
 // Generate TTS for a single scene narration with OpenAI.
-async function createSceneSpeechAudio(narration: string, outputPath: string, fallbackDurationSeconds: number) {
+async function createSceneSpeechAudio(narration: string, outputPath: string, fallbackDurationSeconds: number, voice?: YouTubeTtsVoice) {
   const input = narration.length > TTS_MAX_CHARS
     ? (console.warn(`[TTS] 씬 나레이션이 ${TTS_MAX_CHARS}자를 초과해 잘립니다.`), narration.slice(0, TTS_MAX_CHARS))
     : narration
@@ -626,7 +647,7 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
   })
   const response = await openai.audio.speech.create({
     model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-    voice: (process.env.OPENAI_TTS_VOICE || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
+    voice: voice ?? (process.env.OPENAI_TTS_VOICE || 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
     input,
     response_format: 'mp3',
   })
@@ -635,7 +656,7 @@ async function createSceneSpeechAudio(narration: string, outputPath: string, fal
 
 // Probe the actual duration of an audio file using ffmpeg.
 // This is the source of truth for sync: TTS determines scene length.
-async function probeAudioDuration(filePath: string): Promise<number> {
+async function probeAudioDuration(filePath: string, onFallback?: () => void): Promise<number> {
   const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path
   return new Promise((resolve, reject) => {
     let stderr = ''
@@ -657,6 +678,7 @@ async function probeAudioDuration(filePath: string): Promise<number> {
         resolve(duration)
       } else {
         console.warn('[YouTubeRender] Could not probe audio duration, using 5s fallback')
+        onFallback?.()
         resolve(5)
       }
     })
@@ -724,13 +746,27 @@ function buildAssSubtitlesWithDurations(
   const borderStyle = caption?.captionBackgroundEnabled ? 3 : 1
   const fontWeight = (caption?.captionFontWeight ?? 800) >= 600 ? -1 : 0
   let cursor = 0
-  const events = scenes.map((scene, index) => {
+  // One Dialogue per short phrase (not per scene): scene duration is distributed across
+  // phrases proportionally to character count so captions track the narration.
+  const events = scenes.flatMap((scene, index) => {
     const duration = actualDurations[index] ?? scene.durationSeconds
-    const start = cursor
-    // End subtitle slightly before the scene ends to avoid overlap with next line
-    const end = cursor + Math.max(duration - 0.15, duration * 0.9)
+    const sceneStart = cursor
     cursor += duration
-    return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(scene.narration)}`
+    const phrases = splitNarrationIntoPhrases(scene.narration)
+    if (phrases.length === 0) return []
+    const totalChars = phrases.reduce((sum, phrase) => sum + phrase.length, 0)
+    let phraseCursor = sceneStart
+    return phrases.map((phrase, phraseIndex) => {
+      const start = phraseCursor
+      const isLastPhrase = phraseIndex === phrases.length - 1
+      const rawEnd = isLastPhrase
+        ? sceneStart + duration
+        : phraseCursor + duration * (phrase.length / totalChars)
+      phraseCursor = rawEnd
+      // Trim slightly so a line clears before the next one appears
+      const end = Math.max(start + 0.2, rawEnd - 0.08)
+      return `Dialogue: 0,${formatAssTime(start)},${formatAssTime(end)},Default,,0,0,0,,${escapeAssText(phrase)}`
+    })
   })
   const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
   const hookLayout = hook
@@ -827,6 +863,35 @@ function escapeAssText(text: string) {
   return text
     .replace(/[{}]/g, '')
     .replace(/\r?\n/g, '\\N')
+}
+
+const SUBTITLE_PHRASE_MAX_CHARS = 18
+
+// Split narration into short caption-sized phrases: first on sentence/comma boundaries,
+// then long segments on word boundaries.
+function splitNarrationIntoPhrases(narration: string): string[] {
+  const clean = narration.replace(/\s+/g, ' ').trim()
+  if (!clean) return []
+  const segments = clean.split(/(?<=[.!?…,])\s*/).map(segment => segment.trim()).filter(Boolean)
+  const phrases: string[] = []
+  for (const segment of segments) {
+    if (segment.length <= SUBTITLE_PHRASE_MAX_CHARS) {
+      phrases.push(segment)
+      continue
+    }
+    let current = ''
+    for (const word of segment.split(' ')) {
+      if (current && current.length + 1 + word.length > SUBTITLE_PHRASE_MAX_CHARS) {
+        phrases.push(current)
+        current = word
+      } else {
+        current = current ? `${current} ${word}` : word
+      }
+    }
+    if (current) phrases.push(current)
+  }
+  // Captions read cleaner without trailing commas/periods (question/exclamation marks stay)
+  return phrases.map(phrase => phrase.replace(/[,.]+$/, '').trim()).filter(Boolean)
 }
 
 async function copyFontIfAvailable(fontsDir: string) {

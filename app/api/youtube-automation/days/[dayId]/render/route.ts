@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
@@ -8,7 +8,8 @@ import {
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
-import { logYouTubeAutomation } from '../../../../../../src/lib/youtube/logging'
+import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
+import { produceYouTubeShorts } from '../../../../../../src/lib/youtube/produce'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -137,7 +138,9 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     }
   }
 
-  const hasPlan = Boolean(day.script && day.scenesJson && day.sourceClipsJson)
+  const body = await request.json().catch(() => null) as { regeneratePlan?: boolean } | null
+  const regeneratePlan = Boolean(body?.regeneratePlan)
+  const hasPlan = !regeneratePlan && Boolean(day.script && day.scenesJson && day.sourceClipsJson)
   const status = hasPlan ? 'rendering' : 'planning'
   const renderStage = hasPlan ? '영상 제작 대기열 등록됨' : '스크립트 생성 대기열 등록됨'
   const initialProgress = hasPlan ? 30 : 1
@@ -151,6 +154,8 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
       renderProgress: initialProgress,
       renderStage,
       renderCancelRequested: false,
+      // A degraded plan (e.g. generic fallback script) can be discarded so production replans from scratch
+      ...(regeneratePlan ? { script: null, scenesJson: null, sourceClipsJson: null, qualityNotesJson: null } : {}),
     },
   })
   if (claimed.count === 0) {
@@ -174,6 +179,30 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   })
 
   logYouTubeAutomation('info', 'render_queue_enqueued', logContext)
+
+  // Start production immediately in this request's background so each user's render runs in
+  // its own function invocation (parallel across users). The recovery cron only picks up jobs
+  // whose invocation died before finishing (still-queued or stale).
+  const claimedDayId = day.id
+  const claimedUserId = user.id
+  after(async () => {
+    const started = await prisma.youTubeAutomationDay.updateMany({
+      where: { id: claimedDayId, status, renderStage, renderCancelRequested: false },
+      data: { renderStage: hasPlan ? '영상 제작 작업 실행 중' : '스크립트 생성 작업 실행 중' },
+    }).catch(() => ({ count: 0 }))
+    if (started.count === 0) {
+      // Someone else (e.g. the recovery cron) already claimed this job.
+      logYouTubeAutomation('warn', 'render_after_claim_lost', logContext)
+      return
+    }
+    logYouTubeAutomation('info', 'render_after_start', logContext)
+    try {
+      await produceYouTubeShorts({ dayId: claimedDayId, userId: claimedUserId, requestId })
+      logYouTubeAutomation('info', 'render_after_done', logContext)
+    } catch (error) {
+      logYouTubeAutomation('error', 'render_after_unhandled_error', logContext, summarizeYouTubeAutomationError(error))
+    }
+  })
 
   return NextResponse.json({
     day: { id: day.id, status, renderProgress: initialProgress, renderStage, renderCancelRequested: false },

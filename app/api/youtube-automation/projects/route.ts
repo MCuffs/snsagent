@@ -6,6 +6,7 @@ import {
   isYouTubeAutomationUpgradeLockedDay,
 } from '../../../../lib/youtube-automation-access'
 import { generateThirtyDayPlanner } from '../../../../src/lib/youtube/automation'
+import { pickRandomTtsVoice } from '../../../../src/lib/youtube/ttsVoice'
 import { isYouTubeDayUnlockDue } from '../../../../lib/youtube-automation-schedule'
 import {
   YOUTUBE_CANCEL_SETTLE_MS,
@@ -46,6 +47,7 @@ function serializeProject(project: Record<string, unknown>, user?: { plan?: stri
         renderProgress: day.renderProgress,
         renderStage: day.renderStage,
         renderCancelRequested: day.renderCancelRequested,
+        qualityNotes: safeJsonArray(day.qualityNotesJson),
         uploadedAt: day.uploadedAt instanceof Date ? day.uploadedAt.toISOString() : day.uploadedAt,
         completedAt: day.status === 'completed'
           ? day.updatedAt instanceof Date ? day.updatedAt.toISOString() : day.updatedAt
@@ -244,6 +246,7 @@ export async function POST(request: Request) {
       status: 'planned',
       currentOpenDay: 1,
       planJson: JSON.stringify({ source: 'topic', topic }),
+      ttsVoice: pickRandomTtsVoice(),
       days: {
         create: planner.map(day => {
           const scheduledDate = new Date(start)

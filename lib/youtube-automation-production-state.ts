@@ -14,6 +14,15 @@ export const YOUTUBE_CANCEL_SETTLE_MS = positiveInteger(
   10 * 60 * 1000,
 )
 
+// How many renders may run at the same time across the whole service.
+// Requests start immediately via after(); the recovery cron respects this cap too.
+export const YOUTUBE_RENDER_MAX_CONCURRENT = positiveInteger(
+  process.env.YOUTUBE_RENDER_MAX_CONCURRENT,
+  3,
+  1,
+  8,
+)
+
 export function isYouTubeProductionActiveStatus(status: string | null | undefined) {
   return YOUTUBE_PRODUCTION_ACTIVE_STATUSES.includes(status as typeof YOUTUBE_PRODUCTION_ACTIVE_STATUSES[number])
 }

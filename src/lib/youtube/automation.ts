@@ -38,6 +38,8 @@ export interface DayProductionPlan {
   pinnedComment: string
   scenes: YouTubeScenePlan[]
   sourceClips: StockVideoCandidate[]
+  // True when the LLM call failed and the generic canned plan was used instead
+  usedFallbackPlan: boolean
   ttsProvider: string
   subtitles: Array<{ start: number; end: number; text: string }>
   videoStructure: {
@@ -117,7 +119,8 @@ export async function generateDayProductionPlan(params: {
   usedDefaultTemplate?: boolean
   planStrategy?: YouTubePlanStrategy
 }): Promise<DayProductionPlan> {
-  const fallback = () => buildFallbackDayPlan(params.topic, params.title)
+  const fallbackPlan = buildFallbackDayPlan(params.topic, params.title)
+  const fallback = () => fallbackPlan
   const strategyInstructions = params.planStrategy ? [
     `Narrative strategy: ${params.planStrategy.key} (${params.planStrategy.name})`,
     `Hook pattern: ${params.planStrategy.hookPattern}`,
@@ -177,12 +180,13 @@ export async function generateDayProductionPlan(params: {
     providerCounts: countBy(sourceClips.map(clip => clip.provider)),
   })
   const productionPlan: DayProductionPlan = {
-    script: String(result.script || fallback().script).trim(),
-    description: String(result.description || fallback().description).trim(),
+    script: String(result.script || fallbackPlan.script).trim(),
+    description: String(result.description || fallbackPlan.description).trim(),
     tags: normalizeTags(result.tags, params.topic),
     pinnedComment: String(result.pinnedComment || '오늘 영상이 도움되셨다면 저장해두고 다시 확인해보세요.').trim(),
     scenes,
     sourceClips,
+    usedFallbackPlan: result === fallbackPlan || result.script === fallbackPlan.script,
     ttsProvider: process.env.OPENAI_API_KEY ? 'openai-tts-ready' : 'tts-not-configured',
     subtitles: buildSubtitles(scenes),
     videoStructure: null,
@@ -224,9 +228,11 @@ export async function classifyShortsContent(params: {
   }
 }
 
+const STOCK_SEARCH_CONCURRENCY = 3
+
+// Every scene gets its own candidates so later scenes are not left reusing other scenes' clips.
 async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
-  const results: StockVideoCandidate[] = []
-  for (const scene of scenes.slice(0, 6)) {
+  const perScene = await mapWithConcurrency(scenes, STOCK_SEARCH_CONCURRENCY, async (scene): Promise<StockVideoCandidate[]> => {
     const startedAt = Date.now()
     logYouTubeAutomation('info', 'stock_video_scene_search_start', {}, {
       sceneNumber: scene.sceneNumber,
@@ -234,11 +240,6 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
     })
     const candidates = await searchPexelsVideos(scene.searchKeyword, 2)
     if (candidates.length > 0) {
-      results.push(...candidates.map(candidate => ({
-        ...candidate,
-        sceneNumber: scene.sceneNumber,
-        keyword: scene.searchKeyword,
-      })))
       logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
         sceneNumber: scene.sceneNumber,
         keyword: scene.searchKeyword,
@@ -246,16 +247,15 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
         candidateCount: candidates.length,
         durationMs: Date.now() - startedAt,
       })
-      continue
+      return candidates.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      }))
     }
 
     const pixabay = await searchPixabayVideos(scene.searchKeyword, 2)
     if (pixabay.length > 0) {
-      results.push(...pixabay.map(candidate => ({
-        ...candidate,
-        sceneNumber: scene.sceneNumber,
-        keyword: scene.searchKeyword,
-      })))
       logYouTubeAutomation('info', 'stock_video_scene_search_done', {}, {
         sceneNumber: scene.sceneNumber,
         keyword: scene.searchKeyword,
@@ -263,10 +263,19 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
         candidateCount: pixabay.length,
         durationMs: Date.now() - startedAt,
       })
-      continue
+      return pixabay.map(candidate => ({
+        ...candidate,
+        sceneNumber: scene.sceneNumber,
+        keyword: scene.searchKeyword,
+      }))
     }
 
-    results.push({
+    logYouTubeAutomation('warn', 'stock_video_scene_search_empty', {}, {
+      sceneNumber: scene.sceneNumber,
+      keyword: scene.searchKeyword,
+      durationMs: Date.now() - startedAt,
+    })
+    return [{
       sceneNumber: scene.sceneNumber,
       provider: 'mock',
       id: `mock-${scene.sceneNumber}`,
@@ -275,13 +284,27 @@ async function collectStockVideoCandidates(scenes: YouTubeScenePlan[]) {
       previewUrl: null,
       sourceUrl: null,
       keyword: scene.searchKeyword,
-    })
-    logYouTubeAutomation('warn', 'stock_video_scene_search_empty', {}, {
-      sceneNumber: scene.sceneNumber,
-      keyword: scene.searchKeyword,
-      durationMs: Date.now() - startedAt,
-    })
+    }]
+  })
+  return perScene.flat()
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++
+      results[index] = await worker(items[index], index)
+    }
   }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker()),
+  )
   return results
 }
 

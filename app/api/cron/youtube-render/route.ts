@@ -3,6 +3,7 @@ import prisma from '../../../../lib/db'
 import {
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
   YOUTUBE_PRODUCTION_STALE_MS,
+  YOUTUBE_RENDER_MAX_CONCURRENT,
 } from '../../../../lib/youtube-automation-production-state'
 import { unauthorizedJson, verifyBearerSecret } from '../../../../lib/security'
 import { produceYouTubeShorts } from '../../../../src/lib/youtube/produce'
@@ -26,17 +27,18 @@ export async function GET(request: NextRequest) {
   }
 
   const staleBefore = new Date(Date.now() - YOUTUBE_PRODUCTION_STALE_MS)
-  const running = await prisma.youTubeAutomationDay.findFirst({
+  // Renders now run in the render-request invocation itself (per-user parallel).
+  // Only hold recovery back when the whole service is already at the concurrency cap.
+  const runningCount = await prisma.youTubeAutomationDay.count({
     where: {
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
       renderStage: { notIn: QUEUED_STAGES },
       updatedAt: { gte: staleBefore },
       renderCancelRequested: false,
     },
-    select: { id: true },
   })
-  if (running) {
-    return NextResponse.json({ ok: true, skipped: 'renderer_busy', dayId: running.id })
+  if (runningCount >= YOUTUBE_RENDER_MAX_CONCURRENT) {
+    return NextResponse.json({ ok: true, skipped: 'renderer_busy', running: runningCount })
   }
 
   const candidate = await prisma.youTubeAutomationDay.findFirst({

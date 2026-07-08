@@ -134,6 +134,7 @@ model YouTubeAutomationProject {
   status         String                 @default("planned") // planned, in_progress, completed
   currentOpenDay Int                    @default(1)
   planJson       String                 @default("{}")
+  ttsVoice       String? // alloy, echo, fable, onyx, nova, shimmer — fixed per project for channel voice identity
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   days           YouTubeAutomationDay[]
@@ -180,6 +181,7 @@ model YouTubeAutomationDay {
   sceneRoleSequenceJson String?
   hookPattern          String?
   endingPattern        String?
+  qualityNotesJson     String? // degradations that occurred during production (generated clip fallback, generic plan, TTS probe failure)
   uploadedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
