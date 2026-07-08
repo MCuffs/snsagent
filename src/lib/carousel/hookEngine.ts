@@ -71,6 +71,7 @@ JSON 응답 형식:
   ]
 }`
 
+  // usedFallback marks hooks from the canned list so the pipeline can flag degraded output.
   const result = await client.generateJson<{ hooks: HookCandidate[] }>(
     'hook generation',
     prompt,
@@ -80,6 +81,7 @@ JSON 응답 형식:
         type: hook.type,
         score: hook.baseScore + scoreBoost(hook.type, strategy.strategyType) - index,
         reason: `${brand.targetAudience}에게 ${input.productName} 구매 전 확인할 이유를 짧게 제시합니다.`,
+        usedFallback: true,
       })),
     })
   )

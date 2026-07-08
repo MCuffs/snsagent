@@ -70,6 +70,8 @@ export interface HookCandidate {
   type: HookType
   score: number
   reason: string
+  // True when the LLM call failed and this hook came from the canned fallback list
+  usedFallback?: boolean
 }
 
 export interface CarouselStructure {
@@ -85,6 +87,8 @@ export interface SlideCopy {
   headline: string
   body: string
   ctaText?: string
+  // True when the LLM call failed and canned fallback copy was used for this slide
+  usedFallback?: boolean
 }
 
 export interface SlideDesignPrompt {

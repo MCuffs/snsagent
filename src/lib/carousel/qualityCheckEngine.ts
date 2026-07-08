@@ -21,7 +21,8 @@ export async function runQualityCheck(params: {
 
   for (const slide of params.slides) {
     if (slide.headline.length > 25) issues.push(`${slide.slideNumber}번 headline이 25자를 초과했습니다.`)
-    if (slide.body.length > 120) issues.push(`${slide.slideNumber}번 body가 120자를 초과했습니다.`)
+    // 150 = commerce renderer capacity (5 lines x 30 chars) — same limit as generation/regeneration
+    if (slide.body.length > 150) issues.push(`${slide.slideNumber}번 body가 150자를 초과했습니다.`)
     if (!slide.backgroundImageUrl) issues.push(`${slide.slideNumber}번 배경 이미지 URL이 비어 있습니다.`)
     if (!slide.finalImageUrl) issues.push(`${slide.slideNumber}번 최종 이미지 URL이 비어 있습니다.`)
 

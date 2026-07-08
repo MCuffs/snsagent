@@ -541,6 +541,7 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let sawTerminalEvent = false
 
       const processEvent = (eventName: string, rawData: string) => {
         let data: Record<string, unknown>
@@ -614,8 +615,10 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
             setTimeout(() => router.push(path), 1400)
           }
         } else if (eventName === 'error') {
+          sawTerminalEvent = true
           updateActiveMsg(m => ({ ...m, type: 'error', errorText: data.error as string }))
         }
+        if (eventName === 'done') sawTerminalEvent = true
       }
 
       while (true) {
@@ -628,6 +631,16 @@ export default function VideoCardNewsForm({ brand }: VideoCardNewsFormProps) {
           const eventMatch = part.match(/^event: (\S+)\ndata: ([\s\S]+)$/)
           if (eventMatch) processEvent(eventMatch[1], eventMatch[2])
         }
+      }
+
+      // The stream ended without a done/error event — the server function was likely
+      // killed (timeout/deploy). Without this, the UI would spin on "렌더링 중" forever.
+      if (!sawTerminalEvent && !controller.signal.aborted) {
+        updateActiveMsg(m => ({
+          ...m,
+          type: 'error',
+          errorText: '서버와의 연결이 끊겨 생성이 완료되지 못했습니다. 슬라이드 수를 줄이거나 잠시 후 다시 시도해 주세요.',
+        }))
       }
 
     } catch (err) {

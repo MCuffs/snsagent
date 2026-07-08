@@ -32,6 +32,8 @@ export interface CompletedSlide {
   role: SlideRole
   headline: string
   body: string
+  // True when the LLM call failed and canned fallback copy was used for this slide
+  usedFallback?: boolean
 }
 
 export interface NarrativeMemory {

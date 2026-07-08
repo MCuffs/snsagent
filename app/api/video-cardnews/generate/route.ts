@@ -152,6 +152,7 @@ function sanitizeRole(value: unknown): EditorialSlideRole {
 }
 
 export async function POST(request: NextRequest) {
+  const requestStartedAt = Date.now()
   const user = await getSessionUser()
   if (!user) {
     return new Response(JSON.stringify({ error: '로그인이 필요합니다.' }), {
@@ -354,6 +355,9 @@ export async function POST(request: NextRequest) {
             videoContinuityMode,
             referenceImageUrls,
             signal: request.signal,
+            // Leave ~2 minutes of the 600s function budget for Blob persistence and DB saves,
+            // so the user always gets an explicit SSE error instead of a killed function.
+            deadlineAt: requestStartedAt + 480_000,
             onProgress: (event) => {
               if (event.type === 'video_start') {
                 sse(controller, 'slide_start', {

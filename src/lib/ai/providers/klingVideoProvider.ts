@@ -10,6 +10,8 @@ export interface KlingVideoOptions {
   aspectRatio?: '9:16' | '16:9' | '1:1'
   referenceImageUrls?: string[]
   signal?: AbortSignal
+  // Polling budget for this clip; callers bound it by the remaining serverless-function budget
+  timeoutMs?: number
 }
 
 export interface KlingVideoResult {
@@ -57,7 +59,7 @@ export class KlingVideoProvider {
     const taskId = submitted.taskId
     onProgress?.({ type: 'submit_ok', taskId })
 
-    const videoUrl = await this.pollUntilDone(submitted, 600_000, 5_000, onProgress, signal)
+    const videoUrl = await this.pollUntilDone(submitted, options.timeoutMs ?? 600_000, 5_000, onProgress, signal)
     onProgress?.({ type: 'done', videoUrl })
     return { taskId, videoUrl, durationSeconds: duration }
   }
