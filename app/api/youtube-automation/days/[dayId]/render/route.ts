@@ -6,6 +6,7 @@ import {
   isYouTubeProductionActiveStatus,
   YOUTUBE_CANCEL_SETTLE_MS,
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
@@ -197,7 +198,12 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     }
     logYouTubeAutomation('info', 'render_after_start', logContext)
     try {
-      await produceYouTubeShorts({ dayId: claimedDayId, userId: claimedUserId, requestId })
+      await produceYouTubeShorts({
+        dayId: claimedDayId,
+        userId: claimedUserId,
+        requestId,
+        deadlineAt: startedAt + YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+      })
       logYouTubeAutomation('info', 'render_after_done', logContext)
     } catch (error) {
       logYouTubeAutomation('error', 'render_after_unhandled_error', logContext, summarizeYouTubeAutomationError(error))

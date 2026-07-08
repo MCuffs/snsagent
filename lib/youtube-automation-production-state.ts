@@ -23,6 +23,17 @@ export const YOUTUBE_RENDER_MAX_CONCURRENT = positiveInteger(
   8,
 )
 
+// How much of the serving function's lifetime a production run may spend.
+// Both render entry points declare maxDuration = 600s; keep a margin below that
+// so the pipeline times out and records a clean failure instead of being
+// hard-killed by the platform (which leaves the day frozen in 'rendering').
+export const YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS = positiveInteger(
+  process.env.YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+  540_000,
+  60_000,
+  580_000,
+)
+
 export function isYouTubeProductionActiveStatus(status: string | null | undefined) {
   return YOUTUBE_PRODUCTION_ACTIVE_STATUSES.includes(status as typeof YOUTUBE_PRODUCTION_ACTIVE_STATUSES[number])
 }

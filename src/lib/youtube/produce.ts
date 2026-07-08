@@ -18,11 +18,16 @@ export async function produceYouTubeShorts({
   userId,
   requestId,
   throwOnFailure = false,
+  deadlineAt,
 }: {
   dayId: string
   userId: string
   requestId?: string | null
   throwOnFailure?: boolean
+  // Absolute epoch-ms cutoff from the serving invocation (function lifetime minus
+  // a safety margin) — forwarded to the render pipeline so it self-terminates
+  // with a recorded failure instead of being hard-killed by the platform.
+  deadlineAt?: number
 }) {
   const startedAt = Date.now()
   let lastProgress = 1
@@ -203,6 +208,7 @@ export async function produceYouTubeShorts({
       sourceClips,
       template: parseTemplateSnapshot(day.templateSnapshotJson),
       ttsVoice: resolveProjectTtsVoice(day.projectId, day.project.ttsVoice),
+      deadlineAt,
       onProgress: async (renderProgress, renderStage) => {
         lastProgress = renderProgress
         lastStage = renderStage

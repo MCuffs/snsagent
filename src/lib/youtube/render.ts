@@ -22,6 +22,10 @@ interface RenderYouTubeShortsParams {
   ttsVoice?: YouTubeTtsVoice
   onProgress?: (progress: number, stage: string) => Promise<void>
   shouldCancel?: () => Promise<boolean>
+  // Absolute epoch-ms cutoff derived from the serving invocation's lifetime.
+  // The pipeline aborts with a clean recorded failure before this point so the
+  // platform never hard-kills it mid-render (which freezes the day in 'rendering').
+  deadlineAt?: number
 }
 
 export interface RenderQualityNote {
@@ -61,7 +65,7 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
   await fs.mkdir(workRoot, { recursive: true })
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
-  const deadlineAt = Date.now() + TOTAL_RENDER_TIMEOUT_MS
+  const deadlineAt = Math.min(Date.now() + TOTAL_RENDER_TIMEOUT_MS, params.deadlineAt ?? Infinity)
   const qualityNotes: RenderQualityNote[] = []
   const addQualityNote = (note: RenderQualityNote) => {
     if (!qualityNotes.some(existing => existing.type === note.type && existing.sceneNumber === note.sceneNumber)) {
