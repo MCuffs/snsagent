@@ -62,3 +62,7 @@ prisma/errors.log
 /logo/
 /Front/
 /public/logo.png
+
+# local test videos (not deployed)
+/video_card_news_front/
+/video_youtube/
