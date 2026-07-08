@@ -1,4 +1,4 @@
-﻿import { getLLMClient, getLightClient, getQwenModel } from '../ai/llmClient'
+import { getLightClient } from '../ai/llmClient'
 import type { BrandProfile, CampaignInput, CaptionResult, ContentStrategy, HookCandidate } from './types'
 
 export async function generateCaption(

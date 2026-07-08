@@ -18,7 +18,6 @@ import {
   hasAiRegenerationAccess,
   regenerationPurchaseRequired,
   inferLayoutType,
-  LAYOUT_DEFINITIONS as SHARED_LAYOUT_DEFINITIONS,
 } from './_shared'
 
 // Update slide copy content

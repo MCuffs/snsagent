@@ -1,4 +1,4 @@
-﻿import { dbService } from '../../../lib/db-service'
+import { dbService } from '../../../lib/db-service'
 import { type ImageProvider, sanitizeImagePrompt } from '../ai/imageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
@@ -14,7 +14,7 @@ import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../
 import { createTemplatedEditorialDocument } from '../editor/document'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
-import { getCopywritingModel, getLLMClient, getLightClient, getQwenModel } from '../ai/llmClient'
+import { getLightClient, getQwenModel } from '../ai/llmClient'
 import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
@@ -1209,7 +1209,7 @@ function maxRenderableBodyLines(role: MediaSlideRole | string | undefined) {
   return getCardHarnessContract(role).maxBodyLines
 }
 
-function enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[]): MediaSlidePlan[] {
+function _enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[]): MediaSlidePlan[] {
   return slides.map(slide => {
     const repaired = repairCopyToHarness({
       topic: input.topic,

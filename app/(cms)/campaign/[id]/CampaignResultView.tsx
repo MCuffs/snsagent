@@ -343,7 +343,7 @@ export default function CampaignResultView({
   brand,
   planName,
   showWatermark,
-  regenerationAccess,
+  regenerationAccess: _regenerationAccess,
 }: CampaignResultViewProps) {
   const router = useRouter()
   const locale = useLocale()

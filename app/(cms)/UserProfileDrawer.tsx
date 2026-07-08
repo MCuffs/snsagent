@@ -39,7 +39,8 @@ export function UserProfileDrawer({ userName, userEmail, userPlan, createdAt, ha
   const showCancelBtn = hasSubscription || userEmail === DEMO_EMAIL
 
   useEffect(() => {
-    setPortalReady(true)
+    const id = window.requestAnimationFrame(() => setPortalReady(true))
+    return () => window.cancelAnimationFrame(id)
   }, [])
 
   useEffect(() => {

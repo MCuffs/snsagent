@@ -1,4 +1,4 @@
-﻿import { getLLMClient, getLightClient, getTextGenerationModel, getQwenModel } from '../ai/llmClient'
+import { getLightClient, getQwenModel } from '../ai/llmClient'
 
 export type ContentDomain =
   | 'fashion'

@@ -100,7 +100,7 @@ function PricingGrid({
         setProcessingPayment(null)
         return
       }
-      window.location.href = body.url
+      window.location.assign(body.url)
     } catch {
       setError(isEn ? 'Network error. Please try again.' : '네트워크 오류가 발생했습니다.')
       setProcessingPayment(null)
@@ -194,7 +194,6 @@ function PricingGrid({
                     </button>
                   ) : (
                     <PolarButton
-                      planKey={planKey}
                       locale={locale}
                       processing={processingPayment === planKey}
                       disabled={processingPayment !== null}
@@ -237,13 +236,11 @@ function PricingGrid({
 }
 
 function PolarButton({
-  planKey,
   locale,
   processing,
   disabled,
   onClick,
 }: {
-  planKey: string
   locale: string
   processing: boolean
   disabled: boolean

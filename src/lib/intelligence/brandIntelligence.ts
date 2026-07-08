@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Brand Intelligence Compression Engine
  *
  * Reads accumulated QualityScoreLogs + userEditLogs for a brand,
@@ -11,7 +11,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { getLLMClient, getLightClient, getCopywritingModel, getQwenModel } from '../ai/llmClient'
+import { getLightClient, getQwenModel } from '../ai/llmClient'
 import type { HookPatternId } from '../copywriting/copyKnowledgeBase'
 
 const prisma = new PrismaClient()

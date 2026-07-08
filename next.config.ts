@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 import createNextIntlPlugin from 'next-intl/plugin';
 import { withWorkflow } from 'workflow/next';
 
@@ -54,10 +53,7 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
-    root: path.resolve(__dirname),
-  },
-  outputFileTracingIncludes: {
-    '**': ['./public/fonts/**'],
+    root: __dirname,
   },
 };
 

@@ -1,6 +1,6 @@
 import type { ImageProvider } from '../imageProvider'
 import { MockImageProvider } from './mockImageProvider'
-import { GeminiImageProvider, GeminiWithOpenAIFallbackProvider } from './geminiImageProvider'
+import { GeminiWithOpenAIFallbackProvider } from './geminiImageProvider'
 
 export function getPipelineImageProvider(): ImageProvider {
   const provider = (process.env.IMAGE_PROVIDER || 'gemini').toLowerCase()
