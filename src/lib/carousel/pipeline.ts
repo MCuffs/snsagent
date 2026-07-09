@@ -226,16 +226,34 @@ export async function generateCarouselCampaign(params: {
     })
     agentReportLogs.push(...qualityRes.logs)
 
+    // LLM failures fall back to canned copy that passes rule checks by design —
+    // surface them explicitly and never ship a fallback campaign as "passed".
+    const fallbackSlideNumbers = copies.filter(c => c.usedFallback).map(c => c.slideNumber)
+    const usedFallbackCopy = fallbackSlideNumbers.length > 0 || selectedHook.usedFallback === true
+    if (usedFallbackCopy) {
+      agentReportLogs.push({
+        agentName: 'CopyGenerationGuard',
+        role: 'copy-generation',
+        status: 'error',
+        message: fallbackSlideNumbers.length > 0
+          ? `AI 카피 생성이 실패해 슬라이드 ${fallbackSlideNumbers.join(', ')}에 기본 문구가 사용되었습니다. 내용을 검토하고 재생성을 권장합니다.`
+          : 'AI 훅 생성이 실패해 기본 훅 문구가 사용되었습니다. 내용을 검토하고 재생성을 권장합니다.',
+        timestamp: new Date().toISOString(),
+      })
+      log(`Fallback copy detected (slides: ${fallbackSlideNumbers.join(', ') || 'hook only'})`)
+    }
+    const finalPassed = qualityRes.passed && !usedFallbackCopy
+
     const agentReport: AgentReport = {
       timestamp: new Date().toISOString(),
-      status: qualityRes.passed ? 'passed' : 'needs_review',
+      status: finalPassed ? 'passed' : 'needs_review',
       score: qualityRes.score,
       logs: agentReportLogs,
     }
 
-    log(qualityRes.passed ? 'Quality check passed' : 'Quality check needs review')
+    log(finalPassed ? 'Quality check passed' : 'Quality check needs review')
 
-    const status = qualityRes.passed ? 'pending_approval' : 'needs_review'
+    const status = finalPassed ? 'pending_approval' : 'needs_review'
     const title = `${params.campaignInput.productName} 카드뉴스`
 
     const campaign = await dbService.createCampaign(
@@ -320,7 +338,7 @@ function extractCopyIssueSlides(issues: string[]): Set<number> {
   const nums = new Set<number>()
   for (const issue of issues) {
     const match = issue.match(/^(\d+)번/)
-    if (match && /headline.*25자|body.*120자|금지어|과장 표현/.test(issue)) {
+    if (match && /headline.*25자|body.*150자|금지어|과장 표현/.test(issue)) {
       nums.add(parseInt(match[1], 10))
     }
   }

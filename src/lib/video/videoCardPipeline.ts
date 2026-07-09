@@ -30,6 +30,10 @@ export interface VideoCardPipelineInput {
   videoContinuityMode?: 'separate' | 'continuous'
   referenceImageUrls?: string[]
   signal?: AbortSignal
+  // Absolute time (Date.now() basis) by which video generation must finish.
+  // Keeps sequential Kling polling inside the serverless function budget so the
+  // user gets an explicit error instead of the function being killed mid-stream.
+  deadlineAt?: number
   onProgress?: (event: VideoCardProgressEvent) => void
 }
 
@@ -64,6 +68,7 @@ interface VideoProviderFallbackInput {
   referenceImageUrls?: string[]
   signal?: AbortSignal
   klingProvider: KlingVideoProvider | null
+  timeoutMs?: number
   onPoll: (elapsed: number) => void
 }
 
@@ -86,6 +91,7 @@ async function generateWithProviderFallback(input: VideoProviderFallbackInput): 
     aspectRatio: '16:9' as const,
     referenceImageUrls: input.referenceImageUrls,
     signal: input.signal,
+    timeoutMs: input.timeoutMs,
   }
 
   if (input.klingProvider) {
@@ -137,8 +143,22 @@ export async function generateVideoCardNews(
     firstPromptPreview: prompts[0]?.prompt.slice(0, 200) ?? '(empty)',
   })
 
+  const MIN_CLIP_BUDGET_MS = 45_000
+  const remainingBudgetMs = () => (input.deadlineAt ? input.deadlineAt - Date.now() : null)
+  const ensureClipBudget = (completedCount: number) => {
+    const remaining = remainingBudgetMs()
+    if (remaining !== null && remaining < MIN_CLIP_BUDGET_MS) {
+      throw new Error(
+        `서버 처리 시간 예산이 부족해 영상 생성을 중단했습니다 (${completedCount}/${input.slides.length}개 완료). ` +
+        '슬라이드 수를 줄이거나 잠시 후 다시 시도해 주세요.',
+      )
+    }
+    return remaining
+  }
+
   const generateOne = async (slide: VideoCardSlideInput, index: number): Promise<VideoCardSlideResult> => {
     input.signal?.throwIfAborted()
+    const remaining = ensureClipBudget(index)
     const prompt = slide.videoPrompt?.trim() || prompts[index].prompt
     onProgress?.({ type: 'video_start', slideNumber: slide.slideNumber, total: input.slides.length })
 
@@ -149,6 +169,7 @@ export async function generateVideoCardNews(
         referenceImageUrls: input.referenceImageUrls,
         signal: input.signal,
         klingProvider,
+        timeoutMs: remaining ?? undefined,
         onPoll: (elapsed) => {
           onProgress?.({ type: 'video_polling', slideNumber: slide.slideNumber, elapsed })
         },
@@ -185,6 +206,7 @@ export async function generateVideoCardNews(
         referenceImageUrls: input.referenceImageUrls,
         signal: input.signal,
         klingProvider,
+        timeoutMs: ensureClipBudget(0) ?? undefined,
         onPoll: (elapsed) => {
           onProgress?.({ type: 'video_polling', slideNumber: input.slides[0].slideNumber, elapsed })
         },
@@ -302,13 +324,16 @@ slides=${slideCount}, roles=${getRoleSequence(slideCount).join(',')}
 Rules: headline <=${HEADLINE_MAX_EN} chars, body <=${BODY_MAX_EN} chars, complete sentences. No unsupported facts or internal planning labels.
 JSON only: {"slides":[{"slideNumber":1,"role":"hook","headline":"...","body":"..."}]}`
 
+  // Precompute the fallback so we can detect (by identity) that the LLM call failed.
+  // Placeholder copy must never reach the expensive video-generation stage.
+  const fallbackSlides = buildFallbackSlides(slideCount, topic, isKo)
   const result = await client.generateJson<{
     slides: Array<{ slideNumber: number; role: string; headline: string; body: string }>
   }>(
     'video-card-copy-generation',
     prompt,
     () => ({
-      slides: buildFallbackSlides(slideCount, topic, isKo),
+      slides: fallbackSlides,
     }),
     {
       model: getQwenModel(),
@@ -319,9 +344,12 @@ JSON only: {"slides":[{"slideNumber":1,"role":"hook","headline":"...","body":"..
     },
   )
 
-  const rawSlides = (result && Array.isArray(result.slides))
-    ? result.slides
-    : buildFallbackSlides(slideCount, topic, isKo)
+  if (!result || !Array.isArray(result.slides) || result.slides === fallbackSlides) {
+    throw new Error(isKo
+      ? 'AI 카피 생성에 실패했습니다. 영상 생성은 시작되지 않았으니 잠시 후 다시 시도해 주세요.'
+      : 'AI copy generation failed. Video generation was not started — please retry in a moment.')
+  }
+  const rawSlides = result.slides
 
   const validRoles = new Set(['hook', 'context', 'key-point', 'detail', 'stat', 'summary', 'save-cta'])
   const maxHeadline = isKo ? HEADLINE_MAX_KO : HEADLINE_MAX_EN

@@ -3,10 +3,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import OpenAI from 'openai'
-// @ffmpeg-installer/ffmpeg has no bundled type declarations
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg' as any)).default as { path: string; version: string }
 import type { StockVideoCandidate, YouTubeScenePlan } from './automation'
 import type { YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
 import { fitHookText, renderHookOverlay } from './hookRenderer'
@@ -96,7 +94,6 @@ const CLIP_STEP_COST_MS = DOWNLOAD_TIMEOUT_MS * 2 + NORMALIZE_TIMEOUT_MS + 30_00
 const FINAL_STEP_COST_MS = FINAL_RENDER_TIMEOUT_MS + 120_000
 const TTS_MAX_ATTEMPTS = 3
 const TTS_MAX_CHARS = 3900
-const PUBLIC_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), 'public')
 
 export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsParams): Promise<StoredRenderedAsset> {
   const usableClips = params.sourceClips.filter(clip => clip.videoUrl)
@@ -459,7 +456,7 @@ async function materializeWorkAsset(url: string, destPath: string) {
     await fs.writeFile(destPath, Buffer.from(await response.arrayBuffer()))
     return
   }
-  const source = path.join(PUBLIC_DIR, ...url.replace(/^\//, '').split('/'))
+  const source = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', ...url.replace(/^\//, '').split('/'))
   await fs.copyFile(source, destPath)
 }
 
@@ -475,7 +472,7 @@ async function cleanupWorkAssets(checkpoint: RenderCheckpoint) {
   await Promise.all(
     urls
       .filter(url => url.startsWith('/'))
-      .map(url => fs.rm(path.join(PUBLIC_DIR, ...url.replace(/^\//, '').split('/')), { force: true }).catch(() => undefined)),
+      .map(url => fs.rm(path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', ...url.replace(/^\//, '').split('/')), { force: true }).catch(() => undefined)),
   )
 }
 
@@ -971,7 +968,7 @@ function splitNarrationIntoPhrases(narration: string): string[] {
 
 async function copyFontIfAvailable(fontsDir: string) {
   for (const fileName of ['Pretendard-Bold.otf', 'Pretendard-ExtraBold.otf', 'Pretendard-Black.otf']) {
-    const source = path.join(PUBLIC_DIR, 'fonts', fileName)
+    const source = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'fonts', fileName)
     try {
       await fs.copyFile(source, path.join(fontsDir, fileName))
     } catch {
@@ -1059,7 +1056,7 @@ async function storeAsset(params: {
     throw new Error('렌더링 결과 저장을 위한 BLOB_READ_WRITE_TOKEN이 설정되어 있지 않습니다.')
   }
 
-  const directory = path.join(PUBLIC_DIR, 'generated', 'youtube', params.userId)
+  const directory = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'generated', 'youtube', params.userId)
   await fs.mkdir(directory, { recursive: true })
   const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
   await fs.writeFile(path.join(directory, safeName), params.buffer)

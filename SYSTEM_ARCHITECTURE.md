@@ -1,6 +1,6 @@
 # Shuffla 현재 시스템 구조
 
-기준일: 2026-05-26 (KST)
+기준일: 2026-07-08 (KST)
 대상: `main` 이후 현재 작업 트리의 Next.js 애플리케이션
 
 현재 구현 상태와 우선순위는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`, 변경 경과는 `DEVELOPMENT_LOG.md`, 코드 책임 규칙은 `LAYERS.md`를 기준으로 한다.
@@ -14,7 +14,7 @@
 | DB | PostgreSQL, Prisma 5 |
 | 파일 저장 | Vercel Blob 및 생성 이미지 저장 모듈 |
 | AI/콘텐츠 | Gemini, Groq, OpenAI 계열 연동 모듈 및 레이아웃 파이프라인 |
-| 결제 | 국내 Toss Payments 자동결제(빌링), 해외 PayPal Subscription |
+| 결제 | Polar Checkout 및 Subscription |
 | 소셜 게시 | Meta OAuth, Instagram Graph API |
 
 ## 2. 디렉터리 역할
@@ -155,7 +155,7 @@ erDiagram
 
 | 모델 | 용도 |
 | --- | --- |
-| `User` | 로그인 사용자, 플랜, 토스 빌링키/청구 상태 또는 PayPal 구독 상태 |
+| `User` | 로그인 사용자, 플랜, Polar 구독/결제 상태 |
 | `Brand` | 브랜드 분석 결과, 생성 기준 정보 및 에디터 스타일 선호 |
 | `Campaign` | 카드뉴스 생성 단위와 상태, 사용 이미지 모델 및 AI 재생성 이미지 수 |
 | `CarouselSlide` | 각 슬라이드 카피, 원본 배경, 확정 이미지 및 `editorDocument` 레이어 문서 |
@@ -169,28 +169,21 @@ sequenceDiagram
     participant U as 사용자
     participant UI as /billing
     participant API as Payment API Routes
-    participant TP as Toss Payments
-    participant PP as PayPal
+    participant Polar as Polar
     participant DB as DB Service
 
     U->>UI: 플랜 선택
-    UI->>TP: SDK 카드 자동결제 인증
-    TP->>API: authKey, customerKey 리다이렉트
-    API->>DB: 저장된 customerKey 검증
-    API->>TP: 빌링키 발급 및 서버 고정 금액 최초 승인
-    API->>DB: 플랜, 빌링키, 다음 청구일 저장
-    API->>TP: /api/cron/billing 월별 승인
-    API->>DB: 다음 청구일 및 결제 상태 갱신
-
-    alt 해외 고객
-        U->>UI: PayPal 구독 선택
-        UI->>PP: PayPal Subscription 승인
-        UI->>API: subscriptionId 전달
-        API->>PP: 구독 상태 및 plan_id 조회
-        API->>DB: 검증된 플랜/구독 상태 저장
-        PP->>API: 서명된 Webhook 상태 이벤트
-        API->>DB: 구독 취소/중단 상태 동기화
-    end
+    UI->>API: Checkout 생성 요청
+    API->>Polar: 상품/가격 기준 Checkout 생성
+    Polar-->>API: checkout URL
+    API-->>UI: checkout URL 반환
+    UI->>Polar: 결제 승인
+    Polar->>API: 서명된 webhook 이벤트
+    API->>DB: 주문, 결제 기록, 사용자 플랜 동기화
+    U->>UI: 구독 취소 요청
+    UI->>API: cancel 요청
+    API->>Polar: 구독 취소
+    API->>DB: 내부 FREE 상태 동기화
 ```
 
 관련 파일:
@@ -198,14 +191,14 @@ sequenceDiagram
 | 기능 | 파일 |
 | --- | --- |
 | 결제 UI | `app/(cms)/billing/PricingClientView.tsx` |
-| 최초 승인/취소 | `app/api/payments/toss/*` |
-| 월별 청구 | `app/api/cron/billing/route.ts` |
-| 토스 API 클라이언트 | `lib/tosspayments.ts` |
-| 해외 구독 활성화/취소/Webhook | `app/api/paypal/*` |
-| PayPal API 클라이언트 | `lib/paypal.ts` |
+| Checkout 생성 | `app/api/polar/checkout/route.ts` |
+| 구독 취소 | `app/api/polar/cancel/route.ts` |
+| Webhook 동기화 | `app/api/polar/webhook/route.ts` |
+| Polar API 클라이언트 | `lib/polar.ts` |
+| 주문/결제 기록 | `lib/polar-orders.ts` |
 | 요금제 제한 | `lib/limits.ts` |
 
-국내 카드 경로에서 브라우저는 카드 등록 인증만 수행하며 결제 금액은 서버의 플랜 매핑으로 결정된다. `customerKey`는 사용자별 무작위 값으로 DB에 저장하고 콜백에서 일치 여부를 검증한다. 토스페이먼츠 자동결제는 별도 빌링 계약이 필요하고 자체 스케줄링을 제공하지 않으므로 보호된 크론 호출이 필요하다. 해외 PayPal 경로는 PayPal에서 조회한 `plan_id`와 서명된 웹훅만 신뢰한다. 한 사용자에게는 토스 또는 PayPal 중 하나의 활성 구독만 허용한다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 25,000원/20회), Studio(월 39,000원/30회)다.
+결제는 Polar 단일 경로만 사용한다. 서버는 내부 플랜 매핑으로 Polar checkout을 생성하고, 서명 검증된 webhook과 Polar 주문/구독 상태를 기준으로만 사용자 플랜을 동기화한다. `FREE`는 생성 권한 없는 내부 상태이며, 유료 상품은 Single(월 3,000원/1회), Creator(월 25,000원/20회), Studio(월 39,000원/30회)다.
 
 AI 이미지 원가는 캠페인 단위로 통제한다. 활성 CMS OpenAI 이미지 모델은 `gpt-image-1`로 고정하며, `Campaign.imageModel`, `initialImageCount`, `regenerationImageCount`, `lastRegenerationImageModel`에 생성 사용량을 저장한다. 결과 화면의 AI 배경 재생성은 최초 슬라이드 수와 같은 이미지 크레딧까지만 서버에서 원자적으로 예약해 허용한다.
 
@@ -217,7 +210,6 @@ flowchart LR
     Meta --> MetaCallback["/api/auth/meta/callback"]
     MetaCallback --> Account["InstagramAccount 저장"]
     PostAction["승인/예약 Action"] --> Instagram["Instagram Graph API"]
-    Cron["/api/cron/publish"] --> Instagram
 ```
 
 백엔드 구현 위치:
@@ -226,7 +218,6 @@ flowchart LR
 | --- | --- |
 | Meta OAuth | `app/api/auth/meta/*`, `lib/meta/*` |
 | Instagram 게시 클라이언트 | `lib/instagram/client.ts` |
-| 예약 게시 실행 | `app/api/cron/publish/route.ts` |
 | 승인/예약 Action | `app/actions.ts` |
 
 현재 OAuth 완료/오류 리다이렉트가 `/instagram`을 대상으로 하지만 해당 UI 경로가 현재 CMS에 없으므로 사용자 기능으로는 완료되지 않은 상태다.
@@ -239,8 +230,8 @@ flowchart LR
 | 외부 URL 수집 | SSRF/redirect/크기 방어 적용됨; 운영 관측 지속 |
 | AI 생성 | 주요 배열 응답 fallback 및 이미지 재생성 상한/수량 기록 적용됨; 실제 청구 토큰·생성 시간 관측 보완 |
 | 업로드 | MIME/파일 크기/요청당 4장 적용됨; 사용자 쿼터와 속도 제한 보완 |
-| 결제 | 국내 토스 빌링 및 해외 PayPal 구독 검증 구현됨; 각 공급자 계약/키, 운영 크론 및 sandbox E2E 필요 |
-| 게시 | Instagram 연결 UI, 예약 게시 재시도 및 실패 알림 |
+| 결제 | Polar checkout/webhook 검증 구현됨; 상품/키, webhook, 테스트/라이브 E2E 필요 |
+| 게시 | Instagram 연결 UI, 예약 게시 cron, 재시도 및 실패 알림은 후속 범위 |
 | 데이터 저장 | 운영 DB fail-closed, 마이그레이션 및 백업 |
 
 현재 구현의 우선순위와 장애 목록은 `CURRENT_STATUS_AND_IMPROVEMENTS.md`를 기준 문서로 사용한다.

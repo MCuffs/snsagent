@@ -1,4 +1,4 @@
-﻿import { dbService } from '../../../lib/db-service'
+import { dbService } from '../../../lib/db-service'
 import { type ImageProvider, sanitizeImagePrompt } from '../ai/imageProvider'
 import { getPipelineImageModel, getPipelineImageProvider } from '../ai/providers'
 import { selectLayout } from './layoutEngine'
@@ -14,7 +14,7 @@ import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../
 import { createTemplatedEditorialDocument } from '../editor/document'
 import { planTypography } from './typographyEngine'
 import { generateVisualDirection } from './visualDirectionEngine'
-import { getCopywritingModel, getLLMClient, getLightClient, getQwenModel } from '../ai/llmClient'
+import { getLightClient, getQwenModel } from '../ai/llmClient'
 import { runBrandIntelligenceCompression } from '../intelligence/brandIntelligence'
 import { repairRenderableCopy } from '../copywriting/renderableCopy'
 import { evaluateSemanticCopy } from '../copywriting/semanticCopyCritic'
@@ -175,9 +175,11 @@ export async function previewMediaCarouselCopy(input: MediaCarouselInput): Promi
     memory: personalizationMemory,
     knowledgeContext: knowledgeCtx,
   })
-  let plannedSlides = planMediaSlides(input, editorialPlan)
-  plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
-  return plannedSlides.map(s => ({
+  const plannedSlides = planMediaSlides(input, editorialPlan)
+  // Draft flow: the user reviews this copy in the chat UI before confirming, so a fallback
+  // is visible to them — no hard failure needed here.
+  const copyResult = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+  return copyResult.slides.map(s => ({
     slideNumber: s.slideNumber,
     role: s.role,
     headline: s.headline,
@@ -273,6 +275,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     knowledgeContext: knowledgeCtx,
   })
   let plannedSlides = planMediaSlides(input, editorialPlan)
+  let copyGenerationUsedFallback = false
   if (input.confirmedSlides?.length) {
     // User reviewed and optionally edited the copy — use it as-is, skip LLM copy generation
     plannedSlides = plannedSlides.map(slide => {
@@ -280,7 +283,9 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
       return confirmed ? { ...slide, headline: confirmed.headline, body: confirmed.body } : slide
     })
   } else {
-    plannedSlides = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+    const copyResult = await generateMediaSlideCopies(input, plannedSlides, editorialPlan, knowledgeCtx, domainProfile)
+    plannedSlides = copyResult.slides
+    copyGenerationUsedFallback = copyResult.usedFallbackCopy
   }
   // NOTE: harness is applied once at the end of the agent pipeline — do not enforce here
 
@@ -306,6 +311,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     knowledgeCtx,
     editorialPlan,
     plannedSlides,
+    language: input.language,
   })
   agentReportLogs.push(...narrativeResult.logs)
 
@@ -432,7 +438,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
         designPrompt: sanitizedVisualPrompt,
         harnessDiagnostics: harness.diagnostics,
       })
-      const renderableCheck = validateHarnessedCopy(slide.role, slide.headline, slide.body)
+      const renderableCheck = validateHarnessedCopy(slide.role, slide.headline, slide.body, input.language)
       if (!renderableCheck.passed) {
         baseSlideQualityCheck.issues.push(...renderableCheck.issues)
       }
@@ -516,6 +522,7 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     slides: agentSlides,
     hasFallbackImage: false,
     copyQualityReport: narrativeResult.copyQualityReport,
+    language: input.language,
   })
   agentReportLogs.push(...qualityRes.logs)
 
@@ -569,6 +576,16 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
     })
   }
 
+  if (copyGenerationUsedFallback) {
+    agentReportLogs.push({
+      agentName: 'CopyGenerationGuard',
+      role: 'copy-generation',
+      status: 'error',
+      message: 'AI 카피 생성이 실패해 기본 초안 카피가 사용되었습니다. 내용을 검토하고 재생성을 권장합니다.',
+      timestamp: new Date().toISOString(),
+    })
+  }
+
   const slideQualityIssues = slides.flatMap(slide =>
     slide.qualityCheck.issues.map(issue => ({
       severity: 'warn' as const,
@@ -592,7 +609,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
   const slideQualityScore = calculateSlideQualityScore(slideQualityIssues.length)
   const finalQualityScore = Math.min(qualityRes.score, editorialQuality.score, semanticScore, slideQualityScore)
   const semanticPassedForStatus = semanticQuality.passed || confirmedCopyProvided
-  const qualityPassed = qualityRes.passed &&
+  const qualityPassed = !copyGenerationUsedFallback &&
+    qualityRes.passed &&
     editorialQuality.passed &&
     semanticPassedForStatus &&
     slides.every(slide => slide.qualityCheck.passed)
@@ -728,7 +746,7 @@ async function generateMediaSlideCopies(
   editorialPlan: EditorialDirectorPlan,
   knowledgeCtx: ReturnType<typeof buildCopyKnowledgeContext> | undefined,
   domainProfile: DomainProfile
-): Promise<MediaSlidePlan[]> {
+): Promise<{ slides: MediaSlidePlan[]; usedFallbackCopy: boolean }> {
   const client = getLightClient()
 
   const slideDescriptions = slides
@@ -922,10 +940,12 @@ JSON 응답 형식:
   ]
 }`
 
+  // Precomputed so a silently returned fallback is detectable by identity below.
+  const fallbackCopy = { slides: slides.map(s => ({ slideNumber: s.slideNumber, headline: s.headline, body: s.body })) }
   const result = await client.generateJson<{ slides: Array<{ slideNumber: number; headline: string; body: string }> }>(
     'media slide copy generation',
     prompt,
-    () => ({ slides: slides.map(s => ({ slideNumber: s.slideNumber, headline: s.headline, body: s.body })) }),
+    () => fallbackCopy,
     {
       model: getQwenModel(),
       temperature: 0.35,
@@ -943,6 +963,7 @@ JSON 응답 형식:
     }
   )
 
+  const usedFallbackCopy = !result || result === fallbackCopy || !Array.isArray(result.slides)
   const generatedSlides = Array.isArray(result?.slides) ? result.slides : []
   const copyMap = new Map(generatedSlides.map(s => [s.slideNumber, s]))
   const groundingText = `${input.topic}\n${input.title}\n${input.keyContent}`
@@ -977,7 +998,7 @@ JSON 응답 형식:
     }
   })
 
-  return enforceSemanticMeaning({
+  const finalSlides = await enforceSemanticMeaning({
     input,
     slides: repairedSlides,
     editorialPlan,
@@ -985,6 +1006,7 @@ JSON 응답 형식:
     sourceMaterial,
     systemPrompt,
   })
+  return { slides: finalSlides, usedFallbackCopy }
 }
 
 async function enforceSemanticMeaning(params: {
@@ -1187,7 +1209,7 @@ function maxRenderableBodyLines(role: MediaSlideRole | string | undefined) {
   return getCardHarnessContract(role).maxBodyLines
 }
 
-function enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[]): MediaSlidePlan[] {
+function _enforceHarnessCopy(input: MediaCarouselInput, slides: MediaSlidePlan[]): MediaSlidePlan[] {
   return slides.map(slide => {
     const repaired = repairCopyToHarness({
       topic: input.topic,

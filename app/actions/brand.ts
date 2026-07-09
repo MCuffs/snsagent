@@ -8,7 +8,6 @@ import {
   unauthenticated,
   failed,
   withBrandDna,
-  removeMarkdownBold,
 } from './_shared'
 
 // Brand Save/Update Action

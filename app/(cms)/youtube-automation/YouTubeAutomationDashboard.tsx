@@ -143,11 +143,9 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   const [startingDayId, setStartingDayId] = useState<string | null>(null)
 
   // Completed-day timestamps for the 12-hour countdown
-  const [completedTimes, setCompletedTimes] = useState<Record<string, number>>({})
-
-  useEffect(() => {
-    setCompletedTimes(getCompletedTimes())
-  }, [])
+  const [completedTimes, setCompletedTimes] = useState<Record<string, number>>(() =>
+    typeof window === 'undefined' ? {} : getCompletedTimes()
+  )
 
   useEffect(() => {
     if (isActive) analytics.youtubeAutomationView()
@@ -170,7 +168,10 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
 
   // Load history on mount.
   useEffect(() => {
-    void refreshProjects().finally(() => setHistoryLoading(false))
+    const id = window.setTimeout(() => {
+      void refreshProjects().finally(() => setHistoryLoading(false))
+    }, 0)
+    return () => window.clearTimeout(id)
   }, [refreshProjects])
 
   const hasActiveRender = useMemo(
@@ -384,7 +385,7 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
       : completedTimes[lastCompletedDay.id]
     : null
   const unlockAt = lastCompletedAt ? lastCompletedAt + YOUTUBE_AUTOMATION_UNLOCK_MS : null
-  const now = Date.now()
+  const now = currentTimeMs()
   const msUntilUnlock = unlockAt && unlockAt > now ? unlockAt - now : 0
 
   useEffect(() => {
@@ -631,9 +632,12 @@ function DayCard({
   // Tick countdown while info is visible
   useEffect(() => {
     if (!timeLocked || !showInfo) return
-    setRemaining(msUntilUnlock)
+    const syncId = window.setTimeout(() => setRemaining(msUntilUnlock), 0)
     const id = setInterval(() => setRemaining(prev => Math.max(0, prev - 1000)), 1000)
-    return () => clearInterval(id)
+    return () => {
+      window.clearTimeout(syncId)
+      clearInterval(id)
+    }
   }, [timeLocked, showInfo, msUntilUnlock])
 
   const isProducing = starting || day.status === 'planning' || day.status === 'rendering'
@@ -749,11 +753,11 @@ function DayProductionModal({
   onDone: (updated: Partial<PlannerDay>) => void
   onUploaded: () => Promise<boolean>
 }) {
-  const [phase, setPhase] = useState<ModalPhase>(() => day.mp4Url ? 'done' : day.status === 'rendering' ? 'rendering' : 'planning')
+  const [phase, setPhase] = useState<ModalPhase>(() => day.mp4Url ? 'done' : day.status === 'failed' ? 'error' : day.status === 'rendering' ? 'rendering' : 'planning')
   const [pct, setPct] = useState(() => day.mp4Url ? 100 : day.renderProgress ?? 0)
   const [stepLabel, setStepLabel] = useState('준비 중...')
   const [resultDay, setResultDay] = useState<PlannerDay>(day)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(() => day.status === 'failed' ? '영상 제작에 실패했습니다. 다시 시도해 주세요.' : null)
   const [downloadPct, setDownloadPct] = useState<number | null>(null)
   const [uploadedDone, setUploadedDone] = useState(day.status === 'uploaded')
 
@@ -763,15 +767,19 @@ function DayProductionModal({
 
   useEffect(() => {
     if (day.mp4Url) {
-      setResultDay(day)
-      setPhase('done')
-      setPct(100)
+      window.setTimeout(() => {
+        setResultDay(day)
+        setPhase('done')
+        setPct(100)
+      }, 0)
       return
     }
     if (day.status === 'rendering') return
     if (day.status === 'failed') {
-      setPhase('error')
-      setErrorMsg('영상 제작에 실패했습니다. 다시 시도해 주세요.')
+      window.setTimeout(() => {
+        setPhase('error')
+        setErrorMsg('영상 제작에 실패했습니다. 다시 시도해 주세요.')
+      }, 0)
       return
     }
     void runPipeline()
@@ -812,7 +820,7 @@ function DayProductionModal({
     )
   }, [day, projectId])
 
-  const runPipeline = async () => {
+  async function runPipeline() {
     let failurePhase = day.script ? 'rendering' : 'planning'
     analytics.youtubeProductionStart({
       projectId,
@@ -867,7 +875,7 @@ function DayProductionModal({
     }
   }
 
-  const runRender = async (dayData: PlannerDay, options?: { regeneratePlan?: boolean }) => {
+  async function runRender(dayData: PlannerDay, options?: { regeneratePlan?: boolean }) {
     setPhase('rendering')
     renderStartedAt.current = Date.now()
     const sceneCount = dayData.scenes?.length || 6

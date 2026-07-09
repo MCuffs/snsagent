@@ -62,10 +62,6 @@ function isLegacyToken(token) {
   return token && !token.startsWith('v1:');
 }
 
-function isEncryptedToken(token) {
-  return token && token.startsWith('v1:');
-}
-
 async function createBackup(prisma) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFile = path.join(BACKUP_DIR, `instagram-tokens-${timestamp}.json`);

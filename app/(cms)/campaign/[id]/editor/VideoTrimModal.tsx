@@ -30,11 +30,15 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
   const [durationSec, setDurationSec] = useState(3)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const objectUrl = useRef<string>('')
+  const [objectUrl, setObjectUrl] = useState('')
 
   useEffect(() => {
-    objectUrl.current = URL.createObjectURL(file)
-    return () => URL.revokeObjectURL(objectUrl.current)
+    const url = URL.createObjectURL(file)
+    const id = window.setTimeout(() => setObjectUrl(url), 0)
+    return () => {
+      window.clearTimeout(id)
+      URL.revokeObjectURL(url)
+    }
   }, [file])
 
   const handleLoaded = () => {
@@ -93,17 +97,18 @@ export default function VideoTrimModal({ file, onConfirm, onCancel }: Props) {
 
         {/* 영상 미리보기 */}
         <div className="relative bg-black aspect-[4/5] mx-5 mt-4 rounded-xl overflow-hidden">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            ref={videoRef}
-            src={objectUrl.current}
-            className="absolute inset-0 h-full w-full object-cover"
-            onLoadedMetadata={handleLoaded}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setPlaying(false)}
-            playsInline
-            muted
-          />
+          {objectUrl && (
+            <video
+              ref={videoRef}
+              src={objectUrl}
+              className="absolute inset-0 h-full w-full object-cover"
+              onLoadedMetadata={handleLoaded}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={() => setPlaying(false)}
+              playsInline
+              muted
+            />
+          )}
           {/* 재생 버튼 오버레이 */}
           <button
             type="button"

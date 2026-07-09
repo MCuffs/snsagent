@@ -1,7 +1,8 @@
 import { MarketingNav } from '../components/MarketingNav'
 import { MarketingFooter } from '../components/MarketingFooter'
 import Link from 'next/link'
-import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowRight } from 'lucide-react'
 import { getSessionUser } from '../../lib/auth/user'
 
 export const metadata = {
@@ -77,7 +78,7 @@ const posts = [
     },
 ]
 
-const guides = [
+const _guides = [
     { title: '브랜드 설정 마스터하기', duration: '2:47', accent: 'from-[#ff6b35] to-[#f7931e]' },
     { title: '카드뉴스 9:22분 만에 만들기', duration: '9:22', accent: 'from-[#1c7ed6] to-[#339af0]' },
     { title: '결과 화면 편집과 다운로드', duration: '4:07', accent: 'from-[#7950f2] to-[#9775fa]' },
@@ -129,10 +130,12 @@ export default async function BlogPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
                 {/* Left: Rounded Image Container */}
                 <div className="aspect-[4/3] w-full relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
-                  <img
+                  <Image
                     src={featuredImage}
                     alt={featured.title}
-                    className="object-cover w-full h-full transform transition-transform duration-500 group-hover:scale-102"
+                    fill
+                    sizes="(min-width: 768px) 50vw, 100vw"
+                    className="object-cover transform transition-transform duration-500 group-hover:scale-102"
                   />
                 </div>
 
@@ -198,10 +201,12 @@ export default async function BlogPage() {
                     className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)] transition-all duration-300 hover:border-sky-200 hover:shadow-[0_20px_40px_-15px_rgba(14,165,233,0.08)] hover:-translate-y-1"
                   >
                     <div className="aspect-[4/3] w-full overflow-hidden border-b border-slate-100 bg-slate-50 relative">
-                      <img
+                      <Image
                         src={postImage}
                         alt={post.title}
-                        className="object-cover w-full h-full transform transition-transform duration-500 group-hover:scale-102"
+                        fill
+                        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        className="object-cover transform transition-transform duration-500 group-hover:scale-102"
                       />
                     </div>
                     <div className="p-6 flex flex-col flex-1">

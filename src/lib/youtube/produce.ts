@@ -1,5 +1,8 @@
 import prisma from '../../../lib/db'
-import { YOUTUBE_PRODUCTION_ACTIVE_STATUSES } from '../../../lib/youtube-automation-production-state'
+import {
+  YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+} from '../../../lib/youtube-automation-production-state'
 import { selectPlanStrategy } from '../../../lib/youtube-plan-strategies'
 import { selectShortsTemplate } from '../../../lib/youtube-shorts-templates/select'
 import { shortsTemplateInputSchema, type YouTubeShortsTemplateRecord } from '../../../lib/youtube-shorts-templates/types'
@@ -19,18 +22,6 @@ import {
 } from './render'
 import { resolveProjectTtsVoice } from './ttsVoice'
 
-// How much wall-clock time one function invocation may spend on production in total
-// (planning + render). Must stay under the platform's real execution limit with a margin,
-// otherwise the invocation is killed silently and the day freezes at the last written
-// progress (e.g. "68% 씬별 영상 컷 완료") instead of failing with a retryable error.
-// Vercel Pro (maxDuration 600s) → default 540s. On a 300s-capped plan set 240000.
-const FUNCTION_BUDGET_MS = boundedPositiveInteger(
-  process.env.YOUTUBE_FUNCTION_BUDGET_MS,
-  540_000,
-  60_000,
-  900_000,
-)
-
 // A render that keeps requeuing itself is making checkpoint progress each time, but cap it
 // so a systemically broken environment (e.g. ffmpeg missing) ends in an explicit failure.
 const MAX_RENDER_REQUEUES = boundedPositiveInteger(process.env.YOUTUBE_RENDER_MAX_REQUEUES, 12, 2, 50)
@@ -41,19 +32,20 @@ export async function produceYouTubeShorts({
   dayId,
   userId,
   requestId,
-  invocationStartedAt,
   throwOnFailure = false,
+  deadlineAt,
 }: {
   dayId: string
   userId: string
   requestId?: string | null
-  // Epoch ms when the current function invocation began handling the request.
-  // Used to bound the render so it fails cleanly before the platform kills the invocation.
-  invocationStartedAt?: number
   throwOnFailure?: boolean
+  // Absolute epoch-ms cutoff from the serving invocation (function lifetime minus
+  // a safety margin) — forwarded to the render pipeline so it requeues or self-terminates
+  // with a recorded failure instead of being hard-killed by the platform.
+  deadlineAt?: number
 }) {
   const startedAt = Date.now()
-  const invocationDeadlineAt = (invocationStartedAt ?? startedAt) + FUNCTION_BUDGET_MS
+  const invocationDeadlineAt = deadlineAt ?? (startedAt + YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS)
   let checkpoint: RenderCheckpoint = { version: 1, scenes: [] }
   let lastProgress = 1
   let lastStage = '영상 제작 준비 중'

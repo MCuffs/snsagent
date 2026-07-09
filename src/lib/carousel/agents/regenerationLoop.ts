@@ -58,7 +58,7 @@ ${buildAntiPatternRule('ko')}
 
 규칙:
 - headline: 25자 이하. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
-- body: 220자 이하 — 정보를 풍성하게 1~4문장으로. 뉴스 요약이 아니라 대화체로
+- body: 150자 이하 — 정보를 밀도 있게 1~3문장으로. 뉴스 요약이 아니라 대화체로
 - body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하 필수' : 'null'}
@@ -110,7 +110,8 @@ export async function runRegenerationLoop(
         const repaired = repairRenderableCopy({
           headline: result.headline.trim(),
           body: result.body.trim(),
-          constraints: { maxHeadlineChars: 25, maxBodyChars: 220, maxBodyLines: 5, lineLength: 30 },
+          // 150 = commerce renderer capacity (5 lines x 30 chars) — keep in sync with slideChainAgent
+          constraints: { maxHeadlineChars: 25, maxBodyChars: 150, maxBodyLines: 5, lineLength: 30 },
         })
         const updated: CompletedSlide = {
           slideNumber,

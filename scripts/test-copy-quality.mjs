@@ -151,7 +151,7 @@ JSON 응답 형식:
 }`
 }
 
-function evaluateCopy(slides, tc) {
+function evaluateCopy(slides, _tc) {
   const issues = []
   const warnings = []
   let score = 100

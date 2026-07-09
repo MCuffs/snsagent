@@ -62,6 +62,7 @@ export async function runNarrativePipeline(params: {
     headline: s.headline,
     body: s.body,
     ctaText: s.role === 'cta' ? (params.brand.ctaStyle || '자세히 보기') : undefined,
+    ...(s.usedFallback ? { usedFallback: true } : {}),
   }))
 
   console.log(`[NarrativePipeline] done. slides=${copies.length} score=${criticResult.report.score}`)

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Loader2, Redo2, RotateCcw, Search, Sparkles, Trash2, Type, Underline, Undo2, Upload, Video, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bold, BookmarkCheck, BookmarkPlus, Eye, EyeOff, ImageIcon, Italic, Layers, Redo2, RotateCcw, Sparkles, Trash2, Type, Underline, Undo2, Upload, Video, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEditorialStore } from './useEditorialStore'
 import type { EditorialDocument, EditorialLayer, FontPreset, OverlayPreset } from '../../../../../src/lib/editor/types'
 import type { PexelsBackgroundCandidate } from '../../../../../src/lib/ai/providers/pexelsImageProvider'

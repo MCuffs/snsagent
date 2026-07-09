@@ -92,7 +92,7 @@ const TEST_CASES = [
 const SYSTEM_PROMPT = `당신은 한국 인스타그램 정보/시사/트렌드 카드뉴스 전문 에디터입니다. 제공된 자료를 객관적이고 가독성 높게 요약하여 카드뉴스 카피를 작성하세요. 유효한 JSON으로만 응답하세요.`
 
 // ─── 품질 평가 ────────────────────────────────────────────────────────
-function evaluate(slides, tc) {
+function evaluate(slides, _tc) {
   const issues = []
   const warnings = []
   let score = 100
@@ -443,7 +443,7 @@ async function main() {
   // ─── 개선 흐름 분석 (1회→5회 점수 추이) ─────────────────────────
   if (allResults.length >= 2) {
     console.log('\n[누적 실패 주입 효과 — 라운드별 점수 추이]')
-    allResults.forEach((r, i) => {
+    allResults.forEach((r, _i) => {
       const bar = '█'.repeat(Math.round(r.eval.score / 5))
       console.log(`  테스트 ${r.testId}: ${bar} ${r.eval.score}점`)
     })

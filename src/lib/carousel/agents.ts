@@ -382,8 +382,10 @@ export class QualityGuardAgent {
     slides: AgentSlideData[]
     hasFallbackImage: boolean
     copyQualityReport?: { passed: boolean; score: number; narrativeFlowScore: number; personaFitScore: number; hookPatternScore: number } | null
+    language?: 'ko' | 'en'
   }): { passed: boolean; score: number; logs: AgentReportItem[] } {
     this.logs = []
+    const language = params.language ?? 'ko'
     this.log('info', `최종 카드뉴스 퀄리티 검사(가독성, 정렬, 안전성)를 진행합니다.`)
 
     let totalScore = 100
@@ -399,14 +401,14 @@ export class QualityGuardAgent {
     // 2. 슬라이드별 텍스트 여백 및 가독성 진단
     params.slides.forEach((slide) => {
       const textLen = slide.headline.length + slide.body.length
-      const contract = getCardHarnessContract(slide.role)
+      const contract = getCardHarnessContract(slide.role, language)
       if (textLen > contract.maxTotalChars) {
         totalScore -= 5
         issues.push(`${slide.slideNumber}번 슬라이드: 총 글자수(${textLen}자)가 많아 모바일 가독성이 저하될 우려가 있습니다.`)
         this.log('warn', `슬라이드 ${slide.slideNumber}번: 글자수가 다소 많음. 가독성 경고. 감점(-5점)`)
       }
 
-      const harnessCopy = validateHarnessedCopy(slide.role, slide.headline, slide.body)
+      const harnessCopy = validateHarnessedCopy(slide.role, slide.headline, slide.body, language)
       if (!harnessCopy.passed) {
         harnessCopy.issues.forEach(issue => {
           totalScore -= 3

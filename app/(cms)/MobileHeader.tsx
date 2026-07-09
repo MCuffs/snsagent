@@ -21,14 +21,9 @@ export function useCloseMobileMenu() {
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
   const pathname = usePathname()
   const billingPath = locale ? `/${locale}/billing` : '/billing'
-  const shouldOpenByDefault = pathname !== billingPath
-  const [isOpen, setIsOpen] = useState(shouldOpenByDefault)
+  const [isOpen, setIsOpen] = useState(() => pathname !== billingPath)
 
   const prefix = locale ? `/${locale}` : ''
-
-  useEffect(() => {
-    setIsOpen(shouldOpenByDefault)
-  }, [shouldOpenByDefault])
 
   useEffect(() => {
     if (!isOpen) return

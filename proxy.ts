@@ -1,8 +1,8 @@
 import createMiddleware from 'next-intl/middleware'
 import { type NextRequest, NextResponse } from 'next/server'
 import { routing } from './i18n/routing'
-import { readSessionEmailEdge, SESSION_COOKIE_NAME } from './lib/auth/session-edge'
 import { isAdminEmail } from './lib/auth/admin-emails'
+import { readSessionEmailEdge, SESSION_COOKIE_NAME } from './lib/auth/session-edge'
 
 const intlMiddleware = createMiddleware(routing)
 
@@ -27,10 +27,9 @@ function getRootLocale(request: NextRequest) {
   return routing.defaultLocale
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Pass through API routes, static files, Next.js internals, and Server Actions
   if (
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
@@ -41,14 +40,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 1. Admin route authentication guard
-  // /admin 또는 /{locale}/admin 모두 처리
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
   const localeAdminMatch = pathname.match(/^\/(ko|en)(\/admin(?:\/.*)?)?$/)
   const isLocaleAdminPath = localeAdminMatch && localeAdminMatch[2] !== undefined
 
   if (isAdminPath || isLocaleAdminPath) {
-    // locale-prefixed admin URL → /admin(/*) 로 리디렉트
     if (isLocaleAdminPath) {
       const adminSuffix = localeAdminMatch![2] ?? '/admin'
       return NextResponse.redirect(new URL(adminSuffix, request.url))
@@ -64,7 +60,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 2. Protected user routes guard (billing only — concept/generate/works allow guest browsing)
   const protectedRoutes = ['/billing']
   let relativePath = pathname
   let locale = 'ko'
@@ -93,7 +88,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Root path: geo-based locale redirect
   if (pathname === '/') {
     const locale = getRootLocale(request)
     return NextResponse.redirect(new URL(`/${locale}`, request.url))

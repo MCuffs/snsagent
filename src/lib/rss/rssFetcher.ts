@@ -76,9 +76,6 @@ const FEEDS_EN: Record<string, string[]> = {
   ],
 }
 
-// Legacy default — Korean
-const FEEDS = FEEDS_KO
-
 const TOPIC_STOPWORDS = new Set([
   '카드뉴스', '카드', '뉴스', '만들어주세요', '만들어줘', '만들어', '제작해주세요', '제작해줘',
   '대한', '대해', '관련', '정보', '알려주세요', '알려줘', '해주세요', '해줘', '요청',

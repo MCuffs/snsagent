@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '../../../../lib/db'
 import {
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
   YOUTUBE_PRODUCTION_STALE_MS,
   YOUTUBE_RENDER_MAX_CONCURRENT,
 } from '../../../../lib/youtube-automation-production-state'
@@ -27,7 +28,7 @@ const QUEUED_STAGES = [
 const MAX_STALE_RECOVERY_ATTEMPTS = 4
 
 export async function GET(request: NextRequest) {
-  const invocationStartedAt = Date.now()
+  const startedAt = Date.now()
   if (!verifyBearerSecret(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return unauthorizedJson()
   }
@@ -133,8 +134,8 @@ export async function GET(request: NextRequest) {
       dayId: candidate.id,
       userId: candidate.userId,
       requestId: context.requestId,
-      invocationStartedAt,
       throwOnFailure: true,
+      deadlineAt: startedAt + YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
     })
     return NextResponse.json({ ok: true, dayId: candidate.id, status: 'completed' })
   } catch (error) {

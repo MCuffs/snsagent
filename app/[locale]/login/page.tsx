@@ -42,7 +42,7 @@ export default async function LoginPage({
   const { locale } = await params
   if (user) redirect(`/${locale}/concept`)
 
-  const t = await getTranslations('login')
+  await getTranslations('login')
   const sp = searchParams ? await searchParams : {}
   const errorMessage = sp.error ? getLoginErrorMessage(sp.error, locale) : ''
   const defaultTab = sp.tab === 'signup' ? 'signup' : 'login'

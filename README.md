@@ -2,7 +2,7 @@
 
 Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하고 편집하는 SaaS MVP입니다.
 
-현재 구현은 제품 검증용 단계입니다. 랜딩, Google Login, 브랜드 분석, 참고 이미지 기반 카드뉴스 생성, 결과 편집, 작업 목록, 국내 토스페이먼츠 카드 자동결제와 해외 고객용 PayPal 구독이 연결되어 있으며 세션 서명과 결제 검증도 반영되었습니다. 공개 화면은 현재 구현된 생성·편집·다운로드 흐름만 안내하고, Instagram 사용자 흐름은 추후 개발 범위입니다.
+현재 구현은 제품 검증용 단계입니다. 랜딩, Google Login, 브랜드 분석, 참고 이미지 기반 카드뉴스 생성, 결과 편집, 작업 목록, Polar 기반 구독 결제가 연결되어 있으며 세션 서명과 결제 검증도 반영되었습니다. 공개 화면은 현재 구현된 생성·편집·다운로드 흐름만 안내하고, Instagram 사용자 흐름은 추후 개발 범위입니다.
 
 ## 문서 기준
 
@@ -24,8 +24,8 @@ Shuffla는 브랜드 URL과 대화를 바탕으로 SNS 카드뉴스를 생성하
 | 카드뉴스 생성 | `/generate`, `app/api/agents/generate`, `POST /api/campaigns/generate` | 유료 이용권의 월 횟수 내 대화형 생성 및 렌더링 구현됨 |
 | 결과/편집 | `/campaign/[id]` | Editorial Canvas, 레이어 편집, AI 부분 보정, 확정 렌더/내보내기 구현됨 |
 | 작업 목록 | `/works` | 구현됨 |
-| 구독 | `/billing`, `app/api/payments/toss/*`, `app/api/paypal/*`, `app/api/cron/billing` | 국내 토스 자동결제 및 해외 PayPal 구독으로 유료 플랜 결제 구현됨 |
-| Instagram 발행 | `app/api/auth/meta/*`, `app/api/cron/publish`, Server Actions | 백엔드 코드 유지, 사용자 흐름은 추후 개발 예정 |
+| 구독 | `/billing`, `app/api/polar/*` | Polar Checkout 및 webhook 기반 유료 플랜 결제 구현됨 |
+| Instagram 발행 | `app/api/auth/meta/*`, Server Actions | 백엔드 코드 일부 유지, 사용자 흐름은 추후 개발 예정 |
 
 현재 CMS 메뉴는 `Concept`, `Generate`, `Works`이며, 결제 화면은 사이드바의 요금제 링크에서 접근합니다. 과거 `/brand`, `/campaign/new`, `/instagram` 기반 안내는 현재 사용자 화면 구조가 아닙니다.
 
@@ -69,11 +69,9 @@ Google Login
 
 - 내부 `FREE` 상태는 로그인 직후 또는 취소 후의 이용권 없음 상태이며 생성 한도는 0회입니다.
 - 결제 플랜은 `LITE`/Single 월 3,000원 1회, `PRO`/Creator 월 25,000원 20회, `UNLIMITED`/Studio 월 39,000원 30회로 매핑됩니다.
-- 토스페이먼츠 SDK가 카드 자동결제 인증을 시작하고, 서버 콜백이 저장된 `customerKey`를 검증한 후 내부 플랜 금액으로 빌링키 최초 결제를 승인합니다.
-- 토스페이먼츠는 청구 스케줄을 제공하지 않으므로 `app/api/cron/billing`이 `CRON_SECRET` 인증 하에 국내 카드 구독 만기를 월별 승인합니다.
-- 해외 고객은 PayPal Subscription 버튼을 사용하며, 서버가 PayPal의 `plan_id`와 서명된 웹훅을 검증해 권한을 동기화합니다. 활성 구독이 있으면 다른 공급자의 중복 가입은 허용하지 않습니다.
-- 결제 공급자 전환 배포 전에는 `node scripts/migrate-tosspayments.mjs`를 먼저 실행합니다. 이 스크립트는 기존 네이버페이 배포가 조회하는 컬럼도 유지해 순차 배포 중 로그인 장애를 방지합니다.
-- Meta OAuth, Instagram Graph API 클라이언트, cron 발행 라우트는 존재합니다.
+- 결제는 Polar Checkout을 사용하며, 서버는 Polar 주문/구독 이벤트를 검증해 내부 플랜 권한을 동기화합니다.
+- 활성 구독 취소는 `app/api/polar/cancel`을 통해 처리하고, webhook은 결제/환불 상태를 `PaymentRecord`와 사용자 플랜에 반영합니다.
+- Meta OAuth와 Instagram Graph API 클라이언트는 남아 있지만, 예약 발행 cron은 현재 운영 cron에서 제외했습니다.
 - 현재 CMS에는 Instagram 계정 연결/예약 발행 화면이 없으므로 발행 기능은 사용자 흐름으로 완료되지 않았습니다.
 
 ## 알려진 주요 제한
@@ -83,7 +81,7 @@ Google Login
 1. Instagram 계정 연결/예약 게시 UI는 이번 범위에서 제외되어 추후 개발 예정입니다.
 2. 업로드는 파일당 크기 및 요청당 4장 제한을 적용하지만, 사용자별 저장 쿼터와 속도 제한은 남아 있습니다.
 3. 운영 DB fail-closed, 마이그레이션/백업 정책을 확정해야 합니다.
-4. 토스페이먼츠 자동결제 MID 계약·청구 크론과 PayPal 해외 결제 플랜/웹훅을 설정하고 두 결제 경로의 테스트/라이브 소액 E2E를 완료해야 합니다.
+4. Polar 상품/checkout 링크/webhook 설정과 테스트/라이브 소액 E2E를 완료해야 합니다.
 5. 외부 인증/이미지 공급자를 사용한 E2E와 `npm audit` moderate 2건 검토가 남아 있습니다.
 6. 기본 브랜드 스타일 메모리는 구현되었으며, 여러 작업에서의 선호 학습/추천 고도화, MP4/애니메이션 출력, 실시간 공동 편집은 후속 구현 범위입니다.
 
@@ -109,11 +107,10 @@ npm run dev
 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 네이버 스토어 상품 보조 수집 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `SESSION_SECRET` | HMAC 세션 토큰 서명 키, 운영 환경에서 32자 이상 필요 |
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` | 토스페이먼츠 카드 자동결제 |
-| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, `NEXT_PUBLIC_PAYPAL_*` | 해외 고객용 PayPal 구독 |
+| `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `POLAR_CHECKOUT_*`, `POLAR_PRODUCT_*` | Polar checkout, webhook, 상품 매핑 |
 | `META_APP_ID`, `META_APP_SECRET`, `INSTAGRAM_TOKEN_ENCRYPTION_KEY` | Meta/Instagram 연동 |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 업로드 |
-| `CRON_SECRET` | 예약 게시 및 월 구독 청구 실행 보호 |
+| `CRON_SECRET` | retention, blob cleanup, YouTube render cron 실행 보호 |
 
 ## 배포
 
@@ -128,4 +125,4 @@ Private 조직 저장소에서 Git 배포를 실행하는 커밋 작성자는 Ve
 
 ## 검증
 
-문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. `npm run build`는 통과했으며, `npm run lint`에는 `app/(cms)/TabContext.tsx`와 `src/lib/ai/providers/openAIImageProvider.ts`의 기존 오류가 남아 있습니다. 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.
+문서 기준 최근 확인 결과는 `CURRENT_STATUS_AND_IMPROVEMENTS.md`의 검증 현황을 참조합니다. 운영 준비 판단은 남은 정책 구현과 외부 서비스 E2E 완료 이후에 내려야 합니다.

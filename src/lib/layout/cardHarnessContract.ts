@@ -59,19 +59,22 @@ export function repairCopyToHarness(params: {
   const headline = normalizeCopy(params.headline)
   const body = normalizeCopy(params.body)
 
+  const language = params.language ?? 'ko'
+
   if (containsMetaToken(`${headline} ${body}`)) {
     issues.push('body leaks planning metadata')
   }
 
-  if (hasBrokenHeadline(headline)) {
+  // Korean-specific completeness heuristics must never judge English copy
+  if (language === 'ko' && hasBrokenHeadline(headline)) {
     issues.push('headline is incomplete')
   }
 
-  if (hasBrokenKoreanCopy(body)) {
+  if (language === 'ko' && hasBrokenKoreanCopy(body)) {
     issues.push('body has incomplete Korean copy')
   }
 
-  if (contract.requiresAction && !hasActionCue(body)) {
+  if (contract.requiresAction && !hasActionCue(body, language)) {
     issues.push('CTA action cue is missing')
   }
 
@@ -87,7 +90,7 @@ export function repairCopyToHarness(params: {
   })
   issues.push(...repaired.issues)
 
-  const validation = validateHarnessedCopy(params.role, repaired.headline, repaired.body)
+  const validation = validateHarnessedCopy(params.role, repaired.headline, repaired.body, language)
   if (!validation.passed) {
     issues.push(...validation.issues)
   }
@@ -99,8 +102,13 @@ export function repairCopyToHarness(params: {
   }
 }
 
-export function validateHarnessedCopy(role: string | undefined, headline: string, body: string) {
-  const contract = getCardHarnessContract(role)
+export function validateHarnessedCopy(
+  role: string | undefined,
+  headline: string,
+  body: string,
+  language: 'ko' | 'en' = 'ko',
+) {
+  const contract = getCardHarnessContract(role, language)
   const issues: string[] = []
   const renderable = validateRenderableCopy({
     headline,
@@ -119,13 +127,14 @@ export function validateHarnessedCopy(role: string | undefined, headline: string
   if (containsMetaToken(`${headline} ${body}`)) {
     issues.push('copy leaks internal planning metadata')
   }
-  if (hasBrokenHeadline(headline)) {
+  // Korean-specific completeness heuristics must never judge English copy
+  if (language === 'ko' && hasBrokenHeadline(headline)) {
     issues.push('headline is incomplete or reads like a clipped phrase')
   }
-  if (hasBrokenKoreanCopy(body)) {
+  if (language === 'ko' && hasBrokenKoreanCopy(body)) {
     issues.push('body has broken Korean spacing, particles, or clipped predicate')
   }
-  if (contract.requiresAction && !hasActionCue(body)) {
+  if (contract.requiresAction && !hasActionCue(body, language)) {
     issues.push('closing copy lacks an explicit action cue')
   }
   return {
@@ -140,7 +149,10 @@ function containsMetaToken(value: string) {
     /[A-Za-z]{3,}\s*은\(는\)/.test(value)
 }
 
-function hasActionCue(value: string) {
+function hasActionCue(value: string, language: 'ko' | 'en' = 'ko') {
+  if (language === 'en') {
+    return /\b(save|check|compare|tap|swipe|follow|share|bookmark|revisit|try)\b/i.test(value)
+  }
   return /저장|확인|체크|비교|다시 보기|꺼내보기|정리해두|점검/.test(value)
 }
 

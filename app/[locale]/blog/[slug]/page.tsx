@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, CalendarDays, Clock } from 'lucide-react'
@@ -165,10 +166,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           {/* Post Banner Image */}
           <div className="mt-10 aspect-[16/9] w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50 relative">
-            <img
+            <Image
               src={postImage}
               alt={post.title}
-              className="object-cover w-full h-full"
+              fill
+              sizes="(min-width: 768px) 768px, 100vw"
+              className="object-cover"
             />
           </div>
 

@@ -78,8 +78,10 @@ export async function runMediaNarrativeAgents(params: {
   knowledgeCtx: CopyKnowledgeContext
   editorialPlan: EditorialDirectorPlan
   plannedSlides: { slideNumber: number; role: EditorialSlideRole; headline: string; body: string; layoutType: string }[]
+  language?: 'ko' | 'en'
 }): Promise<MediaNarrativeAdapterResult> {
   const { brand, input, strategy, knowledgeCtx, editorialPlan, plannedSlides } = params
+  const language = params.language ?? 'ko'
 
   const logs: AgentReportItem[] = []
 
@@ -133,23 +135,36 @@ export async function runMediaNarrativeAgents(params: {
     })
 
     // 6. CriticAgent — quality scoring (new capability)
-    //    Evaluates narrative flow, persona fit, hook pattern, duplicate detection
-    console.log('[MediaNarrativeAdapter] CriticAgent starting...')
-    const criticResult: CriticResult = runCriticAgent(memory)
-    logs.push({
-      agentName: 'CriticAgent',
-      role: 'copy-quality',
-      status: criticResult.report.passed ? 'success' : 'warn',
-      message: `Copy quality score: ${criticResult.report.score}. Weak slides: [${criticResult.weakSlides.join(', ') || 'none'}]`,
-      details: {
-        score: criticResult.report.score,
-        narrativeFlowScore: criticResult.report.narrativeFlowScore,
-        personaFitScore: criticResult.report.personaFitScore,
-        hookPatternScore: criticResult.report.hookPatternScore,
-        weakSlides: criticResult.weakSlides,
-      },
-      timestamp: new Date().toISOString(),
-    })
+    //    Evaluates narrative flow, persona fit, hook pattern, duplicate detection.
+    //    Its heuristics (sentence endings, CTA cues, hook signals) are Korean-specific,
+    //    so English copy is scored by the editorial/semantic gates instead.
+    let criticResult: CriticResult | null = null
+    if (language === 'ko') {
+      console.log('[MediaNarrativeAdapter] CriticAgent starting...')
+      criticResult = runCriticAgent(memory)
+      logs.push({
+        agentName: 'CriticAgent',
+        role: 'copy-quality',
+        status: criticResult.report.passed ? 'success' : 'warn',
+        message: `Copy quality score: ${criticResult.report.score}. Weak slides: [${criticResult.weakSlides.join(', ') || 'none'}]`,
+        details: {
+          score: criticResult.report.score,
+          narrativeFlowScore: criticResult.report.narrativeFlowScore,
+          personaFitScore: criticResult.report.personaFitScore,
+          hookPatternScore: criticResult.report.hookPatternScore,
+          weakSlides: criticResult.weakSlides,
+        },
+        timestamp: new Date().toISOString(),
+      })
+    } else {
+      logs.push({
+        agentName: 'CriticAgent',
+        role: 'copy-quality',
+        status: 'info',
+        message: 'Skipped Korean-specific copy heuristics for English content; editorial/semantic gates apply instead.',
+        timestamp: new Date().toISOString(),
+      })
+    }
 
     // 7. Convert back to AgentSlideData[] preserving original EditorialSlideRole
     const slides: AgentSlideData[] = memory.completedSlides.map(cs => {
@@ -166,7 +181,7 @@ export async function runMediaNarrativeAgents(params: {
     return {
       slides,
       logs,
-      copyQualityReport: criticResult.report,
+      copyQualityReport: criticResult?.report ?? null,
     }
   } catch (err) {
     // Fallback: return original slides unchanged (no quality impact)

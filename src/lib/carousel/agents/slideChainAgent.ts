@@ -82,7 +82,7 @@ ${buildAntiPatternRule('ko')}
 
 규칙:
 - headline: 25자 이하 (공백 포함) — 강렬하고 구체적으로. 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
-- body: 220자 이하 (공백 포함) — 핵심 정보를 1~4문장으로 풍성하게 작성. 에디토리얼 톤으로 날카롭게
+- body: 150자 이하 (공백 포함) — 핵심 정보를 1~3문장으로 밀도 있게 작성. 에디토리얼 톤으로 날카롭게
 - body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체("~잖아요", "~라고요?")도 피하세요
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - ctaText: ${isCta ? '20자 이하로 반드시 작성' : 'null'}
@@ -128,23 +128,25 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
     const systemPrompt = ROLE_SYSTEM_PROMPT[slide.role] ?? DEFAULT_SYSTEM_PROMPT
     const userPrompt = buildSlidePrompt(memory, i)
 
+    const fallbackCopy = buildFallbackCopy(memory, slide.slideNumber, slide.role)
+    // Precomputed so a silently returned fallback is detectable by identity below.
+    const fallbackShape = { headline: fallbackCopy.headline, body: fallbackCopy.body, ctaText: fallbackCopy.ctaText ?? null }
     const result = await client.generateJson<{ headline: string; body: string; ctaText?: string | null }>(
       `slide-chain-${slide.slideNumber}`,
       `${systemPrompt}\n\n${userPrompt}`,
-      () => {
-        const fb = buildFallbackCopy(memory, slide.slideNumber, slide.role)
-        return { headline: fb.headline, body: fb.body, ctaText: fb.ctaText ?? null }
-      },
+      () => fallbackShape,
       { model: textModel, temperature: 0.45 }
     )
+    const usedFallback = !result || result === fallbackShape || !result.headline?.trim() || !result.body?.trim()
 
-    const fallbackCopy = buildFallbackCopy(memory, slide.slideNumber, slide.role)
     const repaired = repairRenderableCopy({
       headline: result?.headline?.trim() || fallbackCopy.headline,
       body: result?.body?.trim() || fallbackCopy.body,
+      // 150 = the commerce renderer's true capacity (5 lines x 30 chars) — keep in sync
+      // with renderer.ts truncateAtSentenceBoundary and qualityCheckEngine's body check.
       constraints: {
         maxHeadlineChars: 25,
-        maxBodyChars: 220,
+        maxBodyChars: 150,
         maxBodyLines: 5,
         lineLength: 30,
       },
@@ -157,6 +159,7 @@ export async function runSlideChainAgent(memory: NarrativeMemory): Promise<Compl
       role: slide.role,
       headline,
       body,
+      ...(usedFallback ? { usedFallback: true } : {}),
     }
 
     appendCompletedSlide(memory, completed)

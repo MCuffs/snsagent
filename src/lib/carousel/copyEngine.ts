@@ -72,7 +72,7 @@ ${buildAntiPatternRule('ko')}
 
 규칙:
 - headline: 25자 이하, 강렬하고 구체적으로 (공백 포함). 요약 라벨이 아니라 스크롤을 멈추게 하는 한 줄
-- body: 220자 이하, 핵심 정보를 1~4문장으로 풍성하게 전달 (공백 포함) — 에디토리얼 톤으로 날카롭게. 너무 짧으면 감점
+- body: 150자 이하, 핵심 정보를 1~3문장으로 밀도 있게 전달 (공백 포함) — 에디토리얼 톤으로 날카롭게. 너무 짧으면 감점
 - body 문장 어미를 다양하게 하세요. 매번 "~입니다/~있습니다"로 끝나면 안 됩니다. 하지만 대화체("~잖아요", "~라고요?")도 피하세요. 에디토리얼 톤을 유지하면서 문장 구조를 다양하게 하세요.
 - body는 반드시 완성된 문장으로 끝내세요. 조사, 명사, 연결어, 쉼표 뒤에서 절대 끊지 마세요.
 - 수치가 2개 이상 들어가는 문장은 하나를 선택해 집중하고 나머지는 다음 슬라이드로 배분하세요.
@@ -212,7 +212,8 @@ function cleanCopy(brand: BrandProfile, copy: SlideCopy, knowledgeCtx?: CopyKnow
   return {
     ...copy,
     headline: clean(copy.headline, 25),
-    body: clean(copy.body, 120),
+    // 150 = commerce renderer capacity (5 lines x 30 chars) — same limit everywhere in this pipeline
+    body: clean(copy.body, 150),
     ctaText: copy.ctaText ? clean(copy.ctaText, 30) : undefined,
   }
 }
