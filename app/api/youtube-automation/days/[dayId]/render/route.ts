@@ -27,6 +27,18 @@ function stripRenderRetryNotes(value: string | null): string | null {
   }
 }
 
+// A day that failed by exhausting its requeue budget keeps its per-scene checkpoint;
+// a user-initiated re-render must restart that budget or the first requeue fails it again.
+function resetCheckpointRequeues(value: string | null): string | null {
+  if (!value) return value
+  try {
+    const parsed = JSON.parse(value) as { requeueCount?: number }
+    return JSON.stringify({ ...parsed, requeueCount: 0 })
+  } catch {
+    return value
+  }
+}
+
 export async function POST(request: Request, context: { params: Promise<{ dayId: string }> }) {
   const startedAt = Date.now()
   const requestId = request.headers.get('x-vercel-id') || request.headers.get('x-request-id')
@@ -179,8 +191,12 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
       // A degraded plan (e.g. generic fallback script) can be discarded so production replans from scratch
       ...(regeneratePlan
         ? { script: null, scenesJson: null, sourceClipsJson: null, qualityNotesJson: null, renderCheckpointJson: null }
-        // A user-initiated render resets the cron's silent-death recovery counter
-        : { qualityNotesJson: stripRenderRetryNotes(day.qualityNotesJson) }),
+        // A user-initiated render resets the cron's silent-death recovery counter and the
+        // requeue budget, while keeping the per-scene checkpoint so work resumes, not restarts
+        : {
+          qualityNotesJson: stripRenderRetryNotes(day.qualityNotesJson),
+          renderCheckpointJson: resetCheckpointRequeues(day.renderCheckpointJson),
+        }),
     },
   })
   if (claimed.count === 0) {
