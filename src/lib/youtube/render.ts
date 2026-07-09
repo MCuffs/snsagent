@@ -1046,6 +1046,9 @@ async function storeAsset(params: {
     const blob = await put(`generated/youtube/${params.userId}/${params.fileName}`, params.buffer, {
       access: 'public',
       addRandomSuffix: false,
+      // Checkpointed work assets reuse deterministic names across resumed invocations —
+      // an upload that landed but wasn't checkpointed must overwrite, not fail forever.
+      allowOverwrite: true,
       contentType: params.contentType,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     })
