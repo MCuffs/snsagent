@@ -5,7 +5,7 @@ import {
   type YouTubeShortsTemplateRecord,
 } from '../../../lib/youtube-shorts-templates/types'
 import type { YouTubePlanStrategy } from '../../../lib/youtube-plan-strategies'
-import { logYouTubeAutomation } from './logging'
+import { logYouTubeAutomation, summarizeYouTubeAutomationError } from './logging'
 
 export interface PlannerDay {
   dayNumber: number
@@ -322,7 +322,11 @@ async function searchPexelsVideos(query: string, limit: number): Promise<Omit<St
       headers: { Authorization: apiKey, 'User-Agent': 'Shuffla/1.0' },
       signal: AbortSignal.timeout(6000),
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      // 429/401 here means quota exhaustion or a bad key — surface it instead of silently degrading to mock clips
+      logYouTubeAutomation('warn', 'stock_video_search_http_error', {}, { provider: 'pexels', status: res.status, keyword: query })
+      return []
+    }
     const data = await res.json() as {
       videos?: Array<{
         id: number
@@ -345,7 +349,8 @@ async function searchPexelsVideos(query: string, limit: number): Promise<Omit<St
         sourceUrl: video.url || null,
       }
     }).filter(item => item.videoUrl)
-  } catch {
+  } catch (error) {
+    logYouTubeAutomation('warn', 'stock_video_search_failed', {}, { provider: 'pexels', keyword: query, ...summarizeYouTubeAutomationError(error) })
     return []
   }
 }
@@ -365,7 +370,10 @@ async function searchPixabayVideos(query: string, limit: number): Promise<Omit<S
     const res = await fetch(`https://pixabay.com/api/videos/?${params.toString()}`, {
       signal: AbortSignal.timeout(6000),
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      logYouTubeAutomation('warn', 'stock_video_search_http_error', {}, { provider: 'pixabay', status: res.status, keyword: query })
+      return []
+    }
     const data = await res.json() as {
       hits?: Array<{
         id: number
@@ -385,7 +393,8 @@ async function searchPixabayVideos(query: string, limit: number): Promise<Omit<S
         sourceUrl: hit.pageURL || null,
       }
     }).filter(item => item.videoUrl)
-  } catch {
+  } catch (error) {
+    logYouTubeAutomation('warn', 'stock_video_search_failed', {}, { provider: 'pixabay', keyword: query, ...summarizeYouTubeAutomationError(error) })
     return []
   }
 }

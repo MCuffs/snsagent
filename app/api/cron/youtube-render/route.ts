@@ -21,7 +21,13 @@ const QUEUED_STAGES = [
   '스크립트 생성 준비 중',
 ]
 
+// A silently-killed invocation leaves the day 'rendering' until it goes stale, and this cron
+// would re-run it forever (die → stale → re-run). Cap silent-death recoveries per day row.
+// Recoveries resume from the render checkpoint, so each attempt makes forward progress.
+const MAX_STALE_RECOVERY_ATTEMPTS = 4
+
 export async function GET(request: NextRequest) {
+  const invocationStartedAt = Date.now()
   if (!verifyBearerSecret(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return unauthorizedJson()
   }
@@ -55,11 +61,40 @@ export async function GET(request: NextRequest) {
       id: true,
       userId: true,
       status: true,
+      renderStage: true,
       renderProgress: true,
+      qualityNotesJson: true,
       updatedAt: true,
     },
   })
   if (!candidate) return NextResponse.json({ ok: true, skipped: 'queue_empty' })
+
+  const isStaleRecovery = candidate.updatedAt < staleBefore
+    && !QUEUED_STAGES.includes(candidate.renderStage ?? '')
+  const qualityNotes = parseQualityNotes(candidate.qualityNotesJson)
+  const staleRecoveryCount = qualityNotes.filter(note => note?.type === 'render_retry').length
+  if (isStaleRecovery && staleRecoveryCount >= MAX_STALE_RECOVERY_ATTEMPTS) {
+    const failed = await prisma.youTubeAutomationDay.updateMany({
+      where: {
+        id: candidate.id,
+        status: candidate.status,
+        updatedAt: candidate.updatedAt,
+        renderCancelRequested: false,
+      },
+      data: {
+        status: 'failed',
+        renderProgress: 0,
+        renderStage: '영상 제작이 반복적으로 중단되어 실패 처리되었습니다. 다시 제작 버튼을 누르면 저장된 제작안부터 이어서 진행됩니다.',
+      },
+    })
+    logYouTubeAutomation('error', 'render_queue_stale_retry_exhausted', {
+      requestId: request.headers.get('x-vercel-id'),
+      route: '/api/cron/youtube-render',
+      userId: candidate.userId,
+      dayId: candidate.id,
+    }, { staleRecoveryCount, failedCount: failed.count })
+    return NextResponse.json({ ok: true, dayId: candidate.id, skipped: 'stale_retry_exhausted' })
+  }
 
   const claimed = await prisma.youTubeAutomationDay.updateMany({
     where: {
@@ -73,6 +108,9 @@ export async function GET(request: NextRequest) {
       renderStage: candidate.renderProgress >= 30
         ? '영상 제작 작업 실행 중'
         : '스크립트 생성 작업 실행 중',
+      ...(isStaleRecovery
+        ? { qualityNotesJson: JSON.stringify([...qualityNotes, { type: 'render_retry' }]) }
+        : {}),
     },
   })
   if (claimed.count === 0) {
@@ -95,11 +133,22 @@ export async function GET(request: NextRequest) {
       dayId: candidate.id,
       userId: candidate.userId,
       requestId: context.requestId,
+      invocationStartedAt,
       throwOnFailure: true,
     })
     return NextResponse.json({ ok: true, dayId: candidate.id, status: 'completed' })
   } catch (error) {
     logYouTubeAutomation('error', 'render_queue_job_failed', context, summarizeYouTubeAutomationError(error))
     return NextResponse.json({ ok: false, dayId: candidate.id, status: 'failed' }, { status: 500 })
+  }
+}
+
+function parseQualityNotes(value: string | null): Array<{ type?: string }> {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed as Array<{ type?: string }> : []
+  } catch {
+    return []
   }
 }

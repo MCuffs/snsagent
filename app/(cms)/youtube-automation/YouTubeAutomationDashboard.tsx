@@ -104,6 +104,15 @@ function describeQualityNotes(notes: Array<{ type: string; sceneNumber?: number 
   if (notes.some(note => note.type === 'tts_probe_failed')) {
     messages.push('일부 장면의 음성 길이 측정에 실패해 자막 싱크가 어긋날 수 있습니다.')
   }
+  const silentScenes = notes
+    .filter(note => note.type === 'tts_failed')
+    .map(note => note.sceneNumber)
+    .filter((sceneNumber): sceneNumber is number => typeof sceneNumber === 'number')
+  if (silentScenes.length > 0) {
+    messages.push(`씬 ${silentScenes.join(', ')}의 음성 생성이 반복 실패해 무음으로 제작되었습니다. 다시 제작하면 음성을 다시 시도합니다.`)
+  } else if (notes.some(note => note.type === 'tts_failed')) {
+    messages.push('일부 장면의 음성 생성이 반복 실패해 무음으로 제작되었습니다. 다시 제작하면 음성을 다시 시도합니다.')
+  }
   return messages
 }
 

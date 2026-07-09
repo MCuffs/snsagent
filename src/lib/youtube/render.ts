@@ -22,13 +22,50 @@ interface RenderYouTubeShortsParams {
   sourceClips: StockVideoCandidate[]
   template?: YouTubeShortsTemplateRecord
   ttsVoice?: YouTubeTtsVoice
+  // Absolute wall-clock deadline (ms epoch) the render must finish by — typically the
+  // function invocation budget minus a margin. Without it, the platform kills the
+  // invocation silently and the day freezes at the last written progress instead of failing cleanly.
+  deadlineAt?: number
+  checkpoint?: RenderCheckpoint
+  onCheckpoint?: (checkpoint: RenderCheckpoint) => Promise<void>
   onProgress?: (progress: number, stage: string) => Promise<void>
   shouldCancel?: () => Promise<boolean>
 }
 
 export interface RenderQualityNote {
-  type: 'generated_clip' | 'tts_probe_failed'
+  type: 'generated_clip' | 'tts_probe_failed' | 'tts_failed'
   sceneNumber?: number
+}
+
+// Durable per-scene render progress. Completed TTS/clip assets are uploaded to storage and
+// recorded here, so the next invocation resumes from the last finished scene instead of
+// restarting from scratch when a run gets requeued or its invocation dies.
+export interface RenderSceneCheckpoint {
+  sceneNumber: number
+  ttsUrl?: string
+  ttsDuration?: number
+  ttsFailedAttempts?: number
+  ttsSilentFallback?: boolean
+  ttsProbeFallback?: boolean
+  clipUrl?: string
+  clipFailedAttempts?: number
+  generatedFallback?: boolean
+}
+
+export interface RenderCheckpoint {
+  version: 1
+  ttsProvider?: string
+  requeueCount?: number
+  scenes: RenderSceneCheckpoint[]
+}
+
+// Thrown when the remaining invocation budget cannot fit the next step. The caller requeues
+// the day so a fresh invocation continues from the checkpoint — this is progress, not failure.
+export class YouTubeRenderRequeueError extends Error {
+  constructor() {
+    super('함수 실행 시간이 부족해 다음 실행에서 이어서 진행합니다.')
+    this.name = 'YouTubeRenderRequeueError'
+  }
 }
 
 interface StoredRenderedAsset {
@@ -50,9 +87,14 @@ const NORMALIZE_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_NORMALIZE_TIMEOUT
 const FINAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_FINAL_TIMEOUT_MS || 240_000)
 const TOTAL_RENDER_TIMEOUT_MS = Number(process.env.YOUTUBE_RENDER_TOTAL_TIMEOUT_MS || 8 * 60_000)
 const CLIP_NORMALIZE_MAX_ATTEMPTS = Number(process.env.YOUTUBE_RENDER_CLIP_ATTEMPTS || 3)
-const DOWNLOAD_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_DOWNLOAD_CONCURRENCY, 1, 1, 3)
 const TTS_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_TTS_CONCURRENCY, 2, 1, 3)
 const FFMPEG_CONCURRENCY = positiveInteger(process.env.YOUTUBE_RENDER_FFMPEG_CONCURRENCY, 2, 1, 2)
+// Worst-case wall-clock cost of one unit of work. A step only starts when this much budget
+// remains; otherwise the render requeues itself and a fresh invocation continues.
+const TTS_STEP_COST_MS = TTS_SCENE_TIMEOUT_MS + 20_000
+const CLIP_STEP_COST_MS = DOWNLOAD_TIMEOUT_MS * 2 + NORMALIZE_TIMEOUT_MS + 30_000
+const FINAL_STEP_COST_MS = FINAL_RENDER_TIMEOUT_MS + 120_000
+const TTS_MAX_ATTEMPTS = 3
 const TTS_MAX_CHARS = 3900
 const PUBLIC_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), 'public')
 
@@ -61,22 +103,35 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
   if (usableClips.length === 0) {
     throw new Error('Pexels/Pixabay 영상 후보가 없습니다. API 키 또는 검색 키워드를 확인해 주세요.')
   }
+  const checkpoint = normalizeRenderCheckpoint(params.checkpoint, params.scenes)
+  const sceneCp = (sceneNumber: number) => {
+    let entry = checkpoint.scenes.find(scene => scene.sceneNumber === sceneNumber)
+    if (!entry) {
+      entry = { sceneNumber }
+      checkpoint.scenes.push(entry)
+    }
+    return entry
+  }
+  // Checkpoint writes are serialized so a later snapshot never loses to an earlier slow write
+  let checkpointChain: Promise<void> = Promise.resolve()
+  const saveCheckpoint = () => {
+    const snapshot = JSON.parse(JSON.stringify(checkpoint)) as RenderCheckpoint
+    checkpointChain = checkpointChain.then(() => params.onCheckpoint?.(snapshot) ?? undefined)
+    return checkpointChain
+  }
   const workRoot = path.join(os.tmpdir(), 'shuffla-youtube-automation')
   await fs.mkdir(workRoot, { recursive: true })
   const workDir = await fs.mkdtemp(path.join(workRoot, `${params.dayId}-`))
-  const deadlineAt = Date.now() + TOTAL_RENDER_TIMEOUT_MS
-  const qualityNotes: RenderQualityNote[] = []
-  const addQualityNote = (note: RenderQualityNote) => {
-    if (!qualityNotes.some(existing => existing.type === note.type && existing.sceneNumber === note.sceneNumber)) {
-      qualityNotes.push(note)
-    }
-  }
+  const deadlineAt = Math.min(Date.now() + TOTAL_RENDER_TIMEOUT_MS, params.deadlineAt ?? Number.POSITIVE_INFINITY)
+  const remainingMs = () => deadlineAt - Date.now()
 
   try {
     logYouTubeAutomation('info', 'render_workdir_created', renderLogContext(params), {
       sceneCount: params.scenes.length,
       usableClipCount: usableClips.length,
-      downloadConcurrency: DOWNLOAD_CONCURRENCY,
+      resumedTtsCount: checkpoint.scenes.filter(scene => scene.ttsUrl).length,
+      resumedClipCount: checkpoint.scenes.filter(scene => scene.clipUrl).length,
+      requeueCount: checkpoint.requeueCount ?? 0,
       ttsConcurrency: TTS_CONCURRENCY,
       ffmpegConcurrency: FFMPEG_CONCURRENCY,
     })
@@ -85,204 +140,180 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
     await fs.mkdir(fontsDir, { recursive: true })
     await copyFontIfAvailable(fontsDir)
 
-    // ── Step 1: Generate all TTS in parallel + pre-download all clips in parallel ──
+    // ── Phase 1: per-scene TTS → durable storage (skips scenes already checkpointed) ──
     const ttsProvider = await getTtsProvider()
+    checkpoint.ttsProvider = ttsProvider
     await ensureNotCancelled(params)
 
-    let completedTtsCount = 0
-    let completedDownloadCount = 0
-    const reportAssetPreparationProgress = async () => {
-      const totalUnits = Math.max(1, params.scenes.length * 2)
-      const doneUnits = completedTtsCount + completedDownloadCount
-      await reportProgress(
-        params,
-        Math.min(44, 31 + Math.round((doneUnits / totalUnits) * 13)),
-        `TTS/영상 소스 준비 중 (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length})`,
-      )
-    }
-    logYouTubeAutomation('info', 'render_asset_prepare_start', renderLogContext(params), {
-      sceneCount: params.scenes.length,
-      ttsProvider,
-    })
-    const [ttsResults, rawClipPaths] = await Promise.all([
-      mapWithConcurrency(params.scenes, TTS_CONCURRENCY, async (scene, index) => {
-          const sceneStartedAt = Date.now()
-          await ensureCanContinue(params, deadlineAt)
-          const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
-          logYouTubeAutomation('info', 'render_tts_scene_start', renderLogContext(params), {
-            sceneNumber: scene.sceneNumber,
-            sceneIndex: index + 1,
-            narrationLength: scene.narration.length,
+    const pendingTtsScenes = () => params.scenes.filter(scene => !sceneCp(scene.sceneNumber).ttsUrl)
+    if (pendingTtsScenes().length > 0) {
+      let ttsBudgetExhausted = false
+      await mapWithConcurrency(params.scenes, TTS_CONCURRENCY, async (scene, index) => {
+        const cpScene = sceneCp(scene.sceneNumber)
+        if (cpScene.ttsUrl) return
+        if (ttsBudgetExhausted || remainingMs() < TTS_STEP_COST_MS) {
+          ttsBudgetExhausted = true
+          return
+        }
+        await ensureNotCancelled(params)
+        const sceneStartedAt = Date.now()
+        const sceneSpeechPath = path.join(workDir, `tts-${index + 1}.mp3`)
+        try {
+          await withTimeout(
+            createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds, params.ttsVoice),
+            boundedTimeout(deadlineAt, TTS_SCENE_TIMEOUT_MS),
+            `씬 ${index + 1} TTS 생성이 ${Math.round(TTS_SCENE_TIMEOUT_MS / 1000)}초를 초과했습니다.`,
+          )
+          const actualDuration = await probeAudioDuration(sceneSpeechPath, () => {
+            cpScene.ttsProbeFallback = true
           })
-          try {
-            await withTimeout(
-              createSceneSpeechAudio(scene.narration, sceneSpeechPath, scene.durationSeconds, params.ttsVoice),
-              boundedTimeout(deadlineAt, TTS_SCENE_TIMEOUT_MS),
-              `씬 ${index + 1} TTS 생성이 ${Math.round(TTS_SCENE_TIMEOUT_MS / 1000)}초를 초과했습니다.`,
-            )
-            await ensureCanContinue(params, deadlineAt)
-            const actualDuration = await probeAudioDuration(sceneSpeechPath, () => {
-              addQualityNote({ type: 'tts_probe_failed', sceneNumber: scene.sceneNumber })
+          cpScene.ttsUrl = await storeAsset({
+            userId: params.userId,
+            fileName: `work-${params.dayId}-tts-${scene.sceneNumber}.mp3`,
+            contentType: 'audio/mpeg',
+            buffer: await fs.readFile(sceneSpeechPath),
+          })
+          cpScene.ttsDuration = actualDuration
+          await saveCheckpoint()
+          logYouTubeAutomation('info', 'render_tts_scene_done', renderLogContext(params), {
+            sceneNumber: scene.sceneNumber,
+            actualDuration,
+            durationMs: Date.now() - sceneStartedAt,
+          })
+          const ttsDone = params.scenes.length - pendingTtsScenes().length
+          await reportProgress(
+            params,
+            Math.min(45, 31 + Math.round((ttsDone / params.scenes.length) * 14)),
+            `TTS 음성 생성 중 (${ttsDone}/${params.scenes.length})`,
+          )
+        } catch (error) {
+          if (error instanceof YouTubeRenderCancelledError) throw error
+          cpScene.ttsFailedAttempts = (cpScene.ttsFailedAttempts ?? 0) + 1
+          logYouTubeAutomation('warn', 'render_tts_scene_failed', renderLogContext(params), {
+            sceneNumber: scene.sceneNumber,
+            attempts: cpScene.ttsFailedAttempts,
+            durationMs: Date.now() - sceneStartedAt,
+            ...summarizeYouTubeAutomationError(error),
+          })
+          if (cpScene.ttsFailedAttempts >= TTS_MAX_ATTEMPTS) {
+            // Guarantee forward progress: this scene ships with silent narration + a quality note
+            await createSilentAudio(sceneSpeechPath, scene.durationSeconds)
+            cpScene.ttsUrl = await storeAsset({
+              userId: params.userId,
+              fileName: `work-${params.dayId}-tts-${scene.sceneNumber}.mp3`,
+              contentType: 'audio/mpeg',
+              buffer: await fs.readFile(sceneSpeechPath),
             })
-            await ensureCanContinue(params, deadlineAt)
-            completedTtsCount += 1
-            logYouTubeAutomation('info', 'render_tts_scene_done', renderLogContext(params), {
-              sceneNumber: scene.sceneNumber,
-              sceneIndex: index + 1,
-              actualDuration,
-              durationMs: Date.now() - sceneStartedAt,
-            })
-            await reportAssetPreparationProgress()
-            return { sceneSpeechPath, actualDuration }
-          } catch (error) {
-            logYouTubeAutomation('error', 'render_tts_scene_failed', renderLogContext(params), {
-              sceneNumber: scene.sceneNumber,
-              sceneIndex: index + 1,
-              durationMs: Date.now() - sceneStartedAt,
-              ...summarizeYouTubeAutomationError(error),
-            })
-            throw error
+            cpScene.ttsDuration = scene.durationSeconds
+            cpScene.ttsSilentFallback = true
           }
-        }),
-      mapWithConcurrency(params.scenes, DOWNLOAD_CONCURRENCY, async (_, index) => {
-          const sceneStartedAt = Date.now()
-          await ensureCanContinue(params, deadlineAt)
-          const scene = params.scenes[index]
-          const sceneMatches = preferFastSourceClips(clipsForScene(scene, usableClips))
-          const sceneClipKeys = new Set(sceneMatches.map(clip => `${clip.provider}:${clip.id}`))
-          const fallbackClips = preferFastSourceClips(usableClips)
-            .filter(clip => !sceneClipKeys.has(`${clip.provider}:${clip.id}`))
-          const sceneClips = [...sceneMatches, ...fallbackClips]
-          const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
-          let lastError: unknown
-          try {
-            for (let attempt = 0; attempt < attempts; attempt += 1) {
-              const clip = sceneClips[attempt]
-              if (!clip?.videoUrl) continue
-              const attemptStartedAt = Date.now()
-              const rawPath = path.join(workDir, `source-${index + 1}-${attempt + 1}.mp4`)
-              logYouTubeAutomation('info', 'render_download_scene_start', renderLogContext(params), {
-                sceneNumber: scene.sceneNumber,
-                sceneIndex: index + 1,
-                attempt: attempt + 1,
-                provider: clip.provider,
-                clipId: clip.id,
-              })
-              await reportProgress(
-                params,
-                Math.min(44, 31 + Math.round(((completedTtsCount + completedDownloadCount) / Math.max(1, params.scenes.length * 2)) * 13)),
-                `TTS/source prep (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length}) - downloading scene ${index + 1}/${params.scenes.length}, attempt ${attempt + 1}/${attempts}`,
-              )
-              try {
-                await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel, boundedTimeout(deadlineAt, DOWNLOAD_TIMEOUT_MS))
-                await ensureCanContinue(params, deadlineAt)
-                completedDownloadCount += 1
-                logYouTubeAutomation('info', 'render_download_scene_done', renderLogContext(params), {
-                  sceneNumber: scene.sceneNumber,
-                  sceneIndex: index + 1,
-                  attempt: attempt + 1,
-                  provider: clip.provider,
-                  clipId: clip.id,
-                  durationMs: Date.now() - attemptStartedAt,
-                })
-                await reportAssetPreparationProgress()
-                return rawPath
-              } catch (error) {
-                if (error instanceof YouTubeRenderCancelledError) throw error
-                lastError = error
-                await fs.rm(rawPath, { force: true }).catch(() => undefined)
-                logYouTubeAutomation(attempt + 1 >= attempts ? 'error' : 'warn', 'render_download_scene_attempt_failed', renderLogContext(params), {
-                  sceneNumber: scene.sceneNumber,
-                  sceneIndex: index + 1,
-                  attempt: attempt + 1,
-                  attempts,
-                  provider: clip.provider,
-                  clipId: clip.id,
-                  durationMs: Date.now() - attemptStartedAt,
-                  ...summarizeYouTubeAutomationError(error),
-                })
-                await reportProgress(
-                  params,
-                  Math.min(44, 31 + Math.round(((completedTtsCount + completedDownloadCount) / Math.max(1, params.scenes.length * 2)) * 13)),
-                  `TTS/source prep (${completedTtsCount}/${params.scenes.length}, ${completedDownloadCount}/${params.scenes.length}) - retrying scene ${index + 1}/${params.scenes.length} after attempt ${attempt + 1}/${attempts}`,
-                )
-              }
-            }
-            const fallbackPath = path.join(workDir, `source-${index + 1}-generated.mp4`)
-            logYouTubeAutomation('warn', 'render_download_scene_using_generated_fallback', renderLogContext(params), {
-              sceneNumber: scene.sceneNumber,
-              sceneIndex: index + 1,
-              attempts,
-              ...summarizeYouTubeAutomationError(lastError),
-            })
-            await createGeneratedSourceClip(
-              fallbackPath,
-              Math.max(2, scene.durationSeconds),
-              params.shouldCancel,
-              boundedTimeout(deadlineAt, NORMALIZE_TIMEOUT_MS),
-            )
-            addQualityNote({ type: 'generated_clip', sceneNumber: scene.sceneNumber })
-            completedDownloadCount += 1
-            await reportAssetPreparationProgress()
-            return fallbackPath
-          } catch (error) {
-            logYouTubeAutomation('error', 'render_download_scene_failed', renderLogContext(params), {
-              sceneNumber: scene.sceneNumber,
-              sceneIndex: index + 1,
-              durationMs: Date.now() - sceneStartedAt,
-              ...summarizeYouTubeAutomationError(error),
-            })
-            throw error
-          }
-        }),
-    ])
-    logYouTubeAutomation('info', 'render_asset_prepare_done', renderLogContext(params), {
-      ttsCount: ttsResults.length,
-      downloadCount: rawClipPaths.length,
-    })
-    await reportProgress(params, 45, 'TTS 녹음 및 영상 소스 준비 완료')
+          await saveCheckpoint()
+        }
+      })
+      if (pendingTtsScenes().length > 0) throw new YouTubeRenderRequeueError()
+    }
 
-    const sceneAudioPaths = ttsResults.map(r => r.sceneSpeechPath)
-    const actualDurations = ttsResults.map(r => r.actualDuration)
-    const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
-
-    // ── Step 2: Normalize each clip to actual TTS duration ──
-    // FFmpeg is CPU-bound. On Vercel's small vCPU functions, running one per scene is
-    // usually faster and more stable than spawning all scene encodes at once.
-    await ensureCanContinue(params, deadlineAt)
-    let normalizedCount = 0
-    const normalizedClips = await mapWithConcurrency(
-      params.scenes,
-      FFMPEG_CONCURRENCY,
-      async (scene, index) => {
-        await ensureCanContinue(params, deadlineAt)
+    // ── Phase 2: per-scene download + normalize → durable storage ──
+    const pendingClipScenes = () => params.scenes.filter(scene => !sceneCp(scene.sceneNumber).clipUrl)
+    if (pendingClipScenes().length > 0) {
+      let clipBudgetExhausted = false
+      await mapWithConcurrency(params.scenes, FFMPEG_CONCURRENCY, async (scene, index) => {
+        const cpScene = sceneCp(scene.sceneNumber)
+        if (cpScene.clipUrl) return
+        if (clipBudgetExhausted || remainingMs() < CLIP_STEP_COST_MS) {
+          clipBudgetExhausted = true
+          return
+        }
+        await ensureNotCancelled(params)
+        const sceneStartedAt = Date.now()
         const normalizedPath = path.join(workDir, `clip-${index + 1}.mp4`)
-        await normalizeClipWithFallback({
-          userId: params.userId,
-          dayId: params.dayId,
-          title: params.title,
-          scene,
-          sceneIndex: index,
-          initialInputPath: rawClipPaths[index],
-          outputPath: normalizedPath,
-          durationSeconds: actualDurations[index],
-          template: params.template,
-          shouldCancel: params.shouldCancel,
-          usableClips,
-          workDir,
-          deadlineAt,
-          onGeneratedFallback: () => addQualityNote({ type: 'generated_clip', sceneNumber: scene.sceneNumber }),
-        })
-        normalizedCount += 1
-        await reportProgress(
-          params,
-          Math.min(67, 45 + Math.round((normalizedCount / params.scenes.length) * 22)),
-          `씬별 영상 렌더링 중 (${normalizedCount}/${params.scenes.length})`,
-        )
-        return normalizedPath
-      },
-    )
+        try {
+          const usedGeneratedFallback = await buildNormalizedSceneClip({
+            scene,
+            sceneIndex: index,
+            usableClips,
+            workDir,
+            outputPath: normalizedPath,
+            durationSeconds: cpScene.ttsDuration ?? scene.durationSeconds,
+            deadlineAt,
+            template: params.template,
+            shouldCancel: params.shouldCancel,
+            logContext: renderLogContext(params),
+          })
+          if (usedGeneratedFallback) cpScene.generatedFallback = true
+          cpScene.clipUrl = await storeAsset({
+            userId: params.userId,
+            fileName: `work-${params.dayId}-clip-${scene.sceneNumber}.mp4`,
+            contentType: 'video/mp4',
+            buffer: await fs.readFile(normalizedPath),
+          })
+          await saveCheckpoint()
+          logYouTubeAutomation('info', 'render_clip_scene_done', renderLogContext(params), {
+            sceneNumber: scene.sceneNumber,
+            usedGeneratedFallback,
+            durationMs: Date.now() - sceneStartedAt,
+          })
+          const clipsDone = params.scenes.length - pendingClipScenes().length
+          await reportProgress(
+            params,
+            Math.min(67, 45 + Math.round((clipsDone / params.scenes.length) * 22)),
+            `씬별 영상 렌더링 중 (${clipsDone}/${params.scenes.length})`,
+          )
+        } catch (error) {
+          if (error instanceof YouTubeRenderCancelledError) throw error
+          cpScene.clipFailedAttempts = (cpScene.clipFailedAttempts ?? 0) + 1
+          await saveCheckpoint()
+          logYouTubeAutomation('warn', 'render_clip_scene_failed', renderLogContext(params), {
+            sceneNumber: scene.sceneNumber,
+            attempts: cpScene.clipFailedAttempts,
+            durationMs: Date.now() - sceneStartedAt,
+            ...summarizeYouTubeAutomationError(error),
+          })
+        }
+      })
+      if (pendingClipScenes().length > 0) throw new YouTubeRenderRequeueError()
+    }
+
+    // ── Phase 3: final assembly — needs one uninterrupted window, otherwise continue next run ──
+    if (remainingMs() < FINAL_STEP_COST_MS) throw new YouTubeRenderRequeueError()
+    await ensureNotCancelled(params)
     await reportProgress(params, 68, '씬별 영상 컷 완료')
+
+    const sceneAudioPaths: string[] = []
+    const normalizedClips: string[] = []
+    const actualDurations: number[] = []
+    for (const [index, scene] of params.scenes.entries()) {
+      const cpScene = sceneCp(scene.sceneNumber)
+      const audioPath = path.join(workDir, `final-tts-${index + 1}.mp3`)
+      const clipPath = path.join(workDir, `final-clip-${index + 1}.mp4`)
+      try {
+        await materializeWorkAsset(cpScene.ttsUrl as string, audioPath)
+      } catch (error) {
+        // Checkpointed asset is gone (e.g. deleted from storage) — regenerate it next run
+        cpScene.ttsUrl = undefined
+        await saveCheckpoint()
+        logYouTubeAutomation('warn', 'render_checkpoint_tts_asset_lost', renderLogContext(params), {
+          sceneNumber: scene.sceneNumber,
+          ...summarizeYouTubeAutomationError(error),
+        })
+        throw new YouTubeRenderRequeueError()
+      }
+      try {
+        await materializeWorkAsset(cpScene.clipUrl as string, clipPath)
+      } catch (error) {
+        cpScene.clipUrl = undefined
+        await saveCheckpoint()
+        logYouTubeAutomation('warn', 'render_checkpoint_clip_asset_lost', renderLogContext(params), {
+          sceneNumber: scene.sceneNumber,
+          ...summarizeYouTubeAutomationError(error),
+        })
+        throw new YouTubeRenderRequeueError()
+      }
+      sceneAudioPaths.push(audioPath)
+      normalizedClips.push(clipPath)
+      actualDurations.push(cpScene.ttsDuration ?? scene.durationSeconds)
+    }
+    const totalDuration = actualDurations.reduce((sum, duration) => sum + duration, 0)
 
     // ── Step 3: Concatenate per-scene TTS audio into one track ──
     const speechPath = path.join(workDir, 'speech.mp3')
@@ -389,10 +420,63 @@ export async function renderYouTubeShortsFromStock(params: RenderYouTubeShortsPa
       return { start, end: subtitleCursor, text: scene.narration }
     })
 
-    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider, subtitles, qualityNotes }
+    // Best-effort removal of intermediate work assets now that the final video is stored
+    await cleanupWorkAssets(checkpoint).catch(() => undefined)
+
+    return { mp4Url, thumbnailUrl, ttsAudioUrl, ttsProvider, subtitles, qualityNotes: qualityNotesFromCheckpoint(checkpoint) }
   } finally {
+    await checkpointChain.catch(() => undefined)
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined)
   }
+}
+
+function normalizeRenderCheckpoint(value: RenderCheckpoint | undefined, scenes: YouTubeScenePlan[]): RenderCheckpoint {
+  const sceneNumbers = new Set(scenes.map(scene => scene.sceneNumber))
+  const entries = Array.isArray(value?.scenes)
+    ? value.scenes.filter(scene => scene && sceneNumbers.has(scene.sceneNumber))
+    : []
+  return { version: 1, ttsProvider: value?.ttsProvider, requeueCount: value?.requeueCount ?? 0, scenes: entries }
+}
+
+function qualityNotesFromCheckpoint(checkpoint: RenderCheckpoint): RenderQualityNote[] {
+  const notes: RenderQualityNote[] = []
+  for (const scene of checkpoint.scenes) {
+    if (scene.generatedFallback) notes.push({ type: 'generated_clip', sceneNumber: scene.sceneNumber })
+    if (scene.ttsSilentFallback) {
+      notes.push({ type: 'tts_failed', sceneNumber: scene.sceneNumber })
+    } else if (scene.ttsProbeFallback) {
+      notes.push({ type: 'tts_probe_failed', sceneNumber: scene.sceneNumber })
+    }
+  }
+  return notes
+}
+
+// Bring a checkpointed work asset (Blob URL in production, /public path in local dev) into the workdir.
+async function materializeWorkAsset(url: string, destPath: string) {
+  if (/^https?:\/\//.test(url)) {
+    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(60_000) })
+    if (!response.ok) throw new Error(`작업 파일 다운로드 실패 (HTTP ${response.status})`)
+    await fs.writeFile(destPath, Buffer.from(await response.arrayBuffer()))
+    return
+  }
+  const source = path.join(PUBLIC_DIR, ...url.replace(/^\//, '').split('/'))
+  await fs.copyFile(source, destPath)
+}
+
+async function cleanupWorkAssets(checkpoint: RenderCheckpoint) {
+  const urls = checkpoint.scenes
+    .flatMap(scene => [scene.ttsUrl, scene.clipUrl])
+    .filter((url): url is string => Boolean(url))
+  const blobUrls = urls.filter(url => /^https?:\/\//.test(url))
+  if (blobUrls.length > 0 && process.env.BLOB_READ_WRITE_TOKEN) {
+    const { del } = await import('@vercel/blob')
+    await del(blobUrls, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined)
+  }
+  await Promise.all(
+    urls
+      .filter(url => url.startsWith('/'))
+      .map(url => fs.rm(path.join(PUBLIC_DIR, ...url.replace(/^\//, '').split('/')), { force: true }).catch(() => undefined)),
+  )
 }
 
 async function downloadVideo(
@@ -538,81 +622,72 @@ function isKnownSlowSourceVideo(url: string) {
   return /[_-]1080_20\d{2}[_-]/.test(url) || /[_-]1440_/.test(url) || /[_-]2160_/.test(url)
 }
 
-async function normalizeClipWithFallback(params: {
-  userId: string
-  dayId: string
-  title: string
+// Download a stock clip for the scene (with per-clip retries) and normalize it to the target
+// duration/layout. Falls back to a generated solid-color clip so the scene always resolves.
+// Returns true when the generated fallback was used.
+async function buildNormalizedSceneClip(params: {
   scene: YouTubeScenePlan
   sceneIndex: number
-  initialInputPath: string
-  outputPath: string
-  durationSeconds: number
-  template?: YouTubeShortsTemplateRecord
-  shouldCancel?: () => Promise<boolean>
   usableClips: StockVideoCandidate[]
   workDir: string
+  outputPath: string
+  durationSeconds: number
   deadlineAt: number
-  onGeneratedFallback?: () => void
-}) {
-  const sceneClips = preferFastSourceClips(clipsForScene(params.scene, params.usableClips))
-  const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, sceneClips.length))
+  template?: YouTubeShortsTemplateRecord
+  shouldCancel?: () => Promise<boolean>
+  logContext: { userId: string; dayId: string; title: string }
+}): Promise<boolean> {
+  const sceneMatches = preferFastSourceClips(clipsForScene(params.scene, params.usableClips))
+  const sceneClipKeys = new Set(sceneMatches.map(clip => `${clip.provider}:${clip.id}`))
+  const fallbackClips = preferFastSourceClips(params.usableClips)
+    .filter(clip => !sceneClipKeys.has(`${clip.provider}:${clip.id}`))
+  const candidates = [...sceneMatches, ...fallbackClips].filter(clip => clip.videoUrl)
+  const attempts = Math.max(1, Math.min(CLIP_NORMALIZE_MAX_ATTEMPTS, candidates.length))
   let lastError: unknown
 
-  for (let attempt = 0; attempt < attempts; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (Date.now() >= params.deadlineAt) throw new YouTubeRenderTimeoutError()
-    await params.shouldCancel?.().then(cancel => {
-      if (cancel) throw new YouTubeRenderCancelledError()
-    })
-
+    if (await params.shouldCancel?.()) throw new YouTubeRenderCancelledError()
+    const clip = candidates[attempt]
+    const rawPath = path.join(params.workDir, `source-${params.sceneIndex + 1}-${attempt + 1}.mp4`)
     try {
-      const inputPath = attempt === 0
-        ? params.initialInputPath
-        : await downloadFallbackClip(params, sceneClips[attempt], attempt)
-
+      await downloadVideo(clip.videoUrl as string, rawPath, params.shouldCancel, boundedTimeout(params.deadlineAt, DOWNLOAD_TIMEOUT_MS))
       await normalizeClip({
-        inputPath,
+        inputPath: rawPath,
         outputPath: params.outputPath,
         durationSeconds: params.durationSeconds,
         template: params.template,
         shouldCancel: params.shouldCancel,
         timeoutMs: boundedTimeout(params.deadlineAt, NORMALIZE_TIMEOUT_MS),
       })
-      return
+      return false
     } catch (error) {
       if (error instanceof YouTubeRenderCancelledError) throw error
       lastError = error
-      console.warn(`[YouTubeRender] Scene ${params.sceneIndex + 1} normalize attempt ${attempt + 1} failed`, error)
+      await fs.rm(rawPath, { force: true }).catch(() => undefined)
+      logYouTubeAutomation(attempt + 1 >= attempts ? 'error' : 'warn', 'render_clip_scene_attempt_failed', params.logContext, {
+        sceneNumber: params.scene.sceneNumber,
+        attempt: attempt + 1,
+        attempts,
+        provider: clip.provider,
+        clipId: clip.id,
+        ...summarizeYouTubeAutomationError(error),
+      })
     }
   }
 
-  logYouTubeAutomation('warn', 'render_normalize_scene_using_generated_fallback', {
-    userId: params.userId,
-    dayId: params.dayId,
-    title: params.title,
-  }, {
+  logYouTubeAutomation('warn', 'render_normalize_scene_using_generated_fallback', params.logContext, {
     sceneIndex: params.sceneIndex + 1,
     attempts,
     ...summarizeYouTubeAutomationError(lastError),
   })
-  params.onGeneratedFallback?.()
   await createGeneratedSourceClip(
     params.outputPath,
     Math.max(1, params.durationSeconds),
     params.shouldCancel,
     boundedTimeout(params.deadlineAt, NORMALIZE_TIMEOUT_MS),
   )
-}
-
-async function downloadFallbackClip(params: {
-  sceneIndex: number
-  workDir: string
-  shouldCancel?: () => Promise<boolean>
-  deadlineAt: number
-}, clip: StockVideoCandidate, attempt: number) {
-  if (!clip?.videoUrl) throw new Error('대체 영상 클립을 찾을 수 없습니다.')
-  const rawPath = path.join(params.workDir, `source-${params.sceneIndex + 1}-fallback-${attempt}.mp4`)
-  await downloadVideo(clip.videoUrl, rawPath, params.shouldCancel, boundedTimeout(params.deadlineAt, DOWNLOAD_TIMEOUT_MS))
-  return rawPath
+  return true
 }
 
 async function getTtsProvider(): Promise<string> {
@@ -818,7 +893,7 @@ export class YouTubeRenderCancelledError extends Error {
 
 class YouTubeRenderTimeoutError extends Error {
   constructor() {
-    super('전체 영상 렌더링 제한 시간을 초과했습니다.')
+    super('렌더링 시간이 초과되었습니다. 다시 제작하면 저장된 제작안부터 이어서 진행되어 더 빠르게 완료됩니다.')
     this.name = 'YouTubeRenderTimeoutError'
   }
 }

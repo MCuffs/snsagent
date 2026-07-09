@@ -182,6 +182,7 @@ model YouTubeAutomationDay {
   hookPattern          String?
   endingPattern        String?
   qualityNotesJson     String? // degradations that occurred during production (generated clip fallback, generic plan, TTS probe failure)
+  renderCheckpointJson String? // per-scene durable render progress (TTS/clip asset URLs) so production resumes instead of restarting
   uploadedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt

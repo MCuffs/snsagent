@@ -9,10 +9,22 @@ import {
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
+import { checkYouTubeProductionPreflight } from '../../../../../../src/lib/youtube/preflight'
 import { produceYouTubeShorts } from '../../../../../../src/lib/youtube/produce'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
+
+function stripRenderRetryNotes(value: string | null): string | null {
+  if (!value) return value
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return value
+    return JSON.stringify(parsed.filter(note => (note as { type?: string })?.type !== 'render_retry'))
+  } catch {
+    return value
+  }
+}
 
 export async function POST(request: Request, context: { params: Promise<{ dayId: string }> }) {
   const startedAt = Date.now()
@@ -33,6 +45,15 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   if (!canUseYouTubeAutomationDay(user, day.dayNumber)) {
     logYouTubeAutomation('warn', 'render_request_plan_blocked', logContext, { dayNumber: day.dayNumber, durationMs: Date.now() - startedAt })
     return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
+  }
+
+  const preflight = checkYouTubeProductionPreflight()
+  if (!preflight.ok) {
+    logYouTubeAutomation('error', 'render_request_preflight_failed', logContext, {
+      error: preflight.error,
+      durationMs: Date.now() - startedAt,
+    })
+    return NextResponse.json({ error: preflight.error }, { status: 503 })
   }
 
   if (isYouTubeProductionActiveStatus(day.status) && day.updatedAt.getTime() < Date.now() - YOUTUBE_PRODUCTION_STALE_MS) {
@@ -155,7 +176,10 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
       renderStage,
       renderCancelRequested: false,
       // A degraded plan (e.g. generic fallback script) can be discarded so production replans from scratch
-      ...(regeneratePlan ? { script: null, scenesJson: null, sourceClipsJson: null, qualityNotesJson: null } : {}),
+      ...(regeneratePlan
+        ? { script: null, scenesJson: null, sourceClipsJson: null, qualityNotesJson: null, renderCheckpointJson: null }
+        // A user-initiated render resets the cron's silent-death recovery counter
+        : { qualityNotesJson: stripRenderRetryNotes(day.qualityNotesJson) }),
     },
   })
   if (claimed.count === 0) {
@@ -197,7 +221,7 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     }
     logYouTubeAutomation('info', 'render_after_start', logContext)
     try {
-      await produceYouTubeShorts({ dayId: claimedDayId, userId: claimedUserId, requestId })
+      await produceYouTubeShorts({ dayId: claimedDayId, userId: claimedUserId, requestId, invocationStartedAt: startedAt })
       logYouTubeAutomation('info', 'render_after_done', logContext)
     } catch (error) {
       logYouTubeAutomation('error', 'render_after_unhandled_error', logContext, summarizeYouTubeAutomationError(error))

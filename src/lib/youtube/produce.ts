@@ -10,21 +10,51 @@ import {
   type YouTubeScenePlan,
 } from './automation'
 import { logYouTubeAutomation, summarizeYouTubeAutomationError } from './logging'
-import { renderYouTubeShortsFromStock, YouTubeRenderCancelledError } from './render'
+import { hasStockVideoProviderKey } from './preflight'
+import {
+  renderYouTubeShortsFromStock,
+  YouTubeRenderCancelledError,
+  YouTubeRenderRequeueError,
+  type RenderCheckpoint,
+} from './render'
 import { resolveProjectTtsVoice } from './ttsVoice'
+
+// How much wall-clock time one function invocation may spend on production in total
+// (planning + render). Must stay under the platform's real execution limit with a margin,
+// otherwise the invocation is killed silently and the day freezes at the last written
+// progress (e.g. "68% 씬별 영상 컷 완료") instead of failing with a retryable error.
+// Vercel Pro (maxDuration 600s) → default 540s. On a 300s-capped plan set 240000.
+const FUNCTION_BUDGET_MS = boundedPositiveInteger(
+  process.env.YOUTUBE_FUNCTION_BUDGET_MS,
+  540_000,
+  60_000,
+  900_000,
+)
+
+// A render that keeps requeuing itself is making checkpoint progress each time, but cap it
+// so a systemically broken environment (e.g. ffmpeg missing) ends in an explicit failure.
+const MAX_RENDER_REQUEUES = boundedPositiveInteger(process.env.YOUTUBE_RENDER_MAX_REQUEUES, 12, 2, 50)
+
+const RENDER_QUEUED_STAGE = '영상 제작 대기열 등록됨'
 
 export async function produceYouTubeShorts({
   dayId,
   userId,
   requestId,
+  invocationStartedAt,
   throwOnFailure = false,
 }: {
   dayId: string
   userId: string
   requestId?: string | null
+  // Epoch ms when the current function invocation began handling the request.
+  // Used to bound the render so it fails cleanly before the platform kills the invocation.
+  invocationStartedAt?: number
   throwOnFailure?: boolean
 }) {
   const startedAt = Date.now()
+  const invocationDeadlineAt = (invocationStartedAt ?? startedAt) + FUNCTION_BUDGET_MS
+  let checkpoint: RenderCheckpoint = { version: 1, scenes: [] }
   let lastProgress = 1
   let lastStage = '영상 제작 준비 중'
   let logContext = { requestId, userId, dayId } as {
@@ -184,8 +214,13 @@ export async function produceYouTubeShorts({
     }
 
     if (!day.script || !day.scenesJson) throw new Error('영상 제작 데이터가 없습니다.')
+    checkpoint = parseRenderCheckpoint(day.renderCheckpointJson)
     const sourceClips = parseJsonArray<StockVideoCandidate>(day.sourceClipsJson)
-    if (!sourceClips.some(clip => clip.videoUrl)) throw new Error('사용 가능한 영상 소스가 없습니다.')
+    if (!sourceClips.some(clip => clip.videoUrl)) {
+      throw new Error(hasStockVideoProviderKey()
+        ? '스톡 영상 검색 결과가 없습니다. 검색 API 사용량 초과 또는 일시적 장애일 수 있으니 잠시 후 다시 시도해 주세요.'
+        : '스톡 영상 API 키(PEXELS_API_KEY 또는 PIXABAY_API_KEY)가 설정되지 않아 영상 소스를 찾을 수 없습니다.')
+    }
     const scenes = parseJsonArray<YouTubeScenePlan>(day.scenesJson)
     const shouldCancel = createThrottledCancellationCheck(dayId, logContext)
 
@@ -203,6 +238,16 @@ export async function produceYouTubeShorts({
       sourceClips,
       template: parseTemplateSnapshot(day.templateSnapshotJson),
       ttsVoice: resolveProjectTtsVoice(day.projectId, day.project.ttsVoice),
+      deadlineAt: invocationDeadlineAt,
+      checkpoint,
+      onCheckpoint: async (nextCheckpoint) => {
+        checkpoint = nextCheckpoint
+        const saved = await prisma.youTubeAutomationDay.updateMany({
+          where: { id: dayId, renderCancelRequested: false, status: 'rendering' },
+          data: { renderCheckpointJson: JSON.stringify(nextCheckpoint) },
+        })
+        if (saved.count === 0) throw new YouTubeRenderCancelledError()
+      },
       onProgress: async (renderProgress, renderStage) => {
         lastProgress = renderProgress
         lastStage = renderStage
@@ -233,6 +278,7 @@ export async function produceYouTubeShorts({
         ttsProvider: rendered.ttsProvider,
         subtitleJson: JSON.stringify(rendered.subtitles),
         qualityNotesJson: JSON.stringify([...planPhaseNotes, ...rendered.qualityNotes]),
+        renderCheckpointJson: null,
         renderProgress: 100,
         renderStage: '영상 제작 완료',
         renderCancelRequested: false,
@@ -247,6 +293,59 @@ export async function produceYouTubeShorts({
       ttsProvider: rendered.ttsProvider,
     })
   } catch (error) {
+    if (error instanceof YouTubeRenderRequeueError) {
+      const nextRequeueCount = (checkpoint.requeueCount ?? 0) + 1
+      if (nextRequeueCount > MAX_RENDER_REQUEUES) {
+        await prisma.youTubeAutomationDay.update({
+          where: { id: dayId },
+          data: {
+            status: 'failed',
+            renderProgress: 0,
+            renderStage: `영상 제작 실패 (${lastProgress}% ${lastStage}): 제작이 ${MAX_RENDER_REQUEUES}회 이상 이어졌지만 완료되지 못했습니다. 다시 제작 버튼을 누르면 저장된 진행분부터 이어서 진행됩니다.`,
+            renderCancelRequested: false,
+          },
+        }).catch(() => undefined)
+        logYouTubeAutomation('error', 'production_requeue_exhausted', logContext, {
+          requeueCount: nextRequeueCount,
+          durationMs: Date.now() - startedAt,
+        })
+        if (throwOnFailure) throw error
+        return
+      }
+      // Progress so far is checkpointed — hand the rest to a fresh invocation via the queue
+      const requeued = await prisma.youTubeAutomationDay.updateMany({
+        where: { id: dayId, renderCancelRequested: false, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
+        data: {
+          status: 'rendering',
+          renderStage: RENDER_QUEUED_STAGE,
+          renderCheckpointJson: JSON.stringify({ ...checkpoint, requeueCount: nextRequeueCount }),
+        },
+      }).catch(() => ({ count: 0 }))
+      if (requeued.count > 0) {
+        logYouTubeAutomation('info', 'production_requeued', logContext, {
+          requeueCount: nextRequeueCount,
+          lastProgress,
+          lastStage,
+          durationMs: Date.now() - startedAt,
+        })
+        return
+      }
+      // The day was cancelled or changed underneath us — settle as a cancel, not a failure
+      await prisma.youTubeAutomationDay.update({
+        where: { id: dayId },
+        data: {
+          status: 'ready',
+          renderProgress: 0,
+          renderStage: '영상 제작 중단됨',
+          renderCancelRequested: false,
+        },
+      }).catch(() => undefined)
+      logYouTubeAutomation('warn', 'production_cancelled', logContext, {
+        failureStage: `${lastProgress}% ${lastStage}`,
+        durationMs: Date.now() - startedAt,
+      })
+      return
+    }
     const cancelled = error instanceof YouTubeRenderCancelledError
     const errorSummary = formatProductionError(error)
     const failureStage = `${lastProgress}% ${lastStage}`
@@ -309,6 +408,22 @@ function formatProductionError(error: unknown) {
     .replace(/\s+/g, ' ')
     .replace(/https?:\/\/\S+/g, '[external-url]')
     .slice(0, 240)
+}
+
+function parseRenderCheckpoint(value: string | null): RenderCheckpoint {
+  if (!value) return { version: 1, scenes: [] }
+  try {
+    const parsed = JSON.parse(value) as RenderCheckpoint
+    return parsed && Array.isArray(parsed.scenes) ? parsed : { version: 1, scenes: [] }
+  } catch {
+    return { version: 1, scenes: [] }
+  }
+}
+
+function boundedPositiveInteger(value: string | undefined, fallback: number, min: number, max: number) {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed)) return fallback
+  return Math.max(min, Math.min(max, parsed))
 }
 
 function parseJsonArray<T>(value: string | null): T[] {
