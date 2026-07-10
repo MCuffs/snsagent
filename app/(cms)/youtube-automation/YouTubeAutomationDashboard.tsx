@@ -2,12 +2,14 @@
 
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   CalendarDays, Check, Clock, Download, Folder, FolderOpen,
   Info, Loader2, Lock, Mic2, Play, Sparkles, Trash2, Upload, Video, X,
 } from 'lucide-react'
 import { analytics } from '../../../lib/analytics/thinkingdata'
 import { YOUTUBE_AUTOMATION_UNLOCK_MS } from '../../../lib/youtube-automation-schedule'
+import { getYouTubeAutomationDayLockReason } from '../../../lib/youtube-automation-state'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +52,7 @@ type PlannerDay = {
   qualityNotes?: Array<{ type: string; sceneNumber?: number }>
   uploadedAt?: string | null
   completedAt?: string | null
+  requiresUpgrade?: boolean
 }
 
 type Project = {
@@ -130,6 +133,7 @@ function currentTimeMs() { return Date.now() }
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function YouTubeAutomationDashboard({ isActive = true }: { isActive?: boolean }) {
+  const router = useRouter()
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [modalDay, setModalDay] = useState<PlannerDay | null>(null)
@@ -141,6 +145,7 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
   const [cancellingDayId, setCancellingDayId] = useState<string | null>(null)
   const [startingDayId, setStartingDayId] = useState<string | null>(null)
+  const startingDayIdsRef = useRef(new Set<string>())
 
   // Completed-day timestamps for the 12-hour countdown
   const [completedTimes, setCompletedTimes] = useState<Record<string, number>>(() =>
@@ -228,6 +233,7 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
 
   const handleDayClick = async (day: PlannerDay, effectiveLocked: boolean) => {
     if (!project) return
+    if (startingDayIdsRef.current.has(day.id)) return
     analytics.youtubeDaySelect({
       projectId: project.id,
       dayId: day.id,
@@ -243,23 +249,22 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
     }
     if (day.status === 'planning' || day.status === 'rendering') return
 
+    startingDayIdsRef.current.add(day.id)
     setStartingDayId(day.id)
     setError(null)
-    const optimistic = {
-      ...day,
-      status: day.script ? 'rendering' : 'planning',
-      renderProgress: 1,
-      renderStage: day.script ? '영상 제작 준비 중' : '스크립트 생성 준비 중',
-    }
-    setProject(current => current ? {
-      ...current,
-      days: current.days.map(item => item.id === day.id ? optimistic : item),
-    } : current)
     try {
       const res = await fetch(`/api/youtube-automation/days/${day.id}/render`, { method: 'POST' })
       const data = await readApiJson<{ day?: Partial<PlannerDay>; error?: string }>(res)
-      if (!res.ok || !data.day) throw new Error(data.error || '영상 제작을 시작하지 못했습니다.')
-      const updated = { ...optimistic, ...data.day }
+      if (!res.ok || !data.day) {
+        if (res.status === 402) {
+          setProject(current => current ? {
+            ...current,
+            days: current.days.map(item => item.id === day.id ? { ...item, requiresUpgrade: true } : item),
+          } : current)
+        }
+        throw new Error(data.error || '영상 제작을 시작하지 못했습니다.')
+      }
+      const updated = { ...day, ...data.day }
       setProject(current => current ? {
         ...current,
         days: current.days.map(item => item.id === day.id ? updated : item),
@@ -273,6 +278,7 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
       setError(reason)
       void refreshProjects()
     } finally {
+      startingDayIdsRef.current.delete(day.id)
       setStartingDayId(null)
     }
   }
@@ -568,10 +574,11 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {sortedDays.map(day => {
-            const dbLocked = day.status === 'locked'
             const isNextAfterCompleted = day.dayNumber === nextAfterCompletedDayNumber
             const timeLocked = isNextAfterCompleted && msUntilUnlock > 0
-            const effectiveLocked = dbLocked || timeLocked
+            const lockReason = getYouTubeAutomationDayLockReason(day, timeLocked)
+            const upgradeLocked = lockReason === 'upgrade'
+            const effectiveLocked = lockReason !== null
 
             return (
               <DayCard
@@ -579,8 +586,10 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
                 day={day}
                 effectiveLocked={effectiveLocked}
                 timeLocked={timeLocked}
+                upgradeLocked={upgradeLocked}
                 msUntilUnlock={timeLocked ? msUntilUnlock : 0}
                 onClick={() => handleDayClick(day, effectiveLocked)}
+                onUpgrade={() => router.push('/billing')}
                 onCancel={() => void handleCancelRender(day)}
                 cancelling={cancellingDayId === day.id}
                 starting={startingDayId === day.id}
@@ -612,8 +621,10 @@ function DayCard({
   day,
   effectiveLocked,
   timeLocked,
+  upgradeLocked,
   msUntilUnlock,
   onClick,
+  onUpgrade,
   onCancel,
   cancelling,
   starting,
@@ -621,8 +632,10 @@ function DayCard({
   day: PlannerDay
   effectiveLocked: boolean
   timeLocked: boolean
+  upgradeLocked: boolean
   msUntilUnlock: number
   onClick: () => void
+  onUpgrade: () => void
   onCancel: () => void
   cancelling: boolean
   starting: boolean
@@ -641,7 +654,7 @@ function DayCard({
     }
   }, [timeLocked, showInfo, msUntilUnlock])
 
-  const isProducing = starting || day.status === 'planning' || day.status === 'rendering'
+  const isProducing = day.status === 'planning' || day.status === 'rendering'
   const progress = Math.max(1, Math.min(100, day.renderProgress ?? 1))
 
   return (
@@ -652,19 +665,23 @@ function DayCard({
     >
       <div
         role="button"
-        tabIndex={effectiveLocked && !timeLocked ? -1 : 0}
-        onClick={timeLocked ? () => setShowInfo(v => !v) : onClick}
+        tabIndex={effectiveLocked && !timeLocked && !upgradeLocked ? -1 : 0}
+        onClick={upgradeLocked ? onUpgrade : timeLocked ? () => setShowInfo(v => !v) : onClick}
         onKeyDown={event => {
-          if ((event.key === 'Enter' || event.key === ' ') && !(effectiveLocked && !timeLocked)) {
+          if ((event.key === 'Enter' || event.key === ' ') && !(effectiveLocked && !timeLocked && !upgradeLocked)) {
             event.preventDefault()
-            if (timeLocked) setShowInfo(value => !value)
+            if (upgradeLocked) onUpgrade()
+            else if (timeLocked) setShowInfo(value => !value)
             else onClick()
           }
         }}
-        aria-disabled={effectiveLocked && !timeLocked}
+        aria-disabled={effectiveLocked && !timeLocked && !upgradeLocked}
         className={`min-h-[110px] w-full rounded-2xl border p-4 text-left transition-all duration-300 ${
           isProducing
             ? 'relative z-10 scale-[1.025] border-[#a5b4fc] bg-white shadow-[0_20px_48px_rgba(66,82,255,0.20)]'
+            :
+          upgradeLocked
+            ? 'cursor-pointer border-amber-200 bg-amber-50/80 shadow-[0_12px_30px_rgba(245,158,11,0.10)] hover:border-amber-300 hover:bg-amber-50 active:scale-[0.98]'
             :
           effectiveLocked
             ? 'cursor-not-allowed border-white/54 bg-white/38 opacity-55'
@@ -677,7 +694,10 @@ function DayCard({
             <CalendarDays className="h-3 w-3" />
             Day {day.dayNumber}
           </span>
-          <StatusPill status={day.status} hasMp4={!!day.mp4Url} />
+          {upgradeLocked
+            ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">업그레이드 필요</span>
+            : <StatusPill status={day.status} hasMp4={!!day.mp4Url} />
+          }
         </div>
         <p className="line-clamp-2 text-sm font-black leading-5 text-[#111827]">{day.title}</p>
         {isProducing && (
@@ -703,14 +723,21 @@ function DayCard({
             </div>
           </div>
         )}
-        <p className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#94a3b8]">
+        {starting && !isProducing && (
+          <p className="mt-3 flex items-center gap-1 text-[11px] font-black text-[#4252ff]">
+            <Loader2 className="h-3 w-3 animate-spin" /> 제작 가능 여부 확인 중...
+          </p>
+        )}
+        {!starting && <p className={`mt-3 flex items-center gap-1 text-[11px] font-bold ${upgradeLocked ? 'text-amber-700' : 'text-[#94a3b8]'}`}>
           {effectiveLocked ? <Lock className="h-3 w-3" /> : day.mp4Url ? <Video className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-          {timeLocked
+          {upgradeLocked
+            ? '요금제 업그레이드 후 제작 가능 →'
+            : timeLocked
             ? <><Clock className="h-3 w-3 ml-0.5" />{msToHHMM(remaining)} 후 오픈</>
             : effectiveLocked ? '12시간마다 오픈됩니다'
             : day.mp4Url ? '영상 완성 — 클릭해서 보기'
             : '클릭해서 영상 제작 시작'}
-        </p>
+        </p>}
       </div>
 
       {/* Countdown tooltip — hover on desktop, tap-toggle on mobile */}

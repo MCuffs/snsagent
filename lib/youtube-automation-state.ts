@@ -2,6 +2,18 @@ export interface YouTubeAutomationDayState {
   dayNumber: number
   status: string
   mp4Url?: string | null
+  requiresUpgrade?: boolean
+}
+
+export type YouTubeAutomationDayLockReason = 'upgrade' | 'schedule' | null
+
+export function getYouTubeAutomationDayLockReason(
+  day: YouTubeAutomationDayState,
+  timeLocked = false,
+): YouTubeAutomationDayLockReason {
+  if (day.requiresUpgrade) return 'upgrade'
+  if (timeLocked || day.status === 'locked') return 'schedule'
+  return null
 }
 
 export function isYouTubeAutomationDayOpen(

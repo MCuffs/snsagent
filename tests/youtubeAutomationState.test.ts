@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   canMarkYouTubeAutomationDayUploaded,
+  getYouTubeAutomationDayLockReason,
   isYouTubeAutomationDayOpen,
 } from '../lib/youtube-automation-state.ts'
 import { isYouTubeProductionQueuedStage } from '../lib/youtube-automation-production-state.ts'
@@ -14,6 +15,13 @@ test('locked and future YouTube days cannot be rendered', () => {
 test('the current open YouTube day can be rendered', () => {
   assert.equal(isYouTubeAutomationDayOpen({ dayNumber: 2, status: 'open' }, 2), true)
   assert.equal(isYouTubeAutomationDayOpen({ dayNumber: 1, status: 'failed' }, 2), true)
+})
+
+test('plan upgrade locks take precedence over an open day', () => {
+  assert.equal(getYouTubeAutomationDayLockReason({ dayNumber: 2, status: 'open', requiresUpgrade: true }), 'upgrade')
+  assert.equal(getYouTubeAutomationDayLockReason({ dayNumber: 2, status: 'locked', requiresUpgrade: true }, true), 'upgrade')
+  assert.equal(getYouTubeAutomationDayLockReason({ dayNumber: 2, status: 'open' }, true), 'schedule')
+  assert.equal(getYouTubeAutomationDayLockReason({ dayNumber: 2, status: 'open' }), null)
 })
 
 test('upload marking requires a completed accessible video', () => {
