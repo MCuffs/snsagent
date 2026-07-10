@@ -180,9 +180,10 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   )
 
   // Rendering runs on the server; polling keeps progress visible even after the modal closes.
+  // Keep a slow poll even without an active render — the recovery cron can resume and finish
+  // a day entirely server-side, and an open tab must eventually reflect that.
   useEffect(() => {
-    if (!hasActiveRender) return
-    const interval = setInterval(() => { void refreshProjects() }, 5000)
+    const interval = setInterval(() => { void refreshProjects() }, hasActiveRender ? 5000 : 30000)
     return () => clearInterval(interval)
   }, [hasActiveRender, refreshProjects])
 
