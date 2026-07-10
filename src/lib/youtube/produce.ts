@@ -73,6 +73,16 @@ export async function produceYouTubeShorts({
     if (updated.count === 0) throw new YouTubeRenderCancelledError()
   }
 
+  // Heartbeat: bump updatedAt while the run is alive so stale detection (dashboard sweep,
+  // recovery cron) can use a short window without ever firing on a healthy run — long
+  // ffmpeg encodes and LLM calls otherwise leave the row quiet for minutes.
+  const heartbeat = setInterval(() => {
+    prisma.youTubeAutomationDay.updateMany({
+      where: { id: dayId, renderCancelRequested: false, status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] } },
+      data: { renderProgress: lastProgress },
+    }).catch(() => undefined)
+  }, 45_000)
+
   try {
     logYouTubeAutomation('info', 'production_start', logContext)
     let day = await prisma.youTubeAutomationDay.findFirst({
@@ -358,6 +368,8 @@ export async function produceYouTubeShorts({
       ...summarizeYouTubeAutomationError(error),
     })
     if (throwOnFailure && !cancelled) throw error
+  } finally {
+    clearInterval(heartbeat)
   }
 }
 

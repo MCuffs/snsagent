@@ -3,6 +3,7 @@ import prisma from '../../../../lib/db'
 import {
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
   YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+  YOUTUBE_PRODUCTION_RESUME_STAGE,
   YOUTUBE_PRODUCTION_STALE_MS,
   YOUTUBE_RENDER_MAX_CONCURRENT,
 } from '../../../../lib/youtube-automation-production-state'
@@ -17,6 +18,8 @@ export const maxDuration = 600
 const QUEUED_STAGES = [
   '영상 제작 대기열 등록됨',
   '스크립트 생성 대기열 등록됨',
+  // 대시보드 폴링 스윕이 죽은 실행을 재개 대기로 돌려놓은 작업
+  YOUTUBE_PRODUCTION_RESUME_STAGE,
   // Workflow 소비 장애 당시 생성된 작업도 자동 회수한다.
   '영상 제작 준비 중',
   '스크립트 생성 준비 중',
@@ -70,8 +73,10 @@ export async function GET(request: NextRequest) {
   })
   if (!candidate) return NextResponse.json({ ok: true, skipped: 'queue_empty' })
 
-  const isStaleRecovery = candidate.updatedAt < staleBefore
-    && !QUEUED_STAGES.includes(candidate.renderStage ?? '')
+  // Resume-stage claims are also silent-death recoveries — count them against the cap
+  const isStaleRecovery = (candidate.updatedAt < staleBefore
+    && !QUEUED_STAGES.includes(candidate.renderStage ?? ''))
+    || candidate.renderStage === YOUTUBE_PRODUCTION_RESUME_STAGE
   const qualityNotes = parseQualityNotes(candidate.qualityNotesJson)
   const staleRecoveryCount = qualityNotes.filter(note => note?.type === 'render_retry').length
   if (isStaleRecovery && staleRecoveryCount >= MAX_STALE_RECOVERY_ATTEMPTS) {

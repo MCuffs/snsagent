@@ -11,6 +11,7 @@ import { isYouTubeDayUnlockDue } from '../../../../lib/youtube-automation-schedu
 import {
   YOUTUBE_CANCEL_SETTLE_MS,
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_RESUME_STAGE,
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation } from '../../../../src/lib/youtube/logging'
@@ -108,22 +109,24 @@ async function recoverStaleProductions(userId: string) {
     })
   }
 
+  // A stale active row means its invocation died silently. Do NOT mark it failed here —
+  // per-scene progress is checkpointed, so queue it for the recovery cron to RESUME.
+  // (This sweep runs on every dashboard poll and would otherwise always beat the cron.)
   const staleResult = await prisma.youTubeAutomationDay.updateMany({
     where: {
       userId,
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
       renderCancelRequested: false,
+      renderStage: { not: YOUTUBE_PRODUCTION_RESUME_STAGE },
       updatedAt: { lt: staleBefore },
     },
     data: {
-      status: 'failed',
-      renderProgress: 0,
-      renderStage: '영상 제작 시간이 초과되었습니다. 다시 시도해 주세요.',
+      renderStage: YOUTUBE_PRODUCTION_RESUME_STAGE,
       renderCancelRequested: false,
     },
   })
   if (staleResult.count > 0) {
-    logYouTubeAutomation('warn', 'stale_productions_recovered', { userId }, {
+    logYouTubeAutomation('warn', 'stale_productions_requeued_for_resume', { userId }, {
       count: staleResult.count,
       staleMs: YOUTUBE_PRODUCTION_STALE_MS,
     })

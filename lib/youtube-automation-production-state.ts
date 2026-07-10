@@ -1,11 +1,18 @@
 export const YOUTUBE_PRODUCTION_ACTIVE_STATUSES = ['planning', 'rendering'] as const
 
+// A live production run heartbeats its day row every ~45s (see produceYouTubeShorts),
+// so a row this quiet means the invocation died and is safe to hand to recovery.
 export const YOUTUBE_PRODUCTION_STALE_MS = positiveInteger(
   process.env.YOUTUBE_PRODUCTION_STALE_MS,
-  12 * 60 * 1000,
+  4 * 60 * 1000,
   60_000,
   30 * 60 * 1000,
 )
+
+// Stage set by the dashboard polling sweep when it finds a stale (silently-died) run.
+// It queues the day for the recovery cron to RESUME from its checkpoint instead of
+// marking it failed — the cron counts these claims against the stale-retry cap.
+export const YOUTUBE_PRODUCTION_RESUME_STAGE = '영상 제작 재개 대기 중'
 
 export const YOUTUBE_CANCEL_SETTLE_MS = positiveInteger(
   process.env.YOUTUBE_CANCEL_SETTLE_MS,
