@@ -1,5 +1,17 @@
 const POLAR_API_BASE = 'https://api.polar.sh'
 
+export class PolarApiError extends Error {
+  readonly status: number
+  readonly responseBody: string
+
+  constructor(status: number, responseBody: string) {
+    super(`Polar API error ${status}: ${responseBody}`)
+    this.name = 'PolarApiError'
+    this.status = status
+    this.responseBody = responseBody
+  }
+}
+
 function getPolarApiKey() {
   const key = process.env.POLAR_API_KEY?.trim()
   if (!key) throw new Error('POLAR_API_KEY is not set')
@@ -18,7 +30,7 @@ async function callPolar<T>(path: string, init: RequestInit = {}): Promise<T> {
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Polar API error ${res.status}: ${text}`)
+    throw new PolarApiError(res.status, text)
   }
   return res.json() as Promise<T>
 }
@@ -45,6 +57,35 @@ export async function createCheckoutSession(input: {
       metadata: input.metadata ?? {},
     }),
   })
+}
+
+export function isPolarCustomerEmailValidationError(error: unknown) {
+  return error instanceof PolarApiError
+    && error.status === 422
+    && error.responseBody.includes('customer_email')
+    && error.responseBody.includes('not a valid email address')
+}
+
+export async function createCheckoutSessionWithEmailFallback(input: {
+  productId: string
+  customerId?: string
+  customerEmail?: string
+  successUrl: string
+  metadata?: Record<string, string>
+}): Promise<PolarCheckoutSession> {
+  try {
+    return await createCheckoutSession(input)
+  } catch (error) {
+    if (!input.customerEmail || !isPolarCustomerEmailValidationError(error)) throw error
+
+    // Polar validates that the account email domain can receive mail. Some
+    // legacy Shuffla accounts use non-deliverable domains, so let the buyer
+    // enter a valid billing email in Polar while keeping userId in metadata.
+    return createCheckoutSession({
+      ...input,
+      customerEmail: undefined,
+    })
+  }
 }
 
 export interface PolarSubscription {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '../../../../lib/rateLimiter'
-import { createCheckoutSession, POLAR_PRODUCT_IDS } from '../../../../lib/polar'
+import { createCheckoutSessionWithEmailFallback, POLAR_PRODUCT_IDS } from '../../../../lib/polar'
 
 export const runtime = 'nodejs'
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   if (productId && process.env.POLAR_API_KEY?.trim()) {
     const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
     try {
-      const checkout = await createCheckoutSession({
+      const checkout = await createCheckoutSessionWithEmailFallback({
         productId,
         customerEmail: user.email,
         successUrl: `${origin.replace(/\/$/, '')}/youtube-automation?checkout=success`,
