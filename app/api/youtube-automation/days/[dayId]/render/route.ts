@@ -1,17 +1,18 @@
-import { NextResponse, after } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import { canUseYouTubeAutomationDay, youtubeAutomationUpgradeResponse } from '../../../../../../lib/youtube-automation-access'
 import {
   isYouTubeProductionActiveStatus,
+  isYouTubeProductionQueuedStage,
   YOUTUBE_CANCEL_SETTLE_MS,
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
-  YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+  YOUTUBE_PRODUCTION_QUEUED_STAGES,
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../../../lib/youtube-automation-production-state'
-import { logYouTubeAutomation, summarizeYouTubeAutomationError } from '../../../../../../src/lib/youtube/logging'
+import { logYouTubeAutomation } from '../../../../../../src/lib/youtube/logging'
+import { isYouTubeAutomationDayOpen } from '../../../../../../lib/youtube-automation-state'
 import { checkYouTubeProductionPreflight } from '../../../../../../src/lib/youtube/preflight'
-import { produceYouTubeShorts } from '../../../../../../src/lib/youtube/produce'
 
 export const runtime = 'nodejs'
 export const maxDuration = 600
@@ -50,6 +51,7 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   logYouTubeAutomation('info', 'render_request_start', logContext)
   let day = await prisma.youTubeAutomationDay.findFirst({
     where: { id: dayId, userId: user.id },
+    include: { project: { select: { currentOpenDay: true } } },
   })
   if (!day) {
     logYouTubeAutomation('warn', 'render_request_day_not_found', logContext, { durationMs: Date.now() - startedAt })
@@ -58,6 +60,15 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   if (!canUseYouTubeAutomationDay(user, day.dayNumber)) {
     logYouTubeAutomation('warn', 'render_request_plan_blocked', logContext, { dayNumber: day.dayNumber, durationMs: Date.now() - startedAt })
     return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
+  }
+  if (!isYouTubeAutomationDayOpen(day, day.project.currentOpenDay)) {
+    logYouTubeAutomation('warn', 'render_request_locked_day', logContext, {
+      dayNumber: day.dayNumber,
+      status: day.status,
+      currentOpenDay: day.project.currentOpenDay,
+      durationMs: Date.now() - startedAt,
+    })
+    return NextResponse.json({ error: '아직 오픈되지 않은 날짜입니다.' }, { status: 403 })
   }
 
   const preflight = checkYouTubeProductionPreflight()
@@ -69,12 +80,17 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
     return NextResponse.json({ error: preflight.error }, { status: 503 })
   }
 
-  if (isYouTubeProductionActiveStatus(day.status) && day.updatedAt.getTime() < Date.now() - YOUTUBE_PRODUCTION_STALE_MS) {
+  if (
+    isYouTubeProductionActiveStatus(day.status)
+    && !isYouTubeProductionQueuedStage(day.renderStage)
+    && day.updatedAt.getTime() < Date.now() - YOUTUBE_PRODUCTION_STALE_MS
+  ) {
     const recovered = await prisma.youTubeAutomationDay.updateMany({
       where: {
         id: day.id,
         userId: user.id,
         status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+        renderStage: { notIn: [...YOUTUBE_PRODUCTION_QUEUED_STAGES] },
         updatedAt: { lt: new Date(Date.now() - YOUTUBE_PRODUCTION_STALE_MS) },
       },
       data: {
@@ -91,7 +107,10 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
         previousRenderProgress: day.renderProgress,
         previousRenderStage: day.renderStage,
       })
-      day = await prisma.youTubeAutomationDay.findFirstOrThrow({ where: { id: day.id } })
+      day = await prisma.youTubeAutomationDay.findFirstOrThrow({
+        where: { id: day.id },
+        include: { project: { select: { currentOpenDay: true } } },
+      })
     }
   }
 
@@ -121,7 +140,10 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
           cancelAgeMs,
           settleMs: YOUTUBE_CANCEL_SETTLE_MS,
         })
-        day = await prisma.youTubeAutomationDay.findFirstOrThrow({ where: { id: day.id } })
+        day = await prisma.youTubeAutomationDay.findFirstOrThrow({
+          where: { id: day.id },
+          include: { project: { select: { currentOpenDay: true } } },
+        })
       }
     } else {
       logYouTubeAutomation('warn', 'render_request_active_cancel_settling', logContext, {
@@ -168,7 +190,10 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
         status: day.status,
         cancelAgeMs,
       })
-      day = await prisma.youTubeAutomationDay.findFirstOrThrow({ where: { id: day.id } })
+      day = await prisma.youTubeAutomationDay.findFirstOrThrow({
+        where: { id: day.id },
+        include: { project: { select: { currentOpenDay: true } } },
+      })
     }
   }
 
@@ -220,35 +245,6 @@ export async function POST(request: Request, context: { params: Promise<{ dayId:
   })
 
   logYouTubeAutomation('info', 'render_queue_enqueued', logContext)
-
-  // Start production immediately in this request's background so each user's render runs in
-  // its own function invocation (parallel across users). The recovery cron only picks up jobs
-  // whose invocation died before finishing (still-queued or stale).
-  const claimedDayId = day.id
-  const claimedUserId = user.id
-  after(async () => {
-    const started = await prisma.youTubeAutomationDay.updateMany({
-      where: { id: claimedDayId, status, renderStage, renderCancelRequested: false },
-      data: { renderStage: hasPlan ? '영상 제작 작업 실행 중' : '스크립트 생성 작업 실행 중' },
-    }).catch(() => ({ count: 0 }))
-    if (started.count === 0) {
-      // Someone else (e.g. the recovery cron) already claimed this job.
-      logYouTubeAutomation('warn', 'render_after_claim_lost', logContext)
-      return
-    }
-    logYouTubeAutomation('info', 'render_after_start', logContext)
-    try {
-      await produceYouTubeShorts({
-        dayId: claimedDayId,
-        userId: claimedUserId,
-        requestId,
-        deadlineAt: startedAt + YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
-      })
-      logYouTubeAutomation('info', 'render_after_done', logContext)
-    } catch (error) {
-      logYouTubeAutomation('error', 'render_after_unhandled_error', logContext, summarizeYouTubeAutomationError(error))
-    }
-  })
 
   return NextResponse.json({
     day: { id: day.id, status, renderProgress: initialProgress, renderStage, renderCancelRequested: false },

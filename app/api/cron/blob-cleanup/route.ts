@@ -50,6 +50,17 @@ async function handleBlobCleanup(request: NextRequest) {
     }
   }
 
+  const youtubeDays = await prisma.youTubeAutomationDay.findMany({
+    select: { mp4Url: true, thumbnailUrl: true, ttsAudioUrl: true },
+  })
+  const referencedYoutubeUrls = new Set<string>()
+  const youtubeOrphanCutoff = Date.now() - 24 * 60 * 60 * 1000
+  for (const day of youtubeDays) {
+    for (const url of [day.mp4Url, day.thumbnailUrl, day.ttsAudioUrl]) {
+      if (url?.includes('/generated/youtube/')) referencedYoutubeUrls.add(url)
+    }
+  }
+
   // 2. Blob uploads/ 전체 목록과 대조해 고아 파일만 삭제
   let cursor: string | undefined
   let deleted = 0
@@ -60,6 +71,29 @@ async function handleBlobCleanup(request: NextRequest) {
     const result = await list({ prefix: 'uploads/', token, cursor, limit: 100 })
     for (const blob of result.blobs) {
       if (referencedUrls.has(blob.url)) {
+        kept++
+      } else {
+        await del(blob.url, { token })
+        deleted++
+        deletedFiles.push(blob.pathname)
+      }
+    }
+    cursor = result.cursor
+    if (!result.hasMore) break
+  } while (cursor)
+
+  cursor = undefined
+  do {
+    const result: Awaited<ReturnType<typeof list>> = await list({
+      prefix: 'generated/youtube/',
+      token,
+      cursor,
+      limit: 100,
+    })
+    for (const blob of result.blobs) {
+      // A render uploads files immediately before saving their URLs in the database.
+      // Keep recent unreferenced files so cleanup cannot race that final DB update.
+      if (referencedYoutubeUrls.has(blob.url) || blob.uploadedAt.getTime() >= youtubeOrphanCutoff) {
         kept++
       } else {
         await del(blob.url, { token })

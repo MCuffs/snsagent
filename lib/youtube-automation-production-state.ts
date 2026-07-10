@@ -1,5 +1,18 @@
 export const YOUTUBE_PRODUCTION_ACTIVE_STATUSES = ['planning', 'rendering'] as const
 
+// Stage set by the dashboard polling sweep when it finds a stale (silently-died) run.
+// It queues the day for the recovery cron to RESUME from its checkpoint instead of
+// marking it failed — the cron counts these claims against the stale-retry cap.
+export const YOUTUBE_PRODUCTION_RESUME_STAGE = '영상 제작 재개 대기 중'
+
+export const YOUTUBE_PRODUCTION_QUEUED_STAGES = [
+  '영상 제작 대기열 등록됨',
+  '스크립트 생성 대기열 등록됨',
+  YOUTUBE_PRODUCTION_RESUME_STAGE,
+  '영상 제작 준비 중',
+  '스크립트 생성 준비 중',
+] as const
+
 // A live production run heartbeats its day row every ~45s (see produceYouTubeShorts),
 // so a row this quiet means the invocation died and is safe to hand to recovery.
 export const YOUTUBE_PRODUCTION_STALE_MS = positiveInteger(
@@ -9,11 +22,6 @@ export const YOUTUBE_PRODUCTION_STALE_MS = positiveInteger(
   30 * 60 * 1000,
 )
 
-// Stage set by the dashboard polling sweep when it finds a stale (silently-died) run.
-// It queues the day for the recovery cron to RESUME from its checkpoint instead of
-// marking it failed — the cron counts these claims against the stale-retry cap.
-export const YOUTUBE_PRODUCTION_RESUME_STAGE = '영상 제작 재개 대기 중'
-
 export const YOUTUBE_CANCEL_SETTLE_MS = positiveInteger(
   process.env.YOUTUBE_CANCEL_SETTLE_MS,
   120_000,
@@ -21,8 +29,7 @@ export const YOUTUBE_CANCEL_SETTLE_MS = positiveInteger(
   10 * 60 * 1000,
 )
 
-// How many renders may run at the same time across the whole service.
-// Requests start immediately via after(); the recovery cron respects this cap too.
+// How many queued renders the recovery cron may run at the same time across the service.
 export const YOUTUBE_RENDER_MAX_CONCURRENT = positiveInteger(
   process.env.YOUTUBE_RENDER_MAX_CONCURRENT,
   3,
@@ -43,6 +50,10 @@ export const YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS = positiveInteger(
 
 export function isYouTubeProductionActiveStatus(status: string | null | undefined) {
   return YOUTUBE_PRODUCTION_ACTIVE_STATUSES.includes(status as typeof YOUTUBE_PRODUCTION_ACTIVE_STATUSES[number])
+}
+
+export function isYouTubeProductionQueuedStage(stage: string | null | undefined) {
+  return YOUTUBE_PRODUCTION_QUEUED_STAGES.includes(stage as typeof YOUTUBE_PRODUCTION_QUEUED_STAGES[number])
 }
 
 function positiveInteger(value: string | undefined, fallback: number, min: number, max: number) {

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '../../../../lib/db'
 import {
+  isYouTubeProductionQueuedStage,
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
   YOUTUBE_PRODUCTION_INVOCATION_BUDGET_MS,
+  YOUTUBE_PRODUCTION_QUEUED_STAGES,
   YOUTUBE_PRODUCTION_RESUME_STAGE,
   YOUTUBE_PRODUCTION_STALE_MS,
   YOUTUBE_RENDER_MAX_CONCURRENT,
@@ -15,21 +17,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 600
 
-const QUEUED_STAGES = [
-  '영상 제작 대기열 등록됨',
-  '스크립트 생성 대기열 등록됨',
-  // 대시보드 폴링 스윕이 죽은 실행을 재개 대기로 돌려놓은 작업
-  YOUTUBE_PRODUCTION_RESUME_STAGE,
-  // Workflow 소비 장애 당시 생성된 작업도 자동 회수한다.
-  '영상 제작 준비 중',
-  '스크립트 생성 준비 중',
-]
-
 // A silently-killed invocation leaves the day 'rendering' until it goes stale, and this cron
 // would re-run it forever (die → stale → re-run). Cap silent-death recoveries per day row.
 // Recoveries resume from the render checkpoint, so each attempt makes forward progress.
 const MAX_STALE_RECOVERY_ATTEMPTS = 4
-
 export async function GET(request: NextRequest) {
   const startedAt = Date.now()
   if (!verifyBearerSecret(request.headers.get('authorization'), process.env.CRON_SECRET)) {
@@ -37,12 +28,11 @@ export async function GET(request: NextRequest) {
   }
 
   const staleBefore = new Date(Date.now() - YOUTUBE_PRODUCTION_STALE_MS)
-  // Renders now run in the render-request invocation itself (per-user parallel).
-  // Only hold recovery back when the whole service is already at the concurrency cap.
+  // The cron is the only queue consumer; do not claim another job at the concurrency cap.
   const runningCount = await prisma.youTubeAutomationDay.count({
     where: {
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
-      renderStage: { notIn: QUEUED_STAGES },
+      renderStage: { notIn: [...YOUTUBE_PRODUCTION_QUEUED_STAGES] },
       updatedAt: { gte: staleBefore },
       renderCancelRequested: false,
     },
@@ -56,7 +46,7 @@ export async function GET(request: NextRequest) {
       renderCancelRequested: false,
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
       OR: [
-        { renderStage: { in: QUEUED_STAGES } },
+        { renderStage: { in: [...YOUTUBE_PRODUCTION_QUEUED_STAGES] } },
         { updatedAt: { lt: staleBefore } },
       ],
     },
@@ -75,7 +65,7 @@ export async function GET(request: NextRequest) {
 
   // Resume-stage claims are also silent-death recoveries — count them against the cap
   const isStaleRecovery = (candidate.updatedAt < staleBefore
-    && !QUEUED_STAGES.includes(candidate.renderStage ?? ''))
+    && !isYouTubeProductionQueuedStage(candidate.renderStage))
     || candidate.renderStage === YOUTUBE_PRODUCTION_RESUME_STAGE
   const qualityNotes = parseQualityNotes(candidate.qualityNotesJson)
   const staleRecoveryCount = qualityNotes.filter(note => note?.type === 'render_retry').length

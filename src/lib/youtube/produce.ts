@@ -281,6 +281,7 @@ export async function produceYouTubeShorts({
         subtitleJson: JSON.stringify(rendered.subtitles),
         qualityNotesJson: JSON.stringify([...planPhaseNotes, ...rendered.qualityNotes]),
         renderCheckpointJson: null,
+        completedAt: new Date(),
         renderProgress: 100,
         renderStage: '영상 제작 완료',
         renderCancelRequested: false,

@@ -11,12 +11,15 @@ import { isYouTubeDayUnlockDue } from '../../../../lib/youtube-automation-schedu
 import {
   YOUTUBE_CANCEL_SETTLE_MS,
   YOUTUBE_PRODUCTION_ACTIVE_STATUSES,
+  YOUTUBE_PRODUCTION_QUEUED_STAGES,
   YOUTUBE_PRODUCTION_RESUME_STAGE,
   YOUTUBE_PRODUCTION_STALE_MS,
 } from '../../../../lib/youtube-automation-production-state'
 import { logYouTubeAutomation } from '../../../../src/lib/youtube/logging'
 
 export const runtime = 'nodejs'
+
+class YouTubeProjectHistoryLimitError extends Error {}
 
 function serializeProject(project: Record<string, unknown>, user?: { plan?: string | null; email?: string | null }) {
   const days = Array.isArray(project.days) ? project.days as Record<string, unknown>[] : []
@@ -50,9 +53,7 @@ function serializeProject(project: Record<string, unknown>, user?: { plan?: stri
         renderCancelRequested: day.renderCancelRequested,
         qualityNotes: safeJsonArray(day.qualityNotesJson),
         uploadedAt: day.uploadedAt instanceof Date ? day.uploadedAt.toISOString() : day.uploadedAt,
-        completedAt: day.status === 'completed'
-          ? day.updatedAt instanceof Date ? day.updatedAt.toISOString() : day.updatedAt
-          : null,
+        completedAt: day.completedAt instanceof Date ? day.completedAt.toISOString() : day.completedAt,
       })),
   }
 }
@@ -72,6 +73,15 @@ function retentionCutoff(retentionDays: number | null) {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - retentionDays)
   return cutoff
+}
+
+function historyLimitResponse(limit: number, retentionDays: number | null) {
+  const period = retentionDays ? `최근 ${retentionDays}일 동안 ` : ''
+  return NextResponse.json({
+    error: `현재 플랜은 ${period}작업 히스토리를 최대 ${limit}개까지 저장할 수 있습니다. 기존 작업을 삭제한 뒤 다시 시도해 주세요.`,
+    historyLimit: limit,
+    retentionDays,
+  }, { status: 403 })
 }
 
 async function pruneExpiredProjects(userId: string, retentionDays: number | null) {
@@ -116,8 +126,8 @@ async function recoverStaleProductions(userId: string) {
     where: {
       userId,
       status: { in: [...YOUTUBE_PRODUCTION_ACTIVE_STATUSES] },
+      renderStage: { notIn: [...YOUTUBE_PRODUCTION_QUEUED_STAGES] },
       renderCancelRequested: false,
-      renderStage: { not: YOUTUBE_PRODUCTION_RESUME_STAGE },
       updatedAt: { lt: staleBefore },
     },
     data: {
@@ -160,11 +170,11 @@ async function unlockEligibleProjectDays(projects: Array<Record<string, unknown>
     const days = Array.isArray(project.days) ? project.days as Array<Record<string, unknown>> : []
     const currentOpenDay = Number(project.currentOpenDay)
     const currentDay = days.find(day => Number(day.dayNumber) === currentOpenDay)
-    const completedAt = currentDay?.updatedAt
+    const completedAt = currentDay?.completedAt
 
     if (
       currentOpenDay >= 30 ||
-      currentDay?.status !== 'completed' ||
+      !['completed', 'uploaded'].includes(String(currentDay?.status)) ||
       !(completedAt instanceof Date) ||
       !isYouTubeDayUnlockDue(completedAt, now)
     ) {
@@ -226,12 +236,8 @@ export async function POST(request: Request) {
       ...(cutoff ? { createdAt: { gte: cutoff } } : {}),
     },
   })
-  if (policy.retentionDays && currentProjectCount >= policy.limit) {
-    return NextResponse.json({
-      error: `프로모션 플랜은 최근 ${policy.retentionDays}일 동안 작업 히스토리를 최대 ${policy.limit}개까지 저장할 수 있습니다. 기존 작업을 삭제한 뒤 다시 시도해 주세요.`,
-      historyLimit: policy.limit,
-      retentionDays: policy.retentionDays,
-    }, { status: 403 })
+  if (currentProjectCount >= policy.limit) {
+    return historyLimitResponse(policy.limit, policy.retentionDays)
   }
 
   const body = await request.json().catch(() => null) as { topic?: string } | null
@@ -242,37 +248,57 @@ export async function POST(request: Request) {
   const start = new Date()
   start.setHours(9, 0, 0, 0)
 
-  const project = await prisma.youTubeAutomationProject.create({
-    data: {
-      userId: user.id,
-      topic,
-      status: 'planned',
-      currentOpenDay: 1,
-      planJson: JSON.stringify({ source: 'topic', topic }),
-      ttsVoice: pickRandomTtsVoice(),
-      days: {
-        create: planner.map(day => {
-          const scheduledDate = new Date(start)
-          scheduledDate.setDate(start.getDate() + day.dayNumber - 1)
-          return {
-            userId: user.id,
-            dayNumber: day.dayNumber,
-            scheduledDate,
-            title: day.title,
-            status: day.dayNumber === 1 ? 'open' : 'locked',
-          }
-        }),
-      },
-    },
-    include: { days: true },
-  })
+  let project
+  try {
+    project = await prisma.$transaction(async tx => {
+      // Serialize creation per user so concurrent requests cannot exceed the history limit.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`youtube-project:${user.id}`}))`
+      const latestCount = await tx.youTubeAutomationProject.count({
+        where: {
+          userId: user.id,
+          ...(cutoff ? { createdAt: { gte: cutoff } } : {}),
+        },
+      })
+      if (latestCount >= policy.limit) throw new YouTubeProjectHistoryLimitError()
+
+      return tx.youTubeAutomationProject.create({
+        data: {
+          userId: user.id,
+          topic,
+          status: 'planned',
+          currentOpenDay: 1,
+          planJson: JSON.stringify({ source: 'topic', topic }),
+          ttsVoice: pickRandomTtsVoice(),
+          days: {
+            create: planner.map(day => {
+              const scheduledDate = new Date(start)
+              scheduledDate.setDate(start.getDate() + day.dayNumber - 1)
+              return {
+                userId: user.id,
+                dayNumber: day.dayNumber,
+                scheduledDate,
+                title: day.title,
+                status: day.dayNumber === 1 ? 'open' : 'locked',
+              }
+            }),
+          },
+        },
+        include: { days: true },
+      })
+    })
+  } catch (error) {
+    if (error instanceof YouTubeProjectHistoryLimitError) {
+      return historyLimitResponse(policy.limit, policy.retentionDays)
+    }
+    throw error
+  }
 
   return NextResponse.json({ project: serializeProject(project, user) })
 }
 
 export async function DELETE(request: Request) {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: '濡쒓렇?몄씠 ?꾩슂?⑸땲??' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 
   const body = await request.json().catch(() => null) as { projectId?: string } | null
   const projectId = body?.projectId?.trim()

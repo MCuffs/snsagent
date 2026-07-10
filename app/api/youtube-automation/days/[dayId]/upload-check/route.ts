@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '../../../../../actions'
 import prisma from '../../../../../../lib/db'
 import {
-  canUseYouTubeAutomation,
   canUseYouTubeAutomationDay,
   youtubeAutomationUpgradeResponse,
 } from '../../../../../../lib/youtube-automation-access'
+import { canMarkYouTubeAutomationDayUploaded } from '../../../../../../lib/youtube-automation-state'
 
 export const runtime = 'nodejs'
 
@@ -21,9 +21,9 @@ export async function PATCH(_request: Request, context: { params: Promise<{ dayI
 
   if (!day) return NextResponse.json({ error: '캘린더 항목을 찾을 수 없습니다.' }, { status: 404 })
   if (!canUseYouTubeAutomationDay(user, day.dayNumber)) return NextResponse.json(youtubeAutomationUpgradeResponse(), { status: 402 })
-  const nextOpenDay = canUseYouTubeAutomation(user)
-    ? Math.min(30, Math.max(day.project.currentOpenDay, day.dayNumber + 1))
-    : day.project.currentOpenDay
+  if (!canMarkYouTubeAutomationDayUploaded(day, day.project.currentOpenDay)) {
+    return NextResponse.json({ error: '완성된 영상만 업로드 완료로 표시할 수 있습니다.' }, { status: 409 })
+  }
 
   await prisma.$transaction([
     prisma.youTubeAutomationDay.update({
@@ -32,11 +32,7 @@ export async function PATCH(_request: Request, context: { params: Promise<{ dayI
     }),
     prisma.youTubeAutomationProject.update({
       where: { id: day.projectId },
-      data: { currentOpenDay: nextOpenDay, status: nextOpenDay >= 30 ? 'in_progress' : 'planned' },
-    }),
-    prisma.youTubeAutomationDay.updateMany({
-      where: { projectId: day.projectId, dayNumber: nextOpenDay, status: 'locked' },
-      data: { status: 'open' },
+      data: { status: day.dayNumber >= 30 ? 'completed' : 'in_progress' },
     }),
   ])
 
@@ -46,7 +42,7 @@ export async function PATCH(_request: Request, context: { params: Promise<{ dayI
   })
 
   return NextResponse.json({
-    currentOpenDay: project?.currentOpenDay ?? nextOpenDay,
+    currentOpenDay: project?.currentOpenDay ?? day.project.currentOpenDay,
     days: (project?.days || []).map(item => ({
       id: item.id,
       dayNumber: item.dayNumber,
