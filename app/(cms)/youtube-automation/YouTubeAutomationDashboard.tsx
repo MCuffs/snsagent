@@ -1,10 +1,10 @@
 'use client'
 
 import type React from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import {
-  CalendarDays, Check, Clock, Download, Folder, FolderOpen,
+  CalendarDays, Check, Clock, CreditCard, Download, Folder, FolderOpen,
   Info, Loader2, Lock, Mic2, Play, Sparkles, Trash2, Upload, Video, X,
 } from 'lucide-react'
 import { analytics } from '../../../lib/analytics/thinkingdata'
@@ -133,7 +133,6 @@ function currentTimeMs() { return Date.now() }
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function YouTubeAutomationDashboard({ isActive = true }: { isActive?: boolean }) {
-  const router = useRouter()
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [modalDay, setModalDay] = useState<PlannerDay | null>(null)
@@ -146,6 +145,14 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   const [cancellingDayId, setCancellingDayId] = useState<string | null>(null)
   const [startingDayId, setStartingDayId] = useState<string | null>(null)
   const startingDayIdsRef = useRef(new Set<string>())
+  const [upgradeDay, setUpgradeDay] = useState<PlannerDay | null>(null)
+  const [processingUpgrade, setProcessingUpgrade] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const portalReady = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
 
   // Completed-day timestamps for the 12-hour countdown
   const [completedTimes, setCompletedTimes] = useState<Record<string, number>>(() =>
@@ -261,6 +268,9 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
             ...current,
             days: current.days.map(item => item.id === day.id ? { ...item, requiresUpgrade: true } : item),
           } : current)
+          setUpgradeError(null)
+          setUpgradeDay({ ...day, requiresUpgrade: true })
+          return
         }
         throw new Error(data.error || '영상 제작을 시작하지 못했습니다.')
       }
@@ -280,6 +290,65 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
     } finally {
       startingDayIdsRef.current.delete(day.id)
       setStartingDayId(null)
+    }
+  }
+
+  const handleUpgradePrompt = (day: PlannerDay) => {
+    if (!project) return
+    analytics.youtubeDaySelect({
+      projectId: project.id,
+      dayId: day.id,
+      dayNumber: day.dayNumber,
+      dayStatus: day.status,
+      isLocked: true,
+      hasVideo: Boolean(day.mp4Url),
+    })
+    setUpgradeError(null)
+    setUpgradeDay(day)
+  }
+
+  const handleUpgradeCheckout = async () => {
+    const selectedDay = upgradeDay
+    if (!selectedDay || processingUpgrade) return
+
+    setUpgradeError(null)
+    setProcessingUpgrade(true)
+    analytics.planSelectClick('YOUTUBE_PROMO', 'FREE', {
+      payment_provider: 'polar',
+      source: 'youtube_automation_day_lock',
+      day_number: selectedDay.dayNumber,
+    })
+    analytics.paymentStart('YOUTUBE_PROMO', 'polar', {
+      source: 'youtube_automation_day_lock',
+      day_number: selectedDay.dayNumber,
+    })
+
+    try {
+      const res = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'YOUTUBE_PROMO' }),
+      })
+      const data = await readApiJson<{ url?: string; error?: string }>(res)
+      if (!res.ok || !data.url) {
+        const reason = data.error || '결제창을 열 수 없습니다. 다시 시도해 주세요.'
+        analytics.paymentFailed('YOUTUBE_PROMO', 'polar', reason, {
+          source: 'youtube_automation_day_lock',
+          day_number: selectedDay.dayNumber,
+        })
+        setUpgradeError(reason)
+        setProcessingUpgrade(false)
+        return
+      }
+      window.location.assign(data.url)
+    } catch {
+      const reason = '결제 처리 중 네트워크 오류가 발생했습니다.'
+      analytics.paymentFailed('YOUTUBE_PROMO', 'polar', reason, {
+        source: 'youtube_automation_day_lock',
+        day_number: selectedDay.dayNumber,
+      })
+      setUpgradeError(reason)
+      setProcessingUpgrade(false)
     }
   }
 
@@ -541,6 +610,20 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   // ── Planner view ────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {portalReady && upgradeDay && createPortal(
+        <YouTubeUpgradeCheckoutOverlay
+          dayNumber={upgradeDay.dayNumber}
+          processing={processingUpgrade}
+          error={upgradeError}
+          onCheckout={() => void handleUpgradeCheckout()}
+          onClose={() => {
+            if (processingUpgrade) return
+            setUpgradeDay(null)
+            setUpgradeError(null)
+          }}
+        />,
+        document.body,
+      )}
       {/* Header */}
       <div className="shrink-0 border-b border-white/60 bg-white/54 px-5 py-4 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3">
@@ -589,7 +672,7 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
                 upgradeLocked={upgradeLocked}
                 msUntilUnlock={timeLocked ? msUntilUnlock : 0}
                 onClick={() => handleDayClick(day, effectiveLocked)}
-                onUpgrade={() => router.push('/billing')}
+                onUpgrade={() => handleUpgradePrompt(day)}
                 onCancel={() => void handleCancelRender(day)}
                 cancelling={cancellingDayId === day.id}
                 starting={startingDayId === day.id}
@@ -611,6 +694,101 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
           onUploaded={() => handleMarkUploaded(modalDay)}
         />
       )}
+    </div>
+  )
+}
+
+function YouTubeUpgradeCheckoutOverlay({
+  dayNumber,
+  processing,
+  error,
+  onCheckout,
+  onClose,
+}: {
+  dayNumber: number
+  processing: boolean
+  error: string | null
+  onCheckout: () => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="youtube-upgrade-title"
+        className="w-full max-w-[390px] rounded-3xl border border-white/70 bg-white p-6 shadow-[0_28px_90px_rgba(15,23,42,0.30)]"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f4f6ff] text-[#4252ff]">
+            <Sparkles className="h-6 w-6" />
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={processing}
+            aria-label="닫기"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[#94a3b8] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827] disabled:opacity-40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <h2 id="youtube-upgrade-title" className="mt-5 text-xl font-black leading-8 text-[#111827]">
+          Day {dayNumber}부터 결제가 필요합니다
+        </h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
+          Day 1 무료 체험이 완료되었습니다. 계속 영상을 제작하려면 YouTube Promo 플랜을 시작해 주세요.
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-[#e0e7ff] bg-[#f8f9ff] p-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#4252ff]">YouTube Promo</p>
+              <p className="mt-1 text-sm font-bold text-[#64748b]">유튜브 자동화 전용 플랜</p>
+            </div>
+            <p className="text-xl font-black text-[#111827]">월 9,900원</p>
+          </div>
+          <div className="mt-4 space-y-2 border-t border-[#e0e7ff] pt-4">
+            {['30일 쇼츠 플래너 전체 이용', '작업 히스토리 최대 3개', '작업 결과 30일 보관'].map(feature => (
+              <p key={feature} className="flex items-center gap-2 text-xs font-bold text-[#475569]">
+                <Check className="h-3.5 w-3.5 text-emerald-500" /> {feature}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <p className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-bold leading-5 text-red-700">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={onCheckout}
+          disabled={processing}
+          className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111827] px-4 text-sm font-black text-white transition-colors hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+          {processing ? '결제창 여는 중...' : '월 9,900원 결제하기'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="mt-2 min-h-10 w-full rounded-xl text-xs font-bold text-[#94a3b8] transition-colors hover:bg-[#f8fafc] hover:text-[#475569] disabled:opacity-40"
+        >
+          나중에 하기
+        </button>
+        <p className="mt-3 text-center text-[10px] font-semibold leading-4 text-[#94a3b8]">
+          월 정기결제 · 언제든 해지 가능 · Polar 안전 결제
+        </p>
+      </div>
     </div>
   )
 }
