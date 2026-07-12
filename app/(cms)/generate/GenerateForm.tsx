@@ -1664,7 +1664,7 @@ function DraftStoryboardPreview({
       transition={{ duration: 0.58, ease: [0.19, 1, 0.22, 1] }}
       className="w-full overflow-hidden rounded-[24px] border border-[#dfe5ec] bg-[#f8fafc] shadow-[0_24px_64px_rgba(15,23,42,0.14)]"
     >
-      <div className="border-b border-[#e2e8f0] bg-white px-4 py-3 sm:px-5">
+      <div className="hidden">
         <div className="flex items-center gap-2 overflow-x-auto">
           {[
             isEn ? 'Brief' : '기획',
@@ -1745,14 +1745,14 @@ function DraftStoryboardPreview({
       </div>
 
       <div className="border-t border-[#e2e8f0] px-4 py-4 sm:px-5">
-        <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="hidden">
           <div>
             <p className="text-xs font-black text-[#111827]">{isEn ? 'Shape the story' : '카드 흐름 다듬기'}</p>
             <p className="mt-0.5 text-[10px] font-semibold text-[#94a3b8]">{isEn ? 'Select a card to review and edit it.' : '카드를 선택하면 카피와 순서를 수정할 수 있어요.'}</p>
           </div>
           <span className="shrink-0 text-[10px] font-black text-[#64748b]">{slides.length} CARDS</span>
         </div>
-        <div className="overflow-x-auto pb-3">
+        <div className="hidden">
           <div className="flex min-w-0 gap-3">
           {slides.map((slide, index) => (
             <DraftCardMockup
