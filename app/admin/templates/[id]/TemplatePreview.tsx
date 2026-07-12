@@ -92,7 +92,7 @@ export default function TemplatePreview({ slide, showLabel = true, width = 264 }
             paddingBottom: slide.layout.paddingY * SCALE,
           }}
         >
-          <div style={{ width: '100%', textAlign }}>
+          <div style={{ width: `${slide.layout.contentWidth}%`, textAlign }}>
             <div
               style={{
                 fontSize: slide.typography.fontSize * SCALE,
@@ -108,10 +108,10 @@ export default function TemplatePreview({ slide, showLabel = true, width = 264 }
             <div
               style={{
                 marginTop: 6,
-                fontSize: Math.max(7, slide.typography.fontSize * 0.42 * SCALE),
+                fontSize: Math.max(7, (slide.typography.bodyFontSize ?? slide.typography.fontSize * 0.42) * SCALE),
                 fontWeight: 400,
                 lineHeight: 1.4,
-                color: slide.typography.textColor,
+                color: slide.typography.bodyColor ?? slide.typography.textColor,
                 opacity: 0.82,
               }}
             >

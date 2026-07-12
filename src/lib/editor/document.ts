@@ -144,27 +144,29 @@ export function createTemplatedEditorialDocument(seed: SlideEditorSeed, t: Templ
   const doc = createEditorialDocument(seed)
   const padX = Math.min(300, Math.max(0, Math.round(t.layout?.paddingX ?? 72)))
   const padY = Math.min(400, Math.max(0, Math.round(t.layout?.paddingY ?? 96)))
-  const boxW = Math.max(220, 1080 - padX * 2)
+  const boxW = Math.max(220, Math.min(1080 - padX * 2, Math.round(1080 * (t.layout.contentWidth / 100))))
   const align: 'left' | 'center' | 'right' =
     t.textPosition.endsWith('right') ? 'right' : t.textPosition.endsWith('center') ? 'center' : 'left'
+  const boxX = align === 'center' ? Math.round((1080 - boxW) / 2) : align === 'right' ? 1080 - padX - boxW : padX
   const zone = t.textPosition.startsWith('top') ? 'top' : t.textPosition.startsWith('bottom') ? 'bottom' : 'middle'
   const titleY = zone === 'top' ? Math.max(150, padY + 60) : zone === 'middle' ? 470 : 780
   const subtitleY = Math.min(1120, titleY + 210)
   const titleFs = Math.min(220, Math.max(64, Math.round(t.typography.fontSize)))
-  const bodyFs = Math.max(28, Math.round(titleFs * 0.46))
+  const bodyFs = t.typography.bodyFontSize ?? Math.max(28, Math.round(titleFs * 0.46))
   const titleColor = validColor(t.typography.textColor, '#ffffff')
+  const bodyColor = validColor(t.typography.bodyColor, t.overlay.type === 'light' || t.overlay.type === 'none' ? '#1f2937' : '#ffffff')
   const lineHeight = Math.min(2.4, Math.max(0.8, t.typography.lineHeight || 1.12))
   const tracking = Math.min(40, Math.max(-10, t.typography.letterSpacing ?? 0))
   const fontWeight = Math.min(900, Math.max(700, Math.round(t.typography.fontWeight) || 800))
 
   doc.layers = doc.layers.map((layer) => {
     if (layer.type === 'title') {
-      return { ...layer, x: padX, y: titleY, width: boxW, height: 230, textAlign: align,
+      return { ...layer, x: boxX, y: titleY, width: boxW, height: 230, textAlign: align,
         fontSize: titleFs, fontWeight, lineHeight, tracking, color: titleColor }
     }
     if (layer.type === 'subtitle') {
-      return { ...layer, x: padX, y: subtitleY, width: boxW, height: 220, textAlign: align,
-        fontSize: bodyFs, lineHeight: Math.max(1.2, lineHeight * 1.08), color: titleColor }
+      return { ...layer, x: boxX, y: subtitleY, width: boxW, height: 220, textAlign: align,
+        fontSize: bodyFs, lineHeight: Math.max(1.2, lineHeight * 1.08), color: bodyColor }
     }
     return layer
   })

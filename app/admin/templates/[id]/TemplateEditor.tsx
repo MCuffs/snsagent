@@ -238,6 +238,17 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
 
               {/* Typography */}
               <div>
+                <div className="mb-3 grid gap-3 sm:grid-cols-3">
+                  <NumberField label="Body size" value={slide.typography.bodyFontSize ?? Math.round(slide.typography.fontSize * 0.42)} min={12} max={120} onChange={(v) => setTypo('bodyFontSize', v)} />
+                  <div>
+                    <Label>Body color</Label>
+                    <input type="color" value={slide.typography.bodyColor ?? slide.typography.textColor} onChange={(e) => setTypo('bodyColor', e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-[#ddd]" />
+                  </div>
+                  <div>
+                    <Label>Emphasis color</Label>
+                    <input type="color" value={slide.typography.emphasisColor ?? slide.typography.textColor} onChange={(e) => setTypo('emphasisColor', e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-[#ddd]" />
+                  </div>
+                </div>
                 <h4 className="mb-2 text-xs font-bold text-[#111]">타이포그래피</h4>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <NumberField label="폰트 크기" value={slide.typography.fontSize} min={12} max={220} onChange={(v) => setTypo('fontSize', v)} />
@@ -271,6 +282,9 @@ export default function TemplateEditor({ template }: { template: CardTemplateRec
 
               {/* Layout */}
               <div>
+                <div className="mb-3 max-w-xs">
+                  <NumberField label="Content width (%)" value={slide.layout.contentWidth} min={30} max={100} onChange={(v) => setLayout('contentWidth', v)} />
+                </div>
                 <h4 className="mb-2 text-xs font-bold text-[#111]">레이아웃 여백</h4>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <NumberField label="가로 여백(px)" value={slide.layout.paddingX} min={0} max={400} onChange={(v) => setLayout('paddingX', v)} />

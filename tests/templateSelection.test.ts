@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chooseCardTemplateForContent, fitTemplateToSlideCount } from '../lib/templates/select.ts'
+import { chooseCardTemplateForContent, fitTemplateToSlideCount, resolveTemplateSlideForRole } from '../lib/templates/select.ts'
 import { makeDefaultTemplateConfig, type CardTemplateRecord } from '../lib/templates/types.ts'
 
 function template(slideCount: 5 | 7): CardTemplateRecord {
@@ -55,4 +55,32 @@ test('domain matching takes priority and 6 slides use the nearest 7-slide varian
 
   assert.equal(result?.id, 'tech-7')
   assert.equal(result?.slides.length, 6)
+})
+
+test('non-stat content does not inherit a statistic slot', () => {
+  const source = template(5)
+  source.slides[1].label = 'Editorial Detail'
+  source.slides[1].textPosition = 'bottom-left'
+  source.slides[1].typography.fontSize = 64
+  source.slides[3].label = 'Statistic'
+  source.slides[3].textPosition = 'top-center'
+  source.slides[3].typography.fontSize = 104
+
+  const resolved = resolveTemplateSlideForRole(source, 4, 'detail')
+
+  assert.equal(resolved?.slideNumber, 4)
+  assert.equal(resolved?.label, 'Editorial Detail')
+  assert.equal(resolved?.textPosition, 'bottom-left')
+  assert.equal(resolved?.typography.fontSize, 64)
+})
+
+test('stat content keeps the authored statistic slot', () => {
+  const source = template(5)
+  source.slides[3].label = 'Statistic'
+  source.slides[3].typography.fontSize = 104
+
+  const resolved = resolveTemplateSlideForRole(source, 4, 'stat')
+
+  assert.equal(resolved?.label, 'Statistic')
+  assert.equal(resolved?.typography.fontSize, 104)
 })

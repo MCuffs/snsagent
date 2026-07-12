@@ -36,6 +36,9 @@ export interface TemplateTypography {
   lineHeight: number      // multiplier (e.g. 1.1)
   letterSpacing: number   // px
   textColor: string       // hex
+  bodyFontSize?: number
+  bodyColor?: string
+  emphasisColor?: string
 }
 
 export interface TemplateOverlay {
@@ -105,6 +108,9 @@ export const typographySchema = z.object({
   lineHeight: z.number().min(0.8).max(2.4),
   letterSpacing: z.number().min(-10).max(40),
   textColor: z.string().regex(HEX),
+  bodyFontSize: z.number().min(12).max(120).optional(),
+  bodyColor: z.string().regex(HEX).optional(),
+  emphasisColor: z.string().regex(HEX).optional(),
 })
 
 export const overlaySchema = z.object({
@@ -182,6 +188,9 @@ export function makeDefaultSlide(slideNumber: number): TemplateSlideConfig {
       lineHeight: 1.12,
       letterSpacing: -1,
       textColor: '#ffffff',
+      bodyFontSize: 28,
+      bodyColor: '#ffffff',
+      emphasisColor: '#ff6b35',
     },
     overlay: { type: 'dark', opacity: 55 },
     layout: {

@@ -68,6 +68,36 @@ function cloneSlide(slide: TemplateSlideConfig, slideNumber: number): TemplateSl
   }
 }
 
+const SPECIAL_SLOT_LABELS = /hero|stat|quote|cta/i
+
+/**
+ * Resolves an authored slot against the actual narrative role. Templates are authored by
+ * position, but generated carousels do not guarantee that slide 4 is a statistic, etc.
+ * Incompatible special slots fall back to a neutral detail/lead slot from the same template.
+ */
+export function resolveTemplateSlideForRole(
+  template: CardTemplateRecord,
+  slideNumber: number,
+  role: string | null | undefined,
+): TemplateSlideConfig | null {
+  const positional = template.slides.find(slide => slide.slideNumber === slideNumber)
+  if (!positional) return null
+
+  const normalizedRole = (role ?? '').trim().toLowerCase()
+  const label = positional.label.toLowerCase()
+  const compatible =
+    (!SPECIAL_SLOT_LABELS.test(label)) ||
+    (label.includes('hero') && normalizedRole === 'hook') ||
+    (label.includes('stat') && normalizedRole === 'stat') ||
+    (label.includes('quote') && ['context', 'summary'].includes(normalizedRole)) ||
+    (label.includes('cta') && ['cta', 'save-cta'].includes(normalizedRole))
+
+  if (compatible) return positional
+
+  const neutral = template.slides.find(slide => /editorial detail|detail|lead/i.test(slide.label))
+  return neutral ? cloneSlide(neutral, slideNumber) : positional
+}
+
 /**
  * Fits a 5/7-slide authored template to any generated carousel size from 5 to 10.
  * The hero and CTA are preserved; middle slide styles are sampled or repeated.

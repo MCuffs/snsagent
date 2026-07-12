@@ -29,6 +29,8 @@ export interface TemplateRenderOverrides {
   textColorOverride: string
   headlineFontSizeOverride: number
   bodyFontSizeOverride: number
+  bodyTextColorOverride?: string
+  emphasisColorOverride?: string
   textPositionOverride: string // one of the 9 logical positions, honored by renderMediaCard
   headlineWeightOverride: number
   headlineTrackingOverride: number
@@ -102,7 +104,7 @@ export function applyTemplateSlideToRender(
   }
 
   const headline = Math.round(slide.typography.fontSize)
-  const body = Math.max(20, Math.round(slide.typography.fontSize * 0.42))
+  const body = slide.typography.bodyFontSize ?? Math.max(20, Math.round(slide.typography.fontSize * 0.42))
 
   return {
     layout,
@@ -111,6 +113,8 @@ export function applyTemplateSlideToRender(
       textColorOverride: slide.typography.textColor,
       headlineFontSizeOverride: headline,
       bodyFontSizeOverride: body,
+      bodyTextColorOverride: slide.typography.bodyColor,
+      emphasisColorOverride: slide.typography.emphasisColor,
       textPositionOverride: slide.textPosition,
       headlineWeightOverride: slide.typography.fontWeight,
       headlineTrackingOverride: slide.typography.letterSpacing,

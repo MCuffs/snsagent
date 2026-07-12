@@ -509,6 +509,34 @@ function normalizeDraftSlides(params: GenerateParams, language: 'ko' | 'en' = 'k
   })
 }
 
+function buildFallbackDraftSlides(topic: string, count: number, language: 'ko' | 'en'): DraftSlide[] {
+  return Array.from({ length: count }, (_, index) => {
+    const slideNumber = index + 1
+    const isFirst = index === 0
+    const isLast = index === count - 1
+    const isSummary = !isFirst && !isLast && index === count - 2
+    const role = isFirst ? 'hook' : isLast ? 'save-cta' : isSummary ? 'summary' : index === 1 ? 'context' : 'key-point'
+
+    if (language === 'en') {
+      return {
+        slideNumber,
+        role,
+        headline: isFirst ? `${topic}, what changed?` : isLast ? 'Save this for later' : isSummary ? 'What this means' : index === 1 ? 'Start with the context' : `Key point ${index}`,
+        body: isFirst ? `We will break down ${topic} into the essential context and practical takeaways.` : isLast ? 'Save this carousel and return when you need the main points at a glance.' : 'This card will turn the topic into one clear idea supported by a concrete reason or example.',
+        reasoning: `Fallback ${role} card`,
+      }
+    }
+
+    return {
+      slideNumber,
+      role,
+      headline: isFirst ? `${topic}, 무엇이 달라졌을까?` : isLast ? '필요할 때 다시 꺼내보세요' : isSummary ? '그래서 핵심은 이렇습니다' : index === 1 ? '먼저 맥락부터 살펴볼게요' : `놓치면 안 될 핵심 ${index}`,
+      body: isFirst ? `${topic}에서 지금 알아야 할 배경과 핵심 포인트를 카드별로 차근차근 정리합니다.` : isLast ? '핵심 내용을 저장해 두고 판단이나 실행이 필요할 때 다시 확인해 보세요.' : '이 카드에서는 주제를 이해하는 데 필요한 하나의 관점과 구체적인 이유를 명확하게 설명합니다.',
+      reasoning: `Fallback ${role} card`,
+    }
+  })
+}
+
 function validateClarification(clarification: unknown): clarification is ClarificationPrompt {
   if (!clarification || typeof clarification !== 'object') return false
   const value = clarification as Record<string, unknown>
@@ -730,7 +758,29 @@ export async function POST(request: Request) {
 
           const apiKey = process.env.OPENAI_API_KEY
           if (!apiKey || apiKey.length < 10) {
-            emit('message', {
+            const fallbackCount = [3, 5, 7].includes(Number(slideCount)) ? Number(slideCount) : 5
+            const fallbackTopic = (lastUserMessage?.content || (language === 'en' ? 'New campaign' : '신규 캠페인')).trim().slice(0, 42)
+            const fallbackSlides = buildFallbackDraftSlides(fallbackTopic, fallbackCount, language || 'ko')
+            const fallbackResponse: AgentResponse = {
+              message: language === 'en' ? 'I prepared a local storyboard draft for review.' : '검토할 수 있는 로컬 스토리보드 초안을 준비했습니다.',
+              ready: true,
+              params: {
+                topic: fallbackTopic,
+                visualHint: 'dark-editorial',
+                contentType: language === 'en' ? 'Saveable carousel' : '저장형 카드뉴스',
+                objective: language === 'en' ? 'Inform and engage' : '핵심 정보 전달과 관심 유도',
+                slideCount: fallbackCount,
+                productUrl: null,
+                brandAnalysis: language === 'en' ? 'Drafted with the local fallback planner' : '로컬 대체 플래너로 초안을 구성했습니다.',
+                targetEmotion: language === 'en' ? 'Curiosity' : '호기심',
+                hookDirection: language === 'en' ? 'Question-led opening' : '질문형 오프닝',
+                recommendedCta: language === 'en' ? 'Save for later' : '나중에 다시 보기',
+                reasonForStyle: language === 'en' ? 'A readable editorial structure was applied.' : '읽기 쉬운 에디토리얼 흐름을 적용했습니다.',
+                structurePreview: fallbackSlides.map(item => ({ slideNumber: item.slideNumber, role: item.role, description: item.headline })),
+                draftSlides: fallbackSlides,
+              },
+            }
+            emit('message', fallbackResponse || {
               message: '안녕하세요! API Key 설정이 확인되지 않습니다.',
               ready: true,
               params: { topic: lastUserMessage?.content || '신규 캠페인', visualHint: 'dark-editorial', contentType: '저장형 카드뉴스', objective: '상품 홍보 및 브랜딩 강화', slideCount: 5, productUrl: null, brandAnalysis: 'API Key 없음으로 분석 스킵', targetEmotion: '호기심', hookDirection: '기본 타이틀 제공', recommendedCta: '프로필 링크 확인', reasonForStyle: '기본 에디토리얼 설정 적용', structurePreview: [{ slideNumber: 1, role: 'Hook', description: '제품 소개 메인 헤드라인' }] }

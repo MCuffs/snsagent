@@ -9,7 +9,7 @@ import { checkBrandFit, reinforceSlidesWithBrandDna } from './brandHarness'
 import { runMediaCardQualityCheck, type MediaCardQualityResult } from './qualityCheck'
 import { analyzeReferencePattern } from './referencePatternEngine'
 import { renderMediaCard } from './renderer'
-import { selectCardTemplateForContent } from '../../../lib/templates/select'
+import { resolveTemplateSlideForRole, selectCardTemplateForContent } from '../../../lib/templates/select'
 import { applyTemplateSlideToRender, templateBackgroundPromptHint } from '../../../lib/templates/applyToRender'
 import { createTemplatedEditorialDocument } from '../editor/document'
 import { planTypography } from './typographyEngine'
@@ -404,7 +404,9 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
 
       // Inject the selected template's background style directive so each template yields a
       // distinct background mood (gated: no template → unchanged prompt).
-      const templateSlide = selectedTemplate?.slides.find(s => s.slideNumber === slide.slideNumber)
+      const templateSlide = selectedTemplate
+        ? resolveTemplateSlideForRole(selectedTemplate, slide.slideNumber, slide.role)
+        : null
       const harnessedPrompt = buildHarnessedVisualPrompt(sanitizedVisualPrompt, harness.template, slidePlan?.visualDirection)
       const templateStyleHint = templateSlide ? sanitizeImagePrompt(templateBackgroundPromptHint(templateSlide.background)) : ''
       const finalVisualPrompt = templateStyleHint ? `${harnessedPrompt}\n${templateStyleHint}` : harnessedPrompt
@@ -469,6 +471,8 @@ export async function generateMediaCarousel(input: MediaCarouselInput): Promise<
           textColorOverride: applied.overrides.textColorOverride,
           headlineFontSizeOverride: applied.overrides.headlineFontSizeOverride,
           bodyFontSizeOverride: applied.overrides.bodyFontSizeOverride,
+          bodyTextColorOverride: applied.overrides.bodyTextColorOverride,
+          emphasisColorOverride: applied.overrides.emphasisColorOverride,
           textPositionOverride: applied.overrides.textPositionOverride,
           headlineWeightOverride: applied.overrides.headlineWeightOverride,
           headlineTrackingOverride: applied.overrides.headlineTrackingOverride,

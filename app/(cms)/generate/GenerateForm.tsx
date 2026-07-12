@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -16,8 +16,13 @@ import {
   Check,
   Loader2,
   CreditCard,
+  ChevronRight,
+  GripVertical,
+  Pencil,
+  Palette,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
+import StoryboardStage3D from './StoryboardStage3D'
 
 interface Brand {
   id: string
@@ -64,6 +69,7 @@ interface DisplayMessage {
   revealedContent: string
   isTyping: boolean
   clarification?: ClarificationPrompt
+  params?: GenerateParams
 }
 
 interface GenerateParams {
@@ -172,8 +178,8 @@ function buildDraftRefinementPrompt(locale: string, options?: ClarificationOptio
 let msgCounter = 0
 function mkId() { return `m-${++msgCounter}` }
 
-function aiDisplay(content: string, clarification?: ClarificationPrompt): DisplayMessage {
-  return { id: mkId(), role: 'ai', content, revealedContent: '', isTyping: true, clarification }
+function aiDisplay(content: string, clarification?: ClarificationPrompt, params?: GenerateParams): DisplayMessage {
+  return { id: mkId(), role: 'ai', content, revealedContent: '', isTyping: true, clarification, params }
 }
 
 function userDisplay(content: string): DisplayMessage {
@@ -363,7 +369,7 @@ export default function GenerateForm({
 
   const appendAiMessage = useCallback((content: string, params?: GenerateParams, clarification?: ClarificationPrompt) => {
     clearTypingTimer()
-    const message = aiDisplay(content, clarification)
+    const message = aiDisplay(content, clarification, params)
     let cursor = 0
 
     setDisplayMessages(prev => [...prev, message])
@@ -399,6 +405,13 @@ export default function GenerateForm({
     setDisplayMessages(prev => prev.map(message => (
       message.id === messageId ? { ...message, clarification: undefined } : message
     )))
+  }, [])
+
+  const updateStoryboard = useCallback((messageId: string, params: GenerateParams) => {
+    setDisplayMessages(prev => prev.map(message => (
+      message.id === messageId ? { ...message, params } : message
+    )))
+    setReadyParams(params)
   }, [])
 
   useEffect(() => () => {
@@ -1015,8 +1028,9 @@ export default function GenerateForm({
                 >
                   {/* Timeline Connector Line */}
                   {idx < LOADING_STEPS.length - 1 && (
-                    <div 
-                      className={`absolute left-7 top-14 w-[2px] h-[34px] -translate-x-1/2 z-0 transition-colors duration-500 ${
+                    <div
+                      aria-hidden="true"
+                      className={`absolute left-7 top-full h-4 w-[2px] -translate-x-1/2 transition-colors duration-500 ${
                         isCompleted ? 'bg-emerald-400' : 'bg-[#e5e7eb]'
                       }`}
                     />
@@ -1258,6 +1272,15 @@ export default function GenerateForm({
                       <span className="ml-0.5 inline-block h-[1em] w-px align-middle bg-[#9ca3af] animate-pulse" />
                     )}
                   </div>
+                  {msg.role === 'ai' && !msg.isTyping && (msg.params?.draftSlides?.length || msg.params?.structurePreview?.length) && (
+                    <DraftStoryboardPreview
+                      params={msg.params}
+                      locale={locale}
+                      onChange={(params) => updateStoryboard(msg.id, params)}
+                      onProceed={handleCopyPreview}
+                      isProceeding={previewLoading}
+                    />
+                  )}
                   {msg.role === 'ai' && msg.clarification && !msg.isTyping && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -1567,6 +1590,388 @@ function ImageCardNewsHeroMockup() {
       ))}
     </div>
   )
+}
+
+function DraftStoryboardPreview({
+  params,
+  locale,
+  onChange,
+  onProceed,
+  isProceeding,
+}: {
+  params: GenerateParams
+  locale: string
+  onChange: (params: GenerateParams) => void
+  onProceed: () => void
+  isProceeding: boolean
+}) {
+  const slides = params.draftSlides?.length
+    ? params.draftSlides
+    : (params.structurePreview ?? []).map(slide => ({
+      slideNumber: slide.slideNumber,
+      role: slide.role,
+      headline: slide.description,
+      body: locale === 'en' ? 'This card will develop the idea with clear supporting context.' : '이 카드에서 핵심 맥락과 근거를 시각적으로 풀어냅니다.',
+      reasoning: 'Structure preview fallback',
+    }))
+  const templates = useMemo(() => getTemplateDirections(params), [params])
+  const [templateId, setTemplateId] = useState(templates[0].id)
+  const [selectedSlideNumber, setSelectedSlideNumber] = useState(slides[0]?.slideNumber ?? 1)
+  const [isEditing, setIsEditing] = useState(false)
+  const template = templates.find(item => item.id === templateId) ?? templates[0]
+  const selectedSlide = slides.find(slide => slide.slideNumber === selectedSlideNumber) ?? slides[0]
+  const isEn = locale === 'en'
+
+  const selectTemplate = (nextTemplate: typeof template) => {
+    setTemplateId(nextTemplate.id)
+    onChange({
+      ...params,
+      visualHint: `${params.visualHint}\nSelected visual template: ${nextTemplate.name}`.trim(),
+      reasonForStyle: isEn
+        ? `${nextTemplate.name} was selected for a ${nextTemplate.mood.toLowerCase()} visual rhythm.`
+        : `${nextTemplate.name} 템플릿으로 ${nextTemplate.mood} 무드를 적용합니다.`,
+    })
+  }
+
+  const updateSlide = (field: 'headline' | 'body', value: string) => {
+    if (!selectedSlide) return
+    onChange({
+      ...params,
+      draftSlides: slides.map(slide => (
+        slide.slideNumber === selectedSlide.slideNumber ? { ...slide, [field]: value } : slide
+      )),
+    })
+  }
+
+  const moveSlide = (direction: -1 | 1) => {
+    if (!selectedSlide) return
+    const currentIndex = slides.findIndex(slide => slide.slideNumber === selectedSlide.slideNumber)
+    const nextIndex = currentIndex + direction
+    if (nextIndex < 0 || nextIndex >= slides.length) return
+    const reordered = [...slides]
+    ;[reordered[currentIndex], reordered[nextIndex]] = [reordered[nextIndex], reordered[currentIndex]]
+    onChange({
+      ...params,
+      draftSlides: reordered.map((slide, index) => ({ ...slide, slideNumber: index + 1 })),
+    })
+    setSelectedSlideNumber(nextIndex + 1)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.58, ease: [0.19, 1, 0.22, 1] }}
+      className="w-full overflow-hidden rounded-[24px] border border-[#dfe5ec] bg-[#f8fafc] shadow-[0_24px_64px_rgba(15,23,42,0.14)]"
+    >
+      <div className="border-b border-[#e2e8f0] bg-white px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {[
+            isEn ? 'Brief' : '기획',
+            isEn ? 'Storyboard' : '스토리보드',
+            isEn ? 'Copy review' : '카피 검토',
+            isEn ? 'Generate' : '최종 생성',
+          ].map((step, index) => (
+            <div key={step} className="flex shrink-0 items-center gap-2">
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-black ${index < 2 ? 'bg-[#111827] text-white' : 'border border-[#dbe2ea] bg-white text-[#94a3b8]'}`}>
+                {index < 1 ? <Check className="h-3 w-3" /> : index + 1}
+              </span>
+              <span className={`text-[10px] font-black ${index === 1 ? 'text-[#111827]' : 'text-[#94a3b8]'}`}>{step}</span>
+              {index < 3 && <ChevronRight className="h-3.5 w-3.5 text-[#cbd5e1]" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <StoryboardStage3D
+        slides={slides}
+        swatches={template.swatches}
+        selectedSlideNumber={selectedSlide?.slideNumber ?? 1}
+        onSelect={(slideNumber: number) => {
+          setSelectedSlideNumber(slideNumber)
+          setIsEditing(false)
+        }}
+        locale={locale}
+      />
+
+      <div className="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#111827] px-3 text-[11px] font-black text-white">
+              <Sparkles className="h-3.5 w-3.5" />
+              {isEn ? 'Storyboard ready' : '스토리보드 준비 완료'}
+            </span>
+            <span className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-2.5 py-1 text-[10px] font-black text-[#2563eb]">
+              {slides.length}{isEn ? ' cards' : '장'}
+            </span>
+          </div>
+          <h3 className="mt-3 text-base font-black leading-6 text-[#111827] sm:text-lg">
+            {params.topic}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#64748b]">
+            {params.hookDirection || params.objective || params.contentType}
+          </p>
+        </div>
+
+        <div className="grid min-w-[190px] grid-cols-3 gap-1.5 rounded-[16px] border border-[#e5e7eb] bg-[#f8fafc] p-1.5">
+          {template.swatches.map((color, index) => (
+            <span
+              key={`${color}-${index}`}
+              className="h-8 rounded-xl border border-white shadow-sm"
+              style={{ background: color }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-[#edf0f3] bg-white px-4 py-4 sm:px-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Palette className="h-4 w-4 text-[#475569]" />
+            <p className="text-xs font-black text-[#111827]">{isEn ? 'Choose a visual direction' : '비주얼 템플릿 선택'}</p>
+          </div>
+          <p className="text-[10px] font-semibold text-[#94a3b8]">{isEn ? 'Previewed with your copy' : '현재 카피로 바로 비교'}</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {templates.map(item => (
+            <TemplateDirectionCard
+              key={item.id}
+              template={item}
+              selected={item.id === template.id}
+              onSelect={() => selectTemplate(item)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-[#e2e8f0] px-4 py-4 sm:px-5">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-[#111827]">{isEn ? 'Shape the story' : '카드 흐름 다듬기'}</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-[#94a3b8]">{isEn ? 'Select a card to review and edit it.' : '카드를 선택하면 카피와 순서를 수정할 수 있어요.'}</p>
+          </div>
+          <span className="shrink-0 text-[10px] font-black text-[#64748b]">{slides.length} CARDS</span>
+        </div>
+        <div className="overflow-x-auto pb-3">
+          <div className="flex min-w-0 gap-3">
+          {slides.map((slide, index) => (
+            <DraftCardMockup
+              key={`${slide.slideNumber}-${slide.headline}`}
+              slide={slide}
+              index={index}
+              total={slides.length}
+              template={template}
+              selected={slide.slideNumber === selectedSlide?.slideNumber}
+              onSelect={() => {
+                setSelectedSlideNumber(slide.slideNumber)
+                setIsEditing(false)
+              }}
+            />
+          ))}
+          </div>
+        </div>
+
+        {selectedSlide && (
+          <motion.div layout className="rounded-[18px] border border-[#dbe2ea] bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#111827] text-[10px] font-black text-white">{String(selectedSlide.slideNumber).padStart(2, '0')}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black text-[#111827]">{selectedSlide.headline}</p>
+                  <p className="mt-0.5 text-[9px] font-black uppercase text-[#94a3b8]">{ROLE_LABEL[selectedSlide.role] ?? selectedSlide.role}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" onClick={() => moveSlide(-1)} disabled={selectedSlide.slideNumber === 1} title={isEn ? 'Move left' : '앞으로 이동'} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc] disabled:opacity-30"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => moveSlide(1)} disabled={selectedSlide.slideNumber === slides.length} title={isEn ? 'Move right' : '뒤로 이동'} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc] disabled:opacity-30"><ChevronRight className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => setIsEditing(value => !value)} className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-black ${isEditing ? 'bg-[#111827] text-white' : 'border border-[#e2e8f0] bg-white text-[#475569] hover:bg-[#f8fafc]'}`}><Pencil className="h-3 w-3" />{isEn ? 'Edit' : '수정'}</button>
+              </div>
+            </div>
+            <AnimatePresence initial={false}>
+              {isEditing && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="grid gap-3 pt-3 sm:grid-cols-2">
+                    <label className="text-[10px] font-black text-[#64748b]">{isEn ? 'Headline' : '헤드라인'}<textarea value={selectedSlide.headline} onChange={event => updateSlide('headline', event.target.value)} className="mt-1.5 min-h-20 w-full resize-none rounded-xl border border-[#dbe2ea] bg-[#f8fafc] p-2.5 text-xs font-bold leading-5 text-[#111827] outline-none focus:border-[#6366f1]" /></label>
+                    <label className="text-[10px] font-black text-[#64748b]">{isEn ? 'Body copy' : '본문 카피'}<textarea value={selectedSlide.body} onChange={event => updateSlide('body', event.target.value)} className="mt-1.5 min-h-20 w-full resize-none rounded-xl border border-[#dbe2ea] bg-[#f8fafc] p-2.5 text-xs font-semibold leading-5 text-[#334155] outline-none focus:border-[#6366f1]" /></label>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        <div className="mt-4 flex flex-col gap-3 border-t border-[#e2e8f0] pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-md text-[10px] font-semibold leading-5 text-[#64748b]">{params.reasonForStyle || (isEn ? 'The visual system will stay consistent across every card.' : '선택한 템플릿의 타이포와 컬러 시스템이 모든 카드에 일관되게 적용됩니다.')}</p>
+          <button type="button" onClick={onProceed} disabled={isProceeding} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#111827] px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition hover:bg-[#293244] disabled:opacity-50">
+            {isProceeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {isEn ? 'Approve and review copy' : '이 구성으로 카피 검토'}
+            {!isProceeding && <ArrowRight className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function TemplateDirectionCard({ template, selected, onSelect }: { template: TemplateDirection; selected: boolean; onSelect: () => void }) {
+  return (
+    <button type="button" onClick={onSelect} aria-pressed={selected} className={`group min-w-0 rounded-[14px] border p-2 text-left transition ${selected ? 'border-[#111827] bg-[#f8fafc] shadow-[0_8px_20px_rgba(15,23,42,0.08)]' : 'border-[#e2e8f0] bg-white hover:border-[#aab4c2]'}`}>
+      <div className="relative h-12 overflow-hidden rounded-[9px]" style={{ background: template.background }}>
+        <div className="absolute inset-x-2 bottom-2 flex gap-1">{template.swatches.map(color => <span key={color} className="h-1.5 flex-1 rounded-full" style={{ background: color }} />)}</div>
+        {selected && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#111827] shadow-sm"><Check className="h-3 w-3" /></span>}
+      </div>
+      <p className="mt-2 truncate text-[11px] font-black text-[#111827]">{template.name}</p>
+      <p className="mt-0.5 truncate text-[9px] font-semibold text-[#94a3b8]">{template.mood}</p>
+    </button>
+  )
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  hook: 'HOOK',
+  context: 'CONTEXT',
+  'key-point': 'KEY POINT',
+  benefit: 'BENEFIT',
+  proof: 'PROOF',
+  detail: 'DETAIL',
+  stat: 'STAT',
+  summary: 'SUMMARY',
+  cta: 'CTA',
+  'save-cta': 'CTA',
+}
+
+function DraftCardMockup({
+  slide,
+  index,
+  total,
+  template,
+  selected,
+  onSelect,
+}: {
+  slide: NonNullable<GenerateParams['draftSlides']>[number]
+  index: number
+  total: number
+  template: TemplateDirection
+  selected: boolean
+  onSelect: () => void
+}) {
+  const basis = total <= 3 ? '31%' : total <= 5 ? '23%' : '18%'
+  const roleLabel = ROLE_LABEL[slide.role] ?? slide.role
+  const accent = template.swatches[index % template.swatches.length]
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onSelect}
+      layout
+      initial={{ opacity: 0, x: 26, y: 10, rotate: index % 2 === 0 ? -1.5 : 1.5 }}
+      animate={{ opacity: 1, x: 0, y: 0, rotate: index % 2 === 0 ? -1.5 : 1.5 }}
+      transition={{ duration: 0.48, delay: index * 0.055, ease: [0.19, 1, 0.22, 1] }}
+      style={{ flex: `0 0 ${basis}`, minWidth: total <= 3 ? 150 : 132 }}
+      className={`relative overflow-hidden rounded-[18px] border bg-white p-1.5 text-left transition ${selected ? 'border-[#111827] shadow-[0_18px_42px_rgba(15,23,42,0.16)] ring-2 ring-[#111827]/10' : 'border-[#dbe2ea] shadow-[0_12px_28px_rgba(15,23,42,0.08)] hover:-translate-y-1'}`}
+    >
+      <span className={`absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full shadow-sm ${selected ? 'bg-[#111827] text-white' : 'bg-white/90 text-[#94a3b8]'}`}><GripVertical className="h-3.5 w-3.5" /></span>
+      <div className="aspect-[4/5] overflow-hidden rounded-[15px] bg-[#111827]">
+        <div className="relative h-[45%] overflow-hidden" style={{ background: template.background }}>
+          <div className="absolute inset-0 opacity-70" style={{ background: `radial-gradient(circle at 24% 22%, ${accent}, transparent 34%)` }} />
+          <div className="absolute left-3 top-3 rounded-full bg-white/88 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.13em] text-[#111827]">
+            {roleLabel}
+          </div>
+          <div className="absolute bottom-3 left-3 right-3">
+            <div className="h-2 w-2/3 rounded-full bg-white/80" />
+            <div className="mt-1.5 h-2 w-1/2 rounded-full bg-white/45" />
+          </div>
+        </div>
+        <div className="flex h-[55%] flex-col justify-between bg-white p-3">
+          <div>
+            <p className="text-[9px] font-black text-[#64748b]">CARD {String(slide.slideNumber).padStart(2, '0')}</p>
+            <h4 className="mt-1.5 line-clamp-2 text-[13px] font-black leading-[1.25] text-[#111827]">
+              {slide.headline}
+            </h4>
+          </div>
+          <p className="mt-2 line-clamp-4 text-[10px] font-semibold leading-4 text-[#475569]">
+            {slide.body}
+          </p>
+        </div>
+      </div>
+    </motion.button>
+  )
+}
+
+interface TemplateDirection {
+  id: string
+  name: string
+  mood: string
+  cta: string
+  background: string
+  swatches: string[]
+}
+
+function getTemplateDirections(params: GenerateParams): TemplateDirection[] {
+  const text = `${params.contentType} ${params.objective} ${params.visualHint} ${params.targetEmotion ?? ''}`.toLowerCase()
+  const editorial: TemplateDirection = {
+    id: 'editorial',
+    name: 'Editorial brief',
+    mood: 'Sharp and current',
+    cta: 'Save and share',
+    background: 'linear-gradient(135deg, #0f172a 0%, #334155 54%, #f8fafc 100%)',
+    swatches: ['#0f172a', '#f59e0b', '#f8fafc'],
+  }
+  const premium: TemplateDirection = {
+    id: 'premium',
+    name: 'Premium product',
+    mood: 'Calm and polished',
+    cta: 'Explore product',
+    background: 'linear-gradient(135deg, #f8fafc 0%, #dbeafe 52%, #111827 100%)',
+    swatches: ['#111827', '#dbeafe', '#10b981'],
+  }
+  const friendly: TemplateDirection = {
+    id: 'friendly',
+    name: 'Friendly guide',
+    mood: 'Clear and warm',
+    cta: 'Try it today',
+    background: 'linear-gradient(135deg, #ecfeff 0%, #eef2ff 48%, #fef3c7 100%)',
+    swatches: ['#2563eb', '#14b8a6', '#f59e0b'],
+  }
+
+  if (text.includes('news') || text.includes('trend') || text.includes('issue') || text.includes('뉴스') || text.includes('트렌드')) {
+    return [editorial, friendly, premium]
+  }
+  if (text.includes('premium') || text.includes('brand') || text.includes('product') || text.includes('브랜드') || text.includes('제품')) {
+    return [premium, editorial, friendly]
+  }
+  return [friendly, editorial, premium]
+}
+
+function _pickTemplateDirection(params: GenerateParams) {
+  const text = `${params.contentType} ${params.objective} ${params.visualHint} ${params.targetEmotion ?? ''}`.toLowerCase()
+
+  if (text.includes('news') || text.includes('trend') || text.includes('issue') || text.includes('뉴스') || text.includes('트렌드')) {
+    return {
+      name: 'Editorial brief',
+      mood: 'Sharp and current',
+      cta: 'Save and share',
+      background: 'linear-gradient(135deg, #0f172a 0%, #334155 54%, #f8fafc 100%)',
+      swatches: ['#0f172a', '#f59e0b', '#f8fafc'],
+    }
+  }
+
+  if (text.includes('premium') || text.includes('brand') || text.includes('product') || text.includes('브랜드') || text.includes('제품')) {
+    return {
+      name: 'Premium product',
+      mood: 'Calm and polished',
+      cta: 'Explore product',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #dbeafe 52%, #111827 100%)',
+      swatches: ['#111827', '#dbeafe', '#10b981'],
+    }
+  }
+
+  return {
+    name: 'Friendly guide',
+    mood: 'Clear and warm',
+    cta: 'Try it today',
+    background: 'linear-gradient(135deg, #ecfeff 0%, #eef2ff 48%, #fef3c7 100%)',
+    swatches: ['#2563eb', '#14b8a6', '#f59e0b'],
+  }
 }
 
 function CopyPreviewPanel({

@@ -23,6 +23,8 @@ export interface RenderMediaCardInput {
   textColorOverride?: string
   headlineFontSizeOverride?: number
   bodyFontSizeOverride?: number
+  bodyTextColorOverride?: string
+  emphasisColorOverride?: string
   // Admin template support: one of the 9 logical positions (e.g. "top-right", "middle-center").
   // When set, overrides the layout's built-in text anchor for full WYSIWYG fidelity.
   textPositionOverride?: string
@@ -47,9 +49,12 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const fontFam = input.fontOverride ?? fontFamily(input.layout.typographyStyle)
   const typography = applyTypographyOverrides(input)
   const textColor = input.textColorOverride ?? (input.layout.overlayStyle === 'none' ? '#ffffff' : input.overlay.textColor)
-  const secondaryTextColor = input.textColorOverride
-    ? `${input.textColorOverride}cc`
-    : (input.layout.overlayStyle === 'none' ? 'rgba(255,255,255,0.78)' : input.overlay.secondaryTextColor)
+  // Template colors are headline accents. Body copy keeps the overlay's contrast color
+  // so an accent such as yellow or orange does not turn the entire copy block into one mass.
+  const secondaryTextColor = input.bodyTextColorOverride ?? (input.layout.overlayStyle === 'none'
+    ? 'rgba(255,255,255,0.78)'
+    : input.overlay.secondaryTextColor)
+  const emphasisColor = input.emphasisColorOverride ?? typography.emphasisColor
   const headlineLineGap = input.headlineLineHeightOverride ?? (input.layout.spacingRules?.headlineLineGap || 1.08)
   const bodyLineGap = input.layout.spacingRules?.bodyLineGap || 1.42
   const badgeToHeadlineGap = input.layout.spacingRules?.badgeToHeadlineGap || 24
@@ -71,6 +76,7 @@ export async function renderMediaCard(input: RenderMediaCardInput) {
   const headlineMarkup = renderHeadline(typography, textBox.x, headlineStartBaseline, textColor, textBox.align, fontFam, {
     weight: input.headlineWeightOverride,
     tracking: input.headlineTrackingOverride,
+    emphasisColor,
   })
   const bodyStartBaseline =
     headlineStartBaseline +
@@ -208,14 +214,14 @@ function renderKicker(input: RenderMediaCardInput, x: number, y: number, fill: s
   `
 }
 
-function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center' | 'right', fontFam: string, override?: { weight?: number; tracking?: number }) {
+function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string, align: 'left' | 'center' | 'right', fontFam: string, override?: { weight?: number; tracking?: number; emphasisColor?: string }) {
   const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
   const weight = override?.weight ?? 650
   const tracking = override?.tracking ?? -0.4
   let currentY = y
 
   return plan.headlineLines.map((line) => {
-    const tspans = renderTokenTspans(line.tokens)
+    const tspans = renderTokenTspans(line.tokens, override?.emphasisColor)
     const fallback = escapeXml(line.tokens.map(token => token.text).join(' '))
     const markup = `<text xml:space="preserve" x="${x}" y="${currentY}" text-anchor="${anchor}" font-family="${fontFam}" font-size="${plan.headlineFontSize}" font-weight="${weight}" fill="${fill}" letter-spacing="${tracking}">${tspans || fallback}</text>`
     currentY += plan.headlineFontSize * plan.lineHeight
@@ -223,10 +229,11 @@ function renderHeadline(plan: TypographyPlan, x: number, y: number, fill: string
   }).join('')
 }
 
-function renderTokenTspans(tokens: TypographyToken[]) {
+function renderTokenTspans(tokens: TypographyToken[], emphasisColor?: string) {
   return tokens.map((token, index) => {
     const prefix = index === 0 ? '' : ' '
-    return `<tspan xml:space="preserve">${prefix}${escapeXml(token.text)}</tspan>`
+    const fill = token.style === 'headline-emphasis' && emphasisColor ? ` fill="${escapeXml(emphasisColor)}"` : ''
+    return `<tspan xml:space="preserve"${fill}>${prefix}${escapeXml(token.text)}</tspan>`
   }).join('')
 }
 
