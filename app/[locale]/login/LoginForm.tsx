@@ -118,7 +118,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
 
       {tab === 'login' ? (
         <form onSubmit={handleLoginSubmit} className="space-y-3">
+          <label htmlFor="login-email" className="sr-only">{isEn ? 'Email' : '이메일'}</label>
           <input
+            id="login-email"
             name="email"
             type="email"
             autoComplete="email"
@@ -127,7 +129,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
             className={inputClass}
           />
           <div className="relative">
+            <label htmlFor="login-password" className="sr-only">{isEn ? 'Password' : '비밀번호'}</label>
             <input
+              id="login-password"
               name="password"
               type={showPw ? 'text' : 'password'}
               autoComplete="current-password"
@@ -135,7 +139,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
               required
               className={`${inputClass} pr-11`}
             />
-            <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
+            <button type="button" onClick={() => setShowPw(v => !v)}
+              aria-label={showPw ? (isEn ? 'Hide password' : '비밀번호 숨기기') : (isEn ? 'Show password' : '비밀번호 보기')}
+              aria-pressed={showPw}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09990] hover:text-[#1a1a1a]">
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -153,14 +159,18 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
         </form>
       ) : (
         <form onSubmit={handleRegisterSubmit} className="space-y-3">
+          <label htmlFor="register-name" className="sr-only">{isEn ? 'Name or brand' : '이름 또는 브랜드명'}</label>
           <input
+            id="register-name"
             name="name"
             type="text"
             autoComplete="name"
             placeholder={isEn ? 'Name or brand' : '이름 또는 브랜드명'}
             className={inputClass}
           />
+          <label htmlFor="register-email" className="sr-only">{isEn ? 'Email' : '이메일'}</label>
           <input
+            id="register-email"
             name="email"
             type="email"
             autoComplete="email"
@@ -170,7 +180,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
           />
           <div>
             <div className="relative">
+              <label htmlFor="register-password" className="sr-only">{isEn ? 'Password' : '비밀번호'}</label>
               <input
+                id="register-password"
                 name="password"
                 type={showPw ? 'text' : 'password'}
                 autoComplete="new-password"
@@ -180,7 +192,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
                 required
                 className={`${inputClass} pr-11`}
               />
-              <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
+              <button type="button" onClick={() => setShowPw(v => !v)}
+                aria-label={showPw ? (isEn ? 'Hide password' : '비밀번호 숨기기') : (isEn ? 'Show password' : '비밀번호 보기')}
+                aria-pressed={showPw}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09990] hover:text-[#1a1a1a]">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -196,7 +210,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
           </div>
           <div>
             <div className="relative">
+              <label htmlFor="register-password-confirm" className="sr-only">{isEn ? 'Confirm password' : '비밀번호 확인'}</label>
               <input
+                id="register-password-confirm"
                 name="passwordConfirm"
                 type={showConfirm ? 'text' : 'password'}
                 autoComplete="new-password"
@@ -206,7 +222,9 @@ export default function LoginForm({ locale, defaultTab, loginAction, registerAct
                 required
                 className={`${inputClass} pr-11 ${confirm ? (confirmMatch ? 'border-emerald-400' : 'border-red-300') : ''}`}
               />
-              <button type="button" tabIndex={-1} onClick={() => setShowConfirm(v => !v)}
+              <button type="button" onClick={() => setShowConfirm(v => !v)}
+                aria-label={showConfirm ? (isEn ? 'Hide password confirmation' : '비밀번호 확인 숨기기') : (isEn ? 'Show password confirmation' : '비밀번호 확인 보기')}
+                aria-pressed={showConfirm}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09990] hover:text-[#1a1a1a]">
                 {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

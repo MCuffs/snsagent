@@ -87,6 +87,10 @@ function WebGLDepthField({ color }: { color: string }) {
     observer.observe(host)
     resize()
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let isOnScreen = true
+    let isDocumentVisible = document.visibilityState === 'visible'
+
     const animate = (time: number) => {
       particles.rotation.y = time * 0.000025 + pointerX * 0.035
       particles.rotation.x += ((pointerY * 0.025) - particles.rotation.x) * 0.03
@@ -97,11 +101,37 @@ function WebGLDepthField({ color }: { color: string }) {
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
     }
-    frame = requestAnimationFrame(animate)
+
+    const stopAnimation = () => {
+      if (!frame) return
+      cancelAnimationFrame(frame)
+      frame = 0
+    }
+    const startAnimation = () => {
+      if (frame || prefersReducedMotion || !isOnScreen || !isDocumentVisible) return
+      frame = requestAnimationFrame(animate)
+    }
+    const visibilityObserver = new IntersectionObserver(([entry]) => {
+      isOnScreen = entry?.isIntersecting ?? false
+      if (isOnScreen) startAnimation()
+      else stopAnimation()
+    })
+    const handleVisibilityChange = () => {
+      isDocumentVisible = document.visibilityState === 'visible'
+      if (isDocumentVisible) startAnimation()
+      else stopAnimation()
+    }
+
+    visibilityObserver.observe(host)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    renderer.render(scene, camera)
+    startAnimation()
 
     return () => {
-      cancelAnimationFrame(frame)
+      stopAnimation()
       observer.disconnect()
+      visibilityObserver.disconnect()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       host.parentElement?.removeEventListener('pointermove', onPointerMove)
       pointGeometry.dispose()
       pointMaterial.dispose()

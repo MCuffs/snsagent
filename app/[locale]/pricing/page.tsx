@@ -278,8 +278,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                 </h2>
                 <p className="mt-3 text-[15px] text-[#525252] max-w-lg">
                   {isEn
-                    ? 'All plans include a free trial for day 1. Upgrade to Creator or above to unlock all 30 days.'
-                    : '모든 플랜에서 1일차 영상을 무료 체험할 수 있습니다. Creator 이상으로 업그레이드하면 30일 전체가 열립니다.'}
+                    ? 'All plans include a free trial for day 1. YouTube Promo or Creator and above unlock all 30 days.'
+                    : '모든 플랜에서 1일차 영상을 무료 체험할 수 있습니다. YouTube Promo 또는 Creator 이상에서 30일 전체가 열립니다.'}
                 </p>
               </div>
               <a

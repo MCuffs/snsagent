@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useLocale, useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -22,7 +23,11 @@ import {
   Palette,
 } from 'lucide-react'
 import { analytics, timeEvent } from '../../../lib/analytics/thinkingdata'
-import StoryboardStage3D from './StoryboardStage3D'
+
+const StoryboardStage3D = dynamic(() => import('./StoryboardStage3D'), {
+  ssr: false,
+  loading: () => <div className="h-[580px] w-full animate-pulse bg-[#0b101a] sm:h-[720px]" aria-hidden="true" />,
+})
 
 interface Brand {
   id: string

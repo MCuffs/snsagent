@@ -132,7 +132,15 @@ function currentTimeMs() { return Date.now() }
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function YouTubeAutomationDashboard({ isActive = true }: { isActive?: boolean }) {
+export default function YouTubeAutomationDashboard({
+  isActive = true,
+  isGuest = false,
+  onRequireLogin,
+}: {
+  isActive?: boolean
+  isGuest?: boolean
+  onRequireLogin?: () => void
+}) {
   const [topic, setTopic] = useState('')
   const [project, setProject] = useState<Project | null>(null)
   const [modalDay, setModalDay] = useState<PlannerDay | null>(null)
@@ -160,8 +168,8 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   )
 
   useEffect(() => {
-    if (isActive) analytics.youtubeAutomationView()
-  }, [isActive])
+    if (isActive && !isGuest) analytics.youtubeAutomationView()
+  }, [isActive, isGuest])
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -180,11 +188,12 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
 
   // Load history on mount.
   useEffect(() => {
+    if (!isActive || isGuest) return
     const id = window.setTimeout(() => {
       void refreshProjects().finally(() => setHistoryLoading(false))
     }, 0)
     return () => window.clearTimeout(id)
-  }, [refreshProjects])
+  }, [isActive, isGuest, refreshProjects])
 
   const hasActiveRender = useMemo(
     () => [project, ...history].some(item => item?.days.some(day => day.status === 'planning' || day.status === 'rendering')),
@@ -195,9 +204,10 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   // Keep a slow poll even without an active render — the recovery cron can resume and finish
   // a day entirely server-side, and an open tab must eventually reflect that.
   useEffect(() => {
+    if (!isActive || isGuest) return
     const interval = setInterval(() => { void refreshProjects() }, hasActiveRender ? 5000 : 30000)
     return () => clearInterval(interval)
-  }, [hasActiveRender, refreshProjects])
+  }, [hasActiveRender, isActive, isGuest, refreshProjects])
 
   const sortedDays = useMemo(
     () => [...(project?.days || [])].sort((a, b) => a.dayNumber - b.dayNumber),
@@ -208,6 +218,10 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
     const clean = topic.trim()
     const startedAt = Date.now()
     if (!clean) { setError('주제를 입력해 주세요.'); return }
+    if (isGuest) {
+      onRequireLogin?.()
+      return
+    }
     analytics.youtubePlannerCreateStart(clean.length, history.length)
     setCreating(true)
     setError(null)
@@ -465,12 +479,12 @@ export default function YouTubeAutomationDashboard({ isActive = true }: { isActi
   const msUntilUnlock = unlockAt && unlockAt > now ? unlockAt - now : 0
 
   useEffect(() => {
-    if (msUntilUnlock <= 0) return
+    if (!isActive || isGuest || msUntilUnlock <= 0) return
     const timeout = window.setTimeout(() => {
       void refreshProjects()
     }, msUntilUnlock + 1000)
     return () => window.clearTimeout(timeout)
-  }, [msUntilUnlock, refreshProjects])
+  }, [isActive, isGuest, msUntilUnlock, refreshProjects])
 
   // Determine which day is "next after last completed"
   const nextAfterCompletedDayNumber = useMemo(() => {

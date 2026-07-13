@@ -1,18 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useTab } from '../TabContext'
 import ConceptForm from './ConceptForm'
 import GeneralProfileForm from './GeneralProfileForm'
-import GenerateForm from '../generate/GenerateForm'
-import VideoCardNewsForm from '../video-cardnews/VideoCardNewsForm'
-import YouTubeAutomationDashboard from '../youtube-automation/YouTubeAutomationDashboard'
-import WorksGrid from '../works/WorksGrid'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { CheckCircle2, Globe, TrendingUp, Sparkles, LogIn, Plus, Lock, X } from 'lucide-react'
 import Link from 'next/link'
+
+const GenerateForm = dynamic(() => import('../generate/GenerateForm'), { loading: DashboardLoading })
+const VideoCardNewsForm = dynamic(() => import('../video-cardnews/VideoCardNewsForm'), { loading: DashboardLoading })
+const YouTubeAutomationDashboard = dynamic(() => import('../youtube-automation/YouTubeAutomationDashboard'), { loading: DashboardLoading })
+const WorksGrid = dynamic(() => import('../works/WorksGrid'), { loading: DashboardLoading })
+
+function DashboardLoading() {
+  return (
+    <div className="flex h-full items-center justify-center" role="status" aria-live="polite">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#d7dce5] border-t-[#4252ff]" />
+      <span className="sr-only">Loading</span>
+    </div>
+  )
+}
 
 interface BrandProfileData {
   id: string
@@ -77,6 +88,7 @@ export default function DashboardContainer({
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const activeTab = tab
+  const [mountedTabs, setMountedTabs] = useState(() => new Set([activeTab]))
   const t = useTranslations('concept')
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -103,6 +115,14 @@ export default function DashboardContainer({
     setShowVideoUpgradePrompt(false)
     setDismissedVideoUpgradePrompt(true)
   }
+
+  useEffect(() => {
+    if (mountedTabs.has(activeTab)) return
+    const frame = window.requestAnimationFrame(() => {
+      setMountedTabs(current => new Set(current).add(activeTab))
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeTab, mountedTabs])
 
   const handleGuestAction = () => {
     if (isGuest) {
@@ -283,7 +303,9 @@ export default function DashboardContainer({
             </div>
           </div>}
           <div className="min-h-0 flex-1">
-            {brandToPass ? (
+            {!mountedTabs.has('generate') ? (
+              <DashboardLoading />
+            ) : brandToPass ? (
               <GenerateForm
                 key={brandToPass.id}
                 brand={{
@@ -335,7 +357,7 @@ export default function DashboardContainer({
       <div className={tabPanelClass('video')} aria-hidden={activeTab !== 'video'}>
         {!canUseVideoFeatures ? (
           <VideoUpgradeEmptyState pricingPath={pricingPath} />
-        ) : brandToPass ? (
+        ) : mountedTabs.has('video') && brandToPass ? (
           <VideoCardNewsForm
             brand={brandToPass}
             hasApiKey={hasVideoApiKey}
@@ -348,12 +370,14 @@ export default function DashboardContainer({
       </div>
 
       <div className={tabPanelClass('works')} aria-hidden={activeTab !== 'works'}>
-        <WorksGrid
-          campaigns={campaigns}
-          planName={planName}
-          retentionDays={retentionDays}
-          canUpgradeRetention={canUpgradeRetention}
-        />
+        {mountedTabs.has('works') && (
+          <WorksGrid
+            campaigns={campaigns}
+            planName={planName}
+            retentionDays={retentionDays}
+            canUpgradeRetention={canUpgradeRetention}
+          />
+        )}
       </div>
 
       <div className={tabPanelClass('youtube-automation')} aria-hidden={activeTab !== 'youtube-automation'}>
@@ -364,8 +388,14 @@ export default function DashboardContainer({
             title="유튜브 자동화는 YouTube Promo 플랜부터 사용할 수 있습니다."
             description="월 9,900원 YouTube Promo 플랜에서 30일 쇼츠 플래너와 유튜브 자동화를 사용할 수 있습니다."
           />
+        ) : mountedTabs.has('youtube-automation') ? (
+          <YouTubeAutomationDashboard
+            isActive={activeTab === 'youtube-automation'}
+            isGuest={isGuest}
+            onRequireLogin={() => setShowLoginPrompt(true)}
+          />
         ) : (
-          <YouTubeAutomationDashboard isActive={activeTab === 'youtube-automation'} />
+          <DashboardLoading />
         )}
       </div>
 
@@ -373,7 +403,7 @@ export default function DashboardContainer({
         <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
           {!canUseVideoFeatures ? (
             <VideoUpgradeEmptyState pricingPath={pricingPath} />
-          ) : (
+          ) : mountedTabs.has('video-cardnews') ? (
             <VideoCardNewsForm
               brand={{
                 id: brandToPass.id,
@@ -385,6 +415,8 @@ export default function DashboardContainer({
               }}
               hasApiKey={hasVideoApiKey}
             />
+          ) : (
+            <DashboardLoading />
           )}
         </div>
       )}

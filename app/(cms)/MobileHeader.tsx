@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { ChevronDown, Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -13,6 +13,7 @@ interface MobileHeaderProps {
 }
 
 const CloseMobileMenuContext = createContext<() => void>(() => undefined)
+const MOBILE_FEATURE_MENU_SEEN_KEY = 'shuffla-mobile-feature-menu-seen'
 
 export function useCloseMobileMenu() {
   return useContext(CloseMobileMenuContext)
@@ -21,18 +22,39 @@ export function useCloseMobileMenu() {
 export default function MobileHeader({ children, locale }: MobileHeaderProps) {
   const pathname = usePathname()
   const billingPath = locale ? `/${locale}/billing` : '/billing'
-  const [isOpen, setIsOpen] = useState(() => pathname !== billingPath)
+  const [isOpen, setIsOpen] = useState(false)
 
   const prefix = locale ? `/${locale}` : ''
+
+  const closeMenu = useCallback(() => {
+    window.localStorage.setItem(MOBILE_FEATURE_MENU_SEEN_KEY, 'true')
+    setIsOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (pathname === billingPath) return
+    if (!window.matchMedia('(max-width: 1023px)').matches) return
+    if (window.localStorage.getItem(MOBILE_FEATURE_MENU_SEEN_KEY) === 'true') return
+
+    const frame = window.requestAnimationFrame(() => setIsOpen(true))
+    return () => window.cancelAnimationFrame(frame)
+  }, [billingPath, pathname])
 
   useEffect(() => {
     if (!isOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen])
+  }, [closeMenu, isOpen])
 
   return (
     <>
@@ -45,10 +67,13 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors"
-          aria-label={locale === 'en' ? 'Open menu' : '메뉴 열기'}
+          className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#dfe3ea] bg-white px-3 text-[#3f4652] shadow-sm transition-colors hover:border-[#cbd2dc] hover:bg-[#f4f6f8] hover:text-[#111111]"
+          aria-label={locale === 'en' ? 'Explore features' : '기능 둘러보기'}
+          aria-expanded={isOpen}
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-4 w-4" />
+          <span className="text-xs font-bold">{locale === 'en' ? 'Features' : '기능 둘러보기'}</span>
+          <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </header>
 
@@ -61,7 +86,7 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={closeMenu}
               className="fixed inset-0 z-40 bg-black lg:hidden"
             />
             {/* Drawer — full height including safe area */}
@@ -75,10 +100,15 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
             >
               {/* Close Button */}
               <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-[#e4e4e7] px-5">
-                <span className="text-[14px] font-bold text-[#111111]">{locale === 'en' ? 'Menu' : '메뉴'}</span>
+                <div>
+                  <p className="text-[14px] font-bold text-[#111111]">{locale === 'en' ? 'Explore features' : '기능 둘러보기'}</p>
+                  <p className="mt-0.5 text-[11px] text-[#7c8491]">
+                    {locale === 'en' ? 'Choose what you want to create.' : '원하는 제작 기능을 선택해 보세요.'}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={closeMenu}
                   className="flex h-11 w-11 items-center justify-center rounded-lg text-[#52525b] hover:bg-[#e4e4e7] hover:text-[#111111] transition-colors"
                   aria-label={locale === 'en' ? 'Close menu' : '메뉴 닫기'}
                 >
@@ -93,11 +123,11 @@ export default function MobileHeader({ children, locale }: MobileHeaderProps) {
                   if (e.defaultPrevented) return
                   // Only close drawer when clicking an actual navigation link, not upgrade modals
                   if ((e.target as HTMLElement).closest('a[href]')) {
-                    setIsOpen(false)
+                    closeMenu()
                   }
                 }}
               >
-                <CloseMobileMenuContext.Provider value={() => setIsOpen(false)}>
+                <CloseMobileMenuContext.Provider value={closeMenu}>
                   {children}
                 </CloseMobileMenuContext.Provider>
               </div>
