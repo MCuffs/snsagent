@@ -450,7 +450,6 @@ async function renderShort(params: {
 }): Promise<string> {
   const outputPath = path.join(params.workDir, 'short.mp4')
   const hookPath = path.join(params.workDir, 'hook.txt')
-  const captionPath = path.join(params.workDir, 'caption.txt')
   const creditPath = path.join(params.workDir, 'credit.txt')
   const commentAuthorPath = path.join(params.workDir, 'comment-author.txt')
   const commentTextPath = path.join(params.workDir, 'comment-text.txt')
@@ -460,10 +459,6 @@ async function renderShort(params: {
   const comment = params.clip.comment
   const writes = [
     fs.writeFile(hookPath, wrapKoreanText(params.clip.hookTitle)),
-    fs.writeFile(
-      captionPath,
-      wrapKoreanText(params.clip.subtitleLines[0] ?? '', 21, 3),
-    ),
     fs.writeFile(creditPath, `원본 · ${params.video.channelTitle}`),
   ]
   if (comment) {
@@ -491,10 +486,9 @@ async function renderShort(params: {
     `[composed]drawbox=x=36:y=48:w=648:h=180:color=black@0.72:t=fill,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(hookPath)}':fontcolor=white:fontsize=45:line_spacing=11:x=(w-text_w)/2:y=79`,
     ...(comment
       ? [
-          `drawbox=x=48:y=852:w=624:h=136:color=white@0.94:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(commentAuthorPath)}':fontcolor=0x5f6368:fontsize=19:x=78:y=872,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(commentTextPath)}':fontcolor=0x111111:fontsize=24:line_spacing=8:x=78:y=903`,
+          `drawbox=x=48:y=940:w=624:h=136:color=white@0.94:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(commentAuthorPath)}':fontcolor=0x5f6368:fontsize=19:x=78:y=960,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(commentTextPath)}':fontcolor=0x111111:fontsize=24:line_spacing=8:x=78:y=991`,
         ]
       : []),
-    `drawbox=x=36:y=1007:w=648:h=173:color=black@0.68:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(captionPath)}':fontcolor=white:fontsize=28:line_spacing=8:x=(w-text_w)/2:y=1040`,
     `drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(creditPath)}':fontcolor=white@0.82:fontsize=17:x=48:y=1219[outv]`,
   ].join(',')
 
