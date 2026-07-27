@@ -1824,6 +1824,25 @@
   font-size: 12px;
 }
 
+.sl-upload-progress {
+  background: rgba(16, 185, 129, 0.09);
+  color: #047857;
+}
+
+.sl-progress-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.sl-upload-progress .sl-source-upload-track {
+  margin-top: 12px;
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.sl-upload-progress .sl-source-upload-track span {
+  background: linear-gradient(90deg, #10b981, #4252ff);
+}
+
 .sl-finished {
   margin-top: 4px;
   padding-top: 4px;

@@ -122,7 +122,9 @@ export default function ShortsLab({
     isLongform(selected) &&
     selected.embeddable &&
     !selected.regionBlocked &&
-    !generating
+    !generating &&
+    !uploadingSource &&
+    !captureOpen
 
   const selectVideo = useCallback((id: string) => {
     setSelectedId(id)
@@ -523,7 +525,13 @@ export default function ShortsLab({
                     disabled={!canGenerate}
                     onClick={openBrowserCapture}
                   >
-                    <MonitorUp aria-hidden="true" />브라우저로 무료 만들기
+                    {uploadingSource ? (
+                      <><RefreshCw className="is-spinning" aria-hidden="true" />캡처 전송 중 {uploadProgress}%</>
+                    ) : generating ? (
+                      <><RefreshCw className="is-spinning" aria-hidden="true" />숏폼 만드는 중…</>
+                    ) : (
+                      <><MonitorUp aria-hidden="true" />브라우저로 무료 만들기</>
+                    )}
                   </button>
                   {canGenerate && (
                     <button
@@ -551,7 +559,25 @@ export default function ShortsLab({
                 </div>
               )}
 
+              {uploadingSource && (
+                <div className="sl-compact-progress sl-upload-progress" role="status">
+                  <span className="sl-progress-orbit"><UploadCloud aria-hidden="true" /></span>
+                  <div className="sl-progress-copy">
+                    <strong>캡처가 끝났어요 · 영상 전송 중 {uploadProgress}%</strong>
+                    <p>전송이 끝나면 제목·댓글·음성 분석과 숏폼 제작이 자동으로 시작됩니다.</p>
+                    <div className="sl-source-upload-track" aria-hidden="true">
+                      <span style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {genError && <div className="sl-error">{genError}</div>}
+              {uploadError && !requiresSourceUpload && (
+                <div className="sl-error">
+                  캡처 영상 전송 실패: {uploadError}
+                </div>
+              )}
 
               {requiresSourceUpload && !downloadUrl && (
                 <div className="sl-source-fallback">
