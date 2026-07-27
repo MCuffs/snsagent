@@ -34,6 +34,8 @@ const MONTHLY_QUOTA_MIN = 60
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 const ALLOWED_SOURCE_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
 const BROWSER_CAPTURE_SEC = 35
+// 재생 시작 후 유튜브 임베드 오버레이(제목·로고·컨트롤)가 사라질 때까지 기다리는 시간
+const OVERLAY_SETTLE_MS = 3800
 
 const COMMENT_SOURCE_LABEL: Record<CommentSource, string> = {
   'youtube-api': '유튜브 인기 댓글 반영',
@@ -308,8 +310,17 @@ export default function ShortsLab({
         recorder.onerror = () => reject(new Error('브라우저 녹화 중 오류가 발생했습니다.'))
       })
 
+      const waitOnStream = (ms: number) =>
+        new Promise<void>((resolve, reject) => {
+          const timer = window.setTimeout(resolve, ms)
+          const videoTrack = stream?.getVideoTracks()[0]
+          videoTrack?.addEventListener('ended', () => {
+            window.clearTimeout(timer)
+            reject(new Error('탭 공유가 중간에 종료되었습니다. 다시 시도해 주세요.'))
+          }, { once: true })
+        })
+
       setCaptureState('recording')
-      recorder.start(1000)
       captureFrameRef.current.contentWindow?.postMessage(
         JSON.stringify({ event: 'command', func: 'seekTo', args: [captureStartSec, true] }),
         'https://www.youtube.com',
@@ -319,14 +330,11 @@ export default function ShortsLab({
         'https://www.youtube.com',
       )
 
-      await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(resolve, BROWSER_CAPTURE_SEC * 1000)
-        const videoTrack = stream?.getVideoTracks()[0]
-        videoTrack?.addEventListener('ended', () => {
-          window.clearTimeout(timer)
-          reject(new Error('탭 공유가 중간에 종료되었습니다. 다시 시도해 주세요.'))
-        }, { once: true })
-      })
+      // 재생 시작 직후에는 유튜브 임베드의 제목·로고·컨트롤 오버레이가 영상 위에
+      // 몇 초간 떠 있으므로, 오버레이가 사라진 뒤에 녹화를 시작합니다.
+      await waitOnStream(OVERLAY_SETTLE_MS)
+      recorder.start(1000)
+      await waitOnStream(BROWSER_CAPTURE_SEC * 1000)
       recorder.stop()
       await stopped
       stream.getTracks().forEach(track => track.stop())
@@ -666,7 +674,7 @@ export default function ShortsLab({
         <div className={`sl-capture-stage ${captureState === 'recording' ? 'is-recording' : ''}`}>
           <iframe
             ref={captureFrameRef}
-            src={`https://www.youtube.com/embed/${encodeURIComponent(selected.id)}?enablejsapi=1&playsinline=1&controls=0&rel=0&start=${captureStartSec}`}
+            src={`https://www.youtube.com/embed/${encodeURIComponent(selected.id)}?enablejsapi=1&playsinline=1&controls=0&rel=0&iv_load_policy=3&start=${captureStartSec}`}
             title={`${selected.title} 캡처 미리보기`}
             allow="autoplay; encrypted-media; picture-in-picture"
           />
