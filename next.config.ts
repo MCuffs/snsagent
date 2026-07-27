@@ -46,8 +46,8 @@ const nextConfig: NextConfig = {
 
     const cspHeader = cspDirectives.join('; ')
 
-    // Shorts Lab 데모는 YouTube IFrame 플레이어로 하이라이트 구간을 재생만 합니다.
-    // 전역 CSP 를 넓히지 않고 이 경로에서만 frame-src 를 허용합니다.
+    // Shorts Lab은 독립 경로와 CMS의 concept 탭 양쪽에서 YouTube IFrame을 사용합니다.
+    // 쿼리스트링의 tab 값은 headers()에서 구분할 수 없으므로 concept 경로에도 허용합니다.
     const shortsLabCsp = [
       ...cspDirectives,
       'frame-src https://www.youtube-nocookie.com https://www.youtube.com',
@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
       '/shorts-lab/:path*',
       '/:locale/shorts-lab',
       '/:locale/shorts-lab/:path*',
+      '/concept',
+      '/concept/:path*',
+      '/:locale/concept',
+      '/:locale/concept/:path*',
     ]
 
     return [
