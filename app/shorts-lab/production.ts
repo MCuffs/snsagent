@@ -438,10 +438,6 @@ function wrapKoreanText(text: string, maxChars = 15, maxLines = 2): string {
   return lines.slice(0, maxLines).join('\n')
 }
 
-function escapeFilterPath(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'")
-}
-
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -469,21 +465,36 @@ async function fetchAvatarDataUri(url: string | null): Promise<string | null> {
 const AVATAR_FALLBACK_COLORS = ['#7c4dff', '#ef5350', '#26a69a', '#ffa726', '#42a5f5']
 
 /**
- * 유튜브 다크모드 댓글과 동일한 카드(원형 아바타 · 작성자·시간 · 본문 ·
- * 좋아요/싫어요/답글 줄)를 SVG로 그려 PNG로 렌더합니다.
+ * 이지컷 '댓글 캡처' 템플릿과 동일한 전체 화면 오버레이를 SVG로 그려 PNG로
+ * 렌더합니다: 훅 2줄 중앙정렬(둘째 줄 블루→퍼플 그라데이션) · 유튜브 다크모드
+ * 댓글(원형 아바타 · 작성자·시간 · 본문 · 좋아요/싫어요/답글) · 하단 중앙 워터마크.
  */
-async function renderCommentCard(
-  comment: CapturedComment,
-  workDir: string,
-): Promise<string | null> {
-  try {
-    const avatar = await fetchAvatarDataUri(comment.avatarUrl ?? null)
-    // 이모지는 로드한 폰트에 글리프가 없어 깨진 사각형으로 보이므로 제거합니다.
-    const cleanText = comment.text
-      .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+async function renderTemplateOverlay(params: {
+  clip: ShortClip
+  video: TrendingVideo
+  workDir: string
+}): Promise<string> {
+  // 이모지는 로드한 폰트에 글리프가 없어 깨진 사각형으로 보이므로 제거합니다.
+  const stripEmoji = (value: string) =>
+    value
+      .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
       .replace(/\s+/g, ' ')
       .trim()
-    const lines = wrapKoreanText(cleanText, 21, 2).split('\n').map(escapeXml)
+
+  const hookLines = wrapKoreanText(stripEmoji(params.clip.hookTitle), 14, 2)
+    .split('\n')
+    .map(escapeXml)
+  const hookSvg =
+    hookLines.length > 1
+      ? `<text x="360" y="126" text-anchor="middle" class="hook" fill="#ffffff">${hookLines[0]}</text>
+  <text x="360" y="188" text-anchor="middle" class="hook" fill="url(#hookGrad)">${hookLines[1]}</text>`
+      : `<text x="360" y="158" text-anchor="middle" class="hook" fill="#ffffff">${hookLines[0]}</text>`
+
+  let commentSvg = ''
+  const comment = params.clip.comment
+  if (comment) {
+    const avatar = await fetchAvatarDataUri(comment.avatarUrl ?? null)
+    const lines = wrapKoreanText(stripEmoji(comment.text), 21, 2).split('\n').map(escapeXml)
     const authorRaw = Array.from(comment.author).slice(0, 22).join('')
     const authorLine = escapeXml(`${authorRaw} · ${comment.publishedLabel}`)
     const initial = escapeXml(Array.from(authorRaw.replace(/^@/, ''))[0]?.toUpperCase() ?? '?')
@@ -491,60 +502,64 @@ async function renderCommentCard(
       AVATAR_FALLBACK_COLORS[
         Math.abs(fnv1aText(comment.author)) % AVATAR_FALLBACK_COLORS.length
       ]
-
     const avatarSvg = avatar
-      ? `<image x="18" y="18" width="52" height="52" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice" href="${avatar}"/>`
-      : `<circle cx="44" cy="44" r="26" fill="${fallbackColor}"/><text x="44" y="53" text-anchor="middle" class="initial">${initial}</text>`
-
+      ? `<image x="0" y="0" width="52" height="52" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice" href="${avatar}"/>`
+      : `<circle cx="26" cy="26" r="26" fill="${fallbackColor}"/><text x="26" y="35" text-anchor="middle" class="initial">${initial}</text>`
     const bodySvg = lines
-      .map((line, index) => `<text x="88" y="${84 + index * 33}" class="body">${line}</text>`)
+      .map((line, index) => `<text x="70" y="${66 + index * 33}" class="body">${line}</text>`)
       .join('')
+    commentSvg = `<g transform="translate(48,884)">
+    ${avatarSvg}
+    <text x="70" y="32" class="author">${authorLine}</text>
+    ${bodySvg}
+    <g transform="translate(70,124)">
+      <path transform="scale(0.75)" fill="#aaaaaa" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"/>
+      <text x="26" y="15" class="meta">${escapeXml(formatLikes(comment.likeCount))}</text>
+      <path transform="translate(96,2) scale(0.75)" fill="#aaaaaa" d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2z"/>
+      <text x="146" y="15" class="meta">답글</text>
+    </g>
+  </g>`
+  }
 
-    const svg = `<svg width="624" height="164" viewBox="0 0 624 164" xmlns="http://www.w3.org/2000/svg">
+  const svg = `<svg width="720" height="1280" viewBox="0 0 720 1280" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <clipPath id="avatarClip"><circle cx="44" cy="44" r="26"/></clipPath>
+    <linearGradient id="hookGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#4d9dff"/>
+      <stop offset="1" stop-color="#b16cff"/>
+    </linearGradient>
+    <clipPath id="avatarClip"><circle cx="26" cy="26" r="26"/></clipPath>
     <style>
+      .hook { font-family: Pretendard; font-size: 46px; font-weight: 700; }
       .author { font-family: Pretendard; font-size: 19px; font-weight: 400; fill: #aaaaaa; }
       .body { font-family: Pretendard; font-size: 24px; font-weight: 700; fill: #f1f1f1; }
       .meta { font-family: Pretendard; font-size: 18px; font-weight: 400; fill: #aaaaaa; }
       .initial { font-family: Pretendard; font-size: 24px; font-weight: 700; fill: #ffffff; }
+      .wm { font-family: Pretendard; font-size: 22px; font-weight: 700; fill: #ffffff; }
+      .wmSub { font-family: Pretendard; font-size: 15px; font-weight: 400; fill: #9b9b9b; }
     </style>
   </defs>
-  <rect x="0" y="0" width="624" height="164" rx="18" fill="#0f0f0f" opacity="0.82"/>
-  ${avatarSvg}
-  <text x="88" y="49" class="author">${authorLine}</text>
-  ${bodySvg}
-  <g transform="translate(88,138)">
-    <path transform="scale(0.75)" fill="#aaaaaa" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"/>
-    <text x="26" y="15" class="meta">${escapeXml(formatLikes(comment.likeCount))}</text>
-    <path transform="translate(96,2) scale(0.75)" fill="#aaaaaa" d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2z"/>
-    <text x="146" y="15" class="meta">답글</text>
-  </g>
+  ${hookSvg}
+  ${commentSvg}
+  <text x="360" y="1216" text-anchor="middle" class="wm">Shuffla</text>
+  <text x="360" y="1244" text-anchor="middle" class="wmSub">원본 · ${escapeXml(params.video.channelTitle)}</text>
 </svg>`
 
-    const png = new Resvg(svg, {
-      fitTo: { mode: 'zoom', value: 2 },
-      font: {
-        fontFiles: [
-          path.join(process.cwd(), 'public/fonts/Pretendard-Regular.otf'),
-          path.join(process.cwd(), 'public/fonts/Pretendard-Bold.otf'),
-        ],
-        loadSystemFonts: false,
-        defaultFontFamily: 'Pretendard',
-      },
-    })
-      .render()
-      .asPng()
-    const cardPath = path.join(workDir, 'comment-card.png')
-    await fs.writeFile(cardPath, png)
-    return cardPath
-  } catch (error) {
-    console.warn(
-      '[shorts-lab] 댓글 카드 렌더링에 실패해 댓글 없이 진행합니다.',
-      error instanceof Error ? error.message : error,
-    )
-    return null
-  }
+  const png = new Resvg(svg, {
+    fitTo: { mode: 'zoom', value: 2 },
+    font: {
+      fontFiles: [
+        path.join(process.cwd(), 'public/fonts/Pretendard-Regular.otf'),
+        path.join(process.cwd(), 'public/fonts/Pretendard-Bold.otf'),
+      ],
+      loadSystemFonts: false,
+      defaultFontFamily: 'Pretendard',
+    },
+  })
+    .render()
+    .asPng()
+  const overlayPath = path.join(params.workDir, 'template-overlay.png')
+  await fs.writeFile(overlayPath, png)
+  return overlayPath
 }
 
 function fnv1aText(input: string): number {
@@ -562,44 +577,26 @@ async function renderShort(params: {
   video: TrendingVideo
   workDir: string
   isTabCapture: boolean
-  commentCardPath: string | null
+  overlayPath: string
 }): Promise<string> {
   const outputPath = path.join(params.workDir, 'short.mp4')
-  const hookPath = path.join(params.workDir, 'hook.txt')
-  const creditPath = path.join(params.workDir, 'credit.txt')
-  const fontBold = path.join(process.cwd(), 'public/fonts/Pretendard-ExtraBold.otf')
-  const fontRegular = path.join(process.cwd(), 'public/fonts/Pretendard-Bold.otf')
-
-  await Promise.all([
-    fs.writeFile(hookPath, wrapKoreanText(params.clip.hookTitle)),
-    fs.writeFile(creditPath, `원본 · ${params.video.channelTitle}`),
-  ])
 
   const duration = Math.max(15, params.clip.endSec - params.clip.startSec)
   // 탭 캡처는 뷰포트 전체가 녹화되어 플레이어 레터박스(위아래·좌우 검은 띠)가
-  // 섞일 수 있으므로 중앙 16:9 영역만 잘라 씁니다.
-  const mainChain = params.isTabCapture
-    ? '[main]crop=min(iw\\,ih*16/9):min(ih\\,iw*16/9),scale=720:720:force_original_aspect_ratio=decrease[fg]'
-    : '[main]scale=720:720:force_original_aspect_ratio=decrease[fg]'
-  // 댓글 카드 PNG는 마지막 입력으로 붙습니다 (0=영상, 1=오디오(있을 때), 마지막=카드)
-  const cardInputIndex = params.streams.audioUrl ? 2 : 1
-  const titledChain =
-    `[composed]drawbox=x=36:y=48:w=648:h=180:color=black@0.72:t=fill,` +
-    `drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(hookPath)}':fontcolor=white:fontsize=45:line_spacing=11:x=(w-text_w)/2:y=79,` +
-    `drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(creditPath)}':fontcolor=white@0.82:fontsize=17:x=48:y=1219` +
-    (params.commentCardPath ? '[titled]' : '[outv]')
+  // 섞일 수 있으므로 먼저 중앙 16:9 영역만 잘라냅니다.
+  const capturePrecrop = params.isTabCapture
+    ? 'crop=min(iw\\,ih*16/9):min(ih\\,iw*16/9),'
+    : ''
+  // 숏폼답게 화면을 채우도록 원본을 중앙 기준으로 720x640 밴드에 꽉 차게 크롭합니다.
+  const mainChain = `[0:v]${capturePrecrop}scale=720:640:force_original_aspect_ratio=increase,crop=720:640[fg]`
+  // 템플릿 오버레이 PNG는 마지막 입력으로 붙습니다 (0=영상, 1=오디오(있을 때), 마지막=오버레이)
+  const overlayInputIndex = params.streams.audioUrl ? 2 : 1
   const filter = [
-    '[0:v]split=2[base][main]',
-    '[base]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=12:4,eq=brightness=-0.25[bg]',
+    'color=c=0x0f0f0f:s=720x1280:r=30[bgc]',
     mainChain,
-    '[bg][fg]overlay=(W-w)/2:(H-h)/2[composed]',
-    titledChain,
-    ...(params.commentCardPath
-      ? [
-          `[${cardInputIndex}:v]scale=624:-1[card]`,
-          '[titled][card]overlay=48:938[outv]',
-        ]
-      : []),
+    '[bgc][fg]overlay=0:224:shortest=1[composed]',
+    `[${overlayInputIndex}:v]scale=720:1280[ui]`,
+    '[composed][ui]overlay=0:0[outv]',
   ].join(',')
 
   const inputs = [
@@ -615,7 +612,8 @@ async function renderShort(params: {
           params.clip.startSec,
         )
       : []),
-    ...(params.commentCardPath ? ['-i', params.commentCardPath] : []),
+    '-i',
+    params.overlayPath,
   ]
   const audioMap = params.streams.audioUrl ? '1:a:0?' : '0:a:0?'
 
@@ -732,16 +730,18 @@ export async function produceShort(params: {
     )
 
     params.onProgress?.('render', '숏폼을 완성하고 있어요', '9:16 영상과 후킹 카피 합성 중')
-    const commentCardPath = clip.comment
-      ? await renderCommentCard(clip.comment, workDir)
-      : null
+    const overlayPath = await renderTemplateOverlay({
+      clip,
+      video: params.video,
+      workDir,
+    })
     const renderedPath = await renderShort({
       streams,
       clip,
       video: params.video,
       workDir,
       isTabCapture: Boolean(params.uploadedSourceUrl) && params.uploadedSourceKind === 'capture',
-      commentCardPath,
+      overlayPath,
     })
     const stored = await storeShort(renderedPath, params.userId, params.video.id)
     return { clip, ...stored }
