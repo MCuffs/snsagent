@@ -302,6 +302,7 @@ function fallbackClip(
   video: TrendingVideo,
   comments: CapturedComment[],
   candidates: CandidateWindow[],
+  sourceIsUpload: boolean,
 ): ShortClip {
   const heuristic = generateClips(video, comments)[0]
   const candidate = candidates[0]
@@ -320,6 +321,9 @@ function fallbackClip(
   if (!candidate) {
     return {
       ...heuristic,
+      // 업로드된 원본(브라우저 캡처 35초 등)은 원본 영상보다 짧을 수 있어
+      // 원본 타임라인 기준 시작점을 그대로 쓰면 파일 끝을 넘어 시킹합니다.
+      ...(sourceIsUpload ? { startSec: 0, endSec: 35 } : {}),
       hookTitle: conciseTitle || heuristic.hookTitle,
       subtitleLines: topComment?.text
         ? [topComment.text.replace(/\s+/g, ' ').trim().slice(0, 84)]
@@ -343,8 +347,9 @@ async function selectHook(
   video: TrendingVideo,
   comments: CapturedComment[],
   candidates: CandidateWindow[],
+  sourceIsUpload: boolean,
 ): Promise<ShortClip> {
-  const fallback = () => fallbackClip(video, comments, candidates)
+  const fallback = () => fallbackClip(video, comments, candidates, sourceIsUpload)
   if (candidates.length === 0) return fallback()
 
   const commentText = comments
@@ -593,7 +598,12 @@ export async function produceShort(params: {
       segments = await transcribeAudio(audioPath)
     }
     const candidates = createCandidateWindows(segments)
-    const clip = await selectHook(params.video, params.comments, candidates)
+    const clip = await selectHook(
+      params.video,
+      params.comments,
+      candidates,
+      Boolean(params.uploadedSourceUrl),
+    )
 
     params.onProgress?.('render', '숏폼을 완성하고 있어요', '9:16 영상과 후킹 카피 합성 중')
     const renderedPath = await renderShort({
