@@ -48,8 +48,14 @@ const nextConfig: NextConfig = {
 
     // Shorts Lab은 독립 경로와 CMS의 concept 탭 양쪽에서 YouTube IFrame을 사용합니다.
     // 쿼리스트링의 tab 값은 headers()에서 구분할 수 없으므로 concept 경로에도 허용합니다.
+    // @vercel/blob 클라이언트 업로드는 https://vercel.com/api/blob 을 경유하므로
+    // connect-src에 vercel.com이 없으면 브라우저 캡처 업로드가 CSP에 차단됩니다.
     const shortsLabCsp = [
-      ...cspDirectives,
+      ...cspDirectives.map(directive =>
+        directive.startsWith('connect-src')
+          ? `${directive} https://vercel.com`
+          : directive,
+      ),
       'frame-src https://www.youtube-nocookie.com https://www.youtube.com',
     ].join('; ')
 
