@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import ShortsLab from '../../shorts-lab/ShortsLab'
 import { loadTrending } from '../../shorts-lab/trending'
 import '../../shorts-lab/shorts-lab.css'
+import { notFound } from 'next/navigation'
+import { getSessionUser } from '../../../lib/auth/user'
+import { canAccessShortsLab } from '../../../lib/auth/shorts-lab-access'
 
 export const metadata: Metadata = {
   title: 'Shorts Lab — 구조 검증 데모',
@@ -13,6 +16,8 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function LocalizedShortsLabPage() {
+  const user = await getSessionUser()
+  if (!canAccessShortsLab(user?.email)) notFound()
   const initial = await loadTrending()
-  return <ShortsLab initial={initial} />
+  return <ShortsLab initial={initial} userId={user!.id} />
 }

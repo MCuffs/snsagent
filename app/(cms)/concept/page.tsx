@@ -6,6 +6,7 @@ import { normalizePlan, PRICING_PLANS } from '../../../lib/limits-types'
 import DashboardContainer from './DashboardContainer'
 import { Loader2 } from 'lucide-react'
 import { isAdminEmail } from '../../../lib/auth/admin-emails'
+import { canAccessShortsLab } from '../../../lib/auth/shorts-lab-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,7 @@ async function DashboardDataLoader() {
         summarizedPreference={null}
         isGuest={true}
         userPlan={null}
+        canAccessShortsLab={false}
       />
     )
   }
@@ -120,6 +122,7 @@ async function DashboardDataLoader() {
       userName={user.name}
       summarizedPreference={summarizedPreference}
       userPlan={accessPlan}
+      canAccessShortsLab={canAccessShortsLab(user.email)}
       hasVideoApiKey={Boolean(
         process.env.KLINGAI_API_KEY ||
         (process.env.KLINGAI_ACCESS_KEY && process.env.KLINGAI_SECRET_KEY) ||

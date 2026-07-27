@@ -12,6 +12,7 @@ import { SidebarUsageWidget } from './SidebarUsageWidget'
 import { isAdminEmail } from '../../lib/auth/admin-emails'
 import { getUsageSummaryForUser } from '../../lib/usage-summary'
 import { normalizePlan } from '../../lib/limits-types'
+import { canAccessShortsLab } from '../../lib/auth/shorts-lab-access'
 
 export default async function CmsLayout({ children }: { children: React.ReactNode }) {
   const [user, t] = await Promise.all([
@@ -30,6 +31,7 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
   const isAdminUser = isAdminEmail(user?.email)
   const planLabel = isAdminUser ? 'ADMIN' : user?.plan
   const navAccessPlan = isAdminUser ? 'ADMIN' : user ? normalizePlan(user.plan || 'FREE') : null
+  const showShortsLab = canAccessShortsLab(user?.email)
 
   return (
     <TabProvider>
@@ -55,7 +57,11 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Nav */}
-          <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
+          <SidebarNav
+            hasCompleteBrand={hasCompleteBrand}
+            userPlan={navAccessPlan}
+            canAccessShortsLab={showShortsLab}
+          />
 
         {/* User + Plan */}
         <div className="space-y-1.5 border-t border-white/60 bg-white/36 p-3 backdrop-blur-xl">
@@ -100,7 +106,11 @@ export default async function CmsLayout({ children }: { children: React.ReactNod
         {/* Mobile Header Drawer */}
         <MobileHeader>
           <div className="flex flex-col h-full justify-between pb-4">
-            <SidebarNav hasCompleteBrand={hasCompleteBrand} userPlan={navAccessPlan} />
+            <SidebarNav
+              hasCompleteBrand={hasCompleteBrand}
+              userPlan={navAccessPlan}
+              canAccessShortsLab={showShortsLab}
+            />
 
             <div className="mt-auto space-y-1.5 border-t border-white/60 bg-white/36 p-3 backdrop-blur-xl">
               {user ? (

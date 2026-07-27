@@ -57,7 +57,6 @@ open http://localhost:3000/shorts-lab
 
 - **`app/[locale]/shorts-lab/page.tsx`가 반드시 있어야 합니다.** `proxy.ts`의 next-intl 미들웨어가
   모든 경로를 `/{locale}/...`로 리라이트해서, 루트 `app/shorts-lab/`만 있으면 404가 납니다.
-  `sling-pang`, `studio-tycoon`도 같은 패턴입니다.
 - **API 라우트는 `/api/` 아래에 둬야 합니다.** `proxy.ts`가 `/api`로 시작하는 경로만 통과시킵니다.
 - **CSP.** `next.config.ts`의 전역 CSP에 `frame-src`가 없어 `default-src 'self'`로 폴백되며
   모든 외부 iframe이 차단됩니다. 전역을 넓히지 않고 `/shorts-lab` 경로에만 오버라이드를 추가했습니다.

@@ -66,3 +66,6 @@ prisma/errors.log
 # local test videos (not deployed)
 /video_card_news_front/
 /video_youtube/
+vendor/yt-dlp
+cookies.txt
+youtube-cookies*.txt

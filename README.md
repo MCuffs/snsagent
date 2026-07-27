@@ -110,6 +110,7 @@ npm run dev
 | `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `POLAR_CHECKOUT_*`, `POLAR_PRODUCT_*` | Polar checkout, webhook, 상품 매핑 |
 | `META_APP_ID`, `META_APP_SECRET`, `INSTAGRAM_TOKEN_ENCRYPTION_KEY` | Meta/Instagram 연동 |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 업로드 |
+| `YOUTUBE_COOKIES_B64`, `YOUTUBE_COOKIE_USER_AGENT` | Shorts Lab의 YouTube 인증 쿠키(Base64 Netscape 형식)와 해당 브라우저 User-Agent |
 | `CRON_SECRET` | retention, blob cleanup, YouTube render cron 실행 보호 |
 
 ## 배포

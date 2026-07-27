@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
   { key: 'generate', label: 'Generate', labelKey: 'nav_generate', icon: Zap, descKey: 'nav_generate_desc', href: '/concept?tab=generate' },
   { key: 'video-cardnews', label: '영상 카드뉴스', labelKey: 'nav_video', icon: Clapperboard, descKey: 'nav_video_cardnews_desc', href: '/concept?tab=video-cardnews', badge: 'Beta' },
   { key: 'youtube-automation', label: 'YouTube', labelKey: 'nav_youtube_automation', icon: TvMinimalPlay, descKey: 'nav_youtube_automation_desc', href: '/concept?tab=youtube-automation', badge: 'New' },
+  { key: 'shorts-lab', label: 'Shorts Lab', labelKey: 'nav_shorts_lab', icon: Sparkles, descKey: 'nav_shorts_lab_desc', href: '/concept?tab=shorts-lab', badge: 'Beta' },
   { key: 'works', label: 'Works', labelKey: 'nav_works', icon: Grid3X3, descKey: 'nav_works_desc', href: '/concept?tab=works' },
 ]
 
@@ -32,9 +33,15 @@ interface SidebarNavProps {
   hasCompleteBrand: boolean
   locale?: string
   userPlan?: string | null
+  canAccessShortsLab?: boolean
 }
 
-export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: SidebarNavProps) {
+export default function SidebarNav({
+  hasCompleteBrand,
+  locale,
+  userPlan,
+  canAccessShortsLab = false,
+}: SidebarNavProps) {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useTab()
   const closeMobileMenu = useCloseMobileMenu()
@@ -88,7 +95,7 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
   return (
     <>
       <nav className="flex-1 space-y-1 px-2.5 py-3">
-        {navItems.map((item) => {
+        {navItems.filter(item => item.key !== 'shorts-lab' || canAccessShortsLab).map((item) => {
         const Icon = item.icon
         const disabled = false
         const href = item.key === 'concept' ? `${conceptPath}?tab=concept` : `${conceptPath}${item.href.replace('/concept', '')}`
@@ -198,4 +205,3 @@ export default function SidebarNav({ hasCompleteBrand, locale, userPlan }: Sideb
     </>
   )
 }
-

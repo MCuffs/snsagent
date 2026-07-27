@@ -32,6 +32,7 @@ async function handleBlobCleanup(request: NextRequest) {
   })
 
   const referencedUrls = new Set<string>()
+  const uploadOrphanCutoff = Date.now() - 24 * 60 * 60 * 1000
   for (const slide of slides) {
     if (slide.backgroundImageUrl?.includes('/uploads/')) {
       referencedUrls.add(slide.backgroundImageUrl)
@@ -70,7 +71,7 @@ async function handleBlobCleanup(request: NextRequest) {
   do {
     const result = await list({ prefix: 'uploads/', token, cursor, limit: 100 })
     for (const blob of result.blobs) {
-      if (referencedUrls.has(blob.url)) {
+      if (referencedUrls.has(blob.url) || blob.uploadedAt.getTime() >= uploadOrphanCutoff) {
         kept++
       } else {
         await del(blob.url, { token })

@@ -5,6 +5,9 @@
     },
     "app/api/cron/youtube-render/route.ts": {
       "memory": 3009
+    },
+    "app/api/shorts-lab/generate/route.ts": {
+      "memory": 3009
     }
   },
   "crons": [

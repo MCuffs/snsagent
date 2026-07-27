@@ -1,11 +1,26 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
-import { withWorkflow } from 'workflow/next';
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['@resvg/resvg-js', '@ffmpeg-installer/ffmpeg', '@ffmpeg-installer/linux-x64'],
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+      },
+    ],
+  },
+  outputFileTracingIncludes: {
+    '/api/shorts-lab/generate': ['./vendor/yt-dlp'],
+  },
+  serverExternalPackages: [
+    '@resvg/resvg-js',
+    '@ffmpeg-installer/ffmpeg',
+    '@ffmpeg-installer/linux-x64',
+    'youtube-dl-exec',
+  ],
   async rewrites() {
     return [
       { source: '/sitemap.xml', destination: '/api/sitemap' },
@@ -78,4 +93,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withWorkflow(withNextIntl(nextConfig));
+export default withNextIntl(nextConfig);

@@ -13,6 +13,7 @@ export interface TrendingResult {
   notice: string | null
   videos: TrendingVideo[]
   fetchedAtLabel: string
+  criteriaLabel: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -46,6 +47,10 @@ interface YouTubeVideoItem {
   statistics?: { viewCount?: string }
 }
 
+interface YouTubeSearchItem {
+  id?: { videoId?: string }
+}
+
 function toTrendingVideo(item: YouTubeVideoItem, now: number): TrendingVideo {
   const thumbs = item.snippet?.thumbnails ?? {}
   const thumbnailUrl =
@@ -70,7 +75,7 @@ function toTrendingVideo(item: YouTubeVideoItem, now: number): TrendingVideo {
   }
 }
 
-async function fetchFromYouTube(apiKey: string): Promise<TrendingVideo[]> {
+async function fetchMostPopular(apiKey: string): Promise<TrendingVideo[]> {
   const url = new URL('https://www.googleapis.com/youtube/v3/videos')
   url.searchParams.set('part', 'snippet,contentDetails,status,statistics')
   url.searchParams.set('chart', 'mostPopular')
@@ -88,11 +93,94 @@ async function fetchFromYouTube(apiKey: string): Promise<TrendingVideo[]> {
   return (json.items ?? []).map(item => toTrendingVideo(item, now))
 }
 
+async function fetchVideoDetails(
+  apiKey: string,
+  ids: string[],
+): Promise<TrendingVideo[]> {
+  const uniqueIds = [...new Set(ids)].slice(0, 50)
+  if (uniqueIds.length === 0) return []
+
+  const url = new URL('https://www.googleapis.com/youtube/v3/videos')
+  url.searchParams.set('part', 'snippet,contentDetails,status,statistics')
+  url.searchParams.set('id', uniqueIds.join(','))
+  url.searchParams.set('key', apiKey)
+
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`YouTube Data API ${res.status}: ${await res.text()}`)
+  }
+
+  const json = (await res.json()) as { items?: YouTubeVideoItem[] }
+  const now = Date.now()
+  return (json.items ?? []).map(item => toTrendingVideo(item, now))
+}
+
+async function searchCreativeCommons(
+  apiKey: string,
+  videoDuration: 'medium' | 'long',
+): Promise<string[]> {
+  const url = new URL('https://www.googleapis.com/youtube/v3/search')
+
+  url.searchParams.set('part', 'snippet')
+  url.searchParams.set('type', 'video')
+  url.searchParams.set('q', '한국')
+  url.searchParams.set('order', 'viewCount')
+  url.searchParams.set('regionCode', 'KR')
+  url.searchParams.set('relevanceLanguage', 'ko')
+  url.searchParams.set('maxResults', '25')
+  url.searchParams.set('safeSearch', 'moderate')
+  url.searchParams.set('videoDuration', videoDuration)
+  url.searchParams.set('videoEmbeddable', 'true')
+  url.searchParams.set('videoLicense', 'creativeCommon')
+  url.searchParams.set('key', apiKey)
+
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`YouTube CC 검색 ${res.status}: ${await res.text()}`)
+  }
+
+  const json = (await res.json()) as { items?: YouTubeSearchItem[] }
+  return (json.items ?? [])
+    .map(item => item.id?.videoId)
+    .filter((id): id is string => Boolean(id))
+}
+
+async function fetchCreativeCommonsLongform(
+  apiKey: string,
+): Promise<TrendingVideo[]> {
+  // YouTube 검색의 medium은 4~20분, long은 20분 초과입니다.
+  // 상세 조회 후 Shorts Lab의 정확한 3~60분 기준으로 다시 거릅니다.
+  const [mediumIds, longIds] = await Promise.all([
+    searchCreativeCommons(apiKey, 'medium'),
+    searchCreativeCommons(apiKey, 'long'),
+  ])
+  const videos = await fetchVideoDetails(apiKey, [...mediumIds, ...longIds])
+
+  return videos
+    .filter(
+      video =>
+        video.license === 'creativeCommon' &&
+        video.embeddable &&
+        video.durationSec >= 180 &&
+        video.durationSec <= 3_600,
+    )
+    .sort((a, b) => b.viewCount - a.viewCount)
+}
+
+function mergeUnique(
+  popular: TrendingVideo[],
+  reusable: TrendingVideo[],
+): TrendingVideo[] {
+  const seen = new Set(popular.map(video => video.id))
+  return [...popular, ...reusable.filter(video => !seen.has(video.id))]
+}
+
 const FIXTURE_RESULT = (notice: string | null): TrendingResult => ({
   mode: 'fixture',
   notice,
   videos: FIXTURE_VIDEOS,
   fetchedAtLabel: '픽스처 스냅샷',
+  criteriaLabel: '데모 데이터 · 3~60분 및 CC 필터 검증용',
 })
 
 export async function loadTrending(): Promise<TrendingResult> {
@@ -105,12 +193,24 @@ export async function loadTrending(): Promise<TrendingResult> {
   }
 
   try {
-    const videos = await fetchFromYouTube(apiKey)
+    const popular = await fetchMostPopular(apiKey)
+    let reusable: TrendingVideo[] = []
+    let notice: string | null = null
+
+    try {
+      reusable = await fetchCreativeCommonsLongform(apiKey)
+    } catch (error) {
+      notice =
+        '재사용 가능 영상 확장 검색에 실패해 한국 인기 차트만 표시합니다. ' +
+        (error instanceof Error ? error.message : String(error))
+    }
+
     return {
       mode: 'youtube-api',
-      notice: null,
-      videos,
+      notice,
+      videos: mergeUnique(popular, reusable),
       fetchedAtLabel: `조회 ${new Date().toLocaleTimeString('ko-KR', { hour12: false })}`,
+      criteriaLabel: `한국 인기 차트 50개 + CC 조회수 상위 롱폼 ${reusable.length}개`,
     }
   } catch (error) {
     // 실 API 실패 시에도 데모가 멈추지 않도록 픽스처로 폴백

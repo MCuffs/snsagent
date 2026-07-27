@@ -81,6 +81,8 @@ export interface ResultEvent {
   type: 'result'
   video: TrendingVideo
   clips: ShortClip[]
+  downloadUrl: string
+  fileName: string
   usedMinutes: number
   engine: string
   commentSource: CommentSource
@@ -90,6 +92,7 @@ export interface ResultEvent {
 export interface ErrorEvent {
   type: 'error'
   message: string
+  code?: 'SOURCE_BLOCKED' | 'SOURCE_UPLOAD_INVALID'
 }
 
 export type PipelineEvent = StageEvent | ResultEvent | ErrorEvent

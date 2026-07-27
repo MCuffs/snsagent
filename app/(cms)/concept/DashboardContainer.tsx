@@ -14,6 +14,7 @@ import Link from 'next/link'
 const GenerateForm = dynamic(() => import('../generate/GenerateForm'), { loading: DashboardLoading })
 const VideoCardNewsForm = dynamic(() => import('../video-cardnews/VideoCardNewsForm'), { loading: DashboardLoading })
 const YouTubeAutomationDashboard = dynamic(() => import('../youtube-automation/YouTubeAutomationDashboard'), { loading: DashboardLoading })
+const ShortsLabCmsPanel = dynamic(() => import('../../shorts-lab/ShortsLabCmsPanel'), { loading: DashboardLoading })
 const WorksGrid = dynamic(() => import('../works/WorksGrid'), { loading: DashboardLoading })
 
 function DashboardLoading() {
@@ -69,6 +70,7 @@ interface DashboardContainerProps {
   isGuest?: boolean
   hasVideoApiKey?: boolean
   userPlan?: string | null
+  canAccessShortsLab?: boolean
 }
 
 export default function DashboardContainer({
@@ -85,9 +87,12 @@ export default function DashboardContainer({
   isGuest = false,
   hasVideoApiKey = false,
   userPlan,
+  canAccessShortsLab = false,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
-  const activeTab = tab
+  const activeTab = tab === 'shorts-lab' && !canAccessShortsLab
+    ? 'youtube-automation'
+    : tab
   const [mountedTabs, setMountedTabs] = useState(() => new Set([activeTab]))
   const t = useTranslations('concept')
   const pathname = usePathname()
@@ -398,6 +403,19 @@ export default function DashboardContainer({
           <DashboardLoading />
         )}
       </div>
+
+      {canAccessShortsLab && (
+        <div className={tabPanelClass('shorts-lab')} aria-hidden={activeTab !== 'shorts-lab'}>
+          {mountedTabs.has('shorts-lab') ? (
+            <ShortsLabCmsPanel
+              isActive={activeTab === 'shorts-lab'}
+              userId={userId ?? ''}
+            />
+          ) : (
+            <DashboardLoading />
+          )}
+        </div>
+      )}
 
       {brandToPass && (
         <div className={tabPanelClass('video-cardnews')} aria-hidden={activeTab !== 'video-cardnews'}>
