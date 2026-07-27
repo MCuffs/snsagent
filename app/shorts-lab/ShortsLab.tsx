@@ -320,18 +320,59 @@ export default function ShortsLab({
           }, { once: true })
         })
 
-      setCaptureState('recording')
-      captureFrameRef.current.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'seekTo', args: [captureStartSec, true] }),
-        'https://www.youtube.com',
-      )
-      captureFrameRef.current.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-        'https://www.youtube.com',
-      )
+      const frameWindow = captureFrameRef.current.contentWindow
+      const post = (func: string, args: unknown[] = []) =>
+        frameWindow?.postMessage(
+          JSON.stringify({ event: 'command', func, args }),
+          'https://www.youtube.com',
+        )
 
-      // 재생 시작 직후에는 유튜브 임베드의 제목·로고·컨트롤 오버레이가 영상 위에
-      // 몇 초간 떠 있으므로, 오버레이가 사라진 뒤에 녹화를 시작합니다.
+      // 플레이어가 실제 재생(playerState === 1)을 보고할 때까지 기다립니다.
+      // 시킹·버퍼링으로 재생 시작이 늦어지면 제목 오버레이 페이드도 같이 밀리므로,
+      // 고정 타이머가 아니라 재생 시작 시점을 기준으로 대기해야 합니다.
+      const waitForPlaying = (timeoutMs: number) =>
+        new Promise<void>(resolve => {
+          const cleanup = () => {
+            window.clearTimeout(timer)
+            window.removeEventListener('message', onMessage)
+          }
+          const timer = window.setTimeout(() => {
+            cleanup()
+            resolve()
+          }, timeoutMs)
+          const onMessage = (event: MessageEvent) => {
+            if (event.origin !== 'https://www.youtube.com') return
+            if (typeof event.data !== 'string') return
+            try {
+              const data = JSON.parse(event.data) as { info?: { playerState?: number } }
+              if (data.info?.playerState === 1) {
+                cleanup()
+                resolve()
+              }
+            } catch {
+              // 다른 형식의 메시지는 무시
+            }
+          }
+          window.addEventListener('message', onMessage)
+          frameWindow?.postMessage(
+            JSON.stringify({ event: 'listening', id: 'sl-capture', channel: 'widget' }),
+            'https://www.youtube.com',
+          )
+        })
+
+      setCaptureState('recording')
+      // 브라우저의 유튜브 설정에 자막이 켜져 있으면 임베드에도 CC가 자동 표시되므로
+      // 캡션 모듈을 강제로 내립니다. (URL 파라미터로는 끌 수 없음)
+      post('unloadModule', ['captions'])
+      post('unloadModule', ['cc'])
+      post('seekTo', [captureStartSec, true])
+      post('playVideo')
+
+      await waitForPlaying(8000)
+      // 재생이 실제로 시작된 뒤에도 자동자막이 늦게 붙는 경우가 있어 한 번 더 내립니다.
+      post('unloadModule', ['captions'])
+      post('unloadModule', ['cc'])
+      // 재생 시작 직후 몇 초간 떠 있는 제목·로고 오버레이가 사라진 뒤 녹화를 시작합니다.
       await waitOnStream(OVERLAY_SETTLE_MS)
       recorder.start(1000)
       await waitOnStream(BROWSER_CAPTURE_SEC * 1000)
