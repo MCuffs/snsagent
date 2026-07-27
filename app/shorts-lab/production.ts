@@ -10,7 +10,7 @@ import OpenAI from 'openai'
 import youtubeDl, { create as createYoutubeDl } from 'youtube-dl-exec'
 import { z } from 'zod'
 import { getLLMClient } from '../../src/lib/ai/llmClient'
-import { generateClips } from './pipeline'
+import { formatLikes, generateClips } from './pipeline'
 import type { CapturedComment, ShortClip, TrendingVideo } from './types'
 
 interface TranscriptSegment {
@@ -446,30 +446,54 @@ async function renderShort(params: {
   clip: ShortClip
   video: TrendingVideo
   workDir: string
+  isTabCapture: boolean
 }): Promise<string> {
   const outputPath = path.join(params.workDir, 'short.mp4')
   const hookPath = path.join(params.workDir, 'hook.txt')
   const captionPath = path.join(params.workDir, 'caption.txt')
   const creditPath = path.join(params.workDir, 'credit.txt')
+  const commentAuthorPath = path.join(params.workDir, 'comment-author.txt')
+  const commentTextPath = path.join(params.workDir, 'comment-text.txt')
   const fontBold = path.join(process.cwd(), 'public/fonts/Pretendard-ExtraBold.otf')
   const fontRegular = path.join(process.cwd(), 'public/fonts/Pretendard-Bold.otf')
 
-  await Promise.all([
+  const comment = params.clip.comment
+  const writes = [
     fs.writeFile(hookPath, wrapKoreanText(params.clip.hookTitle)),
     fs.writeFile(
       captionPath,
       wrapKoreanText(params.clip.subtitleLines[0] ?? '', 21, 3),
     ),
     fs.writeFile(creditPath, `원본 · ${params.video.channelTitle}`),
-  ])
+  ]
+  if (comment) {
+    writes.push(
+      fs.writeFile(
+        commentAuthorPath,
+        `${comment.author} · 좋아요 ${formatLikes(comment.likeCount)}`,
+      ),
+      fs.writeFile(commentTextPath, wrapKoreanText(comment.text, 26, 2)),
+    )
+  }
+  await Promise.all(writes)
 
   const duration = Math.max(15, params.clip.endSec - params.clip.startSec)
+  // 탭 캡처는 뷰포트 전체가 녹화되어 플레이어 레터박스(위아래·좌우 검은 띠)가
+  // 섞일 수 있으므로 중앙 16:9 영역만 잘라 씁니다.
+  const mainChain = params.isTabCapture
+    ? '[main]crop=min(iw\\,ih*16/9):min(ih\\,iw*16/9),scale=720:720:force_original_aspect_ratio=decrease[fg]'
+    : '[main]scale=720:720:force_original_aspect_ratio=decrease[fg]'
   const filter = [
     '[0:v]split=2[base][main]',
     '[base]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=12:4,eq=brightness=-0.25[bg]',
-    '[main]scale=720:720:force_original_aspect_ratio=decrease[fg]',
+    mainChain,
     '[bg][fg]overlay=(W-w)/2:(H-h)/2[composed]',
     `[composed]drawbox=x=36:y=48:w=648:h=180:color=black@0.72:t=fill,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(hookPath)}':fontcolor=white:fontsize=45:line_spacing=11:x=(w-text_w)/2:y=79`,
+    ...(comment
+      ? [
+          `drawbox=x=48:y=852:w=624:h=136:color=white@0.94:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(commentAuthorPath)}':fontcolor=0x5f6368:fontsize=19:x=78:y=872,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(commentTextPath)}':fontcolor=0x111111:fontsize=24:line_spacing=8:x=78:y=903`,
+        ]
+      : []),
     `drawbox=x=36:y=1007:w=648:h=173:color=black@0.68:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(captionPath)}':fontcolor=white:fontsize=28:line_spacing=8:x=(w-text_w)/2:y=1040`,
     `drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(creditPath)}':fontcolor=white@0.82:fontsize=17:x=48:y=1219[outv]`,
   ].join(',')
@@ -562,6 +586,7 @@ export async function produceShort(params: {
   comments: CapturedComment[]
   userId: string
   uploadedSourceUrl?: string
+  uploadedSourceKind?: 'capture' | 'file'
   onProgress?: ProductionProgress
 }): Promise<ProducedShort> {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shuffla-shorts-'))
@@ -611,6 +636,7 @@ export async function produceShort(params: {
       clip,
       video: params.video,
       workDir,
+      isTabCapture: Boolean(params.uploadedSourceUrl) && params.uploadedSourceKind === 'capture',
     })
     const stored = await storeShort(renderedPath, params.userId, params.video.id)
     return { clip, ...stored }

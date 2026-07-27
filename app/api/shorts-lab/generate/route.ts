@@ -28,6 +28,7 @@ const videoSchema = z.object({
 const bodySchema = z.object({
   video: videoSchema,
   sourceUrl: z.string().url().optional(),
+  sourceKind: z.enum(['capture', 'file']).optional(),
 })
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { video, sourceUrl } = body
+  const { video, sourceUrl, sourceKind } = body
   if (video.source !== 'youtube-api') {
     return Response.json(
       { error: '데모 영상은 실제 MP4를 만들 수 없습니다. LIVE 목록의 영상을 선택해 주세요.' },
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
           comments: pool.comments,
           userId: user.id,
           uploadedSourceUrl: sourceUrl,
+          uploadedSourceKind: sourceKind,
           onProgress: (id, label, detail) => {
             send({ type: 'stage', id, label, detail, status: 'running' })
           },

@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   CheckCircle2,
   Clapperboard,
@@ -140,7 +141,7 @@ export default function ShortsLab({
     setCaptureError(null)
   }, [])
 
-  const generate = useCallback(async (sourceUrl?: string) => {
+  const generate = useCallback(async (sourceUrl?: string, sourceKind?: 'capture' | 'file') => {
     if (!selected) return
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -177,7 +178,10 @@ export default function ShortsLab({
       const response = await fetch('/api/shorts-lab/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video: selected, ...(sourceUrl ? { sourceUrl } : {}) }),
+        body: JSON.stringify({
+          video: selected,
+          ...(sourceUrl ? { sourceUrl, sourceKind: sourceKind ?? 'file' } : {}),
+        }),
         signal: controller.signal,
       })
       if (!response.ok) {
@@ -209,7 +213,10 @@ export default function ShortsLab({
     }
   }, [selected])
 
-  const uploadSourceAndGenerate = useCallback(async (file: File) => {
+  const uploadSourceAndGenerate = useCallback(async (
+    file: File,
+    sourceKind: 'capture' | 'file' = 'file',
+  ) => {
     if (!selected) return
 
     const extension = file.name.split('.').pop()?.toLowerCase()
@@ -244,7 +251,7 @@ export default function ShortsLab({
       })
 
       setUploadingSource(false)
-      await generate(blob.url)
+      await generate(blob.url, sourceKind)
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : '원본 업로드에 실패했습니다.')
       setUploadingSource(false)
@@ -334,7 +341,7 @@ export default function ShortsLab({
       )
       setCaptureOpen(false)
       setCaptureState('idle')
-      await uploadSourceAndGenerate(file)
+      await uploadSourceAndGenerate(file, 'capture')
     } catch (error) {
       stream?.getTracks().forEach(track => track.stop())
       setCaptureState('idle')
@@ -653,7 +660,9 @@ export default function ShortsLab({
         </section>
       </div>
 
-      {captureOpen && selected && (
+      {/* CMS 탭 패널은 transform-gpu 조상이라 position:fixed가 패널에 갇힙니다.
+          탭 캡처가 항상 화면 전체를 덮도록 body로 포털합니다. */}
+      {captureOpen && selected && createPortal(
         <div className={`sl-capture-stage ${captureState === 'recording' ? 'is-recording' : ''}`}>
           <iframe
             ref={captureFrameRef}
@@ -693,7 +702,8 @@ export default function ShortsLab({
               <small>Chrome 권장 · Creative Commons 영상에만 제공</small>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
