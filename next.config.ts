@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     // Content Security Policy
-    const cspHeader = [
+    const cspDirectives = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.googleadservices.com",
       "style-src 'self' 'unsafe-inline'",
@@ -27,7 +27,23 @@ const nextConfig: NextConfig = {
       "form-action 'self'",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
+    ]
+
+    const cspHeader = cspDirectives.join('; ')
+
+    // Shorts Lab 데모는 YouTube IFrame 플레이어로 하이라이트 구간을 재생만 합니다.
+    // 전역 CSP 를 넓히지 않고 이 경로에서만 frame-src 를 허용합니다.
+    const shortsLabCsp = [
+      ...cspDirectives,
+      'frame-src https://www.youtube-nocookie.com https://www.youtube.com',
     ].join('; ')
+
+    const shortsLabPaths = [
+      '/shorts-lab',
+      '/shorts-lab/:path*',
+      '/:locale/shorts-lab',
+      '/:locale/shorts-lab/:path*',
+    ]
 
     return [
       {
@@ -50,6 +66,11 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // 같은 키의 헤더는 뒤쪽 항목이 앞쪽을 덮어씁니다.
+      ...shortsLabPaths.map(source => ({
+        source,
+        headers: [{ key: 'Content-Security-Policy', value: shortsLabCsp }],
+      })),
     ];
   },
   turbopack: {

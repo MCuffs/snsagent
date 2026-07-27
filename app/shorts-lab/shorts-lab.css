@@ -1,0 +1,1137 @@
+/* Shorts Lab — 독립 데모 스타일.
+   Shuffla 마케팅 페이지와 같은 톤(따뜻한 오프화이트 + 오렌지 액센트)을 따릅니다.
+   전역 셀렉터를 쓰지 않고 .sl-* 로만 스코프합니다. */
+
+.sl-root {
+  --sl-bg: #fbfaf7;
+  --sl-panel: #ffffff;
+  --sl-panel-2: #f6f4ef;
+  --sl-line: #e8e2d8;
+  --sl-line-strong: #dbd7d0;
+  --sl-text: #171714;
+  --sl-text-2: #302c26;
+  --sl-dim: #716a60;
+  --sl-dim-2: #857e73;
+  --sl-accent: #ed6238;
+  --sl-accent-hover: #e95b30;
+  --sl-accent-soft: rgba(237, 98, 56, 0.08);
+  --sl-ok: #3f8f68;
+  --sl-ok-soft: rgba(63, 143, 104, 0.1);
+  --sl-warn: #a8761f;
+  --sl-warn-soft: rgba(168, 118, 31, 0.09);
+  --sl-bad: #c4452c;
+  --sl-bad-soft: rgba(196, 69, 44, 0.08);
+
+  min-height: 100vh;
+  background: var(--sl-bg);
+  color: var(--sl-text);
+  font-family: var(--font-pretendard), 'Pretendard', -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  padding: 22px clamp(16px, 3vw, 34px) 60px;
+  -webkit-font-smoothing: antialiased;
+  selection-color: inherit;
+}
+
+.sl-root ::selection {
+  background: var(--sl-accent-soft);
+}
+
+/* ── 헤더 ───────────────────────────────────────────── */
+
+.sl-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--sl-line);
+}
+
+.sl-header-left,
+.sl-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.sl-logo {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  color: var(--sl-text);
+}
+
+.sl-logo::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  margin-bottom: 2px;
+  border-radius: 50%;
+  background: var(--sl-accent);
+  vertical-align: middle;
+}
+
+.sl-mode {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--sl-line);
+  background: var(--sl-panel);
+}
+
+.sl-mode-fixture {
+  color: var(--sl-warn);
+  border-color: rgba(168, 118, 31, 0.3);
+  background: var(--sl-warn-soft);
+}
+
+.sl-mode-youtube-api {
+  color: var(--sl-ok);
+  border-color: rgba(63, 143, 104, 0.3);
+  background: var(--sl-ok-soft);
+}
+
+.sl-quota {
+  min-width: 195px;
+}
+
+.sl-quota-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--sl-dim);
+  margin-bottom: 6px;
+}
+
+.sl-quota-label strong {
+  color: var(--sl-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-quota-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sl-line);
+  overflow: hidden;
+}
+
+.sl-quota-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sl-accent);
+  transition: width 0.4s ease;
+}
+
+.sl-btn-ghost {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--sl-text-2);
+  border: 1px solid var(--sl-line-strong);
+  background: var(--sl-panel);
+  border-radius: 999px;
+  padding: 8px 15px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sl-btn-ghost:hover:not(:disabled) {
+  border-color: #bfb7ab;
+}
+
+.sl-btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sl-notice {
+  margin-top: 16px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--sl-warn);
+  background: var(--sl-warn-soft);
+  border: 1px solid rgba(168, 118, 31, 0.22);
+  border-radius: 12px;
+  padding: 11px 14px;
+}
+
+/* ── 레이아웃 ───────────────────────────────────────── */
+
+.sl-grid {
+  margin-top: 20px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .sl-grid {
+    grid-template-columns: 340px minmax(0, 1fr) 390px;
+  }
+}
+
+.sl-panel {
+  background: var(--sl-panel);
+  border: 1px solid var(--sl-line);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.sl-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.sl-panel-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.sl-step {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--sl-accent);
+}
+
+.sl-muted-xs {
+  font-size: 11.5px;
+  color: var(--sl-dim-2);
+}
+
+/* ── 필터 ───────────────────────────────────────────── */
+
+.sl-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--sl-line);
+}
+
+.sl-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--sl-text-2);
+  cursor: pointer;
+}
+
+.sl-check input {
+  margin-top: 1px;
+  accent-color: var(--sl-accent);
+  width: 15px;
+  height: 15px;
+  flex: none;
+  cursor: pointer;
+}
+
+.sl-check b {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-dim);
+  background: var(--sl-panel-2);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.sl-check b.is-scarce {
+  color: var(--sl-bad);
+  background: var(--sl-bad-soft);
+}
+
+.sl-check-lg {
+  font-size: 13px;
+  color: var(--sl-text);
+  margin-top: 16px;
+}
+
+.sl-check-lg em,
+.sl-ack em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--sl-dim-2);
+  margin-top: 3px;
+}
+
+.sl-select {
+  width: 100%;
+  font-size: 13px;
+  color: var(--sl-text);
+  background: var(--sl-panel);
+  border: 1px solid var(--sl-line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.sl-count {
+  font-size: 11.5px;
+  color: var(--sl-dim-2);
+  padding: 12px 0;
+}
+
+/* ── 영상 목록 ──────────────────────────────────────── */
+
+.sl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 620px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sl-line-strong) transparent;
+}
+
+.sl-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--sl-panel-2);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sl-item:hover {
+  border-color: var(--sl-line-strong);
+}
+
+.sl-item.is-active {
+  border-color: var(--sl-accent);
+  background: var(--sl-accent-soft);
+}
+
+.sl-item-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+
+.sl-item-dur {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-text);
+  background: #fff;
+  border: 1px solid var(--sl-line-strong);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.sl-badge-cc {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--sl-ok);
+  background: var(--sl-ok-soft);
+  border: 1px solid rgba(63, 143, 104, 0.28);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.sl-item-title {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+  color: var(--sl-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sl-item-meta {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--sl-dim-2);
+  line-height: 1.55;
+}
+
+.sl-empty,
+.sl-placeholder {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--sl-dim-2);
+  padding: 28px 6px;
+  text-align: center;
+}
+
+.sl-error {
+  margin-top: 13px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--sl-bad);
+  background: var(--sl-bad-soft);
+  border: 1px solid rgba(196, 69, 44, 0.22);
+  border-radius: 11px;
+  padding: 10px 12px;
+}
+
+/* ── 선택 영상 · 권리 확인 ──────────────────────────── */
+
+.sl-selected {
+  background: var(--sl-panel-2);
+  border-radius: 14px;
+  padding: 12px 13px;
+  margin-bottom: 15px;
+}
+
+.sl-selected-title {
+  margin: 0 0 5px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+}
+
+.sl-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sl-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12.5px;
+}
+
+.sl-checks strong {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--sl-text);
+  margin-bottom: 2px;
+}
+
+.sl-checks span {
+  color: var(--sl-dim);
+  line-height: 1.55;
+}
+
+.sl-check-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.sl-checks li.is-ok .sl-check-icon {
+  color: var(--sl-ok);
+  background: var(--sl-ok-soft);
+}
+
+.sl-checks li.is-bad .sl-check-icon {
+  color: var(--sl-bad);
+  background: var(--sl-bad-soft);
+}
+
+.sl-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 15px;
+  padding: 12px 13px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--sl-text);
+  background: var(--sl-warn-soft);
+  border: 1px solid rgba(168, 118, 31, 0.22);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.sl-ack input {
+  margin-top: 2px;
+  accent-color: var(--sl-warn);
+  width: 15px;
+  height: 15px;
+  flex: none;
+  cursor: pointer;
+}
+
+/* ── 옵션 ───────────────────────────────────────────── */
+
+.sl-options {
+  margin-top: 19px;
+  padding-top: 17px;
+  border-top: 1px solid var(--sl-line);
+}
+
+.sl-options-label {
+  margin: 0 0 9px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sl-dim-2);
+}
+
+.sl-tpl-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sl-tpl-btn {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--sl-text-2);
+  background: var(--sl-panel);
+  border: 1px solid var(--sl-line-strong);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.sl-tpl-btn:hover {
+  border-color: #bfb7ab;
+}
+
+.sl-tpl-btn.is-active {
+  color: #fff;
+  border-color: var(--sl-accent);
+  background: var(--sl-accent);
+}
+
+.sl-estimate {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sl-text);
+}
+
+.sl-estimate em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--sl-dim-2);
+  margin-top: 4px;
+}
+
+.sl-btn-primary {
+  width: 100%;
+  margin-top: 15px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 13px;
+  cursor: pointer;
+  background: var(--sl-accent);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.sl-btn-primary:hover:not(:disabled) {
+  background: var(--sl-accent-hover);
+  transform: translateY(-1px);
+}
+
+.sl-btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── 진행 단계 ──────────────────────────────────────── */
+
+.sl-stages {
+  list-style: none;
+  margin: 19px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--sl-line);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.sl-stages li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.sl-stages strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.sl-stages span:not(.sl-stage-dot) {
+  color: var(--sl-dim-2);
+  line-height: 1.55;
+}
+
+.sl-stage-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--sl-line-strong);
+}
+
+.sl-stages li.is-running .sl-stage-dot {
+  background: var(--sl-accent);
+  box-shadow: 0 0 0 4px var(--sl-accent-soft);
+  animation: sl-pulse 1s ease-in-out infinite;
+}
+
+.sl-stages li.is-running strong {
+  color: var(--sl-accent);
+}
+
+.sl-stages li.is-done .sl-stage-dot {
+  background: var(--sl-ok);
+}
+
+@keyframes sl-pulse {
+  50% {
+    box-shadow: 0 0 0 7px rgba(237, 98, 56, 0.04);
+  }
+}
+
+/* ── 결과 · 클립 ────────────────────────────────────── */
+
+.sl-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 14px;
+}
+
+.sl-verify-link {
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  color: var(--sl-dim);
+  text-decoration: none;
+  padding: 0 0 14px;
+  transition: color 0.15s;
+}
+
+.sl-verify-link:hover {
+  color: var(--sl-accent);
+}
+
+.sl-clip-meta {
+  border-top: 1px solid var(--sl-line);
+  padding-top: 13px;
+}
+
+.sl-clip-meta > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.sl-clip-meta strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sl-accent);
+}
+
+.sl-clip-meta > div span {
+  color: var(--sl-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-clip-reason {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--sl-dim-2);
+}
+
+/* 자막 초안 — 실제로는 영상에 번인되므로 프레임 밖에 표시 */
+.sl-subs-draft {
+  list-style: none;
+  margin: 9px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-subs-draft li {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--sl-text-2);
+  background: var(--sl-panel-2);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+
+.sl-comment-source {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.sl-comment-source.is-youtube-api {
+  color: var(--sl-ok);
+}
+
+.sl-comment-source.is-fixture {
+  color: var(--sl-warn);
+}
+
+.sl-comment-source.is-none {
+  color: var(--sl-dim-2);
+}
+
+.sl-comment-source em {
+  display: block;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--sl-dim-2);
+  margin-top: 3px;
+}
+
+.sl-clip-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 15px;
+}
+
+.sl-clip-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--sl-dim);
+  background: var(--sl-panel-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.sl-clip-tab:hover {
+  color: var(--sl-text);
+  border-color: var(--sl-line-strong);
+}
+
+.sl-clip-tab.is-active {
+  color: var(--sl-accent);
+  border-color: var(--sl-accent);
+  background: var(--sl-accent-soft);
+}
+
+.sl-clip-tab-idx {
+  font-weight: 600;
+}
+
+.sl-clip-tab-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.sl-engine {
+  margin: 17px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--sl-line);
+  font-size: 11.5px;
+  color: var(--sl-dim);
+}
+
+.sl-engine em {
+  display: block;
+  font-style: normal;
+  line-height: 1.65;
+  color: var(--sl-dim-2);
+  margin-top: 4px;
+}
+
+/* ─────────────────────────────────────────────────────
+   9:16 프리뷰 프레임
+   여기부터는 "결과물"의 디자인이라 Shuffla 톤과 별개로
+   각 템플릿 고유의 색을 유지합니다.
+
+   5종이 동일한 레이아웃을 공유하고 훅 둘째 줄 처리만 다릅니다.
+   ───────────────────────────────────────────────────── */
+
+.sl-frame {
+  position: relative;
+  width: 100%;
+  max-width: 272px;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-shadow: 0 14px 34px rgba(23, 23, 20, 0.18);
+}
+
+/* 훅 블록 — 상단 중앙 2줄 */
+
+.sl-hook {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+  padding: 20px 14px 15px;
+  font-size: 14.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.035em;
+  word-break: keep-all;
+}
+
+.sl-hook-l1 {
+  display: block;
+}
+
+.sl-hook-l2 {
+  display: block;
+}
+
+/* 영상 밴드 — 풀블리드 */
+
+.sl-band {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  flex: none;
+  overflow: hidden;
+  background: #3f3f45;
+}
+
+.sl-embed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.sl-band-play,
+.sl-band-stop {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.sl-band-play {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  font-size: 20px;
+  padding-left: 3px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sl-band-play:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.sl-band-stop {
+  top: 5px;
+  left: 5px;
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.sl-band-range {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  font-size: 8.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.62);
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+
+/* 하단 중앙 워터마크 */
+
+.sl-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 14px 12px 16px;
+}
+
+.sl-watermark-mark {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6b4a, #ed6238);
+}
+
+.sl-watermark-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 댓글 캡처 카드 — 유튜브 댓글 UI 모사 */
+
+.sl-comment {
+  display: flex;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 9px 10px;
+  margin: 10px 11px 0;
+  flex: none;
+}
+
+.sl-comment-light {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+}
+
+.sl-comment-dark {
+  background: #202024;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sl-comment-avatar {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6b7cff, #b45cff);
+}
+
+.sl-comment-body {
+  min-width: 0;
+}
+
+.sl-comment-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: 3px;
+}
+
+.sl-comment-author {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.sl-comment-date {
+  font-size: 8px;
+}
+
+.sl-comment-text {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.sl-comment-actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 5px;
+  font-size: 8px;
+}
+
+.sl-comment-light .sl-comment-author,
+.sl-comment-light .sl-comment-text {
+  color: #0f0f0f;
+}
+
+.sl-comment-light .sl-comment-date,
+.sl-comment-light .sl-comment-actions {
+  color: #606060;
+}
+
+.sl-comment-dark .sl-comment-author,
+.sl-comment-dark .sl-comment-text {
+  color: #f1f1f1;
+}
+
+.sl-comment-dark .sl-comment-date,
+.sl-comment-dark .sl-comment-actions {
+  color: #a8a8a8;
+}
+
+/* ── 템플릿별 색 처리 ──────────────────────────────── */
+
+/* 1. 댓글 캡처 — 둘째 줄 그라데이션 텍스트 */
+.sl-tpl-comment-capture {
+  background: #0d0d10;
+}
+
+.sl-tpl-comment-capture .sl-hook-l1 {
+  color: #fff;
+}
+
+.sl-tpl-comment-capture .sl-hook-l2 {
+  background: linear-gradient(92deg, #4fb0ff, #9b7bff 55%, #d97bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sl-tpl-comment-capture .sl-watermark-name {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* 2. 다크 레드 — 둘째 줄 빨강 박스 */
+.sl-tpl-dark-red {
+  background: #0a0a0a;
+}
+
+.sl-tpl-dark-red .sl-hook-l1 {
+  color: #fff;
+}
+
+.sl-tpl-dark-red .sl-hook-l2 {
+  color: #fff;
+  background: #e11d2e;
+  border-radius: 5px;
+  padding: 3px 9px;
+}
+
+.sl-tpl-dark-red .sl-watermark-name {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* 3. 화이트 옐로 — 둘째 줄 노랑 박스 */
+.sl-tpl-white-yellow {
+  background: #ffffff;
+}
+
+.sl-tpl-white-yellow .sl-hook-l1 {
+  color: #171717;
+}
+
+.sl-tpl-white-yellow .sl-hook-l2 {
+  color: #171717;
+  background: #ffd400;
+  border-radius: 5px;
+  padding: 3px 9px;
+}
+
+.sl-tpl-white-yellow .sl-band {
+  background: #d6d6d6;
+}
+
+.sl-tpl-white-yellow .sl-watermark-name {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+/* 4. 다크 미니멀 — 둘째 줄 빨강 텍스트 */
+.sl-tpl-dark-minimal {
+  background: #0a0a0a;
+}
+
+.sl-tpl-dark-minimal .sl-hook-l1 {
+  color: #fff;
+}
+
+.sl-tpl-dark-minimal .sl-hook-l2 {
+  color: #ff3b3b;
+}
+
+.sl-tpl-dark-minimal .sl-watermark-name {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* 5. 페이퍼 — 둘째 줄 빨강 텍스트 */
+.sl-tpl-paper {
+  background: #f2efe9;
+}
+
+.sl-tpl-paper .sl-hook-l1 {
+  color: #1f1c17;
+}
+
+.sl-tpl-paper .sl-hook-l2 {
+  color: #d93025;
+}
+
+.sl-tpl-paper .sl-band {
+  background: #d6d3cc;
+}
+
+.sl-tpl-paper .sl-watermark-name {
+  color: rgba(0, 0, 0, 0.68);
+}
