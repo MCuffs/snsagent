@@ -22,10 +22,8 @@ let initialized = false
 let initPromise: Promise<TD | null> | null = null
 const queuedTracks: Array<{ event: string; props: Record<string, unknown> }> = []
 
-const APP_ID = '3bd98ae26423469a9a124f4151bf3972'
-// 사설 TE 수신 서버는 http 라 https 페이지에서 직접 전송하면 mixed content 로 차단됩니다.
-// SDK 는 serverUrl 의 origin + /sync_js 로 전송하므로 같은 출처를 지정하고,
-// next.config rewrites 가 /sync_js 를 수신 서버(http://49.51.180.241:8991)로 프록시합니다.
+const APP_ID = 'fb483555173b464fb64813eb7d82f294'
+const SERVER_URL = 'https://te-receiver-naver.thinkingdata.kr'
 
 export async function initThinkingData(): Promise<TD | null> {
   if (typeof window === 'undefined') return null
@@ -36,11 +34,7 @@ export async function initThinkingData(): Promise<TD | null> {
   initPromise = import('thinkingdata-browser').then((mod: any) => {
     const lib = mod.default ?? mod
     td = lib as TD
-    td.init({
-      appId: APP_ID,
-      serverUrl: window.location.origin,
-      autoTrack: { pageShow: true, pageHide: true },
-    })
+    td.init({ appId: APP_ID, serverUrl: SERVER_URL, autoTrack: { pageShow: true, pageHide: true } })
     initialized = true
 
     while (queuedTracks.length > 0) {
