@@ -92,7 +92,6 @@ export interface ResultEvent {
 export interface ErrorEvent {
   type: 'error'
   message: string
-  code?: 'SOURCE_BLOCKED' | 'SOURCE_UPLOAD_INVALID'
 }
 
 export type PipelineEvent = StageEvent | ResultEvent | ErrorEvent

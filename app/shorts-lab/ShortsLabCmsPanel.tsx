@@ -9,9 +9,11 @@ import './shorts-lab.css'
 export default function ShortsLabCmsPanel({
   isActive,
   userId,
+  locked = true,
 }: {
   isActive: boolean
   userId: string
+  locked?: boolean
 }) {
   const [initial, setInitial] = useState<TrendingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +77,7 @@ export default function ShortsLabCmsPanel({
 
   return (
     <div className="h-full overflow-y-auto">
-      <ShortsLab initial={initial} userId={userId} embedded />
+      <ShortsLab initial={initial} userId={userId} embedded locked={locked} />
     </div>
   )
 }

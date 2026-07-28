@@ -1,10 +1,13 @@
 import { z } from 'zod'
 import { head } from '@vercel/blob'
 import { getSessionUser } from '../../../../lib/auth/user'
-import { canAccessShortsLab } from '../../../../lib/auth/shorts-lab-access'
+import {
+  hasShortsLabFullAccess,
+  shortsLabUpgradeResponse,
+} from '../../../../lib/auth/shorts-lab-access'
 import { loadTopComments } from '../../../shorts-lab/comments'
 import { checkEligibility, usedMinutesFor } from '../../../shorts-lab/pipeline'
-import { produceShort, SourceBlockedError } from '../../../shorts-lab/production'
+import { produceShort } from '../../../shorts-lab/production'
 import type { PipelineEvent } from '../../../shorts-lab/types'
 
 export const dynamic = 'force-dynamic'
@@ -25,9 +28,11 @@ const videoSchema = z.object({
   source: z.enum(['fixture', 'youtube-api']),
 })
 
+// 서버 측 원본 추출(yt-dlp) 경로는 제거되었습니다.
+// 브라우저 캡처 또는 직접 업로드한 원본(sourceUrl)이 항상 필요합니다.
 const bodySchema = z.object({
   video: videoSchema,
-  sourceUrl: z.string().url().optional(),
+  sourceUrl: z.string().url(),
 })
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
@@ -35,8 +40,11 @@ const ALLOWED_SOURCE_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/web
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
-  if (!user || !canAccessShortsLab(user.email)) {
+  if (!user) {
     return Response.json({ error: 'Not found' }, { status: 404 })
+  }
+  if (!hasShortsLabFullAccess(user)) {
+    return Response.json(shortsLabUpgradeResponse(), { status: 402 })
   }
 
   let body: z.infer<typeof bodySchema>
@@ -69,25 +77,23 @@ export async function POST(request: Request) {
     )
   }
 
-  if (sourceUrl) {
-    try {
-      const blob = await head(sourceUrl, { token: process.env.BLOB_READ_WRITE_TOKEN })
-      const allowedPrefix = `uploads/shorts-lab/${user.id}/`
-      if (
-        !blob.pathname.startsWith(allowedPrefix) ||
-        !ALLOWED_SOURCE_TYPES.has(blob.contentType) ||
-        blob.size <= 0 ||
-        blob.size > MAX_SOURCE_BYTES
-      ) {
-        throw new Error('업로드한 원본 파일을 확인할 수 없습니다.')
-      }
-    } catch (error) {
-      console.error('[shorts-lab/generate] invalid uploaded source', error)
-      return Response.json(
-        { error: '업로드한 원본 파일이 유효하지 않습니다.' },
-        { status: 422 },
-      )
+  try {
+    const blob = await head(sourceUrl, { token: process.env.BLOB_READ_WRITE_TOKEN })
+    const allowedPrefix = `uploads/shorts-lab/${user.id}/`
+    if (
+      !blob.pathname.startsWith(allowedPrefix) ||
+      !ALLOWED_SOURCE_TYPES.has(blob.contentType) ||
+      blob.size <= 0 ||
+      blob.size > MAX_SOURCE_BYTES
+    ) {
+      throw new Error('업로드한 원본 파일을 확인할 수 없습니다.')
     }
+  } catch (error) {
+    console.error('[shorts-lab/generate] invalid uploaded source', error)
+    return Response.json(
+      { error: '업로드한 원본 파일이 유효하지 않습니다.' },
+      { status: 422 },
+    )
   }
 
   const encoder = new TextEncoder()
@@ -111,7 +117,7 @@ export async function POST(request: Request) {
           video,
           comments: pool.comments,
           userId: user.id,
-          uploadedSourceUrl: sourceUrl,
+          sourceUrl,
           onProgress: (id, label, detail) => {
             send({ type: 'stage', id, label, detail, status: 'running' })
           },
@@ -133,7 +139,6 @@ export async function POST(request: Request) {
         send({
           type: 'error',
           message: error instanceof Error ? error.message : String(error),
-          ...(error instanceof SourceBlockedError ? { code: error.code } : {}),
         })
       } finally {
         controller.close()

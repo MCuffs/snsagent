@@ -1,12 +1,15 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import {
+  Check,
   CheckCircle2,
   Clapperboard,
+  CreditCard,
   Download,
-  FileVideo2,
+  Loader2,
   MonitorUp,
   RefreshCw,
   Sparkles,
@@ -40,16 +43,28 @@ const COMMENT_SOURCE_LABEL: Record<CommentSource, string> = {
   none: '제목·음성 중심 분석',
 }
 
+const emptySubscribe = () => () => undefined
+
 export default function ShortsLab({
   initial,
   userId,
   embedded = false,
+  locked = false,
 }: {
   initial: TrendingResult
   userId: string
   embedded?: boolean
+  locked?: boolean
 }) {
   const [trending, setTrending] = useState(initial)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallProcessing, setPaywallProcessing] = useState(false)
+  const [paywallError, setPaywallError] = useState<string | null>(null)
+  const portalReady = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  )
   const [refreshing, setRefreshing] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const [category, setCategory] = useState('전체')
@@ -67,7 +82,6 @@ export default function ShortsLab({
   const [commentSource, setCommentSource] = useState<CommentSource | null>(null)
   const [commentNotice, setCommentNotice] = useState<string | null>(null)
   const [spentMinutes, setSpentMinutes] = useState(0)
-  const [requiresSourceUpload, setRequiresSourceUpload] = useState(false)
   const [uploadingSource, setUploadingSource] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -127,20 +141,57 @@ export default function ShortsLab({
     !captureOpen
 
   const selectVideo = useCallback((id: string) => {
+    // 무료 유저는 차트 열람까지만 — 영상 선택 시점에 결제 안내로 전환합니다.
+    if (locked) {
+      setPaywallError(null)
+      setPaywallOpen(true)
+      return
+    }
     setSelectedId(id)
     setGenError(null)
     setResultVideo(null)
     setResultClip(null)
     setDownloadUrl('')
-    setRequiresSourceUpload(false)
     setUploadProgress(0)
     setUploadError(null)
     setCaptureOpen(false)
     setCaptureState('idle')
     setCaptureError(null)
-  }, [])
+  }, [locked])
 
-  const generate = useCallback(async (sourceUrl?: string) => {
+  const toggleReusableFilter = useCallback((checked: boolean) => {
+    if (locked) {
+      setPaywallError(null)
+      setPaywallOpen(true)
+      return
+    }
+    setOnlyReusable(checked)
+  }, [locked])
+
+  const startPaywallCheckout = useCallback(async () => {
+    if (paywallProcessing) return
+    setPaywallError(null)
+    setPaywallProcessing(true)
+    try {
+      const res = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'YOUTUBE_PROMO' }),
+      })
+      const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null
+      if (!res.ok || !data?.url) {
+        setPaywallError(data?.error || '결제창을 열 수 없습니다. 다시 시도해 주세요.')
+        setPaywallProcessing(false)
+        return
+      }
+      window.location.assign(data.url)
+    } catch {
+      setPaywallError('결제 처리 중 네트워크 오류가 발생했습니다.')
+      setPaywallProcessing(false)
+    }
+  }, [paywallProcessing])
+
+  const generate = useCallback(async (sourceUrl: string) => {
     if (!selected) return
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -164,12 +215,8 @@ export default function ShortsLab({
         setCommentSource(event.commentSource)
         setCommentNotice(event.commentNotice)
         setSpentMinutes(previous => Math.round((previous + event.usedMinutes) * 10) / 10)
-        setRequiresSourceUpload(false)
       } else {
         setGenError(event.message)
-        if (event.code === 'SOURCE_BLOCKED') {
-          setRequiresSourceUpload(true)
-        }
       }
     }
 
@@ -177,7 +224,7 @@ export default function ShortsLab({
       const response = await fetch('/api/shorts-lab/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video: selected, ...(sourceUrl ? { sourceUrl } : {}) }),
+        body: JSON.stringify({ video: selected, sourceUrl }),
         signal: controller.signal,
       })
       if (!response.ok) {
@@ -353,6 +400,67 @@ export default function ShortsLab({
   return (
     <div className={`sl-root ${embedded ? 'is-embedded' : ''}`}>
       <div className="sl-ambient" aria-hidden="true" />
+      {portalReady && paywallOpen && createPortal(
+        <div className="sl-paywall-backdrop" role="dialog" aria-modal="true" aria-labelledby="sl-paywall-title">
+          <div className="sl-paywall">
+            <div className="sl-paywall-head">
+              <span className="sl-paywall-glyph"><Sparkles aria-hidden="true" /></span>
+              <button
+                type="button"
+                aria-label="닫기"
+                disabled={paywallProcessing}
+                onClick={() => {
+                  if (paywallProcessing) return
+                  setPaywallOpen(false)
+                  setPaywallError(null)
+                }}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <h2 id="sl-paywall-title">결제 후 바로 만들 수 있어요</h2>
+            <p className="sl-paywall-desc">
+              인기 차트 열람은 무료입니다. 재사용 허용 필터와 영상 선택·쇼츠 제작은
+              플랜 시작 후 이용할 수 있습니다.
+            </p>
+            <div className="sl-paywall-plan">
+              <div>
+                <strong>Shorts Lab</strong>
+                <span>재사용 가능한 인기 롱폼 → 업로드용 쇼츠</span>
+              </div>
+              <em>월 9,900원</em>
+            </div>
+            <ul className="sl-paywall-features">
+              {['재사용 허용(CC) 필터·영상 선택', '제목·인기 댓글·음성 AI 분석', '9:16 MP4 다운로드'].map(feature => (
+                <li key={feature}><Check aria-hidden="true" />{feature}</li>
+              ))}
+            </ul>
+            {paywallError && <p className="sl-paywall-error">{paywallError}</p>}
+            <button
+              type="button"
+              className="sl-btn-primary sl-paywall-cta"
+              disabled={paywallProcessing}
+              onClick={() => void startPaywallCheckout()}
+            >
+              {paywallProcessing
+                ? <><Loader2 className="is-spinning" aria-hidden="true" />결제창 여는 중…</>
+                : <><CreditCard aria-hidden="true" />월 9,900원 결제하기</>}
+            </button>
+            <button
+              type="button"
+              className="sl-paywall-later"
+              disabled={paywallProcessing}
+              onClick={() => {
+                setPaywallOpen(false)
+                setPaywallError(null)
+              }}
+            >
+              나중에 하기
+            </button>
+          </div>
+        </div>,
+        document.body,
+      )}
       <header className="sl-header">
         <div className="sl-header-left">
           <span className="sl-logo">
@@ -409,7 +517,7 @@ export default function ShortsLab({
               <input
                 type="checkbox"
                 checked={onlyReusable}
-                onChange={event => setOnlyReusable(event.target.checked)}
+                onChange={event => toggleReusableFilter(event.target.checked)}
               />
               <span>재사용 허용만 (CC)<b>{reusableCount}개</b></span>
             </label>
@@ -533,16 +641,6 @@ export default function ShortsLab({
                       <><MonitorUp aria-hidden="true" />브라우저로 무료 만들기</>
                     )}
                   </button>
-                  {canGenerate && (
-                    <button
-                      type="button"
-                      className="sl-btn-auto-source"
-                      disabled={generating || uploadingSource}
-                      onClick={() => void generate()}
-                    >
-                      YouTube 자동 가져오기 시도
-                    </button>
-                  )}
                   {!isReusable(selected) && (
                     <p className="sl-rights-note">Creative Commons 재사용 허용 영상만 만들 수 있습니다.</p>
                   )}
@@ -573,49 +671,9 @@ export default function ShortsLab({
               )}
 
               {genError && <div className="sl-error">{genError}</div>}
-              {uploadError && !requiresSourceUpload && (
+              {uploadError && (
                 <div className="sl-error">
                   캡처 영상 전송 실패: {uploadError}
-                </div>
-              )}
-
-              {requiresSourceUpload && !downloadUrl && (
-                <div className="sl-source-fallback">
-                  <span className="sl-source-fallback-icon"><FileVideo2 aria-hidden="true" /></span>
-                  <div className="sl-source-fallback-copy">
-                    <strong>원본 파일로 바로 이어서 만들 수 있어요</strong>
-                    <p>
-                      YouTube가 서버 다운로드만 차단했습니다. 보유한 원본 MP4를 올리면
-                      제목·댓글 분석 결과는 그대로 사용해 자동 제작을 계속합니다.
-                    </p>
-                  </div>
-                  <label className={`sl-source-upload ${uploadingSource || generating ? 'is-disabled' : ''}`}>
-                    <UploadCloud aria-hidden="true" />
-                    <span>
-                      {uploadingSource
-                        ? `원본 업로드 중 ${uploadProgress}%`
-                        : generating
-                          ? '숏폼 만드는 중…'
-                          : '원본 영상 선택'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-                      disabled={uploadingSource || generating}
-                      onChange={event => {
-                        const file = event.currentTarget.files?.[0]
-                        event.currentTarget.value = ''
-                        if (file) void uploadSourceAndGenerate(file)
-                      }}
-                    />
-                  </label>
-                  {(uploadingSource || generating) && (
-                    <div className="sl-source-upload-track">
-                      <span style={{ width: `${uploadingSource ? uploadProgress : 100}%` }} />
-                    </div>
-                  )}
-                  <small>MP4·MOV·WebM · 최대 2GB · 브라우저에서 저장소로 직접 전송</small>
-                  {uploadError && <div className="sl-error">{uploadError}</div>}
                 </div>
               )}
 
@@ -623,7 +681,7 @@ export default function ShortsLab({
                 <div className="sl-finished">
                   <div className="sl-finished-head">
                     <span><CheckCircle2 aria-hidden="true" />숏폼이 완성됐어요</span>
-                    <button type="button" onClick={() => void generate()}>다시 만들기</button>
+                    <button type="button" onClick={openBrowserCapture}>다시 만들기</button>
                   </div>
                   <div className="sl-video-result">
                     <video controls playsInline preload="metadata" src={downloadUrl}>

@@ -6,7 +6,7 @@ import { normalizePlan, PRICING_PLANS } from '../../../../lib/limits-types'
 import DashboardContainer from '../../../(cms)/concept/DashboardContainer'
 import { Loader2 } from 'lucide-react'
 import { isAdminEmail } from '../../../../lib/auth/admin-emails'
-import { canAccessShortsLab } from '../../../../lib/auth/shorts-lab-access'
+import { canAccessShortsLab, hasShortsLabFullAccess } from '../../../../lib/auth/shorts-lab-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,6 +123,7 @@ async function DashboardDataLoader() {
       summarizedPreference={summarizedPreference}
       userPlan={accessPlan}
       canAccessShortsLab={canAccessShortsLab(user.email)}
+      shortsLabLocked={!hasShortsLabFullAccess(user)}
     />
   )
 }

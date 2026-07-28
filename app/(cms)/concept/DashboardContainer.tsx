@@ -71,6 +71,7 @@ interface DashboardContainerProps {
   hasVideoApiKey?: boolean
   userPlan?: string | null
   canAccessShortsLab?: boolean
+  shortsLabLocked?: boolean
 }
 
 export default function DashboardContainer({
@@ -88,6 +89,7 @@ export default function DashboardContainer({
   hasVideoApiKey = false,
   userPlan,
   canAccessShortsLab = false,
+  shortsLabLocked = true,
 }: DashboardContainerProps) {
   const { activeTab: tab, setActiveTab } = useTab()
   const activeTab = tab === 'shorts-lab' && !canAccessShortsLab
@@ -410,6 +412,7 @@ export default function DashboardContainer({
             <ShortsLabCmsPanel
               isActive={activeTab === 'shorts-lab'}
               userId={userId ?? ''}
+              locked={shortsLabLocked}
             />
           ) : (
             <DashboardLoading />

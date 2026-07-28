@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/ensure-yt-dlp.mjs && next dev",
-    "build": "node scripts/ensure-yt-dlp.mjs && prisma generate && next build",
+    "dev": "next dev",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -32,7 +32,6 @@
     "thinkingdata-browser": "^2.5.0",
     "three": "^0.185.1",
     "workflow": "^4.5.0",
-    "youtube-dl-exec": "^3.1.9",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },

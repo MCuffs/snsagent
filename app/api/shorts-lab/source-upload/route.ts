@@ -1,6 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { getSessionUser } from '../../../../lib/auth/user'
-import { canAccessShortsLab } from '../../../../lib/auth/shorts-lab-access'
+import { hasShortsLabFullAccess } from '../../../../lib/auth/shorts-lab-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,8 +30,8 @@ export async function POST(request: Request) {
       token: process.env.BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async pathname => {
         const user = await getSessionUser()
-        if (!user || !canAccessShortsLab(user.email)) {
-          throw new Error('업로드 권한이 없습니다.')
+        if (!user || !hasShortsLabFullAccess(user)) {
+          throw new Error('업로드 권한이 없습니다. 유료 플랜에서 이용할 수 있습니다.')
         }
 
         const allowedPrefix = `uploads/shorts-lab/${user.id}/`

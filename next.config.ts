@@ -12,14 +12,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  outputFileTracingIncludes: {
-    '/api/shorts-lab/generate': ['./vendor/yt-dlp'],
-  },
   serverExternalPackages: [
     '@resvg/resvg-js',
     '@ffmpeg-installer/ffmpeg',
     '@ffmpeg-installer/linux-x64',
-    'youtube-dl-exec',
   ],
   async rewrites() {
     return [

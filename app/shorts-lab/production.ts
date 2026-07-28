@@ -7,7 +7,6 @@ import os from 'node:os'
 import path from 'node:path'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import OpenAI from 'openai'
-import youtubeDl, { create as createYoutubeDl } from 'youtube-dl-exec'
 import { z } from 'zod'
 import { getLLMClient } from '../../src/lib/ai/llmClient'
 import { generateClips } from './pipeline'
@@ -26,33 +25,15 @@ interface CandidateWindow {
   text: string
 }
 
-interface SourceStreams {
-  videoUrl: string
-  videoHeaders: string
-  audioUrl: string | null
-  audioHeaders: string | null
-}
+// 브라우저 탭 캡처는 seek·재생 지연 때문에 첫 1~2초에 플레이어 UI가 찍힙니다.
+// 캡처 원본은 이 길이만큼 머리를 무조건 잘라내고 시작합니다.
+const CAPTURE_LEAD_TRIM_SEC = 2.5
+/** 클라이언트 BROWSER_CAPTURE_SEC(35초)와 동기화된 캡처 길이 상한 */
+const CAPTURE_MAX_SEC = 35
 
-interface ExtractedFormat {
-  url?: string
-  vcodec?: string
-  acodec?: string
-  http_headers?: Record<string, string>
-}
-
-interface ExtractedMetadata extends ExtractedFormat {
-  requested_formats?: ExtractedFormat[]
-}
-
-export class SourceBlockedError extends Error {
-  readonly code = 'SOURCE_BLOCKED' as const
-
-  constructor() {
-    super(
-      'YouTube가 서버의 원본 요청을 차단했습니다. 원본 MP4를 올리면 같은 분석 과정으로 바로 이어서 만들 수 있습니다.',
-    )
-    this.name = 'SourceBlockedError'
-  }
+/** 브라우저 캡처 업로드인지 (임의의 원본 MP4 업로드와 구분) */
+function isBrowserCapture(sourceUrl: string): boolean {
+  return sourceUrl.includes('shuffla-capture-')
 }
 
 const selectionSchema = z.object({
@@ -99,132 +80,9 @@ function runFfmpeg(args: string[], timeoutMs = 240_000): Promise<void> {
   })
 }
 
-async function getSourceStreams(
-  videoId: string,
-  uploadedSourceUrl?: string,
-  cookiePath?: string,
-): Promise<SourceStreams> {
-  if (uploadedSourceUrl) {
-    return {
-      videoUrl: uploadedSourceUrl,
-      videoHeaders: '',
-      audioUrl: null,
-      audioHeaders: null,
-    }
-  }
-
-  const executable =
-    process.platform === 'linux' || process.platform === 'darwin'
-      ? createYoutubeDl(path.join(process.cwd(), 'vendor', 'yt-dlp'))
-      : youtubeDl
-
-  let output: ExtractedMetadata | null = null
-  let lastError: unknown = null
-  const clients = cookiePath
-    ? ['web', 'web_embedded', 'android_vr']
-    : ['web_embedded', 'android_vr']
-  extraction:
-  for (const client of clients) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        output = (await executable(`https://www.youtube.com/watch?v=${videoId}`, {
-          ...(cookiePath ? { cookies: cookiePath } : {}),
-          ...(process.env.YOUTUBE_COOKIE_USER_AGENT
-            ? { userAgent: process.env.YOUTUBE_COOKIE_USER_AGENT }
-            : {}),
-          dumpSingleJson: true,
-          format: 'bv*[vcodec^=avc1][height<=720]+ba[ext=m4a]/18',
-          extractorArgs: `youtube:player_client=${client}`,
-          jsRuntimes: 'node',
-          noPlaylist: true,
-          noWarnings: true,
-          sleepRequests: 1,
-          skipDownload: true,
-        } as never)) as unknown as ExtractedMetadata
-        break extraction
-      } catch (error) {
-        lastError = error
-        if (attempt === 0) {
-          await new Promise(resolve => setTimeout(resolve, 750))
-        }
-      }
-    }
-  }
-
-  if (!output) {
-    console.error(
-      '[shorts-lab] YouTube source extraction failed after all retries.',
-      lastError instanceof Error ? lastError.message : lastError,
-    )
-    throw new SourceBlockedError()
-  }
-  const formats = output.requested_formats ?? [output]
-  const video = formats.find(format => format.url && format.vcodec !== 'none')
-  const audio = formats.find(
-    format => format.url && format.acodec !== 'none' && format.vcodec === 'none',
-  )
-  if (!video?.url) throw new Error('유튜브 원본 스트림을 가져오지 못했습니다.')
-
-  const serializeHeaders = (headers?: Record<string, string>) =>
-    Object.entries(headers ?? {})
-      .map(([key, value]) => `${key.replace(/[\r\n:]/g, '')}: ${value.replace(/[\r\n]/g, '')}`)
-      .join('\r\n')
-
-  return {
-    videoUrl: video.url,
-    videoHeaders: serializeHeaders(video.http_headers),
-    audioUrl: audio?.url ?? null,
-    audioHeaders: audio?.url ? serializeHeaders(audio.http_headers) : null,
-  }
-}
-
-async function createYoutubeCookieFile(workDir: string): Promise<string | undefined> {
-  const encoded = process.env.YOUTUBE_COOKIES_B64?.trim()
-  if (!encoded) return undefined
-
-  let content: string
-  try {
-    content = Buffer.from(encoded, 'base64').toString('utf8').replace(/\r\n/g, '\n')
-  } catch {
-    throw new Error('YOUTUBE_COOKIES_B64 값을 해석할 수 없습니다.')
-  }
-
-  if (
-    !content.startsWith('# Netscape HTTP Cookie File') &&
-    !content.startsWith('# HTTP Cookie File')
-  ) {
-    throw new Error('YouTube 쿠키가 Netscape 형식이 아닙니다.')
-  }
-
-  const cookieLines = content
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && (!line.startsWith('#') || line.startsWith('#HttpOnly_')))
-
-  if (cookieLines.length === 0) {
-    throw new Error('YouTube 쿠키 파일에 인증 쿠키가 없습니다.')
-  }
-
-  for (const line of cookieLines) {
-    const fields = line.split('\t')
-    const domain = fields[0]?.replace(/^#HttpOnly_/, '').replace(/^\./, '')
-    if (fields.length < 7 || !domain || (domain !== 'youtube.com' && !domain.endsWith('.youtube.com'))) {
-      throw new Error('YouTube 이외의 도메인 쿠키는 사용할 수 없습니다.')
-    }
-  }
-
-  const cookiePath = path.join(workDir, 'youtube-cookies.txt')
-  await fs.writeFile(cookiePath, `${content.trimEnd()}\n`, {
-    encoding: 'utf8',
-    mode: 0o600,
-  })
-  return cookiePath
-}
-
-function ffmpegInput(url: string, headers?: string | null, startSec?: number): string[] {
+function ffmpegInput(url: string, startSec?: number): string[] {
   return [
     ...(typeof startSec === 'number' ? ['-ss', String(startSec)] : []),
-    ...(headers ? ['-headers', headers] : []),
     '-i',
     url,
   ]
@@ -437,7 +295,7 @@ function escapeFilterPath(value: string): string {
 }
 
 async function renderShort(params: {
-  streams: SourceStreams
+  sourceUrl: string
   clip: ShortClip
   video: TrendingVideo
   workDir: string
@@ -469,28 +327,8 @@ async function renderShort(params: {
     `drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(creditPath)}':fontcolor=white@0.82:fontsize=17:x=48:y=1219[outv]`,
   ].join(',')
 
-  const inputs = params.streams.audioUrl
-    ? [
-        ...ffmpegInput(
-          params.streams.videoUrl,
-          params.streams.videoHeaders,
-          params.clip.startSec,
-        ),
-        ...ffmpegInput(
-          params.streams.audioUrl,
-          params.streams.audioHeaders ?? params.streams.videoHeaders,
-          params.clip.startSec,
-        ),
-      ]
-    : ffmpegInput(
-        params.streams.videoUrl,
-        params.streams.videoHeaders,
-        params.clip.startSec,
-      )
-  const audioMap = params.streams.audioUrl ? '1:a:0?' : '0:a:0?'
-
   await runFfmpeg([
-    ...inputs,
+    ...ffmpegInput(params.sourceUrl, params.clip.startSec),
     '-t',
     String(duration),
     '-filter_complex',
@@ -498,7 +336,7 @@ async function renderShort(params: {
     '-map',
     '[outv]',
     '-map',
-    audioMap,
+    '0:a:0?',
     '-c:v',
     'libx264',
     '-preset',
@@ -556,30 +394,19 @@ export async function produceShort(params: {
   video: TrendingVideo
   comments: CapturedComment[]
   userId: string
-  uploadedSourceUrl?: string
+  sourceUrl: string
   onProgress?: ProductionProgress
 }): Promise<ProducedShort> {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shuffla-shorts-'))
   try {
-    params.onProgress?.('source', '원본을 준비하고 있어요', '재사용 가능한 영상을 불러오는 중')
-    const cookiePath = params.uploadedSourceUrl
-      ? undefined
-      : await createYoutubeCookieFile(workDir)
-    const streams = await getSourceStreams(
-      params.video.id,
-      params.uploadedSourceUrl,
-      cookiePath,
-    )
+    const capture = isBrowserCapture(params.sourceUrl)
 
     params.onProgress?.('analyze', '가장 좋은 순간을 찾고 있어요', '음성을 분석하는 중')
     let segments: TranscriptSegment[] = []
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length >= 10) {
       const audioPath = path.join(workDir, 'source.mp3')
       await runFfmpeg([
-        ...ffmpegInput(
-          streams.audioUrl ?? streams.videoUrl,
-          streams.audioHeaders ?? streams.videoHeaders,
-        ),
+        ...ffmpegInput(params.sourceUrl),
         '-vn',
         '-ac',
         '1',
@@ -592,12 +419,31 @@ export async function produceShort(params: {
       ])
       segments = await transcribeAudio(audioPath)
     }
+    if (capture) {
+      // 트림될 머리 구간에서 끝나는 발화는 후보에서 제외합니다.
+      segments = segments.filter(segment => segment.end > CAPTURE_LEAD_TRIM_SEC)
+    }
     const candidates = createCandidateWindows(segments)
-    const clip = await selectHook(params.video, params.comments, candidates)
+    let clip = await selectHook(params.video, params.comments, candidates)
+
+    if (capture) {
+      // 캡처 첫 1~2초의 플레이어 UI 노출 방지: 시작점을 최소 트림 이후로 강제.
+      // 전사 실패 시 폴백이 원본 전체 길이 기준으로 시작점을 잡는 경우도
+      // 캡처 길이(35초) 안으로 되돌립니다.
+      const start =
+        clip.startSec > CAPTURE_MAX_SEC - 15
+          ? CAPTURE_LEAD_TRIM_SEC
+          : Math.max(clip.startSec, CAPTURE_LEAD_TRIM_SEC)
+      clip = {
+        ...clip,
+        startSec: start,
+        endSec: Math.min(Math.max(clip.endSec, start + 15), CAPTURE_MAX_SEC),
+      }
+    }
 
     params.onProgress?.('render', '숏폼을 완성하고 있어요', '9:16 영상과 후킹 카피 합성 중')
     const renderedPath = await renderShort({
-      streams,
+      sourceUrl: params.sourceUrl,
       clip,
       video: params.video,
       workDir,
