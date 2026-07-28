@@ -348,16 +348,65 @@ export default function ShortsLab({
         recorder.onerror = () => reject(new Error('브라우저 녹화 중 오류가 발생했습니다.'))
       })
 
+      const frameWindow = captureFrameRef.current.contentWindow
+      const sendPlayerCommand = (func: string, args: unknown[] = []) => {
+        frameWindow?.postMessage(
+          JSON.stringify({ event: 'command', func, args }),
+          'https://www.youtube.com',
+        )
+      }
+      // 캡처에 유튜브 자동 자막이 찍히지 않도록 자막 모듈을 내립니다.
+      // (embed 파라미터로는 시청자 자막 설정을 끌 수 없습니다)
+      const unloadCaptions = () => {
+        sendPlayerCommand('unloadModule', ['captions'])
+        sendPlayerCommand('unloadModule', ['cc'])
+      }
+
+      // listening 핸드셰이크로 플레이어 상태를 구독하고,
+      // 실제 재생(PLAYING=1)이 보고된 뒤에 녹화를 시작합니다.
+      // seek 지연 때문에 재생 전 화면(제목·로딩)이 캡처 머리에 길게 찍히는 것을 막습니다.
+      const waitForPlaying = (timeoutMs: number) =>
+        new Promise<void>(resolve => {
+          let settled = false
+          const finish = () => {
+            if (settled) return
+            settled = true
+            window.clearTimeout(timer)
+            window.removeEventListener('message', onMessage)
+            resolve()
+          }
+          const onMessage = (event: MessageEvent) => {
+            if (event.origin !== 'https://www.youtube.com') return
+            if (typeof event.data !== 'string') return
+            try {
+              const data = JSON.parse(event.data) as {
+                event?: string
+                info?: { playerState?: number }
+              }
+              if (data.event === 'infoDelivery' && data.info?.playerState === 1) {
+                // 자동 자막은 재생 시작 후 늦게 붙을 수 있어 한 번 더 내립니다.
+                unloadCaptions()
+                finish()
+              }
+            } catch {
+              // 유튜브 외 포맷 메시지는 무시
+            }
+          }
+          const timer = window.setTimeout(finish, timeoutMs)
+          window.addEventListener('message', onMessage)
+          frameWindow?.postMessage(
+            JSON.stringify({ event: 'listening', id: 'shuffla-capture' }),
+            'https://www.youtube.com',
+          )
+        })
+
       setCaptureState('recording')
+      unloadCaptions()
+      sendPlayerCommand('seekTo', [captureStartSec, true])
+      sendPlayerCommand('playVideo')
+      // 재생 보고까지 최대 8초 대기(폴백 포함) 후 녹화 시작
+      await waitForPlaying(8_000)
       recorder.start(1000)
-      captureFrameRef.current.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'seekTo', args: [captureStartSec, true] }),
-        'https://www.youtube.com',
-      )
-      captureFrameRef.current.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-        'https://www.youtube.com',
-      )
 
       await new Promise<void>((resolve, reject) => {
         const timer = window.setTimeout(resolve, BROWSER_CAPTURE_SEC * 1000)
