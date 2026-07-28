@@ -25,6 +25,7 @@ const videoSchema = z.object({
   id: z.string().min(1),
   title: z.string(),
   channelTitle: z.string(),
+  channelId: z.string().nullable().optional(),
   durationSec: z.number().int().nonnegative(),
   viewCount: z.number().nonnegative(),
   publishedLabel: z.string(),

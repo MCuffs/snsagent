@@ -321,16 +321,54 @@ const THUMB_UP_PATH =
 const THUMB_DOWN_PATH =
   'M22 15h-3V5h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zm-5-10v9.4L12.7 22c-1.2-.1-2-.6-2-2l.7-3.6H5.5c-1.3 0-2.2-1.2-1.9-2.4l1.8-7.2c.2-.9 1-1.8 2-1.8z'
 
+/** 렌더 워터마크용 채널 프로필 이미지 (channels.list 1유닛). 실패하면 이니셜 폴백 */
+async function fetchChannelAvatarDataUri(
+  channelId: string | null | undefined,
+): Promise<string | null> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+  if (!channelId || !apiKey) return null
+  try {
+    const url = new URL('https://www.googleapis.com/youtube/v3/channels')
+    url.searchParams.set('part', 'snippet')
+    url.searchParams.set('id', channelId)
+    url.searchParams.set('key', apiKey)
+    const res = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    if (!res.ok) return null
+    const json = (await res.json()) as {
+      items?: { snippet?: { thumbnails?: Record<string, { url?: string } | undefined> } }[]
+    }
+    const thumbs = json.items?.[0]?.snippet?.thumbnails ?? {}
+    return fetchAvatarDataUri(thumbs.medium?.url ?? thumbs.default?.url ?? null)
+  } catch {
+    return null
+  }
+}
+
+/** 한글 위주 문자열의 대략적 렌더 폭 (px) — 워터마크 중앙 정렬용 */
+function estimateTextWidth(text: string, fontSize: number): number {
+  let width = 0
+  for (const ch of text) {
+    width += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 0.56
+  }
+  return width
+}
+
+// 세로 레이아웃 (이지컷 결과물 템플릿과 동일한 구성):
+//  [훅 2줄] → [영상 밴드 y230~635 · 플랫 다크 배경] → [댓글] → [채널 프로필 워터마크]
+const VIDEO_TOP = 230
+const VIDEO_BOTTOM = VIDEO_TOP + 405
+
 /**
- * 훅 제목(2줄 투톤)·자막·댓글 캡처 카드·워터마크를 한 장의 720x1280 투명 PNG 로 그립니다.
- * (유실 복원 — 레퍼런스: shuffla-bH0GSyyixcQ 결과물)
+ * 훅 제목(2줄, 둘째 줄 포인트 컬러)·자막·댓글 캡처·채널 워터마크를
+ * 한 장의 720x1280 투명 PNG 로 그립니다.
  */
 function buildOverlaySvg(params: {
   clip: ShortClip
   video: TrendingVideo
   avatarDataUri: string | null
+  channelAvatarDataUri: string | null
 }): string {
-  const { clip, video, avatarDataUri } = params
+  const { clip, video, avatarDataUri, channelAvatarDataUri } = params
   const [hookLine1, hookLine2] = splitHook(clip.hookTitle)
   const captionLines = wrapKoreanText(clip.subtitleLines[0] ?? '', 22, 2)
     .split('\n')
@@ -342,78 +380,90 @@ function buildOverlaySvg(params: {
 
   const parts: string[] = []
 
-  // 훅 제목 — 상단 중앙 2줄, 둘째 줄 보라→파랑 그라데이션
+  // 훅 제목 — 상단 중앙 2줄, 둘째 줄 시안 포인트
   if (hookLine2) {
     parts.push(
-      `<text x="360" y="128" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
-      `<text x="360" y="186" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="url(#hookGrad)">${escapeXml(hookLine2)}</text>`,
+      `<text x="360" y="112" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="46" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
+      `<text x="360" y="172" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="46" fill="#3fd8f5">${escapeXml(hookLine2)}</text>`,
     )
   } else {
     parts.push(
-      `<text x="360" y="160" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
+      `<text x="360" y="150" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="46" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
     )
   }
 
-  // 자막 — 16:9 영상 밴드(y 437~842) 하단에 걸치는 검은 띠
+  // 자막 — 영상 밴드 하단에 걸치는 검은 띠
   if (captionLines.length > 0) {
-    const lineHeight = 40
-    const boxHeight = captionLines.length * lineHeight + 20
-    const boxTop = 842 - boxHeight
+    const lineHeight = 38
+    const boxHeight = captionLines.length * lineHeight + 18
+    const boxTop = VIDEO_BOTTOM - boxHeight
     parts.push(
       `<rect x="0" y="${boxTop}" width="720" height="${boxHeight}" fill="rgba(0,0,0,0.78)"/>`,
     )
     captionLines.forEach((line, index) => {
       parts.push(
-        `<text x="360" y="${boxTop + 38 + index * lineHeight}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="27" fill="#ffffff">${escapeXml(line)}</text>`,
+        `<text x="360" y="${boxTop + 36 + index * lineHeight}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="26" fill="#ffffff">${escapeXml(line)}</text>`,
       )
     })
   }
 
-  // 댓글 캡처 카드 — 유튜브 다크 테마 모사
+  // 댓글 캡처 — 영상 바로 아래, 유튜브 다크 테마 (박스 없이 플랫)
   if (comment) {
-    const cardTop = 880
-    parts.push(
-      `<rect x="28" y="${cardTop}" width="664" height="188" rx="18" fill="rgba(0,0,0,0.45)"/>`,
-    )
+    const top = VIDEO_BOTTOM + 46
     if (avatarDataUri) {
       parts.push(
-        `<clipPath id="avatarClip"><circle cx="82" cy="${cardTop + 52}" r="27"/></clipPath>`,
-        `<image href="${avatarDataUri}" x="55" y="${cardTop + 25}" width="54" height="54" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>`,
+        `<clipPath id="avatarClip"><circle cx="76" cy="${top + 24}" r="26"/></clipPath>`,
+        `<image href="${avatarDataUri}" x="50" y="${top - 2}" width="52" height="52" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>`,
       )
     } else {
       parts.push(
-        `<circle cx="82" cy="${cardTop + 52}" r="27" fill="#7c6cff"/>`,
-        `<text x="82" y="${cardTop + 61}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="24" fill="#ffffff">${escapeXml(comment.author.replace('@', '').charAt(0).toUpperCase())}</text>`,
+        `<circle cx="76" cy="${top + 24}" r="26" fill="#7c6cff"/>`,
+        `<text x="76" y="${top + 33}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="23" fill="#ffffff">${escapeXml(comment.author.replace('@', '').charAt(0).toUpperCase())}</text>`,
       )
     }
     parts.push(
-      `<text x="126" y="${cardTop + 42}" font-family="Pretendard" font-weight="500" font-size="21" fill="#9ca3af">${escapeXml(`${comment.author} · ${comment.publishedLabel}`)}</text>`,
+      `<text x="120" y="${top + 14}" font-family="Pretendard" font-weight="500" font-size="20" fill="#9ca3af">${escapeXml(`${comment.author} · ${comment.publishedLabel}`)}</text>`,
     )
     commentLines.forEach((line, index) => {
       parts.push(
-        `<text x="126" y="${cardTop + 78 + index * 34}" font-family="Pretendard" font-weight="500" font-size="23" fill="#f3f4f6">${escapeXml(line)}</text>`,
+        `<text x="120" y="${top + 50 + index * 34}" font-family="Pretendard" font-weight="500" font-size="23" fill="#f3f4f6">${escapeXml(line)}</text>`,
       )
     })
-    const actionsY = cardTop + 78 + commentLines.length * 34 + 8
+    const actionsY = top + 50 + commentLines.length * 34 + 6
     parts.push(
-      `<g transform="translate(126, ${actionsY}) scale(1.05)" fill="#9ca3af"><path d="${THUMB_UP_PATH}"/></g>`,
-      `<text x="158" y="${actionsY + 18}" font-family="Pretendard" font-weight="600" font-size="20" fill="#9ca3af">${escapeXml(formatLikes(comment.likeCount))}</text>`,
-      `<g transform="translate(226, ${actionsY}) scale(1.05)" fill="#9ca3af"><path d="${THUMB_DOWN_PATH}"/></g>`,
-      `<text x="262" y="${actionsY + 18}" font-family="Pretendard" font-weight="600" font-size="20" fill="#9ca3af">답글</text>`,
+      `<g transform="translate(120, ${actionsY})" fill="#9ca3af"><path d="${THUMB_UP_PATH}"/></g>`,
+      `<text x="152" y="${actionsY + 17}" font-family="Pretendard" font-weight="600" font-size="19" fill="#9ca3af">${escapeXml(formatLikes(comment.likeCount))}</text>`,
+      `<g transform="translate(218, ${actionsY})" fill="#9ca3af"><path d="${THUMB_DOWN_PATH}"/></g>`,
+      `<text x="254" y="${actionsY + 17}" font-family="Pretendard" font-weight="600" font-size="19" fill="#9ca3af">답글</text>`,
     )
   }
 
-  // 하단 워터마크 + 원본 크레딧
+  // 하단 중앙 — 원본 채널 프로필 + 채널명 (이지컷과 동일한 채널 크레딧)
+  const watermarkY = 1168
+  const nameSize = 24
+  const nameWidth = estimateTextWidth(video.channelTitle, nameSize)
+  const avatarRadius = 19
+  const gap = 12
+  const totalWidth = avatarRadius * 2 + gap + nameWidth
+  const avatarCx = 360 - totalWidth / 2 + avatarRadius
+  const nameX = avatarCx + avatarRadius + gap
+  if (channelAvatarDataUri) {
+    parts.push(
+      `<clipPath id="channelClip"><circle cx="${avatarCx}" cy="${watermarkY}" r="${avatarRadius}"/></clipPath>`,
+      `<image href="${channelAvatarDataUri}" x="${avatarCx - avatarRadius}" y="${watermarkY - avatarRadius}" width="${avatarRadius * 2}" height="${avatarRadius * 2}" clip-path="url(#channelClip)" preserveAspectRatio="xMidYMid slice"/>`,
+    )
+  } else {
+    parts.push(
+      `<circle cx="${avatarCx}" cy="${watermarkY}" r="${avatarRadius}" fill="#374151"/>`,
+      `<text x="${avatarCx}" y="${watermarkY + 7}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="18" fill="#ffffff">${escapeXml(video.channelTitle.charAt(0))}</text>`,
+    )
+  }
   parts.push(
-    `<text x="360" y="1216" text-anchor="middle" font-family="Pretendard" font-weight="600" font-size="27" fill="#ffffff">Shuffla</text>`,
-    `<text x="360" y="1252" text-anchor="middle" font-family="Pretendard" font-weight="500" font-size="17" fill="#9ca3af">${escapeXml(`원본 · ${video.channelTitle}`)}</text>`,
+    `<text x="${nameX}" y="${watermarkY + 8}" font-family="Pretendard" font-weight="700" font-size="${nameSize}" fill="#f3f4f6">${escapeXml(video.channelTitle)}</text>`,
   )
 
   return [
     '<svg width="720" height="1280" viewBox="0 0 720 1280" xmlns="http://www.w3.org/2000/svg">',
-    '<defs><linearGradient id="hookGrad" x1="0" y1="0" x2="1" y2="0">',
-    '<stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#60a5fa"/>',
-    '</linearGradient></defs>',
     ...parts,
     '</svg>',
   ].join('')
@@ -428,20 +478,24 @@ async function renderShort(params: {
   const outputPath = path.join(params.workDir, 'short.mp4')
   const overlayPath = path.join(params.workDir, 'overlay.png')
 
-  const avatarDataUri = await fetchAvatarDataUri(params.clip.comment?.avatarUrl)
+  const [avatarDataUri, channelAvatarDataUri] = await Promise.all([
+    fetchAvatarDataUri(params.clip.comment?.avatarUrl),
+    fetchChannelAvatarDataUri(params.video.channelId),
+  ])
   const overlaySvg = buildOverlaySvg({
     clip: params.clip,
     video: params.video,
     avatarDataUri,
+    channelAvatarDataUri,
   })
   await fs.writeFile(overlayPath, renderSvgToPng(overlaySvg))
 
   const duration = Math.max(15, params.clip.endSec - params.clip.startSec)
+  // 플랫 다크 배경 위에 훅 바로 아래 영상 밴드를 두는 이지컷형 레이아웃
   const filter = [
-    '[0:v]split=2[base][main]',
-    '[base]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=12:4,eq=brightness=-0.25[bg]',
-    '[main]scale=720:720:force_original_aspect_ratio=decrease[fg]',
-    '[bg][fg]overlay=(W-w)/2:(H-h)/2[composed]',
+    `color=c=0x0b0b0d:s=720x1280:r=30[bg]`,
+    `[0:v]scale=720:${VIDEO_BOTTOM - VIDEO_TOP}:force_original_aspect_ratio=decrease[fg]`,
+    `[bg][fg]overlay=(W-w)/2:${VIDEO_TOP}:shortest=1[composed]`,
     '[composed][1:v]overlay=0:0[outv]',
   ].join(';')
 
