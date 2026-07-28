@@ -101,8 +101,8 @@ export default async function LoginPage({
           </h1>
           <p className="mb-8 text-[15px] text-[#6b7280]">
             {isEn
-              ? 'AI card news, instantly. No design skills needed.'
-              : 'AI로 카드뉴스를 즉시 생성하세요. 디자인 없이도 완성됩니다.'}
+              ? 'AI content, instantly. No design skills needed.'
+              : 'AI로 콘텐츠를 즉시 생성하세요. 디자인 없이도 완성됩니다.'}
           </p>
 
           {/* 폼 카드 */}

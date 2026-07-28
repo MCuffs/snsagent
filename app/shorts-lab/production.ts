@@ -9,7 +9,8 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { getLLMClient } from '../../src/lib/ai/llmClient'
-import { generateClips } from './pipeline'
+import { renderSvgToPng } from '../../src/lib/render/svgToPng'
+import { formatLikes, generateClips, splitHook } from './pipeline'
 import type { CapturedComment, ShortClip, TrendingVideo } from './types'
 
 interface TranscriptSegment {
@@ -290,8 +291,132 @@ function wrapKoreanText(text: string, maxChars = 15, maxLines = 2): string {
   return lines.slice(0, maxLines).join('\n')
 }
 
-function escapeFilterPath(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'")
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/** 댓글 작성자 프로필 이미지를 SVG 에 임베드할 data URI 로 가져옵니다. 실패하면 이니셜 폴백. */
+async function fetchAvatarDataUri(url: string | null | undefined): Promise<string | null> {
+  if (!url || !/^https:\/\//.test(url)) return null
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    if (!res.ok) return null
+    const type = res.headers.get('content-type') ?? 'image/jpeg'
+    if (!type.startsWith('image/')) return null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length === 0 || buffer.length > 2_000_000) return null
+    return `data:${type};base64,${buffer.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
+const THUMB_UP_PATH =
+  'M2 9h3v10H2a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zm5 10V9.6L11.3 2c1.2.1 2 .6 2 2l-.7 3.6h5.9c1.3 0 2.2 1.2 1.9 2.4l-1.8 7.2c-.2.9-1 1.8-2 1.8z'
+const THUMB_DOWN_PATH =
+  'M22 15h-3V5h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zm-5-10v9.4L12.7 22c-1.2-.1-2-.6-2-2l.7-3.6H5.5c-1.3 0-2.2-1.2-1.9-2.4l1.8-7.2c.2-.9 1-1.8 2-1.8z'
+
+/**
+ * 훅 제목(2줄 투톤)·자막·댓글 캡처 카드·워터마크를 한 장의 720x1280 투명 PNG 로 그립니다.
+ * (유실 복원 — 레퍼런스: shuffla-bH0GSyyixcQ 결과물)
+ */
+function buildOverlaySvg(params: {
+  clip: ShortClip
+  video: TrendingVideo
+  avatarDataUri: string | null
+}): string {
+  const { clip, video, avatarDataUri } = params
+  const [hookLine1, hookLine2] = splitHook(clip.hookTitle)
+  const captionLines = wrapKoreanText(clip.subtitleLines[0] ?? '', 22, 2)
+    .split('\n')
+    .filter(Boolean)
+  const comment = clip.comment
+  const commentLines = comment
+    ? wrapKoreanText(comment.text, 26, 2).split('\n').filter(Boolean)
+    : []
+
+  const parts: string[] = []
+
+  // 훅 제목 — 상단 중앙 2줄, 둘째 줄 보라→파랑 그라데이션
+  if (hookLine2) {
+    parts.push(
+      `<text x="360" y="128" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
+      `<text x="360" y="186" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="url(#hookGrad)">${escapeXml(hookLine2)}</text>`,
+    )
+  } else {
+    parts.push(
+      `<text x="360" y="160" text-anchor="middle" font-family="Pretendard" font-weight="800" font-size="44" fill="#ffffff">${escapeXml(hookLine1)}</text>`,
+    )
+  }
+
+  // 자막 — 16:9 영상 밴드(y 437~842) 하단에 걸치는 검은 띠
+  if (captionLines.length > 0) {
+    const lineHeight = 40
+    const boxHeight = captionLines.length * lineHeight + 20
+    const boxTop = 842 - boxHeight
+    parts.push(
+      `<rect x="0" y="${boxTop}" width="720" height="${boxHeight}" fill="rgba(0,0,0,0.78)"/>`,
+    )
+    captionLines.forEach((line, index) => {
+      parts.push(
+        `<text x="360" y="${boxTop + 38 + index * lineHeight}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="27" fill="#ffffff">${escapeXml(line)}</text>`,
+      )
+    })
+  }
+
+  // 댓글 캡처 카드 — 유튜브 다크 테마 모사
+  if (comment) {
+    const cardTop = 880
+    parts.push(
+      `<rect x="28" y="${cardTop}" width="664" height="188" rx="18" fill="rgba(0,0,0,0.45)"/>`,
+    )
+    if (avatarDataUri) {
+      parts.push(
+        `<clipPath id="avatarClip"><circle cx="82" cy="${cardTop + 52}" r="27"/></clipPath>`,
+        `<image href="${avatarDataUri}" x="55" y="${cardTop + 25}" width="54" height="54" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>`,
+      )
+    } else {
+      parts.push(
+        `<circle cx="82" cy="${cardTop + 52}" r="27" fill="#7c6cff"/>`,
+        `<text x="82" y="${cardTop + 61}" text-anchor="middle" font-family="Pretendard" font-weight="700" font-size="24" fill="#ffffff">${escapeXml(comment.author.replace('@', '').charAt(0).toUpperCase())}</text>`,
+      )
+    }
+    parts.push(
+      `<text x="126" y="${cardTop + 42}" font-family="Pretendard" font-weight="500" font-size="21" fill="#9ca3af">${escapeXml(`${comment.author} · ${comment.publishedLabel}`)}</text>`,
+    )
+    commentLines.forEach((line, index) => {
+      parts.push(
+        `<text x="126" y="${cardTop + 78 + index * 34}" font-family="Pretendard" font-weight="500" font-size="23" fill="#f3f4f6">${escapeXml(line)}</text>`,
+      )
+    })
+    const actionsY = cardTop + 78 + commentLines.length * 34 + 8
+    parts.push(
+      `<g transform="translate(126, ${actionsY}) scale(1.05)" fill="#9ca3af"><path d="${THUMB_UP_PATH}"/></g>`,
+      `<text x="158" y="${actionsY + 18}" font-family="Pretendard" font-weight="600" font-size="20" fill="#9ca3af">${escapeXml(formatLikes(comment.likeCount))}</text>`,
+      `<g transform="translate(226, ${actionsY}) scale(1.05)" fill="#9ca3af"><path d="${THUMB_DOWN_PATH}"/></g>`,
+      `<text x="262" y="${actionsY + 18}" font-family="Pretendard" font-weight="600" font-size="20" fill="#9ca3af">답글</text>`,
+    )
+  }
+
+  // 하단 워터마크 + 원본 크레딧
+  parts.push(
+    `<text x="360" y="1216" text-anchor="middle" font-family="Pretendard" font-weight="600" font-size="27" fill="#ffffff">Shuffla</text>`,
+    `<text x="360" y="1252" text-anchor="middle" font-family="Pretendard" font-weight="500" font-size="17" fill="#9ca3af">${escapeXml(`원본 · ${video.channelTitle}`)}</text>`,
+  )
+
+  return [
+    '<svg width="720" height="1280" viewBox="0 0 720 1280" xmlns="http://www.w3.org/2000/svg">',
+    '<defs><linearGradient id="hookGrad" x1="0" y1="0" x2="1" y2="0">',
+    '<stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#60a5fa"/>',
+    '</linearGradient></defs>',
+    ...parts,
+    '</svg>',
+  ].join('')
 }
 
 async function renderShort(params: {
@@ -301,20 +426,15 @@ async function renderShort(params: {
   workDir: string
 }): Promise<string> {
   const outputPath = path.join(params.workDir, 'short.mp4')
-  const hookPath = path.join(params.workDir, 'hook.txt')
-  const captionPath = path.join(params.workDir, 'caption.txt')
-  const creditPath = path.join(params.workDir, 'credit.txt')
-  const fontBold = path.join(process.cwd(), 'public/fonts/Pretendard-ExtraBold.otf')
-  const fontRegular = path.join(process.cwd(), 'public/fonts/Pretendard-Bold.otf')
+  const overlayPath = path.join(params.workDir, 'overlay.png')
 
-  await Promise.all([
-    fs.writeFile(hookPath, wrapKoreanText(params.clip.hookTitle)),
-    fs.writeFile(
-      captionPath,
-      wrapKoreanText(params.clip.subtitleLines[0] ?? '', 21, 3),
-    ),
-    fs.writeFile(creditPath, `원본 · ${params.video.channelTitle}`),
-  ])
+  const avatarDataUri = await fetchAvatarDataUri(params.clip.comment?.avatarUrl)
+  const overlaySvg = buildOverlaySvg({
+    clip: params.clip,
+    video: params.video,
+    avatarDataUri,
+  })
+  await fs.writeFile(overlayPath, renderSvgToPng(overlaySvg))
 
   const duration = Math.max(15, params.clip.endSec - params.clip.startSec)
   const filter = [
@@ -322,13 +442,13 @@ async function renderShort(params: {
     '[base]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=12:4,eq=brightness=-0.25[bg]',
     '[main]scale=720:720:force_original_aspect_ratio=decrease[fg]',
     '[bg][fg]overlay=(W-w)/2:(H-h)/2[composed]',
-    `[composed]drawbox=x=36:y=48:w=648:h=180:color=black@0.72:t=fill,drawtext=fontfile='${escapeFilterPath(fontBold)}':textfile='${escapeFilterPath(hookPath)}':fontcolor=white:fontsize=45:line_spacing=11:x=(w-text_w)/2:y=79`,
-    `drawbox=x=36:y=1007:w=648:h=173:color=black@0.68:t=fill,drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(captionPath)}':fontcolor=white:fontsize=28:line_spacing=8:x=(w-text_w)/2:y=1040`,
-    `drawtext=fontfile='${escapeFilterPath(fontRegular)}':textfile='${escapeFilterPath(creditPath)}':fontcolor=white@0.82:fontsize=17:x=48:y=1219[outv]`,
-  ].join(',')
+    '[composed][1:v]overlay=0:0[outv]',
+  ].join(';')
 
   await runFfmpeg([
     ...ffmpegInput(params.sourceUrl, params.clip.startSec),
+    '-i',
+    overlayPath,
     '-t',
     String(duration),
     '-filter_complex',

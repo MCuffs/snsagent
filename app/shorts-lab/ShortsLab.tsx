@@ -52,6 +52,7 @@ const COMMENT_SOURCE_LABEL: Record<CommentSource, string> = {
 }
 
 const emptySubscribe = () => () => undefined
+const LICENSE_NOTICE_HIDE_KEY = 'shorts_lab_license_notice_hidden'
 
 export default function ShortsLab({
   initial,
@@ -70,6 +71,8 @@ export default function ShortsLab({
   const [paywallError, setPaywallError] = useState<string | null>(null)
   // 무료 체험 1회가 이 세션에서 소진되면 즉시 잠금 — 다음 클릭부터 결제 유도
   const [trialConsumed, setTrialConsumed] = useState(false)
+  // 영상 선택 시 라이선스 직접 확인 안내 — "다시 보지 않기" 전까지 매번 표시
+  const [licenseNoticeFor, setLicenseNoticeFor] = useState<string | null>(null)
   const [sessionUses, setSessionUses] = useState(0)
   const isLocked =
     access.mode === 'locked' || (access.mode === 'trial' && trialConsumed)
@@ -171,6 +174,19 @@ export default function ShortsLab({
     !uploadingSource &&
     !captureOpen
 
+  const applySelection = useCallback((id: string) => {
+    setSelectedId(id)
+    setGenError(null)
+    setResultVideo(null)
+    setResultClip(null)
+    setDownloadUrl('')
+    setUploadProgress(0)
+    setUploadError(null)
+    setCaptureOpen(false)
+    setCaptureState('idle')
+    setCaptureError(null)
+  }, [])
+
   const selectVideo = useCallback((id: string) => {
     const video = videos.find(item => item.id === id)
     analytics.shortsLabVideoSelect({
@@ -184,17 +200,35 @@ export default function ShortsLab({
       openPaywall(access.mode === 'trial' ? 'trial_exhausted' : 'video_click')
       return
     }
-    setSelectedId(id)
-    setGenError(null)
-    setResultVideo(null)
-    setResultClip(null)
-    setDownloadUrl('')
-    setUploadProgress(0)
-    setUploadError(null)
-    setCaptureOpen(false)
-    setCaptureState('idle')
-    setCaptureError(null)
-  }, [access.mode, isLocked, openPaywall, videos])
+    // 라이선스 직접 확인 안내 — "다시 보지 않기" 전까지 선택할 때마다 표시
+    let noticeHidden = false
+    try {
+      noticeHidden = window.localStorage.getItem(LICENSE_NOTICE_HIDE_KEY) === '1'
+    } catch {
+      noticeHidden = false
+    }
+    if (!noticeHidden) {
+      analytics.shortsLabLicenseNoticeShow(id)
+      setLicenseNoticeFor(id)
+      return
+    }
+    applySelection(id)
+  }, [access.mode, applySelection, isLocked, openPaywall, videos])
+
+  const confirmLicenseNotice = useCallback((hideForever: boolean) => {
+    if (!licenseNoticeFor) return
+    analytics.shortsLabLicenseNoticeConfirm(licenseNoticeFor, hideForever)
+    if (hideForever) {
+      try {
+        window.localStorage.setItem(LICENSE_NOTICE_HIDE_KEY, '1')
+      } catch {
+        // 저장 실패해도 진행에는 지장 없음
+      }
+    }
+    const id = licenseNoticeFor
+    setLicenseNoticeFor(null)
+    applySelection(id)
+  }, [applySelection, licenseNoticeFor])
 
   const toggleReusableFilter = useCallback((checked: boolean) => {
     analytics.shortsLabFilterToggle('reusable_cc', checked, isLocked)
@@ -881,7 +915,53 @@ export default function ShortsLab({
         </section>
       </div>
 
-      {captureOpen && selected && (
+      {portalReady && licenseNoticeFor && createPortal(
+        <div className="sl-license-backdrop" role="dialog" aria-modal="true" aria-labelledby="sl-license-title">
+          <div className="sl-license">
+            <div className="sl-license-head">
+              <span className="sl-license-glyph" aria-hidden="true">ⓘ</span>
+              <div>
+                <em>필터 이용 전 확인</em>
+                <h2 id="sl-license-title">영상의 라이선스를 직접 확인해 주세요</h2>
+              </div>
+            </div>
+            <p className="sl-license-desc">
+              재사용 허용 필터는 YouTube에서 <b>크리에이티브 커먼즈</b>로 표시된 영상을
+              선별합니다. 게시자가 라이선스를 변경하거나 제3자 권리가 포함될 수 있으므로,
+              사용 직전에 원본 영상에서 최신 표시를 다시 확인하세요.
+            </p>
+            <ol className="sl-license-steps">
+              <li><b>원본 영상</b>을 YouTube에서 엽니다.</li>
+              <li>영상 설명의 <b>더보기</b>를 선택합니다.</li>
+              <li>설명 최하단의 <b>라이선스</b> 항목을 확인합니다.</li>
+            </ol>
+            <div className="sl-license-sample">
+              <span>라이선스</span>
+              <strong>크리에이티브 커먼즈 저작자 표시 라이선스 (재사용 허용)</strong>
+            </div>
+            <p className="sl-license-note">
+              위 화면은 확인 위치를 설명하기 위해 재구성한 예시이며 실제 YouTube 화면이
+              아닙니다. 음악, 방송 화면, 인물·상표 등 별도 권리는 직접 확인해야 합니다.
+            </p>
+            <div className="sl-license-actions">
+              <button type="button" onClick={() => confirmLicenseNotice(true)}>
+                다시 보지 않기
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                onClick={() => confirmLicenseNotice(false)}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {/* CMS 조상의 backdrop-filter 가 fixed 기준을 가두므로 body 로 포털해야
+          탭 캡처에 사이드바가 찍히지 않고 진짜 전체 화면이 됩니다. */}
+      {portalReady && captureOpen && selected && createPortal(
         <div className={`sl-capture-stage ${captureState === 'recording' ? 'is-recording' : ''}`}>
           <iframe
             ref={captureFrameRef}
@@ -921,7 +1001,8 @@ export default function ShortsLab({
               <small>Chrome 권장 · Creative Commons 영상에만 제공</small>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

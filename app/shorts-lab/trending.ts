@@ -35,6 +35,7 @@ interface YouTubeVideoItem {
   snippet?: {
     title?: string
     channelTitle?: string
+    channelId?: string
     publishedAt?: string
     categoryId?: string
     thumbnails?: Record<string, { url?: string } | undefined>
@@ -63,6 +64,7 @@ function toTrendingVideo(item: YouTubeVideoItem, now: number): TrendingVideo {
     id: item.id,
     title: item.snippet?.title ?? '(제목 없음)',
     channelTitle: item.snippet?.channelTitle ?? '(채널 없음)',
+    channelId: item.snippet?.channelId ?? null,
     durationSec: parseIsoDuration(item.contentDetails?.duration ?? ''),
     viewCount: Number(item.statistics?.viewCount ?? 0),
     publishedLabel: relativeLabel(item.snippet?.publishedAt, now),

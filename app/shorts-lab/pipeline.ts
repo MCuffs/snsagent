@@ -45,6 +45,27 @@ export function relativeLabel(publishedAt: string | undefined, now: number): str
   return `${Math.floor(days / 30)}개월 전`
 }
 
+/**
+ * 훅 제목을 2줄로 쪼갭니다. 두 줄의 글자 수가 가장 비슷해지는 지점에서 자릅니다.
+ * 프리뷰(클라이언트)와 mp4 렌더(서버)가 같은 분리 결과를 쓰도록 공용으로 둡니다.
+ */
+export function splitHook(title: string): [string, string] {
+  const words = title.trim().split(/\s+/)
+  if (words.length < 2) return [title, '']
+  const total = title.replace(/\s/g, '').length
+  let best = 1
+  let bestDiff = Infinity
+  for (let i = 1; i < words.length; i += 1) {
+    const head = words.slice(0, i).join('').length
+    const diff = Math.abs(total - head * 2)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = i
+    }
+  }
+  return [words.slice(0, best).join(' '), words.slice(best).join(' ')]
+}
+
 /** ISO 8601 duration(PT1H2M3S) → 초. YouTube Data API contentDetails.duration 파싱용 */
 export function parseIsoDuration(iso: string): number {
   const m = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso)

@@ -13,6 +13,8 @@ export interface TrendingVideo {
   id: string
   title: string
   channelTitle: string
+  /** 렌더 워터마크용 채널 프로필 조회에 사용. 픽스처는 null */
+  channelId?: string | null
   durationSec: number
   viewCount: number
   publishedLabel: string

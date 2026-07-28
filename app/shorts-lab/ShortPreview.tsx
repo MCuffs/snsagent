@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatDuration, formatLikes } from './pipeline'
+import { formatDuration, formatLikes, splitHook } from './pipeline'
 import type { ShortClip, TemplateId, TrendingVideo } from './types'
 
 // 9:16 프리뷰 렌더러.
@@ -41,26 +41,6 @@ function hueOf(seed: string): number {
   return h
 }
 
-/**
- * 훅 제목을 2줄로 쪼갭니다. 두 줄의 글자 수가 가장 비슷해지는 지점에서 자릅니다.
- * 아랫줄에만 강조를 먹여 시선을 아래(영상)로 끌어내리는 구성입니다.
- */
-function splitHook(title: string): [string, string] {
-  const words = title.trim().split(/\s+/)
-  if (words.length < 2) return [title, '']
-  const total = title.replace(/\s/g, '').length
-  let best = 1
-  let bestDiff = Infinity
-  for (let i = 1; i < words.length; i += 1) {
-    const head = words.slice(0, i).join('').length
-    const diff = Math.abs(total - head * 2)
-    if (diff < bestDiff) {
-      bestDiff = diff
-      best = i
-    }
-  }
-  return [words.slice(0, best).join(' '), words.slice(best).join(' ')]
-}
 
 /**
  * 하이라이트 구간을 YouTube IFrame 플레이어로 재생합니다.

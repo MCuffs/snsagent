@@ -521,6 +521,10 @@ export const analytics = {
     track('shorts_lab_download_click', { video_id: videoId }),
   shortsLabRemakeClick: (videoId: string) =>
     track('shorts_lab_remake_click', { video_id: videoId }),
+  shortsLabLicenseNoticeShow: (videoId: string) =>
+    track('shorts_lab_license_notice_show', { video_id: videoId }),
+  shortsLabLicenseNoticeConfirm: (videoId: string, hideForever: boolean) =>
+    track('shorts_lab_license_notice_confirm', { video_id: videoId, hide_forever: hideForever }),
 
   // Billing
   billingPageView: (currentPlan: string, props?: Record<string, unknown>) =>
