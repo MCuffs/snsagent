@@ -1,4 +1,4 @@
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Captions, Check, FlaskConical, Play, WandSparkles } from 'lucide-react'
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { MarketingFooter } from '../components/MarketingFooter'
@@ -81,8 +81,8 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           sameAs: ['https://www.instagram.com/shuffla.io/'],
         },
         featureList: isEn
-          ? ['Video card news story planning', 'video prompt generation', 'Brand URL analysis', 'AI copy generation', 'AI background image generation', '4:5 Instagram card news export', 'Card news editing studio']
-          : ['영상 카드뉴스 스토리 기획', '영상 프롬프트 생성', '브랜드 URL 분석', 'AI 카피 자동 생성', 'AI 배경 이미지 생성', '4:5 인스타그램 카드뉴스 내보내기', '카드뉴스 편집 스튜디오'],
+          ? ['Shorts-Labs trending long-form discovery and short-form remix', '30-day YouTube Shorts automation', 'Video card news story planning', 'video prompt generation', 'Brand URL analysis', 'AI copy generation', 'AI background image generation', '4:5 Instagram card news export', 'Card news editing studio']
+          : ['Shorts-Labs 인기 롱폼 탐색 및 숏폼 재구성', '30일 유튜브 쇼츠 자동화', '영상 카드뉴스 스토리 기획', '영상 프롬프트 생성', '브랜드 URL 분석', 'AI 카피 자동 생성', 'AI 배경 이미지 생성', '4:5 인스타그램 카드뉴스 내보내기', '카드뉴스 편집 스튜디오'],
         knowsAbout: isEn
           ? ['video card news', 'AI video generation', 'Instagram carousel', 'AI social content', 'card news design']
           : ['영상 카드뉴스', '영상 생성', '인스타그램 카드뉴스', 'AI SNS 콘텐츠', '카드뉴스 디자인'],
@@ -143,6 +143,60 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
             ))}
           </div>
         </FadeUp>
+
+        <section className="px-5 py-24 md:px-8 md:py-32">
+          <FadeUp>
+            <div className="mx-auto max-w-[1300px] overflow-hidden rounded-[30px] bg-[#11110f] text-white">
+              <div className="grid gap-12 px-6 py-12 md:px-10 md:py-16 lg:grid-cols-[0.42fr_0.58fr] lg:items-end lg:px-16 lg:py-20">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#ff8b62]">
+                    <FlaskConical className="h-4 w-4" />
+                    {t('shorts_labs_eyebrow')}
+                  </p>
+                  <h2 className="mt-6 whitespace-pre-line text-[clamp(2.5rem,5vw,4.8rem)] font-semibold leading-[1.02] tracking-[-0.065em]">
+                    {t('shorts_labs_title')}
+                  </h2>
+                  <p className="mt-6 max-w-xl text-[15px] leading-7 text-white/62">
+                    {t('shorts_labs_desc')}
+                  </p>
+                  <div className="mt-9 flex flex-wrap gap-3">
+                    <Link
+                      href={accessHref}
+                      className="inline-flex h-11 items-center gap-2 rounded-full bg-[#ed6238] px-6 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-[#db552d]"
+                    >
+                      {t('shorts_labs_cta')} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      href={`/${locale}/pricing`}
+                      className="inline-flex h-11 items-center rounded-full border border-white/15 px-6 text-sm font-semibold text-white/80 transition hover:bg-white/8 hover:text-white"
+                    >
+                      {t('shorts_labs_pricing')}
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { icon: FlaskConical, label: t('shorts_labs_step1_label'), title: t('shorts_labs_step1_title'), body: t('shorts_labs_step1_body') },
+                    { icon: WandSparkles, label: t('shorts_labs_step2_label'), title: t('shorts_labs_step2_title'), body: t('shorts_labs_step2_body') },
+                    { icon: Captions, label: t('shorts_labs_step3_label'), title: t('shorts_labs_step3_title'), body: t('shorts_labs_step3_body') },
+                  ].map(({ icon: Icon, label, title, body }, index) => (
+                    <article key={label} className="relative min-h-52 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.055] p-5">
+                      <div className="flex items-center justify-between">
+                        <Icon className="h-5 w-5 text-[#ff8b62]" />
+                        <span className="font-mono text-[10px] text-white/30">0{index + 1}</span>
+                      </div>
+                      <p className="mt-8 text-[10px] font-semibold tracking-[0.18em] text-white/35">{label}</p>
+                      <h3 className="mt-2 text-lg font-semibold tracking-[-0.035em]">{title}</h3>
+                      <p className="mt-3 text-xs leading-5 text-white/50">{body}</p>
+                      {index === 2 && <Play className="absolute -bottom-5 -right-4 h-20 w-20 text-white/[0.035]" fill="currentColor" />}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </FadeUp>
+        </section>
 
         <ProductShowcase authenticated={authenticated} locale={locale} />
         <CapabilityObjects />

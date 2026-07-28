@@ -569,11 +569,15 @@ export async function produceShort(params: {
   comments: CapturedComment[]
   userId: string
   sourceUrl: string
+  /** capture: 브라우저 탭 캡처(머리 트림 대상) / file: 사용자가 올린 원본 */
+  sourceKind?: 'capture' | 'file'
   onProgress?: ProductionProgress
 }): Promise<ProducedShort> {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shuffla-shorts-'))
   try {
-    const capture = isBrowserCapture(params.sourceUrl)
+    const capture =
+      params.sourceKind === 'capture' ||
+      (params.sourceKind === undefined && isBrowserCapture(params.sourceUrl))
 
     params.onProgress?.('analyze', '가장 좋은 순간을 찾고 있어요', '음성을 분석하는 중')
     let segments: TranscriptSegment[] = []

@@ -41,7 +41,9 @@ const videoSchema = z.object({
 // 브라우저 캡처 또는 직접 업로드한 원본(sourceUrl)이 항상 필요합니다.
 const bodySchema = z.object({
   video: videoSchema,
+  // 원본은 항상 필요 (서버측 yt-dlp 추출 경로는 제거됨)
   sourceUrl: z.string().url(),
+  sourceKind: z.enum(['capture', 'file']).optional(),
 })
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { video, sourceUrl } = body
+  const { video, sourceUrl, sourceKind } = body
   if (video.source !== 'youtube-api') {
     return Response.json(
       { error: '데모 영상은 실제 MP4를 만들 수 없습니다. LIVE 목록의 영상을 선택해 주세요.' },
@@ -154,6 +156,7 @@ export async function POST(request: Request) {
           comments: pool.comments,
           userId: user.id,
           sourceUrl,
+          sourceKind,
           onProgress: (id, label, detail) => {
             send({ type: 'stage', id, label, detail, status: 'running' })
           },

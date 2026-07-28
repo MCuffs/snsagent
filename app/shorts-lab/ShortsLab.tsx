@@ -310,7 +310,7 @@ export default function ShortsLab({
       const response = await fetch('/api/shorts-lab/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video: selected, sourceUrl }),
+        body: JSON.stringify({ video: selected, sourceUrl, sourceKind: 'capture' }),
         signal: controller.signal,
       })
       if (!response.ok) {
