@@ -27,6 +27,13 @@ export function hasShortsLabFullAccess(user?: {
   return normalizePlan(user.plan || 'FREE') !== 'FREE'
 }
 
+/** 월·일 생성 한도까지 면제되는 계정 (어드민·지정 계정) */
+export function isShortsLabUnlimited(email?: string | null) {
+  if (!email) return false
+  const normalized = email.trim().toLowerCase()
+  return isAdminEmail(normalized) || FULL_ACCESS_EMAILS.has(normalized)
+}
+
 export const SHORTS_LAB_REQUIRED_PLAN = 'YOUTUBE_PROMO'
 
 export function shortsLabUpgradeResponse() {

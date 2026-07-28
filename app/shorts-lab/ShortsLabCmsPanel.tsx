@@ -4,16 +4,26 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import ShortsLab from './ShortsLab'
 import type { TrendingResult } from './trending'
+import type { ShortsLabAccess } from './types'
 import './shorts-lab.css'
+
+const LOCKED_FALLBACK: ShortsLabAccess = {
+  mode: 'locked',
+  monthUsed: 0,
+  dayUsed: 0,
+  monthLimit: 60,
+  dayLimit: 10,
+  unlimited: false,
+}
 
 export default function ShortsLabCmsPanel({
   isActive,
   userId,
-  locked = true,
+  access,
 }: {
   isActive: boolean
   userId: string
-  locked?: boolean
+  access?: ShortsLabAccess | null
 }) {
   const [initial, setInitial] = useState<TrendingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -77,7 +87,12 @@ export default function ShortsLabCmsPanel({
 
   return (
     <div className="h-full overflow-y-auto">
-      <ShortsLab initial={initial} userId={userId} embedded locked={locked} />
+      <ShortsLab
+        initial={initial}
+        userId={userId}
+        embedded
+        access={access ?? LOCKED_FALLBACK}
+      />
     </div>
   )
 }

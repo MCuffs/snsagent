@@ -3,8 +3,16 @@ import { head } from '@vercel/blob'
 import { getSessionUser } from '../../../../lib/auth/user'
 import {
   hasShortsLabFullAccess,
+  isShortsLabUnlimited,
   shortsLabUpgradeResponse,
 } from '../../../../lib/auth/shorts-lab-access'
+import {
+  getShortsLabUsage,
+  recordShortsLabGeneration,
+  SHORTS_LAB_DAILY_LIMIT,
+  SHORTS_LAB_FREE_TRIAL_LIMIT,
+  SHORTS_LAB_MONTHLY_LIMIT,
+} from '../../../../lib/shorts-lab-usage'
 import { loadTopComments } from '../../../shorts-lab/comments'
 import { checkEligibility, usedMinutesFor } from '../../../shorts-lab/pipeline'
 import { produceShort } from '../../../shorts-lab/production'
@@ -43,8 +51,35 @@ export async function POST(request: Request) {
   if (!user) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
+
+  // 한도 정책: 무료 1회 체험 → 이후 결제 / 유료 월 60회·일 10회 / 어드민·지정 계정 무제한
+  const usage = await getShortsLabUsage(user.id)
   if (!hasShortsLabFullAccess(user)) {
-    return Response.json(shortsLabUpgradeResponse(), { status: 402 })
+    if (usage.totalUsed >= SHORTS_LAB_FREE_TRIAL_LIMIT) {
+      return Response.json(
+        { ...shortsLabUpgradeResponse(), reason: 'trial_exhausted' },
+        { status: 402 },
+      )
+    }
+  } else if (!isShortsLabUnlimited(user.email)) {
+    if (usage.monthUsed >= SHORTS_LAB_MONTHLY_LIMIT) {
+      return Response.json(
+        {
+          error: `이번 달 생성 한도(${SHORTS_LAB_MONTHLY_LIMIT}회)를 모두 사용했습니다. 다음 달에 다시 이용할 수 있습니다.`,
+          reason: 'monthly_limit',
+        },
+        { status: 429 },
+      )
+    }
+    if (usage.dayUsed >= SHORTS_LAB_DAILY_LIMIT) {
+      return Response.json(
+        {
+          error: `오늘 생성 한도(${SHORTS_LAB_DAILY_LIMIT}회)를 모두 사용했습니다. 내일 다시 이용할 수 있습니다.`,
+          reason: 'daily_limit',
+        },
+        { status: 429 },
+      )
+    }
   }
 
   let body: z.infer<typeof bodySchema>
@@ -122,6 +157,9 @@ export async function POST(request: Request) {
             send({ type: 'stage', id, label, detail, status: 'running' })
           },
         })
+
+        // 한도 집계용 사용 기록 — 결과 전송 전에 확정합니다.
+        await recordShortsLabGeneration(user.id, video.id)
 
         send({
           type: 'result',

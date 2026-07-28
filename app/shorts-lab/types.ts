@@ -94,4 +94,16 @@ export interface ErrorEvent {
   message: string
 }
 
+/** 서버에서 계산해 내려주는 이용 상태 */
+export interface ShortsLabAccess {
+  /** full: 유료·무제한 / trial: 무료 체험 1회 남음 / locked: 결제 필요 */
+  mode: 'full' | 'trial' | 'locked'
+  monthUsed: number
+  dayUsed: number
+  monthLimit: number
+  dayLimit: number
+  /** 어드민·지정 계정 — 한도 표시 생략 */
+  unlimited: boolean
+}
+
 export type PipelineEvent = StageEvent | ResultEvent | ErrorEvent

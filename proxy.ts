@@ -32,6 +32,8 @@ export async function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith('/api') ||
+    pathname === '/sync_js' ||
+    pathname === '/data_debug' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/_vercel') ||
     pathname.match(/\.[a-zA-Z0-9]+$/) ||

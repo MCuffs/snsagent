@@ -1,6 +1,10 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { getSessionUser } from '../../../../lib/auth/user'
 import { hasShortsLabFullAccess } from '../../../../lib/auth/shorts-lab-access'
+import {
+  getShortsLabUsage,
+  SHORTS_LAB_FREE_TRIAL_LIMIT,
+} from '../../../../lib/shorts-lab-usage'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,8 +34,15 @@ export async function POST(request: Request) {
       token: process.env.BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async pathname => {
         const user = await getSessionUser()
-        if (!user || !hasShortsLabFullAccess(user)) {
-          throw new Error('업로드 권한이 없습니다. 유료 플랜에서 이용할 수 있습니다.')
+        if (!user) {
+          throw new Error('업로드 권한이 없습니다.')
+        }
+        // 무료 체험 1회분의 캡처 업로드는 허용합니다.
+        if (!hasShortsLabFullAccess(user)) {
+          const usage = await getShortsLabUsage(user.id)
+          if (usage.totalUsed >= SHORTS_LAB_FREE_TRIAL_LIMIT) {
+            throw new Error('무료 체험이 끝났습니다. 유료 플랜에서 이용할 수 있습니다.')
+          }
         }
 
         const allowedPrefix = `uploads/shorts-lab/${user.id}/`

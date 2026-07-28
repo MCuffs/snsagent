@@ -1,8 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { createPortal } from 'react-dom'
+import { analytics } from '../../lib/analytics/thinkingdata'
 import {
   Check,
   CheckCircle2,
@@ -29,10 +37,10 @@ import type {
   CommentSource,
   PipelineEvent,
   ShortClip,
+  ShortsLabAccess,
   TrendingVideo,
 } from './types'
 
-const MONTHLY_QUOTA_MIN = 60
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 const ALLOWED_SOURCE_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
 const BROWSER_CAPTURE_SEC = 35
@@ -49,17 +57,23 @@ export default function ShortsLab({
   initial,
   userId,
   embedded = false,
-  locked = false,
+  access,
 }: {
   initial: TrendingResult
   userId: string
   embedded?: boolean
-  locked?: boolean
+  access: ShortsLabAccess
 }) {
   const [trending, setTrending] = useState(initial)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [paywallProcessing, setPaywallProcessing] = useState(false)
   const [paywallError, setPaywallError] = useState<string | null>(null)
+  // 무료 체험 1회가 이 세션에서 소진되면 즉시 잠금 — 다음 클릭부터 결제 유도
+  const [trialConsumed, setTrialConsumed] = useState(false)
+  const [sessionUses, setSessionUses] = useState(0)
+  const isLocked =
+    access.mode === 'locked' || (access.mode === 'trial' && trialConsumed)
+  const isTrial = access.mode === 'trial' && !trialConsumed
   const portalReady = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -81,7 +95,6 @@ export default function ShortsLab({
   const [engine, setEngine] = useState('')
   const [commentSource, setCommentSource] = useState<CommentSource | null>(null)
   const [commentNotice, setCommentNotice] = useState<string | null>(null)
-  const [spentMinutes, setSpentMinutes] = useState(0)
   const [uploadingSource, setUploadingSource] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -94,13 +107,31 @@ export default function ShortsLab({
 
   const { videos, mode, notice, fetchedAtLabel, criteriaLabel } = trending
 
+  useEffect(() => {
+    analytics.shortsLabView({
+      access_mode: access.mode,
+      embedded,
+      video_count: initial.videos.length,
+    })
+    // 최초 노출 1회만 기록
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const openPaywall = useCallback((trigger: string) => {
+    analytics.shortsLabPaywallShow(trigger)
+    setPaywallError(null)
+    setPaywallOpen(true)
+  }, [])
+
   const refresh = useCallback(async () => {
     setRefreshing(true)
     setListError(null)
     try {
       const response = await fetch('/api/shorts-lab/trending', { cache: 'no-store' })
       if (!response.ok) throw new Error(`목록 로딩 실패 (${response.status})`)
-      setTrending((await response.json()) as TrendingResult)
+      const next = (await response.json()) as TrendingResult
+      analytics.shortsLabTrendingRefresh({ video_count: next.videos.length, mode: next.mode })
+      setTrending(next)
     } catch (error) {
       setListError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -141,10 +172,16 @@ export default function ShortsLab({
     !captureOpen
 
   const selectVideo = useCallback((id: string) => {
-    // 무료 유저는 차트 열람까지만 — 영상 선택 시점에 결제 안내로 전환합니다.
-    if (locked) {
-      setPaywallError(null)
-      setPaywallOpen(true)
+    const video = videos.find(item => item.id === id)
+    analytics.shortsLabVideoSelect({
+      video_id: id,
+      video_title: video?.title.slice(0, 80) ?? '',
+      reusable: video ? isReusable(video) : false,
+      blocked: isLocked,
+    })
+    // 잠긴 유저(무료 체험 소진 포함)는 선택 시점에 결제 안내로 전환합니다.
+    if (isLocked) {
+      openPaywall(access.mode === 'trial' ? 'trial_exhausted' : 'video_click')
       return
     }
     setSelectedId(id)
@@ -157,19 +194,20 @@ export default function ShortsLab({
     setCaptureOpen(false)
     setCaptureState('idle')
     setCaptureError(null)
-  }, [locked])
+  }, [access.mode, isLocked, openPaywall, videos])
 
   const toggleReusableFilter = useCallback((checked: boolean) => {
-    if (locked) {
-      setPaywallError(null)
-      setPaywallOpen(true)
+    analytics.shortsLabFilterToggle('reusable_cc', checked, isLocked)
+    if (isLocked) {
+      openPaywall(access.mode === 'trial' ? 'trial_exhausted' : 'cc_filter')
       return
     }
     setOnlyReusable(checked)
-  }, [locked])
+  }, [access.mode, isLocked, openPaywall])
 
   const startPaywallCheckout = useCallback(async () => {
     if (paywallProcessing) return
+    analytics.shortsLabPaywallCheckoutClick()
     setPaywallError(null)
     setPaywallProcessing(true)
     try {
@@ -196,6 +234,8 @@ export default function ShortsLab({
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    const startedAt = Date.now()
+    analytics.shortsLabGenerateStart({ video_id: selected.id, is_trial: isTrial })
     setGenerating(true)
     setProgressLabel('제목과 댓글을 읽고 있어요')
     setGenError(null)
@@ -207,6 +247,12 @@ export default function ShortsLab({
       if (event.type === 'stage') {
         setProgressLabel(event.label)
       } else if (event.type === 'result') {
+        analytics.shortsLabGenerateSuccess({
+          video_id: event.video.id,
+          is_trial: isTrial,
+          duration_ms: Date.now() - startedAt,
+          comment_source: event.commentSource,
+        })
         setResultVideo(event.video)
         setResultClip(event.clips[0] ?? null)
         setDownloadUrl(event.downloadUrl)
@@ -214,8 +260,14 @@ export default function ShortsLab({
         setEngine(event.engine)
         setCommentSource(event.commentSource)
         setCommentNotice(event.commentNotice)
-        setSpentMinutes(previous => Math.round((previous + event.usedMinutes) * 10) / 10)
+        setSessionUses(previous => previous + 1)
+        // 무료 체험 1회 소진 — 이후 어떤 클릭이든 결제 유도로 이어집니다.
+        if (access.mode === 'trial') setTrialConsumed(true)
       } else {
+        analytics.shortsLabGenerateError({
+          video_id: selected.id,
+          reason: event.message.slice(0, 120),
+        })
         setGenError(event.message)
       }
     }
@@ -228,7 +280,27 @@ export default function ShortsLab({
         signal: controller.signal,
       })
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string
+          reason?: string
+        } | null
+        // 서버 한도 응답 — 체험 소진은 결제 유도, 일·월 한도는 안내만
+        if (payload?.reason === 'trial_exhausted') {
+          analytics.shortsLabLimitBlocked('trial_exhausted')
+          setTrialConsumed(true)
+          setGenerating(false)
+          openPaywall('trial_exhausted')
+          return
+        }
+        if (payload?.reason === 'daily_limit' || payload?.reason === 'monthly_limit') {
+          analytics.shortsLabLimitBlocked(payload.reason)
+        } else {
+          analytics.shortsLabGenerateError({
+            video_id: selected.id,
+            reason: payload?.error?.slice(0, 120) ?? `HTTP ${response.status}`,
+            code: payload?.reason,
+          })
+        }
         throw new Error(payload?.error ?? `생성 실패 (${response.status})`)
       }
       if (!response.body) throw new Error('생성 결과를 읽을 수 없습니다.')
@@ -254,7 +326,7 @@ export default function ShortsLab({
     } finally {
       setGenerating(false)
     }
-  }, [selected])
+  }, [access.mode, isTrial, openPaywall, selected])
 
   const uploadSourceAndGenerate = useCallback(async (file: File) => {
     if (!selected) return
@@ -290,16 +362,20 @@ export default function ShortsLab({
         onUploadProgress: progress => setUploadProgress(Math.round(progress.percentage)),
       })
 
+      analytics.shortsLabUploadComplete(selected.id, Math.round(file.size / 1024 / 1024 * 10) / 10)
       setUploadingSource(false)
       await generate(blob.url)
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : '원본 업로드에 실패했습니다.')
+      const reason = error instanceof Error ? error.message : '원본 업로드에 실패했습니다.'
+      analytics.shortsLabUploadError(selected.id, reason.slice(0, 120))
+      setUploadError(reason)
       setUploadingSource(false)
     }
   }, [generate, selected, userId])
 
   const openBrowserCapture = useCallback(() => {
     if (!selected) return
+    analytics.shortsLabCaptureOpen(selected.id)
     const suggested = generateClips(selected, [])[0]
     setCaptureStartSec(suggested?.startSec ?? Math.round(selected.durationSec * 0.08))
     setCaptureError(null)
@@ -400,6 +476,7 @@ export default function ShortsLab({
           )
         })
 
+      analytics.shortsLabCaptureStart(selected.id, captureStartSec)
       setCaptureState('recording')
       unloadCaptions()
       sendPlayerCommand('seekTo', [captureStartSec, true])
@@ -423,6 +500,7 @@ export default function ShortsLab({
 
       const blob = new Blob(chunks, { type: mimeType || 'video/webm' })
       if (blob.size === 0) throw new Error('캡처된 영상이 비어 있습니다. 다시 시도해 주세요.')
+      analytics.shortsLabCaptureComplete(selected.id, Math.round(blob.size / 1024 / 1024 * 10) / 10)
       const file = new File(
         [blob],
         `shuffla-capture-${selected.id}-${captureStartSec}.webm`,
@@ -434,17 +512,26 @@ export default function ShortsLab({
     } catch (error) {
       stream?.getTracks().forEach(track => track.stop())
       setCaptureState('idle')
-      setCaptureError(
+      const reason =
         error instanceof DOMException && error.name === 'NotAllowedError'
           ? '탭 공유가 취소되었습니다. 현재 Shuffla 탭을 선택해 주세요.'
           : error instanceof Error
             ? error.message
-            : '브라우저 캡처에 실패했습니다.',
-      )
+            : '브라우저 캡처에 실패했습니다.'
+      analytics.shortsLabCaptureError(selected.id, reason.slice(0, 120))
+      setCaptureError(reason)
     }
   }, [captureStartSec, selected, uploadSourceAndGenerate])
 
-  const quotaPct = Math.min(100, (spentMinutes / MONTHLY_QUOTA_MIN) * 100)
+  const monthUsedNow = access.monthUsed + sessionUses
+  const dayUsedNow = access.dayUsed + sessionUses
+  const quotaPct = access.unlimited
+    ? 0
+    : access.mode === 'full'
+      ? Math.min(100, (monthUsedNow / access.monthLimit) * 100)
+      : isLocked
+        ? 100
+        : 0
 
   return (
     <div className={`sl-root ${embedded ? 'is-embedded' : ''}`}>
@@ -460,6 +547,7 @@ export default function ShortsLab({
                 disabled={paywallProcessing}
                 onClick={() => {
                   if (paywallProcessing) return
+                  analytics.shortsLabPaywallDismiss()
                   setPaywallOpen(false)
                   setPaywallError(null)
                 }}
@@ -501,6 +589,7 @@ export default function ShortsLab({
               className="sl-paywall-later"
               disabled={paywallProcessing}
               onClick={() => {
+                analytics.shortsLabPaywallDismiss()
                 setPaywallOpen(false)
                 setPaywallError(null)
               }}
@@ -525,8 +614,22 @@ export default function ShortsLab({
         <div className="sl-header-right">
           <div className="sl-quota">
             <div className="sl-quota-label">
-              <span>원본 처리시간 사용량</span>
-              <strong>{spentMinutes} / {MONTHLY_QUOTA_MIN}분</strong>
+              <span>
+                {access.unlimited
+                  ? '생성 한도'
+                  : access.mode === 'full'
+                    ? '이번 달 생성'
+                    : '무료 체험'}
+              </span>
+              <strong>
+                {access.unlimited
+                  ? '무제한'
+                  : access.mode === 'full'
+                    ? `${monthUsedNow}/${access.monthLimit}회 · 오늘 ${dayUsedNow}/${access.dayLimit}회`
+                    : isLocked
+                      ? '소진 · 플랜 필요'
+                      : '1회 남음'}
+              </strong>
             </div>
             <div className="sl-quota-track">
               <div className="sl-quota-fill" style={{ width: `${quotaPct}%` }} />
@@ -731,7 +834,19 @@ export default function ShortsLab({
                 <div className="sl-finished">
                   <div className="sl-finished-head">
                     <span><CheckCircle2 aria-hidden="true" />숏폼이 완성됐어요</span>
-                    <button type="button" onClick={openBrowserCapture}>다시 만들기</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        analytics.shortsLabRemakeClick(resultVideo.id)
+                        if (isLocked) {
+                          openPaywall('trial_exhausted')
+                          return
+                        }
+                        openBrowserCapture()
+                      }}
+                    >
+                      다시 만들기
+                    </button>
                   </div>
                   <div className="sl-video-result">
                     <video controls playsInline preload="metadata" src={downloadUrl}>
@@ -746,7 +861,12 @@ export default function ShortsLab({
                       {' · '}{resultClip.reason}
                     </p>
                   </div>
-                  <a className="sl-download-btn" href={downloadUrl} download={fileName}>
+                  <a
+                    className="sl-download-btn"
+                    href={downloadUrl}
+                    download={fileName}
+                    onClick={() => analytics.shortsLabDownloadClick(resultVideo.id)}
+                  >
                     <Download aria-hidden="true" />MP4 다운로드
                   </a>
                   <div className="sl-result-foot">

@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
     return [
       { source: '/sitemap.xml', destination: '/api/sitemap' },
       { source: '/robots.txt', destination: '/api/robots' },
+      // ThinkingData 사설 수신 서버(http) 프록시 — https 페이지의 mixed content 차단 우회.
+      // SDK 는 serverUrl 의 경로를 버리고 origin + /sync_js 로 전송하므로 루트 경로를 프록시합니다.
+      { source: '/sync_js', destination: 'http://49.51.180.241:8991/sync_js' },
+      { source: '/data_debug', destination: 'http://49.51.180.241:8991/data_debug' },
     ]
   },
   async headers() {

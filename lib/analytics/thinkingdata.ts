@@ -22,8 +22,10 @@ let initialized = false
 let initPromise: Promise<TD | null> | null = null
 const queuedTracks: Array<{ event: string; props: Record<string, unknown> }> = []
 
-const APP_ID = 'fb483555173b464fb64813eb7d82f294'
-const SERVER_URL = 'https://te-receiver-naver.thinkingdata.kr'
+const APP_ID = '3bd98ae26423469a9a124f4151bf3972'
+// 사설 TE 수신 서버는 http 라 https 페이지에서 직접 전송하면 mixed content 로 차단됩니다.
+// SDK 는 serverUrl 의 origin + /sync_js 로 전송하므로 같은 출처를 지정하고,
+// next.config rewrites 가 /sync_js 를 수신 서버(http://49.51.180.241:8991)로 프록시합니다.
 
 export async function initThinkingData(): Promise<TD | null> {
   if (typeof window === 'undefined') return null
@@ -34,7 +36,11 @@ export async function initThinkingData(): Promise<TD | null> {
   initPromise = import('thinkingdata-browser').then((mod: any) => {
     const lib = mod.default ?? mod
     td = lib as TD
-    td.init({ appId: APP_ID, serverUrl: SERVER_URL, autoTrack: { pageShow: true, pageHide: true } })
+    td.init({
+      appId: APP_ID,
+      serverUrl: window.location.origin,
+      autoTrack: { pageShow: true, pageHide: true },
+    })
     initialized = true
 
     while (queuedTracks.length > 0) {
@@ -475,6 +481,52 @@ export const analytics = {
   ) => track('youtube_upload_marked', {
     project_id: projectId, day_id: dayId, day_number: dayNumber, success, reason,
   }),
+
+  // Shorts Lab — 퍼널: view → filter/select → (paywall) → capture → upload → generate → download
+  shortsLabView: (props: { access_mode: string; embedded: boolean; video_count: number }) =>
+    track('shorts_lab_view', props),
+  shortsLabTrendingRefresh: (props: { video_count: number; mode: string }) =>
+    track('shorts_lab_trending_refresh', props),
+  shortsLabFilterToggle: (filter: string, enabled: boolean, blocked: boolean) =>
+    track('shorts_lab_filter_toggle', { filter, enabled, blocked }),
+  shortsLabVideoSelect: (props: {
+    video_id: string
+    video_title: string
+    reusable: boolean
+    blocked: boolean
+  }) => track('shorts_lab_video_select', props),
+  shortsLabPaywallShow: (trigger: string) =>
+    track('shorts_lab_paywall_show', { trigger }),
+  shortsLabPaywallCheckoutClick: () => track('shorts_lab_paywall_checkout_click'),
+  shortsLabPaywallDismiss: () => track('shorts_lab_paywall_dismiss'),
+  shortsLabCaptureOpen: (videoId: string) =>
+    track('shorts_lab_capture_open', { video_id: videoId }),
+  shortsLabCaptureStart: (videoId: string, startSec: number) =>
+    track('shorts_lab_capture_start', { video_id: videoId, start_sec: startSec }),
+  shortsLabCaptureComplete: (videoId: string, sizeMb: number) =>
+    track('shorts_lab_capture_complete', { video_id: videoId, size_mb: sizeMb }),
+  shortsLabCaptureError: (videoId: string, reason: string) =>
+    track('shorts_lab_capture_error', { video_id: videoId, reason }),
+  shortsLabUploadComplete: (videoId: string, sizeMb: number) =>
+    track('shorts_lab_upload_complete', { video_id: videoId, size_mb: sizeMb }),
+  shortsLabUploadError: (videoId: string, reason: string) =>
+    track('shorts_lab_upload_error', { video_id: videoId, reason }),
+  shortsLabGenerateStart: (props: { video_id: string; is_trial: boolean }) =>
+    track('shorts_lab_generate_start', props),
+  shortsLabGenerateSuccess: (props: {
+    video_id: string
+    is_trial: boolean
+    duration_ms: number
+    comment_source?: string
+  }) => track('shorts_lab_generate_success', props),
+  shortsLabGenerateError: (props: { video_id: string; reason: string; code?: string }) =>
+    track('shorts_lab_generate_error', props),
+  shortsLabLimitBlocked: (kind: 'trial_exhausted' | 'daily_limit' | 'monthly_limit') =>
+    track('shorts_lab_limit_blocked', { kind }),
+  shortsLabDownloadClick: (videoId: string) =>
+    track('shorts_lab_download_click', { video_id: videoId }),
+  shortsLabRemakeClick: (videoId: string) =>
+    track('shorts_lab_remake_click', { video_id: videoId }),
 
   // Billing
   billingPageView: (currentPlan: string, props?: Record<string, unknown>) =>

@@ -4,7 +4,7 @@ import { loadTrending } from '../../shorts-lab/trending'
 import '../../shorts-lab/shorts-lab.css'
 import { notFound } from 'next/navigation'
 import { getSessionUser } from '../../../lib/auth/user'
-import { hasShortsLabFullAccess } from '../../../lib/auth/shorts-lab-access'
+import { getShortsLabAccess } from '../../../lib/shorts-lab-usage'
 
 export const metadata: Metadata = {
   title: 'Shorts Lab — 구조 검증 데모',
@@ -18,12 +18,9 @@ export const dynamic = 'force-dynamic'
 export default async function LocalizedShortsLabPage() {
   const user = await getSessionUser()
   if (!user) notFound()
-  const initial = await loadTrending()
-  return (
-    <ShortsLab
-      initial={initial}
-      userId={user.id}
-      locked={!hasShortsLabFullAccess(user)}
-    />
-  )
+  const [initial, access] = await Promise.all([
+    loadTrending(),
+    getShortsLabAccess(user),
+  ])
+  return <ShortsLab initial={initial} userId={user.id} access={access} />
 }
