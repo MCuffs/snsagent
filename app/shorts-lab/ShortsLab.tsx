@@ -795,7 +795,7 @@ export default function ShortsLab({
                     )}
                   </button>
                   {!isReusable(selected) && (
-                    <p className="sl-rights-note">Creative Commons 재사용 허용 영상만 만들 수 있습니다.</p>
+                    <p className="sl-rights-note">“재사용 허용만 (CC)” 영상만 만들 수 있습니다.</p>
                   )}
                 </div>
               )}
