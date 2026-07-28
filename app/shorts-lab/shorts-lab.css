@@ -1645,8 +1645,9 @@
 /* ── 원클릭 제작 화면 ───────────────────────────────── */
 
 .sl-grid.sl-simple-grid {
-  max-width: 1120px;
-  grid-template-columns: minmax(320px, 0.86fr) minmax(440px, 1.14fr);
+  max-width: 1520px;
+  margin-inline: auto;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(520px, 1.18fr);
 }
 
 .sl-maker-panel {
