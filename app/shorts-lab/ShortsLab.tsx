@@ -485,15 +485,16 @@ export default function ShortsLab({
               ))}
             </ul>
             {paywallError && <p className="sl-paywall-error">{paywallError}</p>}
+            {/* billing 페이지 PolarButton과 동일한 스타일·플로우 */}
             <button
               type="button"
-              className="sl-btn-primary sl-paywall-cta"
+              className="sl-paywall-cta"
               disabled={paywallProcessing}
               onClick={() => void startPaywallCheckout()}
             >
               {paywallProcessing
-                ? <><Loader2 className="is-spinning" aria-hidden="true" />결제창 여는 중…</>
-                : <><CreditCard aria-hidden="true" />월 9,900원 결제하기</>}
+                ? <><Loader2 className="is-spinning" aria-hidden="true" />처리 중...</>
+                : <><CreditCard aria-hidden="true" />결제하기</>}
             </button>
             <button
               type="button"

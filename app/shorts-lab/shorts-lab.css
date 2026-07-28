@@ -1800,17 +1800,48 @@
   color: #b91c1c;
 }
 
+/* billing 페이지 PolarButton 스타일 이식.
+   모달은 document.body 로 포털되므로 .sl-root 의 CSS 변수를 쓰면 안 됩니다. */
 .sl-paywall-cta {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 100%;
   margin-top: 18px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sl-paywall-cta:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.sl-paywall-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .sl-paywall-cta svg {
   width: 16px;
   height: 16px;
+}
+
+.sl-paywall-cta .is-spinning {
+  animation: sl-paywall-spin 1s linear infinite;
+}
+
+@keyframes sl-paywall-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sl-paywall-later {
